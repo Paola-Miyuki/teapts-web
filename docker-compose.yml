@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: teapts-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teapts}
+      POSTGRES_USER: ${POSTGRES_USER:-teapts}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teapts}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teapts} -d ${POSTGRES_DB:-teapts}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:7.0
+    container_name: teapts-supertokens
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_CONNECTION_URI: postgresql://${POSTGRES_USER:-teapts}:${POSTGRES_PASSWORD:-teapts}@postgres:5432/${POSTGRES_DB:-teapts}
+      API_KEYS: ""
+    ports:
+      - "${SUPERTOKENS_PORT:-3567}:3567"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: teapts-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      supertokens:
+        condition: service_started
+    environment:
+      PORT: ${BACKEND_PORT:-3001}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-teapts}:${POSTGRES_PASSWORD:-teapts}@postgres:5432/${POSTGRES_DB:-teapts}
+      SUPERTOKENS_CONNECTION_URI: http://supertokens:3567
+    ports:
+      - "${BACKEND_PORT:-3001}:${BACKEND_PORT:-3001}"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run start:dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: teapts-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      PORT: ${FRONTEND_PORT:-3000}
+      NEXT_PUBLIC_API_URL: http://backend:${BACKEND_PORT:-3001}
+    ports:
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --hostname 0.0.0.0 --port ${FRONTEND_PORT:-3000}
+
+volumes:
+  postgres_data:
