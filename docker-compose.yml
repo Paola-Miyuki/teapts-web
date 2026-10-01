@@ -77,6 +77,7 @@ services:
       - ./backend/.env
     environment:
       - SUPERTOKENS_CONNECTION_URI=http://supertokens:3567   # backend chama o SuperTokens pelo nome do serviço, não localhost
+      - DATABASE_HOST=postgres
     depends_on:
       postgres:
         condition: service_healthy
