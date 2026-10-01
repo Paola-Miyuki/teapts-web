@@ -6,8 +6,7 @@
 import { createApp } from './create-app';
 
 /**
- * Inicializa a API, habilita CORS com cookies e registra o middleware
- * responsável pelas rotas do SuperTokens.
+ * Cria a aplicação e inicia o servidor HTTP na porta configurada.
  *
  * @returns promise concluída quando o servidor começa a escutar
  * @throws erro de inicialização ou de abertura da porta

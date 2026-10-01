@@ -7,7 +7,6 @@ import {
   Controller,
   Get,
   UseGuards,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentAccount } from './decorators/current-account.decorator';
@@ -39,10 +38,6 @@ export class AuthController {
     const accountDetails = await this.accountsService.findById(
       account.accountId,
     );
-
-    if (!accountDetails) {
-      throw new UnauthorizedException('Conta não encontrada');
-    }
 
     return {
       accountId: account.accountId,
