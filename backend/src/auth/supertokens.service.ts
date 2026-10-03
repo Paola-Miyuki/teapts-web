@@ -3,11 +3,18 @@
 // Quando o login dá certo, o contexto da conta é gravado na sessão uma única vez.
 // O serviço de contas é usado antes da criação da sessão para impedir identidades órfãs.
 
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import supertokens from 'supertokens-node';
 import Session from 'supertokens-node/recipe/session';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
-import { AccountsService } from '../accounts/accounts.service';
+import {
+  AccountIntegrityError,
+  AccountsService,
+} from '../accounts/accounts.service';
 
 /**
  * Glossário:
@@ -37,6 +44,9 @@ export class SupertokensService {
    * @throws erro de inicialização quando a configuração do SuperTokens é inválida
    */
   constructor(private readonly accountsService: AccountsService) {
+    const logger = this.logger;
+    const accountsServiceRef = this.accountsService;
+
     supertokens.init({
       framework: 'express',
       supertokens: {
@@ -57,25 +67,23 @@ export class SupertokensService {
             apis: (originalImplementation) => ({
               ...originalImplementation,
 
-              signInPOST: async (input) => {
+              signInPOST: async function (input) {
                 // 1) Marcamos somente este fluxo; o createNewSession verá a mesma referência.
                 input.userContext[SIGN_IN_CONTEXT_FLAG] = true;
 
                 try {
-                  const originalSignInPOST =
-                    originalImplementation.signInPOST;
-                  if (originalSignInPOST === undefined) {
+                  if (originalImplementation.signInPOST === undefined) {
                     throw new Error(
                       'A implementação original de signInPOST não está disponível',
                     );
                   }
 
                   // 2) A implementação original valida credenciais e cria a sessão.
-                  const response = await originalSignInPOST(input);
+                  const response = await originalImplementation.signInPOST(input);
 
                   // 3) A mesma resposta protege contra enumeração de contas.
                   if (response.status === 'WRONG_CREDENTIALS_ERROR') {
-                    this.logger.warn(
+                    logger.warn(
                       `Falha de autenticação: status=${response.status}`,
                     );
                     return { status: 'WRONG_CREDENTIALS_ERROR' };
@@ -83,21 +91,38 @@ export class SupertokensService {
 
                   // 4) Outros resultados continuam com o contrato original.
                   if (response.status !== 'OK') {
-                    this.logger.error(
+                    logger.error(
                       `Falha no sign-in: status=${response.status}`,
                     );
                     return response;
                   }
 
                   // 5) O log não contém e-mail, senha, token ou cookie.
-                  this.logger.log(
+                  logger.log(
                     `Autenticação efetuada com sucesso. userId=${response.user.id}`,
                   );
 
                   return response;
                 } catch (error) {
-                  this.logger.error('Falha inesperada na autenticação');
-                  throw error;
+                  if (error instanceof AccountIntegrityError) {
+                    logger.warn(
+                      'Login bloqueado para usuário sem conta de negócio',
+                    );
+                    throw error;
+                  }
+
+                  if (error instanceof Error) {
+                    logger.error(
+                      'Falha inesperada na autenticação',
+                      error.stack,
+                    );
+                  } else {
+                    logger.error('Falha inesperada na autenticação');
+                  }
+
+                  throw new InternalServerErrorException(
+                    'Não foi possível concluir a autenticação',
+                  );
                 }
               },
             }),
@@ -118,7 +143,7 @@ export class SupertokensService {
                 try {
                   // 1) Resolvemos a conta antes de qualquer criação de sessão.
                   const accountContext =
-                    await this.accountsService.resolveAccountContext(
+                    await accountsServiceRef.resolveAccountContext(
                       supertokensUserId,
                     );
 
@@ -131,11 +156,27 @@ export class SupertokensService {
                     },
                   });
                 } catch (error) {
-                  // 3) Sem conta não há sessão válida; o erro de integridade sobe.
-                  this.logger.error(
-                    `Erro de integridade ao criar sessão. userId=${supertokensUserId}`,
+                  if (error instanceof AccountIntegrityError) {
+                    logger.warn(
+                      `Sessão bloqueada para usuário sem conta de negócio. userId=${supertokensUserId}`,
+                    );
+                    throw error;
+                  }
+
+                  if (error instanceof Error) {
+                    logger.error(
+                      `Falha ao criar sessão. userId=${supertokensUserId}`,
+                      error.stack,
+                    );
+                  } else {
+                    logger.error(
+                      `Falha ao criar sessão. userId=${supertokensUserId}`,
+                    );
+                  }
+
+                  throw new InternalServerErrorException(
+                    'Não foi possível criar a sessão',
                   );
-                  throw error;
                 }
               },
             }),
