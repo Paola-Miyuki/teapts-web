@@ -43,7 +43,7 @@ import Session from 'supertokens-web-js/recipe/session';
 SuperTokens.init({
   appInfo: {
     appName: 'TEA-PTS',
-    apiDomain: 'http://localhost:3000',
+    apiDomain: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000',
     websiteDomain: 'http://localhost:3001',
     apiBasePath: '/auth',
     websiteBasePath: '/auth',
@@ -180,3 +180,100 @@ deslogado e redirecione-o para `/login`.
 Não envie tokens no corpo da requisição nem crie um header
 `Authorization` manualmente para esse fluxo. A autenticação é feita pela
 sessão do SuperTokens e pelos cookies gerenciados pelo navegador.
+
+## 7. Modo de transferência e variáveis
+
+O `Session.init()` atual do frontend não informa `tokenTransferMethod`; o
+SDK web usa `cookie` como padrão. Para chamadas manuais com `curl` ou
+`fetch`, envie:
+
+```http
+st-auth-mode: cookie
+```
+
+O backend aceita a preferência do frontend e emite `sAccessToken` e
+`sRefreshToken` como cookies `HttpOnly`. O frontend deve usar:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+O backend precisa das variáveis abaixo:
+
+```env
+WEBSITE_DOMAIN=http://localhost:3001
+API_DOMAIN=http://localhost:3000
+SUPERTOKENS_CONNECTION_URI=http://localhost:3567
+SUPERTOKENS_API_KEY=
+```
+
+## 8. Criar usuário de teste
+
+O signup cria a identidade no SuperTokens, mas não cria automaticamente a
+conta de negócio. Para testar o login, crie o usuário e depois insira seu
+`user.id` em `accounts`.
+
+### Bash
+
+```bash
+EMAIL="teste@example.com"
+PASSWORD="Senha-de-teste-123!"
+
+USER_ID=$(
+  curl -sS -X POST http://localhost:3000/auth/signup \
+    -H 'rid: emailpassword' \
+    -H 'Content-Type: application/json' \
+    -d "{\"formFields\":[{\"id\":\"email\",\"value\":\"$EMAIL\"},{\"id\":\"password\",\"value\":\"$PASSWORD\"}]}" |
+  jq -r '.user.id'
+)
+
+docker compose exec -T postgres psql -U teapts -d teapts -c \
+  "INSERT INTO accounts (supertokens_user_id, name, email, patient_profile_id, professional_profile_ids)
+   VALUES ('$USER_ID', 'Usuário de teste', '$EMAIL', NULL, '{}');"
+```
+
+### PowerShell
+
+```powershell
+$email = "teste@example.com"
+$password = "Senha-de-teste-123!"
+$body = @{
+  formFields = @(
+    @{ id = "email"; value = $email }
+    @{ id = "password"; value = $password }
+  )
+} | ConvertTo-Json -Compress
+
+$signup = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:3000/auth/signup" `
+  -Headers @{ rid = "emailpassword" } `
+  -ContentType "application/json" `
+  -Body $body
+
+$userId = $signup.user.id
+$sql = "INSERT INTO accounts (supertokens_user_id, name, email, patient_profile_id, professional_profile_ids) VALUES ('$userId', 'Usuário de teste', '$email', NULL, '{}');"
+docker compose exec -T postgres psql -U teapts -d teapts -c $sql
+```
+
+## 9. Formatos das respostas
+
+| Rota | Sucesso | Erro ou observação |
+|---|---|---|
+| `POST /auth/signup` | `200` com `status: "OK"` e `user.id` | `200` com status específico do SuperTokens, como `EMAIL_ALREADY_EXISTS_ERROR` |
+| `POST /auth/signin` | `200` com `status: "OK"` e cookies, ou `WRONG_CREDENTIALS_ERROR` | `500` genérico quando não existe conta em `accounts`; não deve emitir sessão |
+| `POST /auth/session/refresh` | `200` e cookies renovados | `401` quando a sessão não pode ser renovada |
+| `POST /auth/signout` | `200` com `{"status":"OK"}` | A sessão é invalidada e os cookies são limpos |
+| `GET /me` | `200` com `accountId`, `name`, `email`, `patientProfileId` e `professionalProfileIds` | `401` sem sessão válida |
+
+Exemplo de login manual com cookies:
+
+```bash
+curl -i -c cookies.txt -X POST http://localhost:3000/auth/signin \
+  -H 'rid: emailpassword' \
+  -H 'st-auth-mode: cookie' \
+  -H 'Content-Type: application/json' \
+  -d '{"formFields":[{"id":"email","value":"teste@example.com"},{"id":"password","value":"Senha-de-teste-123!"}]}'
+
+curl -i -b cookies.txt http://localhost:3000/me
+```
