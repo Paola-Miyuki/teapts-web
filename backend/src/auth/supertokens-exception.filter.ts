@@ -1,5 +1,6 @@
-// Este arquivo encaminha erros que pertencem ao SuperTokens.
-// O filtro usa o errorHandler oficial para preservar os status e contratos.
+// Este arquivo encaminha erros SuperTokens que chegam ao pipeline do NestJS.
+// O tratamento principal das rotas /auth/* ocorre no middleware Express e no
+// errorHandler oficial registrados em create-app.ts.
 // Erros de sessão inválida normalmente viram respostas 401.
 // Erros de negócio não-SuperTokens seguem a cadeia padrão do Express/Nest.
 
@@ -10,7 +11,11 @@ import { errorHandler } from 'supertokens-node/framework/express';
 
 /**
  * Converte erros produzidos pelo SuperTokens em respostas HTTP compatíveis
- * com o middleware Express usado pela aplicação NestJS.
+ * quando eles chegam ao pipeline de exceções do NestJS.
+ *
+ * O filtro não substitui o `middleware()` nem o `errorHandler()` do
+ * SuperTokens: esses componentes continuam sendo o tratamento principal das
+ * rotas `/auth/*`.
  */
 @Catch(supertokens.Error)
 export class SupertokensExceptionFilter implements ExceptionFilter {
