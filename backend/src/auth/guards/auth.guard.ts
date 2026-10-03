@@ -4,16 +4,14 @@
 // Assim o controller pode usar @CurrentAccount() sem repetir essa leitura.
 
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { verifySession } from 'supertokens-node/recipe/session/framework/express';
+import type { SessionRequest } from 'supertokens-node/framework/express';
 import { parseAccountContext } from '../account-context';
 import type { AccountContext } from '../../accounts/accounts.service';
 
-type AuthenticatedRequest = Request & {
+type AuthenticatedRequest = SessionRequest & {
   accountContext?: AccountContext;
-  session?: {
-    getAccessTokenPayload(): unknown;
-  };
 };
 
 /**
@@ -46,7 +44,7 @@ export class AuthGuard implements CanActivate {
     // Se a sessão for inválida, chama next(err) com um erro do SuperTokens,
     // que o SupertokensExceptionFilter converte em 401.
     await new Promise<void>((resolve, reject) => {
-      void this.verify(req as any, res as any, (err?: unknown) =>
+      void this.verify(req, res, (err) =>
         err ? reject(err) : resolve(),
       );
     });
