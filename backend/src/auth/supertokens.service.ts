@@ -111,6 +111,10 @@ export class SupertokensService {
                     throw error;
                   }
 
+                  if (error instanceof supertokens.Error) {
+                    throw error;
+                  }
+
                   if (error instanceof Error) {
                     logger.error(
                       'Falha inesperada na autenticação',
@@ -160,6 +164,10 @@ export class SupertokensService {
                     logger.warn(
                       `Sessão bloqueada para usuário sem conta de negócio. userId=${supertokensUserId}`,
                     );
+                    throw error;
+                  }
+
+                  if (error instanceof supertokens.Error) {
                     throw error;
                   }
 
