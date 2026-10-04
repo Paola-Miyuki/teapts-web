@@ -1,0 +1,31 @@
+# Git e metadados
+.git
+.gitignore
+.dockerignore
+
+# Ambiente: nunca entra na imagem (o frontend recebe o .env como build secret)
+.env*
+
+# Dependências e artefatos de build
+node_modules
+dist
+.next
+out
+.swc
+
+# Testes, cache e logs
+coverage
+.jest-cache
+.eslintcache
+*.lcov
+*.log
+*.tsbuildinfo
+
+# Ferramentas de desenvolvimento
+.husky
+.claude
+AGENTS.md
+README.md
+
+# Layouts de referência: não entram no build
+design
