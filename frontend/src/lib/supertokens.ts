@@ -12,7 +12,8 @@ export function initSuperTokens() {
   SuperTokens.init({
     appInfo: {
       appName: "TEA-PTS",
-      apiDomain: "http://localhost:3000",
+      apiDomain:
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000",
       apiBasePath: "/auth",
     },
 

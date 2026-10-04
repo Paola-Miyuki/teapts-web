@@ -1,124 +1,110 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend TEA-PTS
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API NestJS responsável pelas rotas da aplicação, autenticação com
+SuperTokens e resolução do contexto de contas armazenado em PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Estrutura principal
 
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```text
+src/
+├── accounts/
+│   ├── account.entity.ts
+│   ├── accounts.module.ts
+│   └── accounts.service.ts
+├── auth/
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   ├── account-context.ts
+│   ├── guards/
+│   ├── decorators/
+│   ├── supertokens.service.ts
+│   └── supertokens-exception.filter.ts
+├── app.module.ts
+├── create-app.ts
+└── main.ts
 ```
 
-## Compile and run the project
+`accounts` vincula o `userId` do SuperTokens ao registro de negócio usado
+pela API. `auth` configura os overrides, a validação da sessão e a rota
+protegida `/me`.
+
+## Variáveis de ambiente
+
+Copie o exemplo e ajuste os valores:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+Variáveis usadas pelo backend:
+
+```env
+PORT=3000
+DATABASE_HOST=postgres
+DATABASE_PORT=5432
+DATABASE_USER=teapts
+DATABASE_PASSWORD=teapts
+DATABASE_NAME=teapts
+WEBSITE_DOMAIN=http://localhost:3001
+API_DOMAIN=http://localhost:3000
+SUPERTOKENS_CONNECTION_URI=http://localhost:3567
+SUPERTOKENS_API_KEY=
+NODE_ENV=development
+```
+
+## Subir com Docker Compose
+
+Na raiz do repositório:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d --build
+docker compose ps
 ```
 
-## Deployment
+O backend fica disponível em `http://localhost:3000`. PostgreSQL,
+SuperTokens e frontend são iniciados pelo mesmo Compose.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Executar localmente
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Com PostgreSQL e SuperTokens disponíveis:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm install
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-To add it to this project:
+## Testes e validações
 
 ```bash
-$ npm install @nestjs/observe
+npm run build
+npm run lint
+npm test
+npm run test:e2e
 ```
 
-Then follow the [setup guide](https://docs.nestjs.com/observability/overview) - it takes a single import and an app key.
+Os testes e2e de autenticação usam mocks do Core do SuperTokens e do serviço
+de contas; não precisam de PostgreSQL ou SuperTokens em execução.
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+## Rotas
 
-## Resources
+As rotas `/auth/*` são fornecidas pelo SDK do SuperTokens:
 
-Check out a few resources that may come in handy when working with NestJS:
+| Método | Rota | Resultado principal |
+|---|---|---|
+| `POST` | `/auth/signup` | Cria usuário no SuperTokens |
+| `POST` | `/auth/signin` | Cria sessão e retorna `OK` ou `WRONG_CREDENTIALS_ERROR` |
+| `POST` | `/auth/session/refresh` | Renova a sessão |
+| `POST` | `/auth/signout` | Encerra a sessão |
+| `GET` | `/me` | Retorna os dados da conta autenticada |
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+O frontend deve usar `st-auth-mode: cookie` quando fizer chamadas HTTP
+manuais. O SDK web do SuperTokens gerencia os cookies `HttpOnly`.
 
-## Support
+## Regra de conta órfã
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+O login só cria uma sessão depois de localizar um registro correspondente
+em `accounts.supertokens_user_id`.
 
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Se o usuário existir no SuperTokens, mas não existir em `accounts`, a
+criação da sessão é bloqueada e a API retorna `500` com mensagem genérica.
+Nenhum cookie de sessão deve ser emitido nesse caso.
