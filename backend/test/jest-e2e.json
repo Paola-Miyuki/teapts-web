@@ -1,9 +1,20 @@
 {
+  "rootDir": "..",
+  "roots": ["<rootDir>/test"],
+  "testRegex": ".*\\.e2e-spec\\.ts$",
+  "cacheDirectory": "<rootDir>/.jest-cache/e2e",
+  "extensionsToTreatAsEsm": [".ts"],
   "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
   "testEnvironment": "node",
-  "testRegex": ".e2e-spec.ts$",
+  "moduleNameMapper": {
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
+  "clearMocks": true,
+  "restoreMocks": true,
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      { "useESM": true, "tsconfig": { "module": "ESNext" } }
+    ]
   }
 }

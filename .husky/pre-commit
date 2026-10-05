@@ -1,0 +1,8 @@
+set -e
+
+# Um unico hook para o repo inteiro: backend e frontend sao projetos pnpm
+# separados, mas o commit e um so.
+pnpm --dir backend run lint
+pnpm --dir backend run format:check
+pnpm --dir frontend run lint
+pnpm --dir frontend run format:check

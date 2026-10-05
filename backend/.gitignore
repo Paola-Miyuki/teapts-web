@@ -1,0 +1,21 @@
+# Dependencies
+/node_modules/
+
+# Build and TypeScript
+/dist/
+*.tsbuildinfo
+
+# Tests and tooling
+/coverage/
+/.jest-cache/
+/.eslintcache
+*.lcov
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Editor and OS files
+.DS_Store
