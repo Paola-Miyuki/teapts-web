@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type LogoutButtonProps = {
   allSessions?: boolean;
@@ -15,26 +15,21 @@ export default function LogoutButton({
   const [hasSession, setHasSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const apiUrl =
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:3000";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
   useEffect(() => {
     async function checkSession() {
       try {
         const response = await fetch(`${apiUrl}/me`, {
-          method: "GET",
-          credentials: "include",
+          method: 'GET',
+          credentials: 'include',
         });
 
         setHasSession(response.ok);
       } catch (error) {
-        console.error(
-          "Erro ao verificar sessão:",
-          error
-        );
+        console.error('Erro ao verificar sessão:', error);
 
         setHasSession(false);
       } finally {
@@ -47,9 +42,9 @@ export default function LogoutButton({
 
   function finishLogout() {
     setHasSession(false);
-    setErrorMessage("");
+    setErrorMessage('');
 
-    router.replace("/login");
+    router.replace('/login');
     router.refresh();
   }
 
@@ -59,25 +54,22 @@ export default function LogoutButton({
     }
 
     setLoading(true);
-    setErrorMessage("");
+    setErrorMessage('');
 
     try {
-      const response = await fetch(
-        `${apiUrl}/auth/signout`,
-        {
-          method: "POST",
+      const response = await fetch(`${apiUrl}/auth/signout`, {
+        method: 'POST',
 
-          credentials: "include",
+        credentials: 'include',
 
-          headers: {
-            "Content-Type": "application/json",
-          },
+        headers: {
+          'Content-Type': 'application/json',
+        },
 
-          body: JSON.stringify({
-            allSessions,
-          }),
-        }
-      );
+        body: JSON.stringify({
+          allSessions,
+        }),
+      });
 
       if (response.ok) {
         finishLogout();
@@ -94,25 +86,17 @@ export default function LogoutButton({
         // Resposta sem JSON
       }
 
-      if (
-        response.status === 401 ||
-        data.message === "unauthorised"
-      ) {
+      if (response.status === 401 || data.message === 'unauthorised') {
         finishLogout();
         return;
       }
 
-      setErrorMessage(
-        "Não foi possível encerrar a sessão. Tente novamente."
-      );
+      setErrorMessage('Não foi possível encerrar a sessão. Tente novamente.');
     } catch (error) {
-      console.error(
-        "Erro ao realizar logout:",
-        error
-      );
+      console.error('Erro ao realizar logout:', error);
 
       setErrorMessage(
-        "Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente."
+        'Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente.',
       );
     } finally {
       setLoading(false);
@@ -125,19 +109,11 @@ export default function LogoutButton({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={handleLogout}
-        disabled={loading}
-      >
-        {loading ? "Saindo..." : "Sair"}
+      <button type="button" onClick={handleLogout} disabled={loading}>
+        {loading ? 'Saindo...' : 'Sair'}
       </button>
 
-      {errorMessage && (
-        <p role="alert">
-          {errorMessage}
-        </p>
-      )}
+      {errorMessage && <p role="alert">{errorMessage}</p>}
     </div>
   );
 }
