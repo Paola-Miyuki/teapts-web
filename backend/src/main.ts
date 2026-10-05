@@ -3,6 +3,7 @@
 // O bootstrap só abre a porta depois que toda a aplicação foi criada.
 // A ordem garante que o SuperTokens esteja pronto antes de receber requisições.
 
+import { ConfigService } from '@nestjs/config';
 import { createApp } from './create-app';
 
 /**
@@ -13,6 +14,12 @@ import { createApp } from './create-app';
  */
 async function bootstrap() {
   const app = await createApp();
-  await app.listen(process.env.PORT ?? 3000);
+  const port = Number(app.get(ConfigService).get<string>('PORT', '3000'));
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('PORT must be a valid TCP port');
+  }
+
+  await app.listen(port);
 }
 void bootstrap();

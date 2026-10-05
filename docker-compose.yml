@@ -1,126 +1,179 @@
 # docker-compose.yml
-# Sobe todo o ambiente de desenvolvimento do projeto teapts:
-# banco de dados, autenticação, backend e frontend.
-
 services:
 
   # ---------------------------------------------------------
   # BANCO DE DADOS (PostgreSQL)
-  # Guarda os dados da aplicação. O TypeORM (no backend) se
-  # conecta aqui para ler/gravar informações.
   # ---------------------------------------------------------
   postgres:
     image: postgres:16
     container_name: teapts-postgres
     restart: unless-stopped
+
     environment:
-      POSTGRES_USER: teapts
-      POSTGRES_PASSWORD: teapts
-      POSTGRES_DB: teapts
+      POSTGRES_USER: ${DATABASE_USER:?Defina DATABASE_USER em backend/.env}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Defina DATABASE_PASSWORD em backend/.env}
+      POSTGRES_DB: ${DATABASE_NAME:?Defina DATABASE_NAME em backend/.env}
+
     ports:
-      - "5432:5432"          # porta padrão do Postgres, exposta pra debugar com DBeaver/TablePlus se precisar
+      - "${DATABASE_PORT:-5432}:5432"
+
     volumes:
-      - postgres_data:/var/lib/postgresql/data   # persiste os dados mesmo se o container for recriado
-    healthcheck:              # o Compose só considera o Postgres "pronto" quando esse comando funcionar
-      test: ["CMD-SHELL", "pg_isready -U teapts"]
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
     networks:
       - teapts-network
+
 
   # ---------------------------------------------------------
   # SUPERTOKENS CORE
-  # Serviço de autenticação. O backend (NestJS) fala com ele
-  # via HTTP usando o SDK oficial do SuperTokens.
-  # Ele também precisa de um banco — aqui usamos o mesmo Postgres,
-  # em outra "database" lógica dentro dele.
   # ---------------------------------------------------------
   supertokens:
-    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+    # Pin a versão em backend/.env (SUPERTOKENS_VERSION). `latest` quebra build
+    # reproduzível: o core roda migrations no Postgres ao subir.
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:${SUPERTOKENS_VERSION:-latest}
     container_name: teapts-supertokens
     restart: unless-stopped
+
     depends_on:
       postgres:
         condition: service_healthy
+
     environment:
-      POSTGRESQL_CONNECTION_URI: postgresql://teapts:teapts@postgres:5432/teapts
+      POSTGRESQL_USER: ${DATABASE_USER:?Defina DATABASE_USER em backend/.env}
+      POSTGRESQL_PASSWORD: ${DATABASE_PASSWORD:?Defina DATABASE_PASSWORD em backend/.env}
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_DATABASE_NAME: ${DATABASE_NAME:?Defina DATABASE_NAME em backend/.env}
+
     ports:
-      - "3567:3567"           # porta padrão do SuperTokens Core
+      - "3567:3567"
+
     healthcheck:
       test: >
-        bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e "GET /hello HTTP/1.1\r\nhost: 127.0.0.1:3567\r\nConnection: close\r\n\r\n" >&3 && cat <&3 | grep "Hello"'
-      interval: 5s
+        bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 &&
+        echo -e "GET /hello HTTP/1.1\r\nhost: 127.0.0.1:3567\r\nConnection: close\r\n\r\n" >&3 &&
+        cat <&3 | grep "Hello"'
+      interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
+
     networks:
       - teapts-network
 
+
   # ---------------------------------------------------------
   # BACKEND (NestJS)
-  # API que expõe as rotas do sistema. Usa TypeORM pra falar
-  # com o Postgres e o SDK do SuperTokens pra autenticação.
   # ---------------------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+
     container_name: teapts-backend
     restart: unless-stopped
     working_dir: /app
-    volumes:
-      - ./backend:/app          # espelha o código local dentro do container (hot reload)
-      - /app/node_modules        # evita que o node_modules do host sobrescreva o do container
+
+    # Sem mounts de código: não grava dist nem dependências no host.
+
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
+
+    # Injeta todas as variáveis do backend/.env no NestJS
     env_file:
       - ./backend/.env
+
+    # Sobrescreve apenas valores que precisam usar os nomes
+    # dos serviços Docker em vez de localhost.
+    # NODE_ENV vem do Dockerfile, não se repete aqui.
     environment:
-      - SUPERTOKENS_CONNECTION_URI=http://supertokens:3567   # backend chama o SuperTokens pelo nome do serviço, não localhost
-      - DATABASE_HOST=postgres
+      SUPERTOKENS_CONNECTION_URI: http://supertokens:3567
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+
+    # GET /health: responde 200 só com o Nest no ar e o SELECT 1 passando.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
     depends_on:
       postgres:
         condition: service_healthy
       supertokens:
         condition: service_healthy
+
     networks:
       - teapts-network
 
+
   # ---------------------------------------------------------
   # FRONTEND (Next.js)
-  # Interface web que consome a API do backend.
   # ---------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      secrets:
+        - frontend_env
+
     container_name: teapts-frontend
     restart: unless-stopped
     working_dir: /app
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next               # cache de build do Next, evita conflito com o host
+
+    # Sem mounts de código: o build .next fica dentro da imagem.
+
     ports:
       - "3001:3001"
+
     env_file:
       - ./frontend/.env
+
+    # NODE_ENV vem do Dockerfile, não se repete aqui.
+    environment:
+      PORT: "3001"
+
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+
     networks:
       - teapts-network
 
+
 # ---------------------------------------------------------
-# VOLUMES: onde os dados do Postgres ficam salvos fisicamente
-# no host, sobrevivendo a `docker compose down`.
+# VOLUMES
 # ---------------------------------------------------------
 volumes:
   postgres_data:
 
+
 # ---------------------------------------------------------
-# REDE: permite que os containers se enxerguem pelo nome
-# (ex: "postgres", "supertokens", "backend") em vez de IP.
+# NETWORK
 # ---------------------------------------------------------
 networks:
   teapts-network:
     driver: bridge
+
+# Disponível apenas durante o build do frontend; não copia o .env para a imagem.
+secrets:
+  frontend_env:
+    file: ./frontend/.env

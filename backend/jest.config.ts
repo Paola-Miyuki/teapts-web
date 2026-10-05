@@ -11,17 +11,28 @@ const { config: tsconfig } = ts.readConfigFile(
 const paths = tsconfig?.compilerOptions?.paths ?? {};
 
 const config: Config = {
+  cacheDirectory: '<rootDir>/.jest-cache',
+  clearMocks: true,
+  restoreMocks: true,
+  extensionsToTreatAsEsm: ['.ts'],
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
+  roots: ['<rootDir>/src'],
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      { useESM: true, tsconfig: { module: 'ESNext' } },
+    ],
   },
   moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
   collectCoverageFrom: [
-    'src/**/*.(t|j)s',
-    'libs/**/*.(t|j)s',
-    'apps/**/*.(t|j)s',
+    'src/**/*.ts',
+    '!src/main.ts',
+    '!src/**/*.module.ts',
+    '!src/database/migrations/**',
+    '!src/database/seeds/**',
+    '!src/database/data-source.ts',
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
