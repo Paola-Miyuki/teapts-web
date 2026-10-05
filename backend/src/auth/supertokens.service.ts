@@ -1,19 +1,53 @@
-import { Injectable } from '@nestjs/common';
-import Supertokens from 'supertokens-node';
-import EmailPassword from 'supertokens-node/recipe/emailpassword';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
+import supertokens from 'supertokens-node';
 import Session from 'supertokens-node/recipe/session';
-import { AccountsService } from '../accounts/accounts.service';
+import EmailPassword from 'supertokens-node/recipe/emailpassword';
+import {
+  AccountIntegrityError,
+  AccountsService,
+} from '../accounts/accounts.service';
 
+export const ACCOUNT_CONTEXT_FLAG = 'teapts.accountContext';
+export const SIGN_UP_NAME_KEY = 'teapts.signUpName';
+
+/**
+ * Valida o campo extra `name` do formulário de cadastro.
+ */
+export async function validateName(
+  value: unknown,
+): Promise<string | undefined> {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 'Informe o nome';
+  }
+
+  return undefined;
+}
+
+/**
+ * Inicializa o SuperTokens, cria a conta de negócio no cadastro e inclui o
+ * contexto da conta na sessão do login e do cadastro.
+ */
 @Injectable()
 export class SupertokensService {
+  private readonly logger = new Logger(SupertokensService.name);
+
   constructor(private readonly accountsService: AccountsService) {
-    Supertokens.init({
+    const logger = this.logger;
+    const accountsServiceRef = this.accountsService;
+
+    supertokens.init({
       framework: 'express',
       supertokens: {
-        connectionURI: process.env.SUPERTOKENS_CONNECTION_URI || 'https://try.supertokens.com',
+        connectionURI:
+          process.env.SUPERTOKENS_CONNECTION_URI || 'http://localhost:3567',
+        apiKey: process.env.SUPERTOKENS_API_KEY || undefined,
       },
       appInfo: {
-        appName: 'Teapts',
+        appName: 'TEA-PTS',
         apiDomain: process.env.API_DOMAIN || 'http://localhost:3000',
         websiteDomain: process.env.WEBSITE_DOMAIN || 'http://localhost:3001',
         apiBasePath: '/auth',
@@ -22,69 +56,190 @@ export class SupertokensService {
       recipeList: [
         EmailPassword.init({
           signUpFeature: {
-            formFields: [
-              {
-                id: 'name',
-                validate: async (value) => {
-                  if (typeof value !== 'string' || value.trim().length === 0) {
-                    return 'Nome é obrigatório';
-                  }
-                  return undefined;
-                },
-              },
-            ],
+            formFields: [{ id: 'name', validate: validateName }],
           },
           override: {
-            apis: (originalImplementation) => {
-              return {
-                ...originalImplementation,
-                signUpPOST: async (input) => {
-                  if (originalImplementation.signUpPOST === undefined) {
-                    throw new Error('signUpPOST indefinido');
+            functions: (originalImplementation) => ({
+              ...originalImplementation,
+
+              signUp: async function (input) {
+                const name = input.userContext[SIGN_UP_NAME_KEY];
+                if (typeof name !== 'string' || name.trim() === '') {
+                  logger.error('Cadastro sem nome no userContext');
+                  throw new InternalServerErrorException(
+                    'Não foi possível concluir o cadastro',
+                  );
+                }
+
+                const response = await originalImplementation.signUp(input);
+
+                if (response.status !== 'OK') {
+                  return response;
+                }
+
+                try {
+                  await accountsServiceRef.createForSupertokensUser({
+                    supertokensUserId: response.user.id,
+                    name: name.trim(),
+                    email: input.email,
+                  });
+                } catch (error) {
+                  logger.error(
+                    `Falha ao criar a conta; desfazendo o usuário. userId=${response.user.id}`,
+                    error instanceof Error ? error.stack : undefined,
+                  );
+
+                  try {
+                    await supertokens.deleteUser(response.user.id);
+                  } catch (deleteError) {
+                    logger.error(
+                      `Falha ao desfazer o usuário do SuperTokens. userId=${response.user.id}`,
+                      deleteError instanceof Error
+                        ? deleteError.stack
+                        : undefined,
+                    );
                   }
 
-                  const response = await originalImplementation.signUpPOST(input);
+                  throw new InternalServerErrorException(
+                    'Não foi possível concluir o cadastro',
+                  );
+                }
 
-                  if (response.status === 'OK') {
-                    const supertokensUserId = response.user.id;
-                    const nameField = input.formFields.find((f) => f.id === 'name');
-                    const emailField = input.formFields.find((f) => f.id === 'email');
+                return response;
+              },
+            }),
+            apis: (originalImplementation) => ({
+              ...originalImplementation,
 
-                    const name = nameField ? String(nameField.value) : '';
-                    const email = emailField ? String(emailField.value) : response.user.emails[0];
+              signUpPOST: async function (input) {
+                if (originalImplementation.signUpPOST === undefined) {
+                  throw new Error(
+                    'A implementação original de signUpPOST não está disponível',
+                  );
+                }
 
-                    try {
-                      await this.accountsService.createAccount({
-                        supertokensUserId,
-                        email,
-                        name,
-                      });
-                    } catch (error) {
-                      await Supertokens.deleteUser(supertokensUserId);
+                input.userContext[SIGN_UP_NAME_KEY] = input.formFields.find(
+                  (field) => field.id === 'name',
+                )?.value;
+                input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
 
-                      const errMessage = (error as Error).message;
+                return originalImplementation.signUpPOST(input);
+              },
 
-                      if (errMessage === 'EMAIL_ALREADY_EXISTS') {
-                        return {
-                          status: 'GENERAL_ERROR',
-                          message: 'Este e-mail já está cadastrado no sistema.',
-                        };
-                      }
+              signInPOST: async function (input) {
+                input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
 
-                      return {
-                        status: 'GENERAL_ERROR',
-                        message: 'Erro interno ao criar conta local.',
-                      };
-                    }
+                try {
+                  if (originalImplementation.signInPOST === undefined) {
+                    throw new Error(
+                      'A implementação original de signInPOST não está disponível',
+                    );
                   }
+
+                  const response =
+                    await originalImplementation.signInPOST(input);
+
+                  if (response.status === 'WRONG_CREDENTIALS_ERROR') {
+                    logger.warn(
+                      `Falha de autenticação: status=${response.status}`,
+                    );
+                    return { status: 'WRONG_CREDENTIALS_ERROR' };
+                  }
+
+                  if (response.status !== 'OK') {
+                    logger.error(`Falha no sign-in: status=${response.status}`);
+                    return response;
+                  }
+
+                  logger.log(
+                    `Autenticação efetuada com sucesso. userId=${response.user.id}`,
+                  );
 
                   return response;
-                },
-              };
-            },
+                } catch (error) {
+                  if (error instanceof AccountIntegrityError) {
+                    logger.warn(
+                      'Login bloqueado para usuário sem conta de negócio',
+                    );
+                    throw error;
+                  }
+
+                  if (error instanceof supertokens.Error) {
+                    throw error;
+                  }
+
+                  if (error instanceof Error) {
+                    logger.error(
+                      'Falha inesperada na autenticação',
+                      error.stack,
+                    );
+                  } else {
+                    logger.error('Falha inesperada na autenticação');
+                  }
+
+                  throw new InternalServerErrorException(
+                    'Não foi possível concluir a autenticação',
+                  );
+                }
+              },
+            }),
           },
         }),
-        Session.init(),
+        Session.init({
+          override: {
+            functions: (originalImplementation) => ({
+              ...originalImplementation,
+              createNewSession: async (input) => {
+                if (input.userContext[ACCOUNT_CONTEXT_FLAG] !== true) {
+                  return originalImplementation.createNewSession(input);
+                }
+
+                const supertokensUserId = input.userId;
+
+                try {
+                  const accountContext =
+                    await accountsServiceRef.resolveAccountContext(
+                      supertokensUserId,
+                    );
+
+                  return originalImplementation.createNewSession({
+                    ...input,
+                    accessTokenPayload: {
+                      ...input.accessTokenPayload,
+                      ...accountContext,
+                    },
+                  });
+                } catch (error) {
+                  if (error instanceof AccountIntegrityError) {
+                    logger.warn(
+                      `Sessão bloqueada para usuário sem conta de negócio. userId=${supertokensUserId}`,
+                    );
+                    throw error;
+                  }
+
+                  if (error instanceof supertokens.Error) {
+                    throw error;
+                  }
+
+                  if (error instanceof Error) {
+                    logger.error(
+                      `Falha ao criar sessão. userId=${supertokensUserId}`,
+                      error.stack,
+                    );
+                  } else {
+                    logger.error(
+                      `Falha ao criar sessão. userId=${supertokensUserId}`,
+                    );
+                  }
+
+                  throw new InternalServerErrorException(
+                    'Não foi possível criar a sessão',
+                  );
+                }
+              },
+            }),
+          },
+        }),
       ],
     });
   }
