@@ -5,6 +5,9 @@
 
 import { UnauthorizedException } from '@nestjs/common';
 import type { AccountContext } from '../accounts/accounts.service';
+import { AccountRole } from '../database/enums/account-role.enum';
+
+const ACCOUNT_ROLES: readonly unknown[] = Object.values(AccountRole);
 
 /**
  * Cria o erro padrão usado quando o payload não representa uma conta válida.
@@ -28,9 +31,14 @@ export function parseAccountContext(payload: unknown): AccountContext {
   }
 
   const value = payload as Record<string, unknown>;
-  const { accountId, patientProfileId, professionalProfileIds } = value;
+  const { accountId, role, patientProfileId, professionalProfileIds } = value;
 
   if (typeof accountId !== 'string' || accountId.trim() === '') {
+    throw payloadInvalido();
+  }
+
+  // Sessões criadas antes de `role` entrar no payload exigem novo login.
+  if (!ACCOUNT_ROLES.includes(role)) {
     throw payloadInvalido();
   }
 
@@ -47,6 +55,7 @@ export function parseAccountContext(payload: unknown): AccountContext {
 
   return {
     accountId,
+    role: role as AccountRole,
     patientProfileId,
     professionalProfileIds,
   };

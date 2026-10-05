@@ -1,11 +1,11 @@
-// Este arquivo agrupa a entidade e o serviço de contas.
+// Este arquivo registra o repositório de contas e o serviço que o consulta.
 // O módulo raiz registra o acesso ao banco por TypeORM.
 // O módulo de autenticação importa este módulo para montar o contexto do login.
 // Exportar AccountsService mantém a consulta dentro do container do NestJS.
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Account } from './account.entity';
+import { Account } from '../database/entities/account.entity';
 import { AccountsService } from './accounts.service';
 
 /**

@@ -1,123 +1,89 @@
 # Backend (NestJS)
 
-API do TEAPTS: NestJS + TypeORM + PostgreSQL, com autenticação via
-SuperTokens e resolução do contexto de contas armazenado em PostgreSQL.
+API do TEA-PTS: NestJS + TypeORM + PostgreSQL, com autenticação pelo
+SuperTokens.
 
-## Requisitos
+Este arquivo cobre só o que é do código do backend: scripts, variáveis e
+estrutura. Para rodar a stack, use o [README da raiz](../README.md):
 
-- Node >= 22.12 e `pnpm`
-- PostgreSQL e SuperTokens no ar (ver `docker-compose.yml` na raiz do repositório)
+- setup e primeira execução: seções 1 a 4;
+- migrations, schemas e conta de teste: seção 5 ("Banco de dados");
+- fluxo de login, rotas, curls e respostas de erro: seção 6 ("Autenticação").
 
-## Setup
+## Scripts
 
-```bash
-cp .env.example .env   # preencha DATABASE_PASSWORD
-pnpm install
-```
+Rode de dentro de `backend/` ou da raiz com `pnpm --dir backend run <script>`.
 
-O `pnpm install` também registra os hooks do Git: o `prepare` aponta o
-`core.hooksPath` para `.husky/` na raiz do repositório, que roda o lint e o
-format:check dos dois projetos e um único commitlint na mensagem de commit.
+| Script                               | O que faz                                                          |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `start:dev`                          | API em watch na porta `PORT` (padrão 3000)                         |
+| `start:debug`                        | igual ao `start:dev`, com o inspector do Node                      |
+| `build` / `start:prod`               | compila para `dist/` / roda a partir de `dist/`                    |
+| `migration:show`                     | lista as migrations (`[X]` = aplicada)                             |
+| `migration:run` / `migration:revert` | aplica as pendentes / desfaz a última                              |
+| `migration:generate <caminho>`       | gera migration comparando as entidades com o banco no ar           |
+| `seed:test-user`                     | cria `teste@teapts.local` / `teapts123`; precisa do SuperTokens no ar |
+| `test` / `test:cov` / `test:watch`   | testes unitários (Jest em ESM)                                     |
+| `test:e2e`                           | sobe o `AppModule` e chama as rotas por HTTP                       |
+| `lint` / `typecheck`                 | ESLint / `tsc --noEmit`                                            |
+| `format` / `format:check`            | Prettier, alterando ou só conferindo                               |
+
+Os testes unitários e e2e não precisam de PostgreSQL nem de SuperTokens: o
+repositório e o Core do SuperTokens são substituídos por mocks.
+
+O `pnpm install` também registra os hooks do Git (o `prepare` aponta o
+`core.hooksPath` para `.husky/` da raiz).
 
 ## Variáveis de ambiente
 
-| Variável                     | Uso                                              |
-| ---------------------------- | ------------------------------------------------ |
-| `PORT`                       | porta HTTP da API (padrão 3000)                  |
-| `DATABASE_HOST`              | host do PostgreSQL                               |
-| `DATABASE_PORT`              | porta do PostgreSQL                              |
-| `DATABASE_USER`              | usuário do PostgreSQL                            |
-| `DATABASE_PASSWORD`          | senha do PostgreSQL (só no `.env`)               |
-| `DATABASE_NAME`              | nome do banco                                    |
-| `WEBSITE_DOMAIN`             | origem do frontend (CORS e SuperTokens)          |
-| `API_DOMAIN`                 | domínio público da API (SuperTokens)             |
-| `SUPERTOKENS_CONNECTION_URI` | endereço do Core do SuperTokens                  |
-| `SUPERTOKENS_API_KEY`        | chave do Core do SuperTokens (vazia em dev)      |
-| `SUPERTOKENS_VERSION`        | tag da imagem do SuperTokens no Compose          |
+`cp .env.example .env` (ou `make env` na raiz). Os valores do exemplo
+funcionam em desenvolvimento; só falta preencher `DATABASE_PASSWORD`.
 
-## Banco de dados
+| Variável                     | Padrão                  | Uso                                         |
+| ---------------------------- | ----------------------- | ------------------------------------------- |
+| `PORT`                       | `3000`                  | porta HTTP da API                           |
+| `DATABASE_HOST`              | `localhost`             | host do PostgreSQL                          |
+| `DATABASE_PORT`              | `5432`                  | porta do PostgreSQL                         |
+| `DATABASE_USER`              | `teapts`                | usuário do PostgreSQL                       |
+| `DATABASE_PASSWORD`          | vazio                   | senha do PostgreSQL (só no `.env`)          |
+| `DATABASE_NAME`              | `teapts`                | nome do banco                               |
+| `WEBSITE_DOMAIN`             | `http://localhost:3001` | origem do frontend (CORS e cookies)         |
+| `API_DOMAIN`                 | `http://localhost:3000` | domínio público da API                      |
+| `SUPERTOKENS_CONNECTION_URI` | `http://localhost:3567` | endereço do Core do SuperTokens             |
+| `SUPERTOKENS_API_KEY`        | vazio                   | chave do Core (vazia em dev)                |
+| `SUPERTOKENS_VERSION`        | `latest`                | tag da imagem do Core no Compose; fixe uma  |
 
-O schema só muda por migration (`synchronize` é sempre `false`). Entidades e
-migrations são registradas explicitamente em `src/database/database.config.ts`:
-entidade ou migration nova que não entrar nos arrays `entities`/`migrations`
-desse arquivo é ignorada pelo TypeORM.
-
-Para inspecionar o banco e os atalhos `make`, veja a seção "Banco de dados" do
-README da raiz.
-
-```bash
-pnpm migration:show                 # lista as migrations ([X] = aplicada)
-pnpm migration:run                  # aplica as migrations pendentes
-pnpm migration:revert               # desfaz a última migration
-pnpm migration:generate src/database/migrations/<Nome>
-pnpm seed:test-user                 # cria a conta de teste (teste@teapts.local / teapts123)
-```
-
-## Executar
-
-```bash
-pnpm start:dev     # watch, na porta PORT (padrão 3000)
-pnpm start:prod    # a partir de dist/ (exige pnpm build)
-```
-
-## Rotas
-
-As rotas `/auth/*` são fornecidas pelo SDK do SuperTokens:
-
-| Método | Rota                    | Resposta                                                                               |
-| ------ | ----------------------- | -------------------------------------------------------------------------------------- |
-| GET    | `/health`               | `200 {"status":"ok","database":"up"}` ou `503 {"status":"degraded","database":"down"}` |
-| POST   | `/auth/signup`          | Cria usuário no SuperTokens                                                            |
-| POST   | `/auth/signin`          | Cria sessão e retorna `OK` ou `WRONG_CREDENTIALS_ERROR`                                |
-| POST   | `/auth/session/refresh` | Renova a sessão                                                                        |
-| POST   | `/auth/signout`         | Encerra a sessão                                                                       |
-| GET    | `/me`                   | Retorna os dados da conta autenticada                                                  |
-
-O frontend deve usar `st-auth-mode: cookie` quando fizer chamadas HTTP
-manuais. O SDK web do SuperTokens gerencia os cookies `HttpOnly`.
-
-## Regra de conta órfã
-
-O login só cria uma sessão depois de localizar um registro correspondente
-em `accounts.supertokens_user_id`.
-
-Se o usuário existir no SuperTokens, mas não existir em `accounts`, a
-criação da sessão é bloqueada e a API retorna `500` com mensagem genérica.
-Nenhum cookie de sessão deve ser emitido nesse caso.
-
-## Qualidade
-
-```bash
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm test          # unitários, não precisam de banco
-pnpm test:cov
-pnpm test:e2e      # sobe o AppModule e exercita as rotas por HTTP
-```
-
-Os testes e2e de autenticação usam mocks do Core do SuperTokens e do serviço
-de contas; não precisam de PostgreSQL ou SuperTokens em execução.
+No Docker, o Compose troca `DATABASE_HOST` por `postgres` e
+`SUPERTOKENS_CONNECTION_URI` por `http://supertokens:3567`.
 
 ## Estrutura
 
 ```
 src/
-  app.module.ts            ConfigModule + TypeOrmModule + módulos da API
-  create-app.ts            CORS, middleware e filtros do SuperTokens
   main.ts                  bootstrap e validação da porta
-  accounts/                conta vinculada ao usuário do SuperTokens
-  auth/                    SuperTokens, guard, decorator e rota /me
+  create-app.ts            CORS, middleware() e errorHandler() do SuperTokens
+  app.module.ts            ConfigModule + TypeOrmModule + módulos da API
+  accounts/
+    accounts.service.ts    cria a conta no signup e monta o contexto da sessão
+  auth/
+    supertokens.service.ts         receitas EmailPassword e Session; campo name no
+                                   signup; overrides de signUpPOST, signUp,
+                                   signInPOST e createNewSession
+    account-context.ts             valida o payload da sessão
+    guards/auth.guard.ts           adapta o verifySession aos guards do NestJS
+    decorators/current-account.decorator.ts   entrega o contexto ao controller
+    auth.controller.ts             GET /me
+    supertokens-exception.filter.ts           erros do SuperTokens no pipeline do NestJS
   database/
-    database.config.ts     opções de conexão a partir do ambiente
+    database.config.ts     conexão e arrays entities/migrations
     data-source.ts         DataSource usado pela CLI do TypeORM
-    entities/              entidades (account)
-    enums/                 enums do banco (account_role_e)
+    entities/              account, patient, professional
+    enums/                 account_role_e, specialism_e
     migrations/            histórico do schema
-    seeds/                 scripts de dados de desenvolvimento
-  health/                  health check
+    seeds/                 dados de desenvolvimento
+  health/                  GET /health
 test/                      testes e2e
 ```
 
-Detalhes do fluxo de autenticação em `DOCS_AUTH.md` e da integração com o
-frontend em `DOCS_FRONTEND.md`.
+Entidade ou migration nova precisa entrar nos arrays `entities`/`migrations`
+de `src/database/database.config.ts`; senão o TypeORM a ignora.

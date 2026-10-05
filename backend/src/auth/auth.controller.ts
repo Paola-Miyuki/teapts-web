@@ -3,11 +3,7 @@
 // Aqui existe apenas GET /me, que consulta a conta da sessão já validada.
 // Não há endpoint de login próprio para evitar duplicar regras de autenticação.
 
-import {
-  Controller,
-  Get,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AuthGuard } from './guards/auth.guard';
 import { CurrentAccount } from './decorators/current-account.decorator';
 import { AccountsService } from '../accounts/accounts.service';
@@ -43,6 +39,7 @@ export class AuthController {
       accountId: account.accountId,
       name: accountDetails.name,
       email: accountDetails.email,
+      role: accountDetails.role,
       patientProfileId: account.patientProfileId,
       professionalProfileIds: account.professionalProfileIds,
     };

@@ -14,6 +14,15 @@ Dois modos de trabalho:
 
 Escolha livre, e dá para alternar: os dois usam o mesmo `.env` e o mesmo banco. Em qualquer um dos dois, testes, lint e `typecheck` rodam **na máquina** — por isso Node e pnpm são pré-requisito mesmo para quem só quer Docker.
 
+**Primeira vez no projeto?** Siga nesta ordem:
+
+1. [Pré-requisitos](#1-pré-requisitos) e [Setup](#2-setup) (`make env`, `make install`, preencher `DATABASE_PASSWORD`).
+2. Suba a stack: [local](#3-rodar-local) **ou** [Docker](#4-rodar-no-docker).
+3. Crie a conta de teste: [5.2](#52-conta-de-teste).
+4. Teste o login com os curls de [6.4](#64-testar-com-curl).
+
+Este README cobre a stack inteira. Scripts, variáveis e estrutura de cada projeto ficam em [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
+
 ---
 
 ## 1. Pré-requisitos
@@ -48,7 +57,7 @@ make env       # cria backend/.env e frontend/.env a partir dos .env.example
 make install   # instala as bibliotecas e registra os hooks do Husky
 ```
 
-Depois do `make env`, abra `backend/.env` e **preencha `DATABASE_PASSWORD`**. Vale também fixar `SUPERTOKENS_VERSION`: o padrão é `latest`, que não é reproduzível. Os `.env` nunca são sobrescritos nem versionados — ao criar variável nova, atualize o `.env.example`.
+Depois do `make env`, abra `backend/.env` e **preencha `DATABASE_PASSWORD`**. Vale também fixar `SUPERTOKENS_VERSION`: o padrão é `latest`, que não é reproduzível. As demais variáveis (inclusive as do SuperTokens, ver [6.2](#62-variáveis-de-ambiente)) já vêm com valores que funcionam em desenvolvimento. Os `.env` nunca são sobrescritos nem versionados — ao criar variável nova, atualize o `.env.example`.
 
 ---
 
@@ -61,7 +70,13 @@ make up-d-db     # postgres + supertokens em segundo plano
 make ps          # os dois devem estar "healthy"
 ```
 
-**3.2 Confira o `backend/.env`:** use `DATABASE_HOST=localhost`. Os nomes `postgres` e `supertokens` só resolvem dentro da rede do Docker, e é o Compose que os injeta nos containers.
+**3.2 Confira o `backend/.env`:** use `DATABASE_HOST=localhost` e `SUPERTOKENS_CONNECTION_URI=http://localhost:3567`. Os nomes `postgres` e `supertokens` só resolvem dentro da rede do Docker, e é o Compose que os injeta nos containers.
+
+Para conferir se o SuperTokens Core está no ar:
+
+```bash
+curl -s http://localhost:3567/hello     # responde "Hello"
+```
 
 **3.3 Aplique as migrations** (ver [seção 5](#5-banco-de-dados)):
 
@@ -75,6 +90,8 @@ cd backend && pnpm migration:run
 cd backend  && pnpm start:dev     # http://localhost:3000
 cd frontend && pnpm dev -p 3001   # http://localhost:3001
 ```
+
+**3.5 Crie a conta de teste** ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)). A tela de login fica em <http://localhost:3001/login>.
 
 **Mudou `frontend/.env`?** Pare o `pnpm dev` e suba de novo: as `NEXT_PUBLIC_*` entram no bundle no build, e o servidor em execução não relê o arquivo. No Docker, o equivalente é `make rebuild-frontend-no-cache`.
 
@@ -94,7 +111,7 @@ make up-d      # builda (na 1ª vez), sobe postgres → supertokens → backend 
 make ps        # todos "running"/"healthy"
 ```
 
-Frontend em <http://localhost:3001>, backend em <http://localhost:3000>.
+Frontend em <http://localhost:3001> (login em `/login`), backend em <http://localhost:3000>. Em seguida, crie a conta de teste com `make seed` ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)).
 
 Todo alvo que sobe o backend (`up`, `up-d`, `rebuild`, `rebuild-no-cache`, `rebuild-backend`) espera o container ficar em execução e então roda `make migrate`. Se a migration falhar, o comando termina com erro **e os containers continuam no ar** — investigue com `make logs-backend` e rode `make migrate` de novo. `make up` sobe em segundo plano e segue os logs, então `Ctrl+C` só fecha os logs: para parar de verdade, use `make down`.
 
@@ -107,6 +124,7 @@ O que o `docker-compose.yml` garante:
 - **Rede `teapts-network`:** os serviços se acham pelo nome (`postgres`, `supertokens`, `backend`).
 - **Ordem de subida por healthcheck:** SuperTokens espera o Postgres saudável, o backend espera os dois, e o frontend espera o `GET /health` do backend passar. Nada sobe em cima de um serviço que ainda não responde.
 - **Versão do SuperTokens vem do `.env`:** `SUPERTOKENS_VERSION` (padrão `latest`). Fixe uma versão — o core roda migrations no Postgres ao subir.
+- **SuperTokens no schema `supertokens`:** o core usa o mesmo banco da aplicação, mas cria as tabelas dele no schema `supertokens` (`POSTGRESQL_TABLE_SCHEMA`). As tabelas da aplicação ficam no `public`.
 - **`frontend/.env` entra como build secret:** fica disponível só durante o `pnpm run build` e não é copiado para a imagem. Sem esse arquivo, o build do frontend falha.
 
 > ⚠️ **Não há mount de código.** Editar arquivo no host não muda nada no container, e o que você fizer dentro do container (`pnpm add`, `pnpm format`, migration gerada) **se perde no próximo rebuild** e nunca chega ao host. Para iterar em código, use o modo local da [seção 3](#3-rodar-local). O Docker aqui serve para rodar a stack inteira como ela vai rodar em produção.
@@ -136,6 +154,13 @@ O schema **só muda por migration** (`synchronize` é sempre `false`). Entidades
 
 Estrutura em `backend/src/database/`: `entities/`, `enums/`, `migrations/`, `seeds/`.
 
+| Schema | Tabelas | Quem cuida |
+| --- | --- | --- |
+| `public` | `account`, `patient`, `professional`, `migrations` | migrations do TypeORM |
+| `supertokens` | `emailpassword_users`, `session_info`, `all_auth_recipe_users`… | o próprio SuperTokens Core, ao subir |
+
+Não crie migration para as tabelas do schema `supertokens` nem as altere à mão.
+
 ### 5.1 Migrations
 
 Toda mudança de schema passa por três passos. Nenhum é opcional:
@@ -162,17 +187,18 @@ Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `mi
 ### 5.2 Conta de teste
 
 ```bash
-make seed                      # Docker
-cd backend && pnpm seed:test-user   # local
+make seed                                  # Docker
+pnpm --dir backend run seed:test-user      # local
 ```
 
-Cria `teste@teapts.local` / `teapts123`, role `admin`, na tabela `account`. É idempotente: rodar de novo não duplica.
+Cria o usuário `teste@teapts.local` / `teapts123` **no SuperTokens** e a conta vinculada na tabela `account`, com role `admin`. Precisa do Postgres **e** do SuperTokens no ar. É idempotente: rodar de novo não duplica (se o usuário já existe no SuperTokens, o seed só cria a conta que faltar).
 
 ### 5.3 Testar se o banco está de pé
 
 ```bash
-make db-tables                              # lista as tabelas (espere ver account e migrations)
+make db-tables                              # tabelas do public: account, patient, professional, migrations
 make db-account                             # mostra as contas
+make db-query SQL="\dt supertokens.*"       # tabelas do SuperTokens
 make psql                                   # sessão psql interativa
 ```
 
@@ -205,11 +231,173 @@ make up-d      # já aplica as migrations
 make seed
 ```
 
+Como o SuperTokens usa o mesmo volume, o `make clean` também apaga os usuários e as sessões dele. Depois do reset, só existe a conta criada pelo `make seed`.
+
 Trocar `DATABASE_PASSWORD` **não** muda a senha de um banco já criado no volume: altere no PostgreSQL ou recrie o volume (com backup antes).
 
 ---
 
-## 6. Testes e qualidade
+## 6. Autenticação (SuperTokens)
+
+### 6.1 Como funciona
+
+A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita **EmailPassword** e sessões do próprio SuperTokens. São três peças:
+
+| Peça | Onde | O que guarda/faz |
+| --- | --- | --- |
+| SuperTokens Core | container `supertokens`, porta 3567 | e-mail, senha (hash) e sessões, no schema `supertokens` do Postgres |
+| Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
+| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role` e o vínculo `supertokens_user_id` |
+
+A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` (no máximo um) e `professional` (vários).
+
+```text
+POST /auth/signup (email, password, name)
+  -> SuperTokens cria a identidade
+  -> backend cria a linha em account (role = user)
+     (se o banco falhar, a identidade é apagada do SuperTokens)
+  -> sessão criada
+
+POST /auth/signin (email, password)
+  -> SuperTokens valida a senha
+  -> backend busca a conta por supertokens_user_id
+     (sem conta: 500 e nenhuma sessão)
+  -> sessão criada com accountId, role, patientProfileId e professionalProfileIds no token
+
+GET /me
+  -> verifySession valida o token
+  -> backend devolve os dados da conta
+```
+
+Decisões que valem saber antes de mexer:
+
+- **Não existe endpoint de login próprio.** Signin, signup, refresh e signout são as rotas do SDK; o backend só sobrescreve partes delas em `backend/src/auth/supertokens.service.ts`.
+- **O contexto da conta só entra no token no signin e no signup.** Esses dois fluxos marcam o `userContext` (`teapts.accountContext`) e o `createNewSession` só adiciona `accountId`, `role` e perfis quando vê essa marca. O refresh mantém o payload que já existia.
+- **Os perfis no token são uma foto do momento do login.** Quem criar ou remover um perfil precisa atualizar a sessão (`Session.mergeIntoAccessTokenPayload`) ou exigir login de novo.
+- **Erros de conta respondem `500` genérico**, sem stack trace nem detalhe de infraestrutura, e nenhuma sessão é emitida.
+
+Os arquivos de cada peça estão na seção "Estrutura" do [`backend/README.md`](backend/README.md#estrutura).
+
+### 6.2 Variáveis de ambiente
+
+Os valores do `.env.example` já funcionam em desenvolvimento. As que importam para a autenticação:
+
+- `backend/.env`: `SUPERTOKENS_CONNECTION_URI` (endereço do Core; `http://localhost:3567` no modo local), `API_DOMAIN` e `WEBSITE_DOMAIN` (o frontend precisa estar exatamente nessa origem para CORS e cookies funcionarem);
+- `frontend/.env`: `NEXT_PUBLIC_API_URL`, o endereço da API usado pelo SDK web.
+
+Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambiente) e [`frontend/README.md`](frontend/README.md#variáveis-de-ambiente).
+
+### 6.3 Rotas
+
+| Método | Rota | Corpo / headers | Resposta |
+| --- | --- | --- | --- |
+| POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name` | `200 {"status":"OK","user":{...}}` e sessão |
+| POST | `/auth/signin` | `rid: emailpassword`; `formFields`: `email`, `password` | `200 {"status":"OK","user":{...}}` e sessão |
+| POST | `/auth/session/refresh` | refresh token | novos tokens |
+| POST | `/auth/signout` | access token | `200 {"status":"OK"}` |
+| GET | `/me` | access token | dados da conta |
+
+O header `st-auth-mode` escolhe como a sessão trafega:
+
+- `st-auth-mode: cookie` — tokens em cookies `HttpOnly` (é o que o navegador/frontend usa);
+- `st-auth-mode: header` — tokens nos headers de resposta `st-access-token` e `st-refresh-token`, enviados de volta em `Authorization: Bearer <token>` (prático para curl e Postman).
+
+A senha precisa de pelo menos 8 caracteres, com letra e número (regra padrão do SuperTokens). O `name` não pode ser vazio.
+
+### 6.4 Testar com curl
+
+Com a stack no ar e a conta de teste criada ([5.2](#52-conta-de-teste)):
+
+```bash
+API=http://localhost:3000
+H=/tmp/teapts-headers.txt
+
+# 1) Login (modo header): os tokens voltam nos headers da resposta
+curl -s -D "$H" -X POST "$API/auth/signin" \
+  -H 'rid: emailpassword' -H 'st-auth-mode: header' -H 'Content-Type: application/json' \
+  -d '{"formFields":[{"id":"email","value":"teste@teapts.local"},{"id":"password","value":"teapts123"}]}'
+echo
+ACCESS=$(grep -i '^st-access-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
+REFRESH=$(grep -i '^st-refresh-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
+echo "access token recebido: ${ACCESS:+sim}"
+
+# 2) Rota protegida
+curl -s "$API/me" -H "Authorization: Bearer $ACCESS"
+echo
+
+# 3) Renovar a sessão (gera um access token novo)
+curl -s -D "$H" -o /dev/null -X POST "$API/auth/session/refresh" \
+  -H 'st-auth-mode: header' -H "Authorization: Bearer $REFRESH"
+ACCESS=$(grep -i '^st-access-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
+REFRESH=$(grep -i '^st-refresh-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
+
+# 4) Logout: revoga a sessão; depois disso o refresh responde 401
+curl -s -X POST "$API/auth/signout" -H "Authorization: Bearer $ACCESS"
+echo
+```
+
+O `GET /me` deve responder:
+
+```json
+{
+  "accountId": "<uuid da conta>",
+  "name": "Usuario de Teste",
+  "email": "teste@teapts.local",
+  "role": "admin",
+  "patientProfileId": null,
+  "professionalProfileIds": []
+}
+```
+
+**Cadastrar uma conta nova** (cria o usuário no SuperTokens e a linha em `account`):
+
+```bash
+curl -s -X POST "$API/auth/signup" \
+  -H 'rid: emailpassword' -H 'st-auth-mode: header' -H 'Content-Type: application/json' \
+  -d '{"formFields":[{"id":"email","value":"maria@teapts.local"},{"id":"password","value":"Senha123"},{"id":"name","value":"Maria"}]}'
+```
+
+**Mesmo fluxo com cookies** (como o navegador faz):
+
+```bash
+C=/tmp/teapts-cookies.txt
+curl -s -c "$C" -X POST "$API/auth/signin" \
+  -H 'rid: emailpassword' -H 'st-auth-mode: cookie' -H 'Content-Type: application/json' \
+  -d '{"formFields":[{"id":"email","value":"teste@teapts.local"},{"id":"password","value":"teapts123"}]}'
+echo
+curl -s -b "$C" "$API/me"
+echo
+```
+
+Respostas que indicam problema:
+
+| Resposta | Causa |
+| --- | --- |
+| signin `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
+| signin/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
+| signup `200 {"status":"FIELD_ERROR",...}` | `name` vazio ou senha fraca; a mensagem diz qual campo |
+| signup `200 {"status":"EMAIL_ALREADY_EXISTS_ERROR"}` | e-mail já cadastrado |
+| `/me` `401 {"message":"unauthorised"}` | nenhum token chegou: o login não deu `OK` ou faltou `Authorization`/cookie |
+| `/me` `401 {"message":"try refresh token"}` | access token expirado: chame `/auth/session/refresh` |
+| `/me` `401` "Payload de sessão inválido" | sessão criada por uma versão antiga do backend: faça login de novo |
+
+### 6.5 Inspecionar o SuperTokens
+
+```bash
+curl -s http://localhost:3567/hello                                               # Core no ar
+make db-query SQL="SELECT user_id, email FROM supertokens.emailpassword_users"    # usuários
+make db-query SQL="SELECT id, email, supertokens_user_id, role FROM account"      # contas vinculadas
+```
+
+Todo `user_id` do SuperTokens deve ter uma conta com o mesmo valor em `supertokens_user_id`. Um usuário sem conta não consegue fazer login (500).
+
+### 6.6 Integração no frontend
+
+O SDK web já está configurado no frontend. Como fazer login, enviar os cookies nas chamadas à API e tratar o `401` está na seção "Autenticação" do [`frontend/README.md`](frontend/README.md#autenticação).
+
+---
+
+## 7. Testes e qualidade
 
 Tudo roda **no host**, contra o código do working tree. Não precisa de container.
 
@@ -228,23 +416,13 @@ pnpm --dir backend test
 pnpm --dir frontend lint
 ```
 
-Scripts disponíveis em `backend/` e `frontend/`:
-
-| Ação | Comando |
-| --- | --- |
-| Testes | `test` |
-| Watch | `test:watch` |
-| Cobertura | `test:cov` |
-| E2E (só backend) | `test:e2e` |
-| Tipos | `typecheck` |
-| Lint | `lint` |
-| Formatar (altera arquivos) | `format` |
+A lista de scripts de cada projeto está no README dele ([backend](backend/README.md#scripts), [frontend](frontend/README.md#scripts)).
 
 Os testes unitários e e2e **não precisam de banco**: a conexão é substituída por um stub.
 
 ---
 
-## 7. Comandos make
+## 8. Comandos make
 
 **Setup**
 
@@ -290,7 +468,7 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make migrate-show` | Lista as migrations, `[X]` = aplicada |
 | `make migrate-revert` | Desfaz a última |
 | `make migrate-generate NAME=AddFoo` | Gera migration a partir das entidades, **no host** (precisa de `make up-d-db`) |
-| `make seed` | Cria a conta de teste |
+| `make seed` | Cria a conta de teste no SuperTokens e em `account` |
 | `make db-tables` | Lista as tabelas |
 | `make db-account` | Mostra as contas |
 | `make db-query SQL="..."` | Roda um SQL qualquer |
@@ -311,7 +489,7 @@ Os alvos de banco rodam no container `teapts-backend` via `docker exec`. Os de t
 
 ---
 
-## 8. Commits
+## 9. Commits
 
 ```bash
 git checkout -b feat/nome-da-feature
@@ -336,26 +514,3 @@ Mensagem: **uma linha, em inglês**, `tipo: descrição curta` (Conventional Com
 
 Exemplos: `fix: handle expired session`, `build: add axios to backend`.
 
----
-
-## 9. Problemas comuns
-
-| Sintoma | Solução |
-| --- | --- |
-| `relation "account" does not exist` | `make migrate` (ou `pnpm migration:run`) |
-| Editou a entidade e a coluna não existe no banco | falta a migration: gere com `make migrate-generate NAME=...` e aplique com `make rebuild-backend` |
-| Entidade/migration nova é ignorada | registre-a nos arrays de `backend/src/database/database.config.ts` |
-| `executable file not found in $PATH: pnpm` no `docker exec` | esperado: a imagem de produção não tem pnpm. Use os alvos `make` de banco, ou rode no host |
-| `Cannot find module` no container | imagem desatualizada: `make rebuild-backend` / `make rebuild-frontend` |
-| `Cannot find module` na máquina | `make install` |
-| `pnpm install` falha com `Permission denied` em `node_modules` | arquivos com dono `root`/`nobody`: `sudo rm -rf <projeto>/node_modules && make install` |
-| Editou código e o container não mudou | é esperado: não há mount. `make rebuild-backend` / `make rebuild-frontend` |
-| Migration nova não aparece no `make migrate-show` | ela está só no host. `make rebuild-backend` recompila e aplica |
-| `make migrate-generate` falha ao conectar | ele roda no host: suba o banco com `make up-d-db` e deixe `DATABASE_HOST=localhost` |
-| Backend local não conecta no banco | `DATABASE_HOST=localhost` no `backend/.env`; `make up-d-db`; `make ps` |
-| `/health` responde `503` | o banco caiu ou as credenciais do `.env` mudaram |
-| Mudou `frontend/.env` e o frontend usa o valor antigo | `make rebuild-frontend-no-cache` (as `NEXT_PUBLIC_*` são embutidas no build) |
-| Erro de `.env` não encontrado | `make env` |
-| Porta em uso (3000, 3001) ao rodar local | o container ocupa a porta: `make stop` libera e mantém o banco de pé; `make start` volta ao Docker |
-| Porta em uso (5432, 3567) | pare o processo ou rode `make down` |
-| Quer zerar o banco | `make clean && make up-d && make seed` |

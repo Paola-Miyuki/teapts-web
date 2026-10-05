@@ -44,9 +44,7 @@ export class AuthGuard implements CanActivate {
     // Se a sessão for inválida, chama next(err) com um erro do SuperTokens,
     // que o SupertokensExceptionFilter converte em 401.
     await new Promise<void>((resolve, reject) => {
-      void this.verify(req, res, (err) =>
-        err ? reject(err) : resolve(),
-      );
+      void this.verify(req, res, (err) => (err ? reject(err) : resolve()));
     });
 
     const session = req.session;

@@ -5,7 +5,7 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { Account } from '../src/accounts/account.entity';
+import { Account } from '../src/database/entities/account.entity';
 import { AppModule } from '../src/app.module';
 
 // Sobe o AppModule inteiro (Config + TypeOrm + Health) e exercita as rotas por

@@ -54,6 +54,10 @@ services:
       POSTGRESQL_HOST: postgres
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_DATABASE_NAME: ${DATABASE_NAME:?Defina DATABASE_NAME em backend/.env}
+      # Tabelas do core no schema `supertokens`, separadas das tabelas e das
+      # migrations da aplicação (schema public). O core cria o schema e as
+      # tabelas sozinho no boot.
+      POSTGRESQL_TABLE_SCHEMA: supertokens
 
     ports:
       - "3567:3567"

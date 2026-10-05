@@ -46,13 +46,13 @@
   background: var(--accent);
   color: var(--fg);
 
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 18px;
   font-weight: 600;
 }
 
 .brandName {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
 
   font-size: 23px;
   font-weight: 600;
@@ -131,7 +131,7 @@
 
   text-align: center;
 
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
 
   font-size: 36px;
   font-weight: 400;
@@ -205,7 +205,7 @@
   outline-offset: 2px;
 }
 
-.field input[aria-invalid="true"] {
+.field input[aria-invalid='true'] {
   border: 2px solid var(--fg);
 }
 
@@ -253,8 +253,8 @@
   height: 20px;
 }
 
-.revealButton[aria-pressed="true"]::after {
-  content: "";
+.revealButton[aria-pressed='true']::after {
+  content: '';
 
   position: absolute;
 
@@ -396,7 +396,7 @@
 
 .divider::before,
 .divider::after {
-  content: "";
+  content: '';
 
   flex: 1;
 

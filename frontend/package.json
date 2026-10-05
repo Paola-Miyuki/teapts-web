@@ -1,12 +1,23 @@
 {
   "name": "frontend",
   "version": "0.1.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=12.9.1"
+  },
   "private": true,
   "scripts": {
+    "prepare": "if [ -e ../.git ] && [ -x node_modules/.bin/husky ]; then cd .. && husky .husky; fi",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,cjs}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,mjs,cjs}\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
     "next": "16.3.5",
@@ -16,12 +27,22 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

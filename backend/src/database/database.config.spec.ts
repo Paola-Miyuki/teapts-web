@@ -1,7 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { getDatabaseOptions } from './database.config';
 import { Account } from './entities/account.entity';
+import { Patient } from './entities/patient.entity';
+import { Professional } from './entities/professional.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
+import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
+import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -62,8 +66,12 @@ describe('getDatabaseOptions', () => {
 
   it('registers the entities and migrations explicitly', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
-      entities: [Account],
-      migrations: [CreateAccount1791072000000],
+      entities: [Account, Patient, Professional],
+      migrations: [
+        CreateAccount1791072000000,
+        LinkAccountToSupertokens1791148800000,
+        CreatePatientAndProfessional1791148860000,
+      ],
     });
   });
 
