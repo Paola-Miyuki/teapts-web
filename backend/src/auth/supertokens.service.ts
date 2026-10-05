@@ -1,14 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import Supertokens from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import Session from 'supertokens-node/recipe/session';
 import { AccountsService } from '../accounts/accounts.service';
 
 @Injectable()
-export class SupertokensService implements OnModuleInit {
-  constructor(private readonly accountsService: AccountsService) {}
-
-  onModuleInit() {
+export class SupertokensService {
+  constructor(private readonly accountsService: AccountsService) {
     Supertokens.init({
       framework: 'express',
       supertokens: {
@@ -17,7 +15,7 @@ export class SupertokensService implements OnModuleInit {
       appInfo: {
         appName: 'Teapts',
         apiDomain: process.env.API_DOMAIN || 'http://localhost:3000',
-        websiteDomain: process.env.WEBSITE_DOMAIN || 'http://localhost:3000',
+        websiteDomain: process.env.WEBSITE_DOMAIN || 'http://localhost:3001',
         apiBasePath: '/auth',
         websiteBasePath: '/auth',
       },

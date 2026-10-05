@@ -5,6 +5,6 @@ import { AccountsModule } from '../accounts/accounts.module';
 @Module({
   imports: [AccountsModule],
   providers: [SupertokensService],
-  exports: [SupertokensService],
+  exports: [SupertokensService], 
 })
 export class AuthModule {}
