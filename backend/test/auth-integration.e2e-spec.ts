@@ -36,6 +36,8 @@ type CapturedConfig = {
 class MockSuperTokensError extends Error {}
 const supertokensInit = jest.fn<(config: CapturedConfig) => void>();
 const deleteUser = jest.fn<(userId: string) => Promise<Payload>>();
+const revokeAllSessionsForUser =
+  jest.fn<(userId: string) => Promise<string[]>>();
 
 jest.unstable_mockModule('supertokens-node', () => ({
   default: {
@@ -50,7 +52,10 @@ jest.unstable_mockModule('supertokens-node/recipe/emailpassword', () => ({
 }));
 
 jest.unstable_mockModule('supertokens-node/recipe/session', () => ({
-  default: { init: jest.fn((config: unknown) => config) },
+  default: {
+    init: jest.fn((config: unknown) => config),
+    revokeAllSessionsForUser,
+  },
 }));
 
 jest.unstable_mockModule(
@@ -80,6 +85,7 @@ let SupertokensService: SupertokensModule['SupertokensService'];
 let ACCOUNT_CONTEXT_FLAG: SupertokensModule['ACCOUNT_CONTEXT_FLAG'];
 let SIGN_UP_NAME_KEY: SupertokensModule['SIGN_UP_NAME_KEY'];
 let validateName: SupertokensModule['validateName'];
+let processLogout: SupertokensModule['processLogout'];
 
 beforeAll(async () => {
   ({ AccountIntegrityError, AccountsService } =
@@ -90,6 +96,7 @@ beforeAll(async () => {
     ACCOUNT_CONTEXT_FLAG,
     SIGN_UP_NAME_KEY,
     SupertokensService,
+    processLogout,
     validateName,
   } = await import('../src/auth/supertokens.service.js'));
 });
@@ -119,6 +126,7 @@ describe('authentication integration', () => {
   let createNewSession: jest.Mock<Fn>;
   let originalSignUp: jest.Mock<Fn>;
   let sessionImplementation: Implementation;
+  let sessionApiImplementation: Implementation;
   let emailPasswordFunctions: Implementation;
   let emailPasswordApis: Implementation;
 
@@ -162,6 +170,9 @@ describe('authentication integration', () => {
       }));
       sessionImplementation = sessionConfig.override!.functions!({
         createNewSession,
+      });
+      sessionApiImplementation = sessionConfig.override!.apis!({
+        signOutPOST: jest.fn<Fn>(async () => ({ status: 'OK' })),
       });
 
       originalSignUp = jest.fn<Fn>(async (input) =>
@@ -445,6 +456,71 @@ describe('authentication integration', () => {
       const response = await request(app).get('/me');
 
       expect(response.status).toBe(401);
+    });
+
+    it('revokes the current session and returns OK', async () => {
+      const revokeSession = jest.fn(async () => undefined);
+      const session = {
+        getUserId: () => accountUserId,
+        revokeSession,
+      };
+
+      await expect(
+        sessionApiImplementation.signOutPOST({
+          session,
+          options: {
+            req: {
+              getJSONBody: async () => ({ allSessions: false }),
+            },
+          },
+        }),
+      ).resolves.toEqual({ status: 'OK' });
+
+      expect(revokeSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('revokes every session when allSessions is true', async () => {
+      const revokeSession = jest.fn(async () => undefined);
+      revokeAllSessionsForUser.mockResolvedValue([]);
+      const session = {
+        getUserId: () => accountUserId,
+        revokeSession,
+      };
+
+      await expect(
+        sessionApiImplementation.signOutPOST({
+          session,
+          options: {
+            req: {
+              getJSONBody: async () => ({ allSessions: true }),
+            },
+          },
+        }),
+      ).resolves.toEqual({ status: 'OK' });
+      expect(revokeAllSessionsForUser).toHaveBeenCalledWith(accountUserId);
+      expect(revokeAllSessionsForUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('is idempotent when the current session was already revoked', async () => {
+      const session = {
+        getUserId: () => accountUserId,
+        revokeSession: jest.fn(async () => undefined),
+      };
+
+      await expect(
+        processLogout(
+          session as unknown as Parameters<typeof processLogout>[0],
+          false,
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        processLogout(
+          session as unknown as Parameters<typeof processLogout>[0],
+          false,
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(session.revokeSession).toHaveBeenCalledTimes(2);
     });
   });
 });

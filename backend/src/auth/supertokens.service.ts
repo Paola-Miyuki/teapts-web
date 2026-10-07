@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import supertokens from 'supertokens-node';
 import Session from 'supertokens-node/recipe/session';
+import type { SessionContainer } from 'supertokens-node/recipe/session';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import {
   AccountIntegrityError,
@@ -13,6 +14,35 @@ import {
 
 export const ACCOUNT_CONTEXT_FLAG = 'teapts.accountContext';
 export const SIGN_UP_NAME_KEY = 'teapts.signUpName';
+
+const logoutLogger = new Logger('Logout');
+
+/**
+ * Revoga a sessão atual e, opcionalmente, todas as sessões do usuário.
+ *
+ * `session.revokeSession` também solicita ao SuperTokens a limpeza dos
+ * cookies da resposta associada ao signOutPOST. A operação é segura para
+ * uma sessão já revogada: o SDK não exige que a revogação retorne true.
+ *
+ * @param session sessão validada pelo signOutPOST oficial do SuperTokens
+ * @param allSessions quando true, revoga todas as sessões do usuário
+ */
+export async function processLogout(
+  session: SessionContainer,
+  allSessions: boolean,
+): Promise<void> {
+  const userId = session.getUserId();
+
+  await session.revokeSession();
+
+  if (allSessions) {
+    await Session.revokeAllSessionsForUser(userId);
+  }
+
+  logoutLogger.log(
+    `Logout concluído. userId=${userId} allSessions=${allSessions}`,
+  );
+}
 
 /**
  * Valida o campo extra `name` do formulário de cadastro.
@@ -286,6 +316,19 @@ export class SupertokensService {
                     'Não foi possível criar a sessão',
                   );
                 }
+              },
+            }),
+            apis: (originalImplementation) => ({
+              ...originalImplementation,
+              signOutPOST: async ({ session, options }) => {
+                const body = await options.req.getJSONBody();
+                const allSessions =
+                  typeof body === 'object' &&
+                  body !== null &&
+                  'allSessions' in body &&
+                  body.allSessions === true;
+                await processLogout(session, allSessions);
+                return { status: 'OK' };
               },
             }),
           },
