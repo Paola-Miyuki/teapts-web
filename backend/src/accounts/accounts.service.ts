@@ -31,13 +31,11 @@ export class AccountsService {
     private readonly accountRepository: Repository<Account>,
   ) {}
 
-  async createForSupertokensUser(
-    dto: CreateForSupertokensUserDto,
-  ): Promise<Account> {
+  async createAccount(dto: CreateForSupertokensUserDto): Promise<Account> {
     const account = this.accountRepository.create({
       supertokensUserId: dto.supertokensUserId,
-      name: dto.name,
-      email: dto.email,
+      name: dto.name.trim(),
+      email: dto.email.trim().toLowerCase(),
       role: AccountRole.User,
       lastUpdatedAt: null,
     });
@@ -45,45 +43,36 @@ export class AccountsService {
     return await this.accountRepository.save(account);
   }
 
-  async findBySupertokensUserId(supertokensUserId: string): Promise<Account> {
-    const account = await this.accountRepository.findOne({
-      where: { supertokensUserId },
-    });
-
-    if (!account) {
-      throw new NotFoundException('Conta não encontrada para este usuário');
-    }
-
-    return account;
-  }
-
   async resolveAccountContext(
     supertokensUserId: string,
   ): Promise<AccountContext> {
-    const account = (await this.accountRepository.findOne({
+    const account = await this.accountRepository.findOne({
       where: { supertokensUserId },
       relations: { patientProfile: true, professionalProfiles: true },
-    })) as Account | null;
+    });
 
     if (!account || !account.id || !account.id.trim()) {
       throw new AccountIntegrityError();
     }
 
+    const patientProfile = account.patientProfile
+      ? await account.patientProfile
+      : null;
+    const professionalProfiles = account.professionalProfiles
+      ? await account.professionalProfiles
+      : [];
+
     return {
       accountId: account.id,
       role: account.role,
-      patientProfileId: account.patientProfile
-        ? account.patientProfile.accountId ?? (account.patientProfile as any).id
-        : null,
-      professionalProfileIds: account.professionalProfiles
-        ? account.professionalProfiles.map((p: any) => p.id)
-        : [],
+      patientProfileId: patientProfile?.accountId ?? null,
+      professionalProfileIds: professionalProfiles.map((profile) => profile.id),
     };
   }
 
   async findById(id: string): Promise<Account> {
     const account = await this.accountRepository.findOne({
-      where: { id } as any,
+      where: { id },
     });
 
     if (!account) {

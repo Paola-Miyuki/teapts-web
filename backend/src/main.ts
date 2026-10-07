@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import supertokens from 'supertokens-node';
 import { middleware, errorHandler } from 'supertokens-node/framework/express';
-import { SupertokensService } from './auth/supertokens.service'; 
+import { SupertokensService } from './auth/supertokens.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

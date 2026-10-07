@@ -1,82 +1,65 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Account } from '../database/entities/account.entity';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { NotFoundException } from '@nestjs/common';
 import { AccountRole } from '../database/enums/account-role.enum';
+import { AccountsService } from './accounts.service';
 
-export class AccountIntegrityError extends Error {
-  constructor(message = 'Inconsistência nos dados da conta') {
-    super(message);
-    this.name = 'AccountIntegrityError';
-  }
-}
+describe('AccountsService', () => {
+  const accountRepository = {
+    create: jest.fn<(value?: unknown) => unknown>(),
+    save: jest.fn<(value?: unknown) => unknown>(),
+    findOne: jest.fn<(value?: unknown) => unknown>(),
+  };
+  let service: AccountsService;
 
-export interface CreateForSupertokensUserDto {
-  supertokensUserId: string;
-  name: string;
-  email: string;
-}
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AccountsService(accountRepository as never);
+  });
 
-export interface AccountContext {
-  accountId: string;
-  role: AccountRole;
-  patientProfileId: string | null;
-  professionalProfileIds: string[];
-}
-
-@Injectable()
-export class AccountsService {
-  constructor(
-    @InjectRepository(Account)
-    private readonly accountRepository: Repository<Account>,
-  ) {}
-
-  /**
-   * Resolve o contexto da conta a partir do ID do SuperTokens
-   */
-  async resolveAccountContext(supertokensUserId: string): Promise<AccountContext> {
-    const account = (await this.accountRepository.findOne({
-      where: { supertokensUserId },
-      relations: { patientProfile: true, professionalProfiles: true },
-    })) as Account | null;
-
-    if (!account || !account.id || !account.id.trim()) {
-      throw new AccountIntegrityError();
-    }
-
-    return {
-      accountId: account.id,
-      role: account.role,
-      patientProfileId: account.patientProfile ? (account.patientProfile.accountId ?? (account.patientProfile as any).id) : null,
-      professionalProfileIds: account.professionalProfiles ? account.professionalProfiles.map((p: any) => p.id) : [],
+  it('creates an account linked to the SuperTokens user', async () => {
+    const account = {
+      id: 'account-1',
+      supertokensUserId: 'user-1',
+      name: 'Pessoa Teste',
+      email: 'pessoa@example.com',
+      role: AccountRole.User,
+      lastUpdatedAt: null,
     };
-  }
+    accountRepository.create.mockReturnValue(account as never);
+    accountRepository.save.mockResolvedValue(account as never);
 
-  /**
-   * Cria o registo da conta no PostgreSQL associando o supertokensUserId
-   */
-  async createForSupertokensUser(dto: CreateForSupertokensUserDto): Promise<Account> {
-    const account = this.accountRepository.create({
-      supertokensUserId: dto.supertokensUserId,
-      name: dto.name,
-      email: dto.email,
+    await expect(
+      service.createAccount({
+        supertokensUserId: 'user-1',
+        name: ' Pessoa Teste ',
+        email: ' PESSOA@EXAMPLE.COM ',
+      }),
+    ).resolves.toBe(account);
+
+    expect(accountRepository.create).toHaveBeenCalledWith({
+      supertokensUserId: 'user-1',
+      name: 'Pessoa Teste',
+      email: 'pessoa@example.com',
       role: AccountRole.User,
       lastUpdatedAt: null,
     });
+  });
 
-    return await this.accountRepository.save(account);
-  }
+  it('finds an account by id', async () => {
+    const account = { id: 'account-1' };
+    accountRepository.findOne.mockResolvedValue(account as never);
 
-  /**
-   * Procura uma conta pelo ID do PostgreSQL
-   */
-  async findById(id: string): Promise<Account> {
-    const account = await this.accountRepository.findOne({ where: { id } as any });
+    await expect(service.findById('account-1')).resolves.toBe(account);
+    expect(accountRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 'account-1' },
+    });
+  });
 
-    if (!account) {
-      throw new NotFoundException('Conta não encontrada');
-    }
+  it('throws when an account does not exist', async () => {
+    accountRepository.findOne.mockResolvedValue(null as never);
 
-    return account;
-  }
-}
+    await expect(service.findById('missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
