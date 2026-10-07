@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 
+import Logo from '@/components/Logo';
 import { initSuperTokens } from '@/lib/supertokens';
 import styles from './login.module.css';
 
@@ -113,15 +114,7 @@ export default function LoginPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.brand}>
-          <div className={styles.logo}>TEA</div>
-
-          <div>
-            <div className={styles.brandName}>TEA-PTS</div>
-
-            <span className={styles.brandCaption}>
-              Programa Terapêutico Singular
-            </span>
-          </div>
+          <Logo caption="Programa Terapêutico Singular" />
         </div>
 
         <button type="button" className={styles.helpButton}>
