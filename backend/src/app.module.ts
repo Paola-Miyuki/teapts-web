@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { getDatabaseOptions } from './database/database.config';
 import { HealthModule } from './health/health.module';
+import { ProfessionalsModule } from './professionals/professionals.module';
 
 /**
  * Módulo raiz: configura o banco de dados e reúne os módulos da API.
@@ -26,6 +27,7 @@ import { HealthModule } from './health/health.module';
     AccountsModule,
     AuthModule,
     HealthModule,
+    ProfessionalsModule,
   ],
 })
 export class AppModule {}

@@ -65,6 +65,10 @@ src/
   app.module.ts            ConfigModule + TypeOrmModule + módulos da API
   accounts/
     accounts.service.ts    cria a conta no signup e monta o contexto da sessão
+  professionals/
+    professionals.controller.ts  GET /professionals protegido por sessão
+    professionals.service.ts      consulta profissionais com filtros e paginação
+    dto/                          contratos e normalização da consulta
   auth/
     supertokens.service.ts         receitas EmailPassword e Session; campo name no
                                    signup; overrides de signUpPOST, signUp,
