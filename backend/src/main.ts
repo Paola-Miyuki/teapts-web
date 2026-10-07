@@ -1,25 +1,25 @@
-// Este arquivo é o ponto de entrada do processo HTTP.
-// Ele chama createApp para montar middleware, filtros e módulos.
-// O bootstrap só abre a porta depois que toda a aplicação foi criada.
-// A ordem garante que o SuperTokens esteja pronto antes de receber requisições.
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import supertokens from 'supertokens-node';
+import { middleware, errorHandler } from 'supertokens-node/framework/express';
+import { SupertokensService } from './auth/supertokens.service';
 
-import { ConfigService } from '@nestjs/config';
-import { createApp } from './create-app';
-
-/**
- * Cria a aplicação e inicia o servidor HTTP na porta configurada.
- *
- * @returns promise concluída quando o servidor começa a escutar
- * @throws erro de inicialização ou de abertura da porta
- */
 async function bootstrap() {
-  const app = await createApp();
-  const port = Number(app.get(ConfigService).get<string>('PORT', '3000'));
+  const app = await NestFactory.create(AppModule);
 
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('PORT must be a valid TCP port');
-  }
+  app.enableCors({
+    origin: ['http://localhost:3001', 'http://localhost:3000'],
+    credentials: true,
+    allowedHeaders: ['content-type', ...supertokens.getAllCORSHeaders()],
+  });
 
-  await app.listen(port);
+  app.get(SupertokensService);
+
+  app.use(middleware());
+
+  app.use(errorHandler());
+  await app.listen(process.env.PORT || 3000);
+  console.log('Backend NestJS/SuperTokens a rodar na porta 3000');
 }
-void bootstrap();
+
+bootstrap();

@@ -1,9 +1,3 @@
-// Este arquivo cuida da configuração do SuperTokens.
-// Ele mantém os endpoints oficiais POST /auth/signup e POST /auth/signin.
-// No cadastro, a conta de negócio é criada junto com a identidade do SuperTokens.
-// No login e no cadastro, o contexto da conta é gravado na sessão uma única vez.
-// O serviço de contas é usado antes da criação da sessão para impedir identidades órfãs.
-
 import {
   Injectable,
   InternalServerErrorException,
@@ -18,20 +12,7 @@ import {
   AccountsService,
 } from '../accounts/accounts.service';
 
-/**
- * Glossário:
- * override: substituição controlada de uma função oficial do SuperTokens.
- * recipe: módulo do SuperTokens, como EmailPassword ou Session.
- * sessão: vínculo autenticado mantido pelos cookies da aplicação.
- * access token: credencial curta usada para validar uma requisição.
- * payload: dados carregados dentro do access token.
- * userContext: contexto interno repassado entre as funções do SuperTokens.
- * guard: componente que decide se uma rota pode continuar.
- * decorator: anotação que entrega um dado já validado ao controller.
- */
 export const ACCOUNT_CONTEXT_FLAG = 'teapts.accountContext';
-
-/** Chave do userContext que leva o nome do formulário até o signUp. */
 export const SIGN_UP_NAME_KEY = 'teapts.signUpName';
 
 const logoutLogger = new Logger('Logout');
@@ -65,9 +46,6 @@ export async function processLogout(
 
 /**
  * Valida o campo extra `name` do formulário de cadastro.
- *
- * @param value valor enviado pelo frontend
- * @returns mensagem de erro ou undefined quando o valor é válido
  */
 export async function validateName(
   value: unknown,
@@ -87,12 +65,6 @@ export async function validateName(
 export class SupertokensService {
   private readonly logger = new Logger(SupertokensService.name);
 
-  /**
-   * Registra os recipes e os overrides usados pela aplicação.
-   *
-   * @param accountsService consulta a conta de negócio antes de criar a sessão
-   * @throws erro de inicialização quando a configuração do SuperTokens é inválida
-   */
   constructor(private readonly accountsService: AccountsService) {
     const logger = this.logger;
     const accountsServiceRef = this.accountsService;
@@ -121,34 +93,28 @@ export class SupertokensService {
               ...originalImplementation,
 
               signUp: async function (input) {
-                // O signUpPOST deixa o nome no userContext. Sem ele não há
-                // como criar a conta, então nem a identidade é criada.
                 const name = input.userContext[SIGN_UP_NAME_KEY];
+
                 if (typeof name !== 'string' || name.trim() === '') {
-                  logger.error('Cadastro sem nome no userContext');
+                  logger.error('Cadastro sem nome no userContext.');
                   throw new InternalServerErrorException(
                     'Não foi possível concluir o cadastro',
                   );
                 }
 
-                // 1) O SuperTokens cria a identidade (e-mail + senha).
                 const response = await originalImplementation.signUp(input);
 
                 if (response.status !== 'OK') {
                   return response;
                 }
 
-                // 2) A conta é criada antes da sessão, que é aberta depois
-                // pelo signUpPOST original.
                 try {
-                  await accountsServiceRef.createForSupertokensUser({
+                  await accountsServiceRef.createAccount({
                     supertokensUserId: response.user.id,
                     name: name.trim(),
-                    email: input.email,
+                    email: input.email.trim().toLowerCase(),
                   });
                 } catch (error) {
-                  // 3) Compensação: sem conta, a identidade é desfeita para
-                  // não deixar vínculo parcial (RFAUT001).
                   logger.error(
                     `Falha ao criar a conta; desfazendo o usuário. userId=${response.user.id}`,
                     error instanceof Error ? error.stack : undefined,
@@ -183,17 +149,24 @@ export class SupertokensService {
                   );
                 }
 
-                // O nome já foi validado por validateName.
-                input.userContext[SIGN_UP_NAME_KEY] = input.formFields.find(
-                  (field) => field.id === 'name',
+                const nameValue = input.formFields.find(
+                  (field) =>
+                    field.id === 'name' ||
+                    field.id === 'fullName' ||
+                    field.id === 'nome',
                 )?.value;
+
+                if (nameValue) {
+                  input.userContext[SIGN_UP_NAME_KEY] = nameValue;
+                  input.userContext.name = nameValue;
+                }
+
                 input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
 
                 return originalImplementation.signUpPOST(input);
               },
 
               signInPOST: async function (input) {
-                // 1) Marcamos somente este fluxo; o createNewSession verá a mesma referência.
                 input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
 
                 try {
@@ -203,11 +176,9 @@ export class SupertokensService {
                     );
                   }
 
-                  // 2) A implementação original valida credenciais e cria a sessão.
                   const response =
                     await originalImplementation.signInPOST(input);
 
-                  // 3) A mesma resposta protege contra enumeração de contas.
                   if (response.status === 'WRONG_CREDENTIALS_ERROR') {
                     logger.warn(
                       `Falha de autenticação: status=${response.status}`,
@@ -215,13 +186,11 @@ export class SupertokensService {
                     return { status: 'WRONG_CREDENTIALS_ERROR' };
                   }
 
-                  // 4) Outros resultados continuam com o contrato original.
                   if (response.status !== 'OK') {
                     logger.error(`Falha no sign-in: status=${response.status}`);
                     return response;
                   }
 
-                  // 5) O log não contém e-mail, senha, token ou cookie.
                   logger.log(
                     `Autenticação efetuada com sucesso. userId=${response.user.id}`,
                   );
@@ -261,22 +230,18 @@ export class SupertokensService {
             functions: (originalImplementation) => ({
               ...originalImplementation,
               createNewSession: async (input) => {
-                // Fora do login e do cadastro, não alteramos refresh ou outros fluxos.
                 if (input.userContext[ACCOUNT_CONTEXT_FLAG] !== true) {
                   return originalImplementation.createNewSession(input);
                 }
 
-                // userId é o id primário do SuperTokens, o mesmo gravado na conta.
                 const supertokensUserId = input.userId;
 
                 try {
-                  // 1) Resolvemos a conta antes de qualquer criação de sessão.
                   const accountContext =
                     await accountsServiceRef.resolveAccountContext(
                       supertokensUserId,
                     );
 
-                  // 2) A sessão é criada uma única vez, já com o payload final.
                   return originalImplementation.createNewSession({
                     ...input,
                     accessTokenPayload: {

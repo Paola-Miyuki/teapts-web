@@ -121,7 +121,7 @@ describe('authentication integration', () => {
   let accountsService: {
     resolveAccountContext: jest.Mock<(userId: string) => Promise<Payload>>;
     findById: jest.Mock<() => Promise<Payload>>;
-    createForSupertokensUser: jest.Mock<(input: Payload) => Promise<Payload>>;
+    createAccount: jest.Mock<(input: Payload) => Promise<Payload>>;
   };
   let createNewSession: jest.Mock<Fn>;
   let originalSignUp: jest.Mock<Fn>;
@@ -156,7 +156,7 @@ describe('authentication integration', () => {
         email: 'teste@example.com',
         role: accountContext.role,
       })),
-      createForSupertokensUser: jest.fn(async (input: Payload) => ({
+      createAccount: jest.fn(async (input: Payload) => ({
         id: 'account-2',
         ...input,
       })),
@@ -377,7 +377,7 @@ describe('authentication integration', () => {
         status: 'OK',
       });
 
-      expect(accountsService.createForSupertokensUser).toHaveBeenCalledWith({
+      expect(accountsService.createAccount).toHaveBeenCalledWith({
         supertokensUserId: newUserId,
         name: 'Maria',
         email: 'maria@example.com',
@@ -386,7 +386,7 @@ describe('authentication integration', () => {
         newUserId,
       );
       expect(
-        accountsService.createForSupertokensUser.mock.invocationCallOrder[0],
+        accountsService.createAccount.mock.invocationCallOrder[0],
       ).toBeLessThan(createNewSession.mock.invocationCallOrder[0]);
       expect(createNewSession).toHaveBeenCalledWith(
         expect.objectContaining({ accessTokenPayload: accountContext }),
@@ -395,7 +395,7 @@ describe('authentication integration', () => {
     });
 
     it('deletes the SuperTokens user when the account cannot be created', async () => {
-      accountsService.createForSupertokensUser.mockRejectedValue(
+      accountsService.createAccount.mockRejectedValue(
         new Error('duplicate key'),
       );
 
@@ -412,7 +412,7 @@ describe('authentication integration', () => {
         emailPasswordApis.signUpPOST(signUpInput('Maria', 'taken@example.com')),
       ).resolves.toEqual({ status: 'EMAIL_ALREADY_EXISTS_ERROR' });
 
-      expect(accountsService.createForSupertokensUser).not.toHaveBeenCalled();
+      expect(accountsService.createAccount).not.toHaveBeenCalled();
     });
 
     it('refuses to create an identity without a name in the userContext', async () => {

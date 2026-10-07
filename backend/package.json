@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "dev": "nest start --watch",
     "prepare": "if [ -e ../.git ] && [ -x node_modules/.bin/husky ]; then cd .. && husky .husky; fi",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"*.{ts,mjs,cjs}\"",
@@ -32,10 +33,13 @@
     "@nestjs/core": "^12.0.1",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/typeorm": "^12.0.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "pg": "^8.23.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "supertokens-node": "^24.0.3",
+    "ts-node": "^10.9.2",
     "typeorm": "^1.1.1"
   },
   "devDependencies": {
@@ -56,7 +60,6 @@
     "prettier": "^3.4.2",
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.0",
-    "ts-node": "^10.9.2",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.71.0"
   },

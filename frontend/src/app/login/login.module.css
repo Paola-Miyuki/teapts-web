@@ -33,44 +33,6 @@
   gap: 12px;
 }
 
-.logo {
-  width: 61px;
-  height: 44px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 8px;
-
-  background: var(--accent);
-  color: var(--fg);
-
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.brandName {
-  font-family: Georgia, 'Times New Roman', serif;
-
-  font-size: 23px;
-  font-weight: 600;
-
-  letter-spacing: -0.7px;
-  line-height: 1.2;
-}
-
-.brandCaption {
-  display: block;
-
-  margin-top: 4px;
-
-  color: var(--muted);
-
-  font-size: 10px;
-}
-
 .helpButton {
   min-height: 44px;
 
