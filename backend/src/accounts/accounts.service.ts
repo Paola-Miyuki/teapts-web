@@ -1,23 +1,27 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from '../database/entities/account.entity';
-import { CreateAccountDto } from './dto/create-account.dto';
-
-export interface AccountContext {
-  accountId: string;
-  role?: string;
-  patientProfileId?: string | null;
-  professionalProfileIds?: string[];
-  accountName?: string;
-  accountEmail?: string;
-}
+import { AccountRole } from '../database/enums/account-role.enum';
 
 export class AccountIntegrityError extends Error {
-  constructor(message = 'Conta de negócio não encontrada para o usuário') {
+  constructor(message = 'Inconsistência nos dados da conta') {
     super(message);
     this.name = 'AccountIntegrityError';
   }
+}
+
+export interface CreateForSupertokensUserDto {
+  supertokensUserId: string;
+  name: string;
+  email: string;
+}
+
+export interface AccountContext {
+  accountId: string;
+  role: AccountRole;
+  patientProfileId: string | null;
+  professionalProfileIds: string[];
 }
 
 @Injectable()
@@ -27,9 +31,59 @@ export class AccountsService {
     private readonly accountRepository: Repository<Account>,
   ) {}
 
+  async createForSupertokensUser(
+    dto: CreateForSupertokensUserDto,
+  ): Promise<Account> {
+    const account = this.accountRepository.create({
+      supertokensUserId: dto.supertokensUserId,
+      name: dto.name,
+      email: dto.email,
+      role: AccountRole.User,
+      lastUpdatedAt: null,
+    });
+
+    return await this.accountRepository.save(account);
+  }
+
+  async findBySupertokensUserId(supertokensUserId: string): Promise<Account> {
+    const account = await this.accountRepository.findOne({
+      where: { supertokensUserId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Conta não encontrada para este usuário');
+    }
+
+    return account;
+  }
+
+  async resolveAccountContext(
+    supertokensUserId: string,
+  ): Promise<AccountContext> {
+    const account = (await this.accountRepository.findOne({
+      where: { supertokensUserId },
+      relations: { patientProfile: true, professionalProfiles: true },
+    })) as Account | null;
+
+    if (!account || !account.id || !account.id.trim()) {
+      throw new AccountIntegrityError();
+    }
+
+    return {
+      accountId: account.id,
+      role: account.role,
+      patientProfileId: account.patientProfile
+        ? account.patientProfile.accountId ?? (account.patientProfile as any).id
+        : null,
+      professionalProfileIds: account.professionalProfiles
+        ? account.professionalProfiles.map((p: any) => p.id)
+        : [],
+    };
+  }
+
   async findById(id: string): Promise<Account> {
     const account = await this.accountRepository.findOne({
-      where: { id },
+      where: { id } as any,
     });
 
     if (!account) {
@@ -37,52 +91,5 @@ export class AccountsService {
     }
 
     return account;
-  }
-
-  async createAccount(input: CreateAccountDto): Promise<Account> {
-    const normalizedEmail = input.email.trim().toLowerCase();
-
-    const existingAccount = await this.accountRepository.findOne({
-      where: { email: normalizedEmail },
-    });
-
-    if (existingAccount) {
-      throw new ConflictException('EMAIL_ALREADY_EXISTS');
-    }
-
-    const account = this.accountRepository.create({
-      supertokensUserId: input.supertokensUserId,
-      email: normalizedEmail,
-      name: input.name,
-    });
-
-    return await this.accountRepository.save(account);
-  }
-
-  async createForSupertokensUser(data: {
-    supertokensUserId: string;
-    name: string;
-    email: string;
-  }): Promise<Account> {
-    return this.createAccount(data);
-  }
-
-  async resolveAccountContext(supertokensUserId: string): Promise<AccountContext> {
-    const account = await this.accountRepository.findOne({
-      where: { supertokensUserId },
-    });
-
-    if (!account) {
-      throw new AccountIntegrityError();
-    }
-
-    return {
-      accountId: account.id,
-      accountName: account.name,
-      accountEmail: account.email,
-      role: (account as any).role || 'USER',
-      patientProfileId: (account as any).patientProfileId || null,
-      professionalProfileIds: (account as any).professionalProfileIds || [],
-    };
   }
 }

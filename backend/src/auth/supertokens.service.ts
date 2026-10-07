@@ -63,9 +63,35 @@ export class SupertokensService {
               ...originalImplementation,
 
               signUp: async function (input) {
-                const name = input.userContext[SIGN_UP_NAME_KEY];
+                // 1. Procura o nome nas várias propriedades possíveis
+                let name =
+                  input.userContext[SIGN_UP_NAME_KEY] ||
+                  input.userContext?.name ||
+                  input.formFields?.find(
+                    (field) =>
+                      field.id === 'name' ||
+                      field.id === 'fullName' ||
+                      field.id === 'nome',
+                  )?.value;
+
+                // 2. Fallback: Tenta extrair diretamente do body do Express
+                if (!name && input.options?.req) {
+                  const expressReq =
+                    (input.options.req as any)?.original || input.options.req;
+                  if (expressReq?.body) {
+                    name =
+                      expressReq.body.name ||
+                      expressReq.body.fullName ||
+                      expressReq.body.nome;
+                  }
+                }
+
                 if (typeof name !== 'string' || name.trim() === '') {
-                  logger.error('Cadastro sem nome no userContext');
+                  logger.error(
+                    `Cadastro sem nome no userContext. FormFields recebidos: ${JSON.stringify(
+                      input.formFields,
+                    )}`,
+                  );
                   throw new InternalServerErrorException(
                     'Não foi possível concluir o cadastro',
                   );
@@ -118,9 +144,31 @@ export class SupertokensService {
                   );
                 }
 
-                input.userContext[SIGN_UP_NAME_KEY] = input.formFields.find(
-                  (field) => field.id === 'name',
+                // Extrai o nome dos formFields do SuperTokens
+                let nameValue = input.formFields?.find(
+                  (field) =>
+                    field.id === 'name' ||
+                    field.id === 'fullName' ||
+                    field.id === 'nome',
                 )?.value;
+
+                // Fallback: extrai do body do Express
+                if (!nameValue && input.options?.req) {
+                  const expressReq =
+                    (input.options.req as any)?.original || input.options.req;
+                  if (expressReq?.body) {
+                    nameValue =
+                      expressReq.body.name ||
+                      expressReq.body.fullName ||
+                      expressReq.body.nome;
+                  }
+                }
+
+                if (nameValue) {
+                  input.userContext[SIGN_UP_NAME_KEY] = nameValue;
+                  input.userContext.name = nameValue;
+                }
+
                 input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
 
                 return originalImplementation.signUpPOST(input);
@@ -147,7 +195,9 @@ export class SupertokensService {
                   }
 
                   if (response.status !== 'OK') {
-                    logger.error(`Falha no sign-in: status=${response.status}`);
+                    logger.error(
+                      `Falha no sign-in: status=${response.status}`,
+                    );
                     return response;
                   }
 
