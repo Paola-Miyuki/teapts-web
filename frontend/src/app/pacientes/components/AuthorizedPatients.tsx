@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import styles from '../pacientes.module.css';
@@ -36,6 +36,8 @@ export default function AuthorizedPatients() {
   const [patients, setPatients] = useState<Patient[] | null>(null);
   const [page, setPage] = useState(1);
   const [retryKey, setRetryKey] = useState(0);
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
 
   const [pagination, setPagination] = useState<PaginationData>({
     page: 1,
@@ -43,8 +45,6 @@ export default function AuthorizedPatients() {
     total: 0,
     totalPages: 1,
   });
-
-  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -91,9 +91,26 @@ export default function AuthorizedPatients() {
     };
   }, [page, retryKey, router]);
 
+  const filteredPatients = useMemo(() => {
+    if (!patients) {
+      return [];
+    }
+
+    const term = search.trim().toLocaleLowerCase('pt-BR');
+
+    if (!term) {
+      return patients;
+    }
+
+    return patients.filter((patient) =>
+      patient.name.toLocaleLowerCase('pt-BR').includes(term),
+    );
+  }, [patients, search]);
+
   function handlePageChange(newPage: number) {
     setPatients(null);
     setError('');
+    setSearch('');
     setPage(newPage);
   }
 
@@ -117,7 +134,7 @@ export default function AuthorizedPatients() {
 
           <button
             type="button"
-            className={styles.errorButton}
+            className={styles.secondaryButton}
             onClick={handleRetry}
           >
             Tentar novamente
@@ -133,7 +150,40 @@ export default function AuthorizedPatients() {
 
   return (
     <>
-      <PatientList patients={patients} />
+      <div className={styles.toolbar}>
+        <label className={styles.search}>
+          <svg
+            className={styles.icon}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+          >
+            <circle cx="10" cy="10" r="6" />
+            <path d="m15 15 6 6" />
+          </svg>
+
+          <input
+            type="search"
+            value={search}
+            placeholder="Buscar paciente pelo nome"
+            aria-label="Buscar paciente pelo nome"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+
+        <span className={styles.count}>
+          {filteredPatients.length}{' '}
+          {filteredPatients.length === 1 ? 'paciente' : 'pacientes'}
+        </span>
+      </div>
+
+      {filteredPatients.length > 0 ? (
+        <PatientList patients={filteredPatients} page={pagination.page} />
+      ) : (
+        <EmptyState isSearch onClearSearch={() => setSearch('')} />
+      )}
 
       <Pagination
         page={pagination.page}

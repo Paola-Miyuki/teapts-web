@@ -8,24 +8,37 @@ type Patient = {
 
 type PatientListProps = {
   patients: Patient[];
+  page: number;
 };
 
-export default function PatientList({ patients }: PatientListProps) {
+export default function PatientList({ patients, page }: PatientListProps) {
   return (
-    <section className={styles.card}>
-      <div className={styles.listHeader}>
-        <h2>Pacientes autorizados</h2>
+    <div className={styles.tableCard}>
+      <div className={styles.tableWrapper}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Situação do PTS</th>
+              <th>Acompanhamento</th>
+            </tr>
+          </thead>
 
-        <span>
-          {patients.length} {patients.length === 1 ? 'paciente' : 'pacientes'}
-        </span>
+          <tbody>
+            {patients.map((patient) => (
+              <PatientListItem key={patient.id} patient={patient} />
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <ul className={styles.list}>
-        {patients.map((patient) => (
-          <PatientListItem key={patient.id} patient={patient} />
-        ))}
-      </ul>
-    </section>
+      <div className={styles.tableFoot}>
+        <span>Somente pacientes vinculados ao seu acesso.</span>
+
+        <span className={styles.pageNumber}>
+          {String(page).padStart(2, '0')}
+        </span>
+      </div>
+    </div>
   );
 }
