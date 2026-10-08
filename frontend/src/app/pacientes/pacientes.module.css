@@ -1,0 +1,179 @@
+.page {
+  min-height: 100vh;
+  background: #f7f6f2;
+  color: #1f2a24;
+  padding: 48px 24px;
+}
+
+.content {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.heading {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #647269;
+}
+
+.heading h1 {
+  margin: 0;
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 1.05;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.description {
+  max-width: 620px;
+  margin: 14px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #667169;
+}
+
+.card {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dde2dd;
+  border-radius: 18px;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e4e8e4;
+}
+
+.listHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.patientItem {
+  display: flex;
+  align-items: center;
+  min-height: 72px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #edf0ed;
+}
+
+.patientItem:last-child {
+  border-bottom: 0;
+}
+
+.patientName {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.state {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  padding: 40px 24px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #dde2dd;
+  border-radius: 18px;
+}
+
+.state h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.state p {
+  max-width: 440px;
+  margin: 0;
+  line-height: 1.6;
+  color: #667169;
+}
+
+.errorButton {
+  margin-top: 20px;
+  padding: 11px 18px;
+  border: 1px solid #2e4438;
+  border-radius: 10px;
+  background: #2e4438;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.errorButton:hover {
+  background: #22352b;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.pagination button {
+  padding: 10px 16px;
+  border: 1px solid #cfd6d0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #26352d;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pagination button:hover:not(:disabled) {
+  border-color: #2e4438;
+}
+
+.pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination span {
+  font-size: 14px;
+  color: #667169;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 32px 16px;
+  }
+
+  .heading {
+    margin-bottom: 24px;
+  }
+
+  .patientItem {
+    padding: 16px 18px;
+  }
+
+  .pagination {
+    gap: 10px;
+  }
+
+  .pagination button {
+    padding: 9px 12px;
+  }
+}
