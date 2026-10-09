@@ -93,6 +93,7 @@ export class SupertokensService {
               ...originalImplementation,
 
               signUp: async function (input) {
+                // Lê o nome diretamente do userContext preenchido pela camada de API (signUpPOST)
                 const name = input.userContext[SIGN_UP_NAME_KEY];
 
                 if (typeof name !== 'string' || name.trim() === '') {
