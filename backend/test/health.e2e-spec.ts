@@ -6,6 +6,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { Account } from '../src/database/entities/account.entity';
+import { Professional } from '../src/database/entities/professional.entity';
 import { AppModule } from '../src/app.module';
 
 // Sobe o AppModule inteiro (Config + TypeOrm + Health) e exercita as rotas por
@@ -28,6 +29,9 @@ describe('AppModule (e2e)', () => {
       } as unknown as DataSource)
       // O repositorio de contas (login) dependeria dos metadados da DataSource.
       .overrideProvider(getRepositoryToken(Account))
+      .useValue({})
+      // A consulta de profissionais tambem depende do repositorio TypeORM.
+      .overrideProvider(getRepositoryToken(Professional))
       .useValue({})
       .compile();
 
