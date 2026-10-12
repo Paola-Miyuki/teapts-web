@@ -1,0 +1,5 @@
+set -e
+
+# A mensagem de commit e uma so, entao a config do commitlint fica no backend
+# e vale para o repositorio inteiro.
+backend/node_modules/.bin/commitlint --config backend/commitlint.config.cjs --edit "$1"
