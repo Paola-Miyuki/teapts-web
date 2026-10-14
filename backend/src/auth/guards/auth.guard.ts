@@ -25,8 +25,10 @@ type AuthenticatedRequest = SessionRequest & {
  */
 @Injectable()
 export class AuthGuard implements CanActivate {
-  // middleware oficial do SuperTokens, reaproveitado dentro do guard
-  private readonly verify = verifySession();
+  // middleware oficial do SuperTokens, reaproveitado dentro do guard.
+  // checkDatabase consulta o core para que uma sessão revogada no signout
+  // seja recusada na hora, e não só quando o access token expirar.
+  private readonly verify = verifySession({ checkDatabase: true });
 
   /**
    * Valida a sessão antes de permitir a execução do controller.

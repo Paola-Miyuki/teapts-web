@@ -58,19 +58,19 @@ jest.unstable_mockModule('supertokens-node/recipe/session', () => ({
   },
 }));
 
+type SessionMiddleware = (
+  request: Request,
+  response: Response,
+  next: (error?: unknown) => void,
+) => Promise<void>;
+
+const verifySession = jest.fn<(options?: unknown) => SessionMiddleware>(
+  () => async (_request, _response, next) => next(),
+);
+
 jest.unstable_mockModule(
   'supertokens-node/recipe/session/framework/express',
-  () => ({
-    verifySession: jest.fn(
-      () =>
-        async (
-          _request: Request,
-          _response: Response,
-          next: (error?: unknown) => void,
-        ) =>
-          next(),
-    ),
-  }),
+  () => ({ verifySession }),
 );
 
 // Import dinâmico com `.js`: exigido pelo nodenext; o Jest mapeia para `.ts`.
@@ -449,6 +449,10 @@ describe('authentication integration', () => {
 
       expect(accountsService.resolveAccountContext).not.toHaveBeenCalled();
       expect(createNewSession).toHaveBeenCalledWith(input);
+    });
+
+    it('checks the session in the database so a revoked session is refused', () => {
+      expect(verifySession).toHaveBeenCalledWith({ checkDatabase: true });
     });
 
     it('returns 401 for GET /me without a valid session payload', async () => {
