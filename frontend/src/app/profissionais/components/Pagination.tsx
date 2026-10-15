@@ -1,3 +1,4 @@
+import ui from '@/components/ui.module.css';
 import styles from '../profissionais.module.css';
 
 type PaginationProps = {
@@ -19,6 +20,7 @@ export default function Pagination({
     <nav className={styles.pagination} aria-label="Paginação de profissionais">
       <button
         type="button"
+        className={`${ui.btn} ${ui.btnSecondary}`}
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
       >
@@ -31,6 +33,7 @@ export default function Pagination({
 
       <button
         type="button"
+        className={`${ui.btn} ${ui.btnSecondary}`}
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
       >

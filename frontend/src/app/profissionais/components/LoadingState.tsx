@@ -1,13 +1,12 @@
+import ui from '@/components/ui.module.css';
 import styles from '../profissionais.module.css';
 
 export default function LoadingState() {
   return (
-    <div className={styles.state} role="status" aria-live="polite">
-      <div>
-        <div className={styles.loader} />
+    <div className={ui.empty} role="status" aria-live="polite">
+      <div className={styles.loader} />
 
-        <p>Carregando profissionais...</p>
-      </div>
+      <p>Carregando profissionais...</p>
     </div>
   );
 }

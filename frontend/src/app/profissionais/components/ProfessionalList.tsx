@@ -1,5 +1,6 @@
 import type { Professional } from './Professionals';
 import ProfessionalListItem from './ProfessionalListItem';
+import ui from '@/components/ui.module.css';
 import styles from '../profissionais.module.css';
 
 type ProfessionalListProps = {
@@ -12,7 +13,7 @@ export default function ProfessionalList({
   total,
 }: ProfessionalListProps) {
   return (
-    <div className={styles.tableCard}>
+    <div className={`${ui.card} ${styles.tableCard}`}>
       <div className={styles.tableHeader}>
         <div>
           <h2>Profissionais encontrados</h2>
