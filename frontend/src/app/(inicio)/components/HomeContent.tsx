@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
+import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
+import type { ProfileKind } from '@/lib/account';
 import styles from '../inicio.module.css';
-import Icon from './Icon';
-import type { ProfileKind } from './Inicio';
 
 type HomeContentProps = {
   kind: ProfileKind;
@@ -22,8 +23,8 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
 
   return (
     <>
-      <div className={styles.heading}>
-        <p className={styles.eyebrow}>{EYEBROWS[kind]}</p>
+      <div className={ui.heading}>
+        <p className={ui.eyebrow}>{EYEBROWS[kind]}</p>
 
         <h1>{firstName ? `Boas-vindas, ${firstName}.` : 'Boas-vindas.'}</h1>
 
@@ -35,8 +36,8 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
       </div>
 
       {kind === 'waiting' ? (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
+        <div className={ui.empty}>
+          <div className={ui.emptyIcon}>
             <Icon name="clock" />
           </div>
 
@@ -78,10 +79,10 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
 
             <Link
               href="/profissionais"
-              className={`${styles.btn} ${styles.btnPrimary}`}
+              className={`${ui.btn} ${ui.btnPrimary}`}
             >
               Consultar profissionais
-              <Icon name="arrow" className={styles.icon} />
+              <Icon name="arrow" className={ui.icon} />
             </Link>
           </div>
 

@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 import InicioPage from './page';
-import type { Account } from './components/Inicio';
+import type { Account } from '@/lib/account';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),

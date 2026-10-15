@@ -21,6 +21,13 @@ const glyphs = {
     </>
   ),
   arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
+  back: <path d="M20 12H4m6-6-6 6 6 6" />,
+  eye: (
+    <>
+      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof glyphs;

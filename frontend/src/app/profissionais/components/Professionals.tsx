@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import styles from '../profissionais.module.css';
+import ui from '@/components/ui.module.css';
 import EmptyState from './EmptyState';
 import LoadingState from './LoadingState';
 import Pagination from './Pagination';
@@ -176,20 +176,18 @@ export default function Professionals() {
       {professionals === null ? (
         <LoadingState />
       ) : error ? (
-        <div className={styles.state} role="alert">
-          <div>
-            <h2>Não foi possível carregar os profissionais</h2>
+        <div className={ui.empty} role="alert">
+          <h2>Não foi possível carregar os profissionais</h2>
 
-            <p>{error}</p>
+          <p>{error}</p>
 
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={handleRetry}
-            >
-              Tentar novamente
-            </button>
-          </div>
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnSecondary}`}
+            onClick={handleRetry}
+          >
+            Tentar novamente
+          </button>
         </div>
       ) : professionals.length === 0 ? (
         <EmptyState

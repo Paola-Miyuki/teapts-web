@@ -6,16 +6,9 @@ import Link from 'next/link';
 
 import Logo from '@/components/Logo';
 import LogoutButton from '@/components/LogoutButton';
-import styles from '../inicio.module.css';
+import type { NavItem } from '@/lib/account';
+import styles from './AppShell.module.css';
 import Icon from './Icon';
-import type { IconName } from './Icon';
-
-export type NavItem = {
-  href: string;
-  icon: IconName;
-  label: string;
-  current?: boolean;
-};
 
 type AppShellProps = {
   userName: string;
