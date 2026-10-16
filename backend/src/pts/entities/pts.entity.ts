@@ -1,35 +1,34 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, ManyToMany, JoinTable, CreateDateColumn } from 'typeorm';
+import { Patient } from '../../database/entities/patient.entity';
+import { Professional } from '../../database/entities/professional.entity';
 
-export enum PtsStateEnum {
-  DRAFT = 'draft',
-  PLANNING = 'planning',
-  RUNNING = 'running',
-  CONCLUDED = 'concluded',
-  CANCELLED = 'cancelled',
-  REJECTED = 'rejected',
-}
-
-@Entity('projeto_terapeutico_singular')
+@Entity('pts')
 export class PtsEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'text', name: 'socialSituation' })
+  @Column()
+  status: string;
+
+  @Column()
   socialSituation: string;
 
-  @Column({
-    type: 'enum',
-    enum: PtsStateEnum,
-    default: PtsStateEnum.DRAFT,
-  })
-  status: PtsStateEnum;
-
-  @CreateDateColumn({ type: 'timestamp', name: 'createdAt' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ name: 'patient_id' })
+  @Column()
   patientId: string;
 
-  @Column({ name: 'responsible_professional_id' })
+  @ManyToOne(() => Patient, { eager: true })
+  patient: Patient;
+
+  @Column()
   responsibleProfessionalId: string;
+
+  @ManyToOne(() => Professional, { eager: true })
+  responsible: Professional;
+
+  @ManyToMany(() => Professional, { eager: true })
+  @JoinTable()
+  team: Professional[];
 }

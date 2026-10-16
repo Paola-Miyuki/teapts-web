@@ -1,121 +1,64 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { ProjetoTerapeuticoSingular, PtsStateEnum } from './entities/projeto-terapeutico-singular.entity';
-import { CreatePtsRequestDto } from './dto/create-pts.dto';
-import { Professional } from '../../professional/entities/professional.entity';
-import { Patient } from '../../patient/entities/patient.entity';
+import { PtsEntity } from './entities/pts.entity';
+import { PtsStateEnum } from '../database/enums/pts-state.enum';
+import { Professional } from '../database/entities/professional.entity';
+import { Patient } from '../database/entities/patient.entity';
 
 @Injectable()
 export class PtsService {
   constructor(
-    @InjectRepository(ProjetoTerapeuticoSingular)
-    private readonly ptsRepository: Repository<ProjetoTerapeuticoSingular>,
+    @InjectRepository(PtsEntity)
+    private readonly ptsRepository: Repository<PtsEntity>,
     @InjectRepository(Professional)
     private readonly professionalRepository: Repository<Professional>,
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
   ) {}
 
-  async create(dto: CreatePtsRequestDto, currentAccountId: string) {
-    // 1. Validar que o professionalId pertence à conta autenticada
-    const professional = await this.professionalRepository.findOne({
-      where: { id: dto.professionalId },
-      relations: ['account', 'specialism'],
-    });
-
-    if (!professional || professional.account.id !== currentAccountId) {
-      throw new HttpException(
-        { status: 'FORBIDDEN', message: 'O professionalId informado não pertence à conta autenticada.' },
-        HttpStatus.FORBIDDEN,
-      );
+  async createPts(dto: any, currentAccountId: string) {
+const professional = await this.professionalRepository.findOne({
+  where: { id: dto.responsibleProfessionalId },
+  relations: {
+    account: true,
+  },
+});
+    if (!professional || professional.account?.id !== currentAccountId) {
+      throw new ForbiddenException('Profissional não autorizado ou não encontrado.');
     }
 
-    // 2. Validar que o paciente existe
+    // Validação do paciente
     const patient = await this.patientRepository.findOne({
       where: { accountId: dto.patientId },
-      relations: ['account'],
+      relations: {
+        account: true,
+      },
     });
 
     if (!patient) {
-      throw new HttpException(
-        { status: 'PATIENT_NOT_FOUND', message: 'Paciente não encontrado.' },
-        HttpStatus.NOT_FOUND,
-      );
+      throw new NotFoundException('Paciente não encontrado.');
     }
 
-    // 3. Validar que o paciente não tem PTS ativo em PLANNING ou RUNNING (RN011)
-    const activePts = await this.ptsRepository.findOne({
-      where: {
-        patientId: dto.patientId,
-        status: In([PtsStateEnum.PLANNING, PtsStateEnum.RUNNING]),
-      },
-    });
-
-    if (activePts) {
-      throw new HttpException(
-        { status: 'ACTIVE_PTS_ALREADY_EXISTS', message: 'O paciente já possui um PTS aprovado ativo.' },
-        HttpStatus.CONFLICT,
-      );
-    }
-
-    // 4. Validar e buscar os profissionais da equipe (removendo duplicados e o responsável)
-    let teamMembers: Professional[] = [];
-    if (dto.teamProfessionalIds && dto.teamProfessionalIds.length > 0) {
-      const uniqueTeamIds = Array.from(new Set(dto.teamProfessionalIds)).filter(
-        (id) => id !== dto.professionalId,
-      );
-
-      teamMembers = await this.professionalRepository.find({
-        where: { id: In(uniqueTeamIds) },
-        relations: ['specialism'],
-      });
-
-      if (teamMembers.length !== uniqueTeamIds.length) {
-        throw new HttpException(
-          { status: 'PROFESSIONAL_NOT_FOUND', message: 'Um ou mais profissionais da equipe não foram encontrados.' },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-    }
-
-    // 5. Persistir o PTS em DRAFT
     const pts = this.ptsRepository.create({
-      socialSituation: dto.socialSituation,
       status: PtsStateEnum.DRAFT,
+      socialSituation: dto.socialSituation,
       patientId: dto.patientId,
-      responsibleProfessionalId: dto.professionalId,
-      team: teamMembers,
+      responsibleProfessionalId: dto.responsibleProfessionalId,
     });
 
     const savedPts = await this.ptsRepository.save(pts);
+    return savedPts;
+  }
 
-    // 6. Retornar formatado com status em maiúsculas conforme DTO de resposta
-    return {
-      id: savedPts.id,
-      status: savedPts.status.toUpperCase(),
-      socialSituation: savedPts.socialSituation,
-      createdAt: savedPts.createdAt.toISOString(),
-      patient: {
-        id: patient.accountId,
-        name: patient.account.name,
-      },
-      responsible: {
-        id: professional.id,
-        name: professional.account.name,
-        specialism: {
-          id: professional.specialism?.id,
-          name: professional.specialism?.name,
-        },
-      },
-      team: teamMembers.map((member) => ({
-        id: member.id,
-        name: member.account.name,
-        specialism: {
-          id: member.specialism?.id,
-          name: member.specialism?.name,
-        },
-      })),
-    };
+  async findByPatient(patientId: string) {
+    return this.ptsRepository.find({
+      where: { patientId },
+      relations: {
+        patient: { account: true },
+        responsible: { account: true },
+        team: { account: true },
+    },
+    });
   }
 }

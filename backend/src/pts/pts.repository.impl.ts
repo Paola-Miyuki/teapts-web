@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { CreatePtsResponseDto } from './dto/create-pts.dto';
 import { CreateDraftInput, ProfessionalRecord, PtsRepository } from './pts.repository';
-import { PtsEntity, PtsStateEnum } from './entities/pts.entity';
+import { PtsEntity } from './entities/pts.entity';
+import { PtsStateEnum } from '../database/enums/pts-state.enum';
 import { Professional } from '../database/entities/professional.entity';
 import { Patient } from '../database/entities/patient.entity';
 
@@ -24,14 +25,16 @@ export class PtsRepositoryImpl extends PtsRepository {
   async findProfessionalById(id: number): Promise<ProfessionalRecord | null> {
     const professional = await this.professionalRepository.findOne({
       where: { id: id as any },
-      relations: ['account'],
+      relations: {
+        account: true,
+      },
     });
 
     if (!professional) return null;
 
     return {
       id: professional.id as unknown as number,
-      accountId: professional.account?.id,
+      accountId: professional.account?.id ?? ('' as any),
     };
   }
 
@@ -68,7 +71,6 @@ export class PtsRepositoryImpl extends PtsRepository {
     await queryRunner.startTransaction();
 
     try {
-      // 1. Criar e salvar o PTS principal em DRAFT
       const pts = queryRunner.manager.create(PtsEntity, {
         socialSituation: input.socialSituation,
         status: PtsStateEnum.DRAFT,
@@ -78,7 +80,6 @@ export class PtsRepositoryImpl extends PtsRepository {
 
       const savedPts = await queryRunner.manager.save(PtsEntity, pts);
 
-      // 2. Inserir a equipa inicial na tabela de junção, se houver IDs
       if (input.teamProfessionalIds && input.teamProfessionalIds.length > 0) {
         const uniqueTeamIds = Array.from(new Set(input.teamProfessionalIds)).filter(
           (id) => id !== input.responsibleProfessionalId,
@@ -94,11 +95,18 @@ export class PtsRepositoryImpl extends PtsRepository {
 
       await queryRunner.commitTransaction();
 
-      // 3. Buscar dados completos para montar o DTO de resposta
       const fullPts = await this.ptsRepository.findOne({
         where: { id: savedPts.id },
-        relations: ['patient', 'patient.account', 'responsible', 'responsible.account', 'responsible.specialism', 'team', 'team.account', 'team.specialism'],
+        relations: {
+          patient: { account: true },
+          responsible: { account: true },
+          team: { account: true },
+        },
       });
+
+      if (!fullPts) {
+        throw new Error('Erro ao recuperar o PTS recém-criado.');
+      }
 
       return {
         id: fullPts.id,
@@ -106,23 +114,23 @@ export class PtsRepositoryImpl extends PtsRepository {
         socialSituation: fullPts.socialSituation,
         createdAt: fullPts.createdAt.toISOString(),
         patient: {
-          id: fullPts.patient.accountId,
-          name: fullPts.patient.account.name,
+          id: fullPts.patient?.accountId,
+          name: fullPts.patient?.account?.name ?? '',
         },
         responsible: {
-          id: fullPts.responsible.id,
-          name: fullPts.responsible.account.name,
+          id: fullPts.responsible?.id,
+          name: fullPts.responsible?.account?.name ?? '',
           specialism: {
-            id: fullPts.responsible.specialism?.id,
-            name: fullPts.responsible.specialism?.name,
+            id: fullPts.responsible?.specialism as any,
+            name: String(fullPts.responsible?.specialism ?? ''),
           },
         },
         team: fullPts.team ? fullPts.team.map((t) => ({
           id: t.id,
-          name: t.account.name,
+          name: t.account?.name ?? '',
           specialism: {
-            id: t.specialism?.id,
-            name: t.specialism?.name,
+            id: t.specialism as any,
+            name: String(t.specialism ?? ''),
           },
         })) : [],
       };
