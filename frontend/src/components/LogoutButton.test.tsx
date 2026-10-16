@@ -40,6 +40,16 @@ describe('LogoutButton', () => {
     ).toBeInTheDocument();
   });
 
+  it('aceita classe e conteúdo personalizados', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce(response(null, 200));
+
+    render(<LogoutButton className="custom">Sair da conta</LogoutButton>);
+
+    expect(
+      await screen.findByRole('button', { name: 'Sair da conta' }),
+    ).toHaveClass('custom');
+  });
+
   it('não exibe o botão quando não existe sessão ativa', async () => {
     jest.mocked(fetch).mockResolvedValueOnce(response(null, 401));
 

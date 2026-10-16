@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 
 import Logo from '@/components/Logo';
+import ui from '@/components/ui.module.css';
 import { initSuperTokens } from '@/lib/supertokens';
 import styles from './login.module.css';
 
@@ -141,10 +142,13 @@ export default function LoginPage() {
             <p className={styles.intro}>Acesse sua conta TEA-PTS.</p>
 
             <form onSubmit={handleSubmit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="email">E-mail</label>
+              <div className={`${ui.field} ${styles.field}`}>
+                <label htmlFor="email" className={ui.label}>
+                  E-mail
+                </label>
 
                 <input
+                  className={ui.input}
                   id="email"
                   name="email"
                   type="email"
@@ -166,16 +170,17 @@ export default function LoginPage() {
                   }}
                 />
 
-                {emailError && (
-                  <p className={styles.fieldError}>{emailError}</p>
-                )}
+                {emailError && <p className={ui.fieldError}>{emailError}</p>}
               </div>
 
-              <div className={styles.field}>
-                <label htmlFor="password">Senha</label>
+              <div className={`${ui.field} ${styles.field}`}>
+                <label htmlFor="password" className={ui.label}>
+                  Senha
+                </label>
 
                 <div className={styles.passwordWrapper}>
                   <input
+                    className={ui.input}
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
@@ -221,7 +226,7 @@ export default function LoginPage() {
                 </div>
 
                 {passwordError && (
-                  <p className={styles.fieldError}>{passwordError}</p>
+                  <p className={ui.fieldError}>{passwordError}</p>
                 )}
               </div>
 
@@ -237,14 +242,14 @@ export default function LoginPage() {
               </div>
 
               {loginError && (
-                <p className={styles.loginError} role="alert">
+                <p className={`${ui.alert} ${styles.loginError}`} role="alert">
                   {loginError}
                 </p>
               )}
 
               <button
                 type="submit"
-                className={styles.submitButton}
+                className={`${ui.btn} ${ui.btnPrimary} ${ui.btnBlock} ${styles.mainButton}`}
                 disabled={loading}
               >
                 {loading ? 'Entrando...' : 'Entrar'}
@@ -257,7 +262,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              className={styles.signupButton}
+              className={`${ui.btn} ${ui.btnSecondary} ${ui.btnBlock} ${styles.mainButton}`}
               onClick={() => router.push('/cadastro')}
             >
               Criar conta

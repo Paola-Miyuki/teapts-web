@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
+import ui from '@/components/ui.module.css';
 import type { Filters, ProfessionalSpecialism } from './Professionals';
 import styles from '../profissionais.module.css';
 
@@ -44,14 +45,14 @@ export default function ProfessionalFilters({
   }
 
   return (
-    <form className={styles.filters} onSubmit={handleSubmit}>
+    <form className={`${ui.card} ${styles.filters}`} onSubmit={handleSubmit}>
       <div className={styles.filterMain}>
-        <label className={styles.search}>
-          <span>Nome</span>
+        <label className={ui.field}>
+          <span className={ui.label}>Nome</span>
 
           <div className={styles.inputWithIcon}>
             <svg
-              className={styles.icon}
+              className={styles.searchIcon}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -65,6 +66,7 @@ export default function ProfessionalFilters({
             </svg>
 
             <input
+              className={ui.input}
               type="text"
               value={name}
               placeholder="Buscar por nome"
@@ -76,10 +78,11 @@ export default function ProfessionalFilters({
           </div>
         </label>
 
-        <label className={styles.filterField}>
-          <span>Especialidade</span>
+        <label className={ui.field}>
+          <span className={ui.label}>Especialidade</span>
 
           <select
+            className={ui.input}
             value={specialism}
             aria-label="Especialidade"
             onChange={(event) => {
@@ -97,10 +100,11 @@ export default function ProfessionalFilters({
         </label>
       </div>
 
-      <label className={styles.idsField}>
-        <span>Identificadores</span>
+      <label className={`${ui.field} ${styles.idsField}`}>
+        <span className={ui.label}>Identificadores</span>
 
         <input
+          className={ui.input}
           type="text"
           value={ids}
           placeholder="IDs separados por vírgula"
@@ -110,20 +114,20 @@ export default function ProfessionalFilters({
           }}
         />
 
-        <small>
+        <small className={ui.hint}>
           Use este campo somente quando precisar consultar profissionais
           específicos.
         </small>
       </label>
 
       <div className={styles.filterActions}>
-        <button type="submit" className={styles.primaryButton}>
+        <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`}>
           Aplicar filtros
         </button>
 
         <button
           type="button"
-          className={styles.secondaryButton}
+          className={`${ui.btn} ${ui.btnSecondary}`}
           onClick={handleClear}
         >
           Limpar filtros
