@@ -9,7 +9,7 @@ import {
   ExecutionContext,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import type { AccountContext } from '../../accounts/accounts.service';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 
 type AuthenticatedRequest = Request & {
   accountContext?: AccountContext;

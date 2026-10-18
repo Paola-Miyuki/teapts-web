@@ -88,7 +88,11 @@ export default function AppShell({
         id="sidebar"
         className={`${styles.sidebar} ${isMobile && open ? styles.open : ''}`}
       >
-        <Link href="/" className={styles.brand} aria-label="TEA-PTS, início">
+        <Link
+          href="/home"
+          className={styles.brand}
+          aria-label="TEA-PTS, início"
+        >
           <Logo />
         </Link>
 
@@ -161,7 +165,7 @@ export default function AppShell({
         <main className={styles.content}>
           {breadcrumb && (
             <nav className={styles.breadcrumb} aria-label="Caminho da página">
-              <Link href="/">Início</Link>
+              <Link href="/home">Início</Link>
               <span aria-hidden="true">/</span>
               <span>{breadcrumb}</span>
             </nav>

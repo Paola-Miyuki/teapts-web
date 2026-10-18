@@ -8,7 +8,7 @@ import { Response } from 'express';
 import { verifySession } from 'supertokens-node/recipe/session/framework/express';
 import type { SessionRequest } from 'supertokens-node/framework/express';
 import { parseAccountContext } from '../account-context';
-import type { AccountContext } from '../../accounts/accounts.service';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 
 type AuthenticatedRequest = SessionRequest & {
   accountContext?: AccountContext;
@@ -26,7 +26,7 @@ type AuthenticatedRequest = SessionRequest & {
 @Injectable()
 export class AuthGuard implements CanActivate {
   // middleware oficial do SuperTokens, reaproveitado dentro do guard.
-  // checkDatabase consulta o core para que uma sessão revogada no signout
+  // checkDatabase consulta o core para que uma sessão revogada no logout
   // seja recusada na hora, e não só quando o access token expirar.
   private readonly verify = verifySession({ checkDatabase: true });
 

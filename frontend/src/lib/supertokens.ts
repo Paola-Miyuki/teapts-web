@@ -2,6 +2,8 @@ import SuperTokens from 'supertokens-web-js';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 import Session from 'supertokens-web-js/recipe/session';
 
+import { API_URL } from '@/lib/api';
+
 let initialized = false;
 
 export function initSuperTokens() {
@@ -12,7 +14,7 @@ export function initSuperTokens() {
   SuperTokens.init({
     appInfo: {
       appName: 'TEA-PTS',
-      apiDomain: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000',
+      apiDomain: API_URL,
       apiBasePath: '/auth',
     },
 

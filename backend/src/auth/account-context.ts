@@ -4,8 +4,8 @@
 // O contexto validado é entregue depois pelo decorator @CurrentAccount().
 
 import { UnauthorizedException } from '@nestjs/common';
-import type { AccountContext } from '../accounts/accounts.service';
-import { AccountRole } from '../database/enums/account-role.enum';
+import type { AccountContext } from '../accounts/services/accounts.service';
+import { AccountRole } from '../accounts/enums/account-role.enum';
 
 const ACCOUNT_ROLES: readonly unknown[] = Object.values(AccountRole);
 

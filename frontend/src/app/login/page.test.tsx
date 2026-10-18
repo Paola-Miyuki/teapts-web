@@ -53,12 +53,12 @@ describe('LoginPage', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('goes to the home page after a successful sign-in', async () => {
+  it('goes to the home page after a successful login', async () => {
     signIn.mockResolvedValue({ status: 'OK' });
 
     fillAndSubmit('teste@teapts.local', 'teapts123');
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/home'));
     expect(signIn).toHaveBeenCalledWith({
       formFields: [
         { id: 'email', value: 'teste@teapts.local' },

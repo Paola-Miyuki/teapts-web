@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+
+import { apiFetch } from '@/lib/api';
 
 type LogoutButtonProps = {
   allSessions?: boolean;
@@ -17,36 +19,11 @@ export default function LogoutButton({
 }: LogoutButtonProps) {
   const router = useRouter();
 
-  const [hasSession, setHasSession] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  // Só é renderizado dentro do AppShell, depois que o useAccount carregou a conta.
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-
-  useEffect(() => {
-    async function checkSession() {
-      try {
-        const response = await fetch(`${apiUrl}/me`, {
-          method: 'GET',
-          credentials: 'include',
-        });
-
-        setHasSession(response.ok);
-      } catch (error) {
-        console.error('Erro ao verificar sessão:', error);
-
-        setHasSession(false);
-      } finally {
-        setCheckingSession(false);
-      }
-    }
-
-    checkSession();
-  }, [apiUrl]);
-
   function finishLogout() {
-    setHasSession(false);
     setErrorMessage('');
 
     router.replace('/login');
@@ -54,7 +31,7 @@ export default function LogoutButton({
   }
 
   async function handleLogout() {
-    if (!hasSession || loading) {
+    if (loading) {
       return;
     }
 
@@ -62,10 +39,8 @@ export default function LogoutButton({
     setErrorMessage('');
 
     try {
-      const response = await fetch(`${apiUrl}/auth/signout`, {
+      const response = await apiFetch('/auth/logout', {
         method: 'POST',
-
-        credentials: 'include',
 
         headers: {
           'Content-Type': 'application/json',
@@ -106,10 +81,6 @@ export default function LogoutButton({
     } finally {
       setLoading(false);
     }
-  }
-
-  if (checkingSession || !hasSession) {
-    return null;
   }
 
   return (
