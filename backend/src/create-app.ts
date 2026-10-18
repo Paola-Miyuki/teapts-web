@@ -2,12 +2,14 @@
 // Primeiro entram CORS e o middleware do SuperTokens.
 // Depois o errorHandler oficial trata as rotas /auth/* e seus erros.
 // O filtro global só atua quando um erro SuperTokens chega ao pipeline NestJS.
+// O ValidationPipe global valida os DTOs de todas as rotas.
 
 import { NestFactory } from '@nestjs/core';
 import supertokens from 'supertokens-node';
 import { errorHandler, middleware } from 'supertokens-node/framework/express';
 import { AppModule } from './app.module';
 import { SupertokensExceptionFilter } from './auth/supertokens-exception.filter';
+import { createValidationPipe } from './common/validation/create-validation-pipe';
 
 /**
  * Cria a aplicação com a mesma cadeia de middleware usada em produção.
@@ -32,6 +34,7 @@ export async function createApp() {
   app.use(middleware());
   app.use(errorHandler());
   app.useGlobalFilters(new SupertokensExceptionFilter());
+  app.useGlobalPipes(createValidationPipe());
 
   return app;
 }

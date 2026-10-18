@@ -91,7 +91,7 @@ export default function LoginPage() {
       });
 
       if (response.status === 'OK') {
-        router.replace('/');
+        router.replace('/home');
         return;
       }
 
@@ -263,7 +263,7 @@ export default function LoginPage() {
             <button
               type="button"
               className={`${ui.btn} ${ui.btnSecondary} ${ui.btnBlock} ${styles.mainButton}`}
-              onClick={() => router.push('/cadastro')}
+              onClick={() => router.push('/signup')}
             >
               Criar conta
             </button>
