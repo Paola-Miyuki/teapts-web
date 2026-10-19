@@ -94,3 +94,19 @@ test/                      testes e2e
 
 Entidade ou migration nova precisa entrar nos arrays `entities`/`migrations`
 de `src/database/database.config.ts`; senão o TypeORM a ignora.
+
+## GET /patients/authorized
+
+Consulta autenticada que lista pacientes vinculados a PTS em estado
+`planning` ou `running`, nos quais o profissional logado é responsável ou
+participa da equipe.
+
+Parâmetros de query:
+
+- `page`: página, padrão `1`, mínimo `1`;
+- `limit`: quantidade por página, padrão `10`, mínimo `1` e máximo `100`.
+
+A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
+totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
+(`Parâmetro inválido: X`), `401` (sem sessão) e `500`
+(`Não foi possível consultar os pacientes autorizados.`).
