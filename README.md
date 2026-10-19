@@ -271,8 +271,8 @@ GET /me
 
 Decisões que valem saber antes de mexer:
 
-- **Não existe endpoint de login próprio.** Signin, signup, refresh e signout são as rotas do SDK; o backend só sobrescreve partes delas em `backend/src/auth/supertokens.service.ts`.
-- **O contexto da conta só entra no token no signin e no signup.** Esses dois fluxos marcam o `userContext` (`teapts.accountContext`) e o `createNewSession` só adiciona `accountId`, `role` e perfis quando vê essa marca. O refresh mantém o payload que já existia.
+- **Não existe endpoint de login próprio.** Login (`/auth/signin`), signup e refresh são as rotas do SDK; o backend só sobrescreve partes delas em `backend/src/auth/supertokens.service.ts`. O logout é o `POST /auth/logout` do `AuthController` (o `/auth/signout` do SDK está desligado).
+- **O contexto da conta só entra no token no login e no signup.** Esses dois fluxos marcam o `userContext` (`teapts.accountContext`) e o `createNewSession` só adiciona `accountId`, `role` e perfis quando vê essa marca. O refresh mantém o payload que já existia.
 - **Os perfis no token são uma foto do momento do login.** Quem criar ou remover um perfil precisa atualizar a sessão (`Session.mergeIntoAccessTokenPayload`) ou exigir login de novo.
 - **Erros de conta respondem `500` genérico**, sem stack trace nem detalhe de infraestrutura, e nenhuma sessão é emitida.
 
@@ -294,7 +294,7 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/signin` | `rid: emailpassword`; `formFields`: `email`, `password` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
-| POST | `/auth/signout` | access token | `200 {"status":"OK"}` |
+| POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
 
 O header `st-auth-mode` escolhe como a sessão trafega:
@@ -332,7 +332,7 @@ ACCESS=$(grep -i '^st-access-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
 REFRESH=$(grep -i '^st-refresh-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
 
 # 4) Logout: revoga a sessão; depois disso o refresh responde 401
-curl -s -X POST "$API/auth/signout" -H "Authorization: Bearer $ACCESS"
+curl -s -X POST "$API/auth/logout" -H "Authorization: Bearer $ACCESS"
 echo
 ```
 
@@ -373,8 +373,8 @@ Respostas que indicam problema:
 
 | Resposta | Causa |
 | --- | --- |
-| signin `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
-| signin/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
+| login (`/auth/signin`) `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
+| login/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
 | signup `200 {"status":"FIELD_ERROR",...}` | `name` vazio ou senha fraca; a mensagem diz qual campo |
 | signup `200 {"status":"EMAIL_ALREADY_EXISTS_ERROR"}` | e-mail já cadastrado |
 | `/me` `401 {"message":"unauthorised"}` | nenhum token chegou: o login não deu `OK` ou faltou `Authorization`/cookie |

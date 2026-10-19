@@ -5,8 +5,8 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { Account } from '../src/database/entities/account.entity';
-import { Professional } from '../src/database/entities/professional.entity';
+import { Account } from '../src/accounts/entities/account.entity';
+import { Professional } from '../src/professionals/entities/professional.entity';
 import { AppModule } from '../src/app.module';
 
 // Sobe o AppModule inteiro (Config + TypeOrm + Health) e exercita as rotas por

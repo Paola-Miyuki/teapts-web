@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { AuthController } from './auth.controller';
-import { SupertokensService } from './supertokens.service';
+import { AuthController } from './controllers/auth.controller';
+import { SupertokensService } from './services/supertokens.service';
 import { AccountsModule } from '../accounts/accounts.module';
 
 @Module({

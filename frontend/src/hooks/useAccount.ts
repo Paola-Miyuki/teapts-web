@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import type { Account } from '@/lib/account';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+import { getMe, type Account } from '@/lib/account';
+import { ApiError } from '@/lib/api';
 
 const LOAD_ERROR = 'Não foi possível carregar os dados da sua conta.';
 
@@ -20,32 +19,23 @@ export function useAccount() {
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`${API_URL}/me`, { credentials: 'include' })
-      .then(async (response) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (response.status === 401) {
-          router.replace('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          setError(LOAD_ERROR);
-          return;
-        }
-
-        const result = (await response.json()) as Account;
-
+    getMe()
+      .then((result) => {
         if (!cancelled) {
           setAccount(result);
         }
       })
-      .catch(() => {
-        if (!cancelled) {
-          setError(LOAD_ERROR);
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
         }
+
+        if (error instanceof ApiError && error.status === 401) {
+          router.replace('/login');
+          return;
+        }
+
+        setError(LOAD_ERROR);
       });
 
     return () => {

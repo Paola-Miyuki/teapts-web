@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
 import { getDatabaseOptions } from './database.config';
-import { Account } from './entities/account.entity';
-import { Patient } from './entities/patient.entity';
-import { Professional } from './entities/professional.entity';
+import { Account } from '../accounts/entities/account.entity';
+import { Patient } from '../patients/entities/patient.entity';
+import { Professional } from '../professionals/entities/professional.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';

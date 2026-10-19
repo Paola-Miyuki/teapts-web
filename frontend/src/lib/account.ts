@@ -1,4 +1,5 @@
 import type { IconName } from '@/components/Icon';
+import { request } from '@/lib/api';
 
 export type Account = {
   accountId: string;
@@ -8,6 +9,11 @@ export type Account = {
   patientProfileId: string | null;
   professionalProfileIds: string[];
 };
+
+// GET /me: conta da sessão atual.
+export function getMe() {
+  return request<Account>('/me');
+}
 
 export type ProfileKind = 'admin' | 'professional' | 'patient' | 'waiting';
 
@@ -49,13 +55,13 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
   let items: NavItem[];
 
   if (kind === 'waiting') {
-    items = [{ href: '/', icon: 'home', label: 'Início' }];
+    items = [{ href: '/home', icon: 'home', label: 'Início' }];
   } else if (kind === 'patient') {
-    items = [{ href: '/', icon: 'home', label: 'Meu cuidado' }];
+    items = [{ href: '/home', icon: 'home', label: 'Meu cuidado' }];
   } else {
     items = [
-      { href: '/', icon: 'home', label: 'Início' },
-      { href: '/profissionais', icon: 'people', label: 'Profissionais' },
+      { href: '/home', icon: 'home', label: 'Início' },
+      { href: '/professionals', icon: 'people', label: 'Profissionais' },
     ];
   }
 
