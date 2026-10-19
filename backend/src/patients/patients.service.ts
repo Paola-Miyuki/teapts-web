@@ -28,6 +28,18 @@ export class PatientsService {
     private readonly patientRepository: Repository<Patient>,
   ) {}
 
+  /**
+   * Busca pacientes relacionados a PTS ativos aos quais a conta tem acesso.
+   *
+   * O accountId vem do contexto autenticado, e o responsável do PTS conta
+   * como membro da equipe, conforme a RN005. A consulta usa offset/limit
+   * porque getRawMany ignora skip/take quando há JOIN.
+   *
+   * @param accountId identificador da conta autenticada
+   * @param request parâmetros de paginação já normalizados
+   * @returns pacientes autorizados e metadados da paginação
+   * @throws InternalServerErrorException quando a consulta ao banco falha
+   */
   async findAuthorized(
     accountId: string,
     request: GetAuthorizedPatientsRequestDto,

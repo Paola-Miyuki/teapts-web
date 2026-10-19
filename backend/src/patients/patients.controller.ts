@@ -15,6 +15,17 @@ import { PatientsService } from './patients.service';
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
+  /**
+   * Retorna pacientes autorizados, filtrados por PTS ativo e paginados.
+   *
+   * O accountId é obtido do contexto autenticado, e a consulta considera o
+   * responsável do PTS como membro da equipe, conforme a RN005.
+   *
+   * @param account contexto da conta autenticada
+   * @param query parâmetros brutos recebidos na URL
+   * @returns pacientes autorizados e dados de paginação
+   * @throws BadRequestException quando um parâmetro de paginação é inválido
+   */
   @Get('patients/authorized')
   @UseGuards(AuthGuard)
   async findAuthorized(
