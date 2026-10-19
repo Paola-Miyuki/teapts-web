@@ -69,6 +69,9 @@ src/
     professionals.controller.ts  GET /professionals protegido por sessão
     professionals.service.ts      consulta profissionais com filtros e paginação
     dto/                          contratos e normalização da consulta
+  patients/
+    patients.controller.ts        GET /patients/authorized protegido por sessão
+    patients.service.ts            consulta pacientes autorizados com paginação
   auth/
     supertokens.service.ts         receitas EmailPassword e Session; campo name no
                                    signup; overrides de signUpPOST, signUp,
