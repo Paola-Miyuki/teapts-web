@@ -7,6 +7,7 @@ import { getDatabaseOptions } from './database/database.config';
 import { HealthModule } from './health/health.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { PatientsModule } from './patients/patients.module';
+import { PtsModule } from './pts/pts.module';
 
 /**
  * Módulo raiz: configura o banco de dados e reúne os módulos da API.
@@ -30,6 +31,7 @@ import { PatientsModule } from './patients/patients.module';
     HealthModule,
     ProfessionalsModule,
     PatientsModule,
+    PtsModule,
   ],
 })
 export class AppModule {}

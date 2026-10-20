@@ -1,7 +1,6 @@
 // Este arquivo concentra a regra da consulta de pacientes autorizados.
 // A query fica no PatientsRepository; aqui ficam o erro seguro, a conversão
 // para o contrato público e os metadados da paginação.
-
 import {
   Injectable,
   InternalServerErrorException,

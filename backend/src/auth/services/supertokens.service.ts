@@ -43,10 +43,6 @@ export async function processLogout(
     `Logout concluído. userId=${userId} allSessions=${allSessions}`,
   );
 }
-
-/**
- * Valida o campo extra `name` do formulário de cadastro.
- */
 export async function validateName(
   value: unknown,
 ): Promise<string | undefined> {
@@ -57,10 +53,6 @@ export async function validateName(
   return undefined;
 }
 
-/**
- * Inicializa o SuperTokens, cria a conta de negócio no cadastro e inclui o
- * contexto da conta na sessão do login e do cadastro.
- */
 @Injectable()
 export class SupertokensService {
   private readonly logger = new Logger(SupertokensService.name);
@@ -93,6 +85,7 @@ export class SupertokensService {
               ...originalImplementation,
 
               signUp: async function (input) {
+                // Lê o nome diretamente do userContext preenchido pela camada de API (signUpPOST)
                 const name = input.userContext[SIGN_UP_NAME_KEY];
 
                 if (typeof name !== 'string' || name.trim() === '') {

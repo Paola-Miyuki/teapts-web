@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
 import { Patient } from '../entities/patient.entity';
 
+
 /** Estados de PTS considerados ativos para a consulta. */
 export const ACTIVE_PTS_STATES = ['planning', 'running'];
 
