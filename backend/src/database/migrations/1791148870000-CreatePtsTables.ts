@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreatePtsTables1698000000000 implements MigrationInterface {
+export class CreatePtsTables1791148870000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Criação do ENUM para os estados do PTS
     await queryRunner.query(`
