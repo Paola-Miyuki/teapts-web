@@ -45,3 +45,25 @@ body {
   color: var(--foreground);
   font-family: var(--font-body);
 }
+
+/* Força restrição de tamanho em todas as imagens da aplicação */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Corrige especificamente o tamanho do avatar da barra lateral/cabeçalho */
+aside img, 
+header img, 
+.avatar img, 
+.app-brand img {
+  width: 36px !important;
+  height: 36px !important;
+  object-fit: contain;
+}
+
+/* Caso o logótipo da marca precise de ser um pouco maior mas controlado */
+.app-brand img {
+  width: 40px !important;
+  height: auto !important;
+}
