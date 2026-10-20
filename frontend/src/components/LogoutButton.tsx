@@ -1,14 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 type LogoutButtonProps = {
   allSessions?: boolean;
+  className?: string;
+  children?: ReactNode;
 };
 
 export default function LogoutButton({
   allSessions = false,
+  className,
+  children = 'Sair',
 }: LogoutButtonProps) {
   const router = useRouter();
 
@@ -109,8 +114,13 @@ export default function LogoutButton({
 
   return (
     <div>
-      <button type="button" onClick={handleLogout} disabled={loading}>
-        {loading ? 'Saindo...' : 'Sair'}
+      <button
+        type="button"
+        className={className}
+        onClick={handleLogout}
+        disabled={loading}
+      >
+        {loading ? 'Saindo...' : children}
       </button>
 
       {errorMessage && <p role="alert">{errorMessage}</p>}

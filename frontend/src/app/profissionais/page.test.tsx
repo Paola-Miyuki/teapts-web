@@ -32,6 +32,24 @@ function mockResponse({
   } as unknown as Response;
 }
 
+const ACCOUNT = {
+  accountId: 'account-uuid',
+  name: 'Priscila Martins',
+  email: 'priscila@example.com',
+  role: 'user',
+  patientProfileId: null,
+  professionalProfileIds: ['professional-profile-uuid'],
+};
+
+// /me responde com a conta; as demais chamadas vão para o mock de profissionais.
+function mockApi(professionals: jest.Mock) {
+  (global.fetch as jest.Mock).mockImplementation((url: string) =>
+    url.endsWith('/me')
+      ? Promise.resolve(mockResponse({ data: ACCOUNT }))
+      : professionals(url),
+  );
+}
+
 describe('ProfissionaisPage', () => {
   const replace = jest.fn();
 
@@ -45,37 +63,62 @@ describe('ProfissionaisPage', () => {
     global.fetch = jest.fn();
   });
 
-  it('exibe o estado de carregamento', () => {
-    (global.fetch as jest.Mock).mockImplementation(() => new Promise(() => {}));
+  it('exibe o estado de carregamento', async () => {
+    mockApi(jest.fn(() => new Promise(() => {})));
 
     render(<ProfissionaisPage />);
 
-    expect(screen.getByText('Carregando profissionais...')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Carregando profissionais...'),
+    ).toBeInTheDocument();
+  });
+
+  it('exibe a estrutura padrão com a conta autenticada', async () => {
+    mockApi(jest.fn(() => new Promise(() => {})));
+
+    render(<ProfissionaisPage />);
+
+    expect(await screen.findByText('Priscila Martins')).toBeInTheDocument();
+
+    const menu = within(
+      screen.getByRole('navigation', { name: 'Menu principal' }),
+    );
+
+    expect(menu.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    expect(menu.getByRole('link', { name: 'Início' })).not.toHaveAttribute(
+      'aria-current',
+    );
   });
 
   it('consulta e exibe os profissionais', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        data: {
-          data: [
-            {
-              id: 'professional-uuid',
-              name: 'Maria Silva',
-              email: 'maria@example.com',
-              specialism: {
-                id: 'psychologist',
-                name: 'Psicologia',
+    mockApi(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          data: {
+            data: [
+              {
+                id: 'professional-uuid',
+                name: 'Maria Silva',
+                email: 'maria@example.com',
+                specialism: {
+                  id: 'psychologist',
+                  name: 'Psicologia',
+                },
               },
+            ],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 1,
+              totalPages: 1,
             },
-          ],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 1,
-            totalPages: 1,
           },
-        },
-      }),
+        }),
+      ),
     );
 
     render(<ProfissionaisPage />);
@@ -101,18 +144,20 @@ describe('ProfissionaisPage', () => {
   });
 
   it('exibe estado vazio quando não existem profissionais', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        data: {
-          data: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            totalPages: 0,
+    mockApi(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          data: {
+            data: [],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 0,
+              totalPages: 0,
+            },
           },
-        },
-      }),
+        }),
+      ),
     );
 
     render(<ProfissionaisPage />);
@@ -123,11 +168,13 @@ describe('ProfissionaisPage', () => {
   });
 
   it('exibe erro quando a consulta falha', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        status: 500,
-        ok: false,
-      }),
+    mockApi(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 500,
+          ok: false,
+        }),
+      ),
     );
 
     render(<ProfissionaisPage />);
@@ -142,11 +189,13 @@ describe('ProfissionaisPage', () => {
   });
 
   it('redireciona para login quando a sessão não é válida', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(
-      mockResponse({
-        status: 401,
-        ok: false,
-      }),
+    mockApi(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 401,
+          ok: false,
+        }),
+      ),
     );
 
     render(<ProfissionaisPage />);
@@ -157,43 +206,46 @@ describe('ProfissionaisPage', () => {
   });
 
   it('aplica filtros por nome e especialidade', async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce(
-        mockResponse({
-          data: {
-            data: [],
-            pagination: {
-              page: 1,
-              limit: 10,
-              total: 0,
-              totalPages: 0,
-            },
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        mockResponse({
-          data: {
-            data: [
-              {
-                id: 'professional-uuid',
-                name: 'Maria Silva',
-                email: 'maria@example.com',
-                specialism: {
-                  id: 'psychologist',
-                  name: 'Psicologia',
-                },
+    mockApi(
+      jest
+        .fn()
+        .mockResolvedValueOnce(
+          mockResponse({
+            data: {
+              data: [],
+              pagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                totalPages: 0,
               },
-            ],
-            pagination: {
-              page: 1,
-              limit: 10,
-              total: 1,
-              totalPages: 1,
             },
-          },
-        }),
-      );
+          }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({
+            data: {
+              data: [
+                {
+                  id: 'professional-uuid',
+                  name: 'Maria Silva',
+                  email: 'maria@example.com',
+                  specialism: {
+                    id: 'psychologist',
+                    name: 'Psicologia',
+                  },
+                },
+              ],
+              pagination: {
+                page: 1,
+                limit: 10,
+                total: 1,
+                totalPages: 1,
+              },
+            },
+          }),
+        ),
+    );
 
     render(<ProfissionaisPage />);
 
@@ -229,53 +281,56 @@ describe('ProfissionaisPage', () => {
   });
 
   it('consulta a próxima página mantendo os filtros', async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce(
-        mockResponse({
-          data: {
-            data: [
-              {
-                id: '1',
-                name: 'Ana Silva',
-                email: 'ana@example.com',
-                specialism: {
-                  id: 'doctor',
-                  name: 'Medicina',
+    mockApi(
+      jest
+        .fn()
+        .mockResolvedValueOnce(
+          mockResponse({
+            data: {
+              data: [
+                {
+                  id: '1',
+                  name: 'Ana Silva',
+                  email: 'ana@example.com',
+                  specialism: {
+                    id: 'doctor',
+                    name: 'Medicina',
+                  },
                 },
+              ],
+              pagination: {
+                page: 1,
+                limit: 10,
+                total: 11,
+                totalPages: 2,
               },
-            ],
-            pagination: {
-              page: 1,
-              limit: 10,
-              total: 11,
-              totalPages: 2,
             },
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        mockResponse({
-          data: {
-            data: [
-              {
-                id: '11',
-                name: 'João Santos',
-                email: 'joao@example.com',
-                specialism: {
-                  id: 'doctor',
-                  name: 'Medicina',
+          }),
+        )
+        .mockResolvedValueOnce(
+          mockResponse({
+            data: {
+              data: [
+                {
+                  id: '11',
+                  name: 'João Santos',
+                  email: 'joao@example.com',
+                  specialism: {
+                    id: 'doctor',
+                    name: 'Medicina',
+                  },
                 },
+              ],
+              pagination: {
+                page: 2,
+                limit: 10,
+                total: 11,
+                totalPages: 2,
               },
-            ],
-            pagination: {
-              page: 2,
-              limit: 10,
-              total: 11,
-              totalPages: 2,
             },
-          },
-        }),
-      );
+          }),
+        ),
+    );
 
     render(<ProfissionaisPage />);
 
