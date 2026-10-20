@@ -2,8 +2,8 @@ import { ConfigService } from '@nestjs/config';
 import supertokens from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
-import { Account } from '../entities/account.entity';
-import { AccountRole } from '../enums/account-role.enum';
+import { Account } from '../../accounts/entities/account.entity';
+import { AccountRole } from '../../accounts/enums/account-role.enum';
 
 const TENANT_ID = 'public';
 const EMAIL = 'teste@teapts.local';

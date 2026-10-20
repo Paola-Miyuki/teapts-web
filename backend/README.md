@@ -60,34 +60,48 @@ No Docker, o Compose troca `DATABASE_HOST` por `postgres` e
 
 ```
 src/
-  main.ts                  bootstrap e validação da porta
-  create-app.ts            CORS, middleware() e errorHandler() do SuperTokens
+  main.ts                  bootstrap, ValidationPipe global e porta
+  create-app.ts            CORS, middleware() e errorHandler() do SuperTokens,
+                           ValidationPipe global (usado nos testes)
   app.module.ts            ConfigModule + TypeOrmModule + módulos da API
+  common/
+    validation/create-validation-pipe.ts   ValidationPipe e formato { status, message }
   accounts/
-    accounts.service.ts    cria a conta no signup e monta o contexto da sessão
+    services/accounts.service.ts           cria a conta no signup e monta o contexto da sessão
+    entities/account.entity.ts
+    enums/account-role.enum.ts             account_role_e
   professionals/
-    professionals.controller.ts  GET /professionals protegido por sessão
-    professionals.service.ts      consulta profissionais com filtros e paginação
-    dto/                          contratos e normalização da consulta
+    controllers/professionals.controller.ts    GET /professionals protegido por sessão
+    services/professionals.service.ts          erro seguro, contrato e paginação
+    repositories/professionals.repository.ts   query com filtros e paginação
+    dto/                                       contratos e validação da consulta
+    entities/professional.entity.ts
+    enums/specialism.enum.ts                   specialism_e
+  patients/
+    entities/patient.entity.ts
   auth/
-    supertokens.service.ts         receitas EmailPassword e Session; campo name no
-                                   signup; overrides de signUpPOST, signUp,
-                                   signInPOST e createNewSession
-    account-context.ts             valida o payload da sessão
-    guards/auth.guard.ts           adapta o verifySession aos guards do NestJS
+    services/supertokens.service.ts        receitas EmailPassword e Session; campo name no
+                                           signup; overrides de signUpPOST, signUp,
+                                           signInPOST e createNewSession; signOutPOST desligado
+    controllers/auth.controller.ts         GET /me e POST /auth/logout
+    dto/logout-request.dto.ts              corpo do logout (allSessions)
+    account-context.ts                     valida o payload da sessão
+    guards/auth.guard.ts                   adapta o verifySession aos guards do NestJS
     decorators/current-account.decorator.ts   entrega o contexto ao controller
-    auth.controller.ts             GET /me
-    supertokens-exception.filter.ts           erros do SuperTokens no pipeline do NestJS
+    supertokens-exception.filter.ts        erros do SuperTokens no pipeline do NestJS
   database/
     database.config.ts     conexão e arrays entities/migrations
     data-source.ts         DataSource usado pela CLI do TypeORM
-    entities/              account, patient, professional
-    enums/                 account_role_e, specialism_e
     migrations/            histórico do schema
     seeds/                 dados de desenvolvimento
-  health/                  GET /health
+  health/
+    controllers/health.controller.ts       GET /health
 test/                      testes e2e
 ```
+
+Cada módulo de domínio separa as camadas em `controllers/`, `services/` e
+`repositories/` (repository próprio só quando a query é complexa; senão o
+service usa o `Repository<T>` do TypeORM), com os specs ao lado do arquivo.
 
 Entidade ou migration nova precisa entrar nos arrays `entities`/`migrations`
 de `src/database/database.config.ts`; senão o TypeORM a ignora.
