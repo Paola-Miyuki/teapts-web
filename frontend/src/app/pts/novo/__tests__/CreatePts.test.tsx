@@ -1,70 +1,114 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/http';
 import * as api from '../api/ptsApi';
 import { CreatePts } from '../CreatePts';
+import {
+  MOCK_PATIENT_ID,
+  MOCK_PATIENT_WITH_ACTIVE_PTS_ID,
+  MOCK_PROFESSIONAL_ID,
+  mockProfessionals,
+} from '../api/mocks';
+import type { Account } from '@/lib/account';
 
-vi.mock('../api/ptsApi');
-vi.mock('@/lib/supertokens', () => ({ initSuperTokens: vi.fn() }));
+jest.mock('../api/ptsApi', () => ({
+  listEligiblePatients: jest.fn(),
+  listProfessionals: jest.fn(),
+  createPts: jest.fn(),
+}));
+
+jest.mock('@/lib/supertokens', () => ({ initSuperTokens: jest.fn() }));
 
 const SOCIAL = 'Paciente em situação de vulnerabilidade social.';
+
+const testAccount: Account = {
+  accountId: '00000000-0000-4000-8000-000000000001',
+  name: 'Kaio Felipe',
+  email: 'kaio@example.com',
+  role: 'user',
+  patientProfileId: null,
+  professionalProfileIds: [MOCK_PROFESSIONAL_ID],
+};
+
 const createdPts = {
-  id: 100,
-  patientId: 25,
-  responsibleProfessionalId: 10,
+  id: '00000000-0000-4000-8000-000000000100',
+  status: 'DRAFT' as const,
   socialSituation: SOCIAL,
-  status: 'DRAFT',
   createdAt: '2026-10-06T18:00:00.000Z',
-  teamProfessionalIds: [11, 15],
+  patient: {
+    id: MOCK_PATIENT_ID,
+    name: 'Maria Silva',
+  },
+  responsible: {
+    id: MOCK_PROFESSIONAL_ID,
+    name: 'Kaio Felipe',
+    specialism: { id: 'psychologist', name: 'Psicologia' },
+  },
+  team: mockProfessionals.slice(1, 3).map((professional) => ({
+    id: professional.id,
+    name: professional.name,
+    specialism: professional.specialism,
+  })),
 };
 
 async function renderScreen() {
-  render(<CreatePts />);
-  await screen.findByLabelText(/^paciente$/i); // aguarda carregar os dados
+  render(<CreatePts account={testAccount} />);
+  await screen.findByLabelText(/^paciente$/i);
 }
 
 async function fillForm(
   user: ReturnType<typeof userEvent.setup>,
   withTeam = true,
 ) {
-  await user.selectOptions(screen.getByLabelText(/^paciente$/i), '25');
+  await user.selectOptions(
+    screen.getByLabelText(/^paciente$/i),
+    MOCK_PATIENT_ID,
+  );
+
   if (withTeam) {
     await user.click(screen.getByText(/selecione os profissionais/i));
     await user.click(screen.getByLabelText(/Ana Lima/));
     await user.click(screen.getByLabelText(/Bruno Souza/));
   }
+
   await user.type(screen.getByLabelText(/situação social/i), SOCIAL);
 }
 
 beforeEach(() => {
-  vi.resetAllMocks();
-  vi.mocked(api.getCurrentProfessional).mockResolvedValue({
-    id: 10,
-    name: 'Kaio Felipe',
-    specialty: 'Psicólogo(a)',
-  });
-  vi.mocked(api.listEligiblePatients).mockResolvedValue([
-    { id: 25, name: 'Maria Silva' },
-    { id: 26, name: 'Diego Alves' },
+  jest.resetAllMocks();
+
+  (api.listEligiblePatients as jest.Mock).mockResolvedValue([
+    { id: MOCK_PATIENT_ID, name: 'Maria Silva' },
+    {
+      id: MOCK_PATIENT_WITH_ACTIVE_PTS_ID,
+      name: 'Diego Alves',
+    },
   ]);
-  vi.mocked(api.listProfessionals).mockResolvedValue([
-    { id: 10, name: 'Kaio Felipe', specialty: 'Psicólogo(a)' }, // responsável: não deve aparecer na equipe
-    { id: 11, name: 'Ana Lima', specialty: 'Médica' },
-    { id: 15, name: 'Bruno Souza', specialty: 'Fisioterapeuta' },
-  ]);
+
+  (api.listProfessionals as jest.Mock).mockResolvedValue(mockProfessionals);
 });
 
 describe('CreatePts', () => {
   it('carrega os dados e não lista o próprio responsável na equipe', async () => {
     await renderScreen();
+
     expect(
       screen.getByRole('option', { name: 'Maria Silva' }),
     ).toBeInTheDocument();
+
     expect(screen.getByLabelText(/Ana Lima/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Kaio Felipe/)).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByLabelText(
+        new RegExp(
+          `${mockProfessionals[0].name}.*${mockProfessionals[0].specialism.name}`,
+          'i',
+        ),
+      ),
+    ).not.toBeInTheDocument();
+
     expect(screen.getByLabelText(/seu perfil profissional/i)).toHaveValue(
-      'Kaio Felipe · Psicólogo(a)',
+      `${mockProfessionals[0].name} · ${mockProfessionals[0].specialism.name}`,
     );
   });
 
@@ -83,7 +127,9 @@ describe('CreatePts', () => {
   it('cria com o payload correto, mostra loading e informa DRAFT', async () => {
     const user = userEvent.setup();
     let resolve!: (v: typeof createdPts) => void;
-    vi.mocked(api.createPts).mockReturnValue(new Promise((r) => (resolve = r)));
+    (api.createPts as jest.Mock).mockReturnValue(
+      new Promise((r) => (resolve = r)),
+    );
 
     await renderScreen();
     await fillForm(user);
@@ -93,24 +139,24 @@ describe('CreatePts', () => {
       await screen.findByRole('button', { name: /criando proposta/i }),
     ).toBeDisabled();
     expect(api.createPts).toHaveBeenCalledWith({
-      professionalId: 10,
-      patientId: 25,
+      professionalId: MOCK_PROFESSIONAL_ID,
+      patientId: MOCK_PATIENT_ID,
       socialSituation: SOCIAL,
-      teamProfessionalIds: [11, 15],
+      teamProfessionalIds: [mockProfessionals[1].id, mockProfessionals[2].id],
     });
 
     resolve(createdPts);
     expect(await screen.findByTestId('pts-created')).toHaveTextContent('DRAFT');
     expect(
       screen.getByRole('link', { name: /abrir proposta/i }),
-    ).toHaveAttribute('href', '/pts/100');
+    ).toHaveAttribute('href', `/pts/${createdPts.id}`);
   });
 
   it('permite criar sem equipe (opcional)', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.createPts).mockResolvedValue({
+    (api.createPts as jest.Mock).mockResolvedValue({
       ...createdPts,
-      teamProfessionalIds: [],
+      team: [],
     });
     await renderScreen();
     await fillForm(user, false);
@@ -125,7 +171,7 @@ describe('CreatePts', () => {
 
   it('trata PTS_ACTIVE_EXISTS e destaca o campo paciente', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.createPts).mockRejectedValue(
+    (api.createPts as jest.Mock).mockRejectedValue(
       new ApiError(
         409,
         'PTS_ACTIVE_EXISTS',
@@ -150,7 +196,7 @@ describe('CreatePts', () => {
 
   it('trata profissional sem autorização para o perfil (403)', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.createPts).mockRejectedValue(
+    (api.createPts as jest.Mock).mockRejectedValue(
       new ApiError(403, 'PROFESSIONAL_NOT_AUTHORIZED'),
     );
     await renderScreen();
@@ -164,7 +210,7 @@ describe('CreatePts', () => {
 
   it('exibe a mensagem da API em erros não mapeados e preserva o formulário', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.createPts).mockRejectedValue(
+    (api.createPts as jest.Mock).mockRejectedValue(
       new ApiError(500, 'INTERNAL', 'Falha interna.'),
     );
     await renderScreen();
@@ -177,13 +223,17 @@ describe('CreatePts', () => {
 
   it('permite tentar de novo quando o carregamento inicial falha', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.listEligiblePatients).mockRejectedValueOnce(
+
+    (api.listEligiblePatients as jest.Mock).mockRejectedValueOnce(
       new ApiError(0, 'NETWORK_ERROR'),
     );
-    render(<CreatePts />);
+
+    render(<CreatePts account={testAccount} />);
+
     await user.click(
       await screen.findByRole('button', { name: /tentar novamente/i }),
     );
+
     expect(await screen.findByLabelText(/^paciente$/i)).toBeInTheDocument();
   });
 });

@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import Session from 'supertokens-web-js/recipe/session';
 import Logo from '@/components/Logo';
 import { initSuperTokens } from '@/lib/supertokens';
-import { getCurrentProfessional } from './api/ptsApi';
-import type { Professional } from './types';
+import { getMe } from '@/lib/account';
+import type { Account } from '@/lib/account';
 
 type NavKey = 'patients' | 'createPts';
 
@@ -50,17 +50,26 @@ export function AppShell({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [user, setUser] = useState<Professional | null>(null);
+  const [user, setUser] = useState<Account | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     initSuperTokens();
-    const controller = new AbortController();
-    getCurrentProfessional(controller.signal)
-      .then(setUser)
+
+    let active = true;
+
+    getMe()
+      .then((account) => {
+        if (active) {
+          setUser(account);
+        }
+      })
       .catch(() => {});
-    return () => controller.abort();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   function toggleSidebar() {
