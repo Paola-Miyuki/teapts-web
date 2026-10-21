@@ -15,25 +15,44 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { SessionRequest } from 'supertokens-node/framework/express';
 import { AuthGuard } from '../guards/auth.guard';
 import { CurrentAccount } from '../decorators/current-account.decorator';
 import { LogoutRequestDto } from '../dto/logout-request.dto';
+import { LogoutResponseDto } from '../dto/logout-response.dto';
+import { MeResponseDto } from '../dto/me-response.dto';
 import { processLogout } from '../services/supertokens.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import {
+  ErrorResponseDto,
+  UnauthorizedResponseDto,
+} from '../../common/swagger/error-response.dto';
 
 /**
  * Expõe endpoints da aplicação que dependem de uma sessão válida.
  *
  * @param accountsService serviço que busca os dados atuais da conta
  */
+@ApiTags('auth')
+@ApiCookieAuth()
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
 @Controller()
 export class AuthController {
   constructor(private readonly accountsService: AccountsService) {}
 
   @Get('me')
   @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: MeResponseDto })
   /**
    * Retorna os dados da conta atual, identificada pelo contexto da sessão.
    *
@@ -44,7 +63,9 @@ export class AuthController {
    * @returns dados públicos da conta atual
    * @throws UnauthorizedException quando a conta não pode ser encontrada
    */
-  async getMe(@CurrentAccount() account: AccountContext) {
+  async getMe(
+    @CurrentAccount() account: AccountContext,
+  ): Promise<MeResponseDto> {
     const accountDetails = await this.accountsService.findById(
       account.accountId,
     );
@@ -62,6 +83,14 @@ export class AuthController {
   @Post('auth/logout')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: allSessions',
+    },
+  })
   /**
    * Encerra a sessão atual e, com `allSessions: true`, todas as do usuário.
    *
@@ -73,7 +102,10 @@ export class AuthController {
    * @returns `{ status: 'OK' }`, o mesmo corpo do signout do SDK
    * @throws UnauthorizedException quando não há sessão na requisição
    */
-  async logout(@Req() req: SessionRequest, @Body() body: LogoutRequestDto) {
+  async logout(
+    @Req() req: SessionRequest,
+    @Body() body: LogoutRequestDto,
+  ): Promise<LogoutResponseDto> {
     if (!req.session) {
       throw new UnauthorizedException('Sessão não validada');
     }

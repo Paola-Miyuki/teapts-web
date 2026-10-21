@@ -2,6 +2,7 @@
 // A validação acontece no ValidationPipe global, antes do controller, para
 // impedir que valores inválidos alcancem a consulta ao banco.
 
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEnum,
@@ -86,11 +87,24 @@ function toIdList({ value }: { value: unknown }): unknown {
  * parâmetro inválido é o reportado no erro.
  */
 export class GetProfessionalsRequestDto {
+  // page e limit têm valor padrão, então são opcionais na query; o plugin
+  // os marcaria como obrigatórios por não terem `?`.
+  @ApiPropertyOptional({
+    type: 'integer',
+    default: DEFAULT_PROFESSIONALS_PAGE,
+    minimum: 1,
+  })
   @Transform(toPageNumber(DEFAULT_PROFESSIONALS_PAGE))
   @IsInt(invalidParameter('page'))
   @Min(1, invalidParameter('page'))
   page: number = DEFAULT_PROFESSIONALS_PAGE;
 
+  @ApiPropertyOptional({
+    type: 'integer',
+    default: DEFAULT_PROFESSIONALS_LIMIT,
+    minimum: 1,
+    maximum: MAX_PROFESSIONALS_LIMIT,
+  })
   @Transform(toPageNumber(DEFAULT_PROFESSIONALS_LIMIT))
   @IsInt(invalidParameter('limit'))
   @Min(1, invalidParameter('limit'))
@@ -108,6 +122,12 @@ export class GetProfessionalsRequestDto {
   @IsEnum(Specialism, invalidParameter('specialism'))
   specialism?: Specialism;
 
+  @ApiPropertyOptional({
+    type: String,
+    description: 'UUIDs separados por vírgula.',
+    example:
+      '7d0e8f2a-1c3b-4d5e-8f90-a1b2c3d4e5f6,0f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b',
+  })
   @Transform(toIdList)
   @IsOptional()
   @Matches(UUID_PATTERN, { ...invalidParameter('ids'), each: true })
