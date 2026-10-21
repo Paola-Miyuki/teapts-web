@@ -1,4 +1,3 @@
-
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 
 export interface ProfessionalRecord {
@@ -15,9 +14,7 @@ export interface CreateDraftInput {
 
 /** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
-  abstract findProfessionalById(
-    id: string,
-  ): Promise<ProfessionalRecord | null>;
+  abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
 
   abstract patientExists(id: string): Promise<boolean>;
 

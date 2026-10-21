@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -28,9 +27,7 @@ export class PtsRepositoryImpl extends PtsRepository {
     super();
   }
 
-  async findProfessionalById(
-    id: string,
-  ): Promise<ProfessionalRecord | null> {
+  async findProfessionalById(id: string): Promise<ProfessionalRecord | null> {
     const professional = await this.professionalRepository.findOne({
       where: { id },
       relations: {
@@ -79,9 +76,7 @@ export class PtsRepositoryImpl extends PtsRepository {
     return found.map((professional) => professional.id);
   }
 
-  async createDraft(
-    input: CreateDraftInput,
-  ): Promise<CreatePtsResponseDto> {
+  async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {
     const queryRunner = this.dataSource.createQueryRunner();
 
     await queryRunner.connect();
@@ -126,7 +121,7 @@ export class PtsRepositoryImpl extends PtsRepository {
 
       const response: CreatePtsResponseDto = {
         id: fullPts.id,
-        status: fullPts.status.toUpperCase() as CreatePtsResponseDto['status'],
+        status: fullPts.status,
         socialSituation: fullPts.socialSituation,
         createdAt: fullPts.createdAt.toISOString(),
         patient: {

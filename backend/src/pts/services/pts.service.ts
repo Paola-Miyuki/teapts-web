@@ -1,4 +1,3 @@
-
 import { Injectable } from '@nestjs/common';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
 import { PtsRepository } from '../repositories/pts.repository';
@@ -18,10 +17,7 @@ export class PtsService {
       dto.professionalId,
     );
 
-    if (
-      !professional ||
-      professional.accountId !== currentAccountId
-    ) {
+    if (!professional || professional.accountId !== currentAccountId) {
       throw professionalNotAuthorized();
     }
 
@@ -38,9 +34,7 @@ export class PtsService {
     ].filter((id) => id !== dto.professionalId);
 
     const existingIds =
-      await this.ptsRepository.findExistingProfessionalIds(
-        teamProfessionalIds,
-      );
+      await this.ptsRepository.findExistingProfessionalIds(teamProfessionalIds);
 
     const existingIdSet = new Set(existingIds);
     const missingIds = teamProfessionalIds.filter(

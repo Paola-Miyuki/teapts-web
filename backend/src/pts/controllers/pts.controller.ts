@@ -1,4 +1,3 @@
-
 import { Body, Controller, Post } from '@nestjs/common';
 import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
