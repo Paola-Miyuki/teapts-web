@@ -1,5 +1,5 @@
-
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   CreateDraftInput,
   ProfessionalRecord,
@@ -13,9 +13,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   created: CreatePtsResponseDto[] = [];
   private nextId = 100;
 
-  async findProfessionalById(
-    id: string,
-  ): Promise<ProfessionalRecord | null> {
+  async findProfessionalById(id: string): Promise<ProfessionalRecord | null> {
     return this.professionals.get(id) ?? null;
   }
 
@@ -36,7 +34,7 @@ export class InMemoryPtsRepository extends PtsRepository {
 
     const pts: CreatePtsResponseDto = {
       id: String(this.nextId++),
-      status: 'DRAFT',
+      status: PtsStateEnum.DRAFT,
       socialSituation: input.socialSituation,
       createdAt: new Date().toISOString(),
       patient: {

@@ -18,7 +18,11 @@ describe('CreatePtsRequestDto', () => {
   });
 
   it('aceita a equipe omitida', async () => {
-    const { teamProfessionalIds: _omit, ...payload } = valid;
+    const payload = {
+      professionalId: valid.professionalId,
+      patientId: valid.patientId,
+      socialSituation: valid.socialSituation,
+    };
     const dto = plainToInstance(CreatePtsRequestDto, payload);
     const errors = await validate(dto);
 
@@ -30,8 +34,14 @@ describe('CreatePtsRequestDto', () => {
     ['patientId inválido', { ...valid, patientId: '25' }],
     ['situação social vazia', { ...valid, socialSituation: '' }],
     ['situação social não textual', { ...valid, socialSituation: 123 }],
-    ['equipe não é um array', { ...valid, teamProfessionalIds: '750e8400-e29b-41d4-a716-446655440000' }],
-    ['equipe contém UUID inválido', { ...valid, teamProfessionalIds: ['inválido'] }],
+    [
+      'equipe não é um array',
+      { ...valid, teamProfessionalIds: '750e8400-e29b-41d4-a716-446655440000' },
+    ],
+    [
+      'equipe contém UUID inválido',
+      { ...valid, teamProfessionalIds: ['inválido'] },
+    ],
   ])('rejeita %s', async (_name, payload) => {
     const dto = plainToInstance(CreatePtsRequestDto, payload);
     const errors = await validate(dto);

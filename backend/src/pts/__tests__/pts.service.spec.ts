@@ -1,9 +1,5 @@
-
 import { PtsService } from '../services/pts.service';
-import {
-  InMemoryPtsRepository,
-  seededRepo,
-} from './in-memory-pts.repository';
+import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 
 const body = {
@@ -35,11 +31,8 @@ describe('PtsService.createPts', () => {
           id: 'prof-10',
         },
         socialSituation: body.socialSituation,
-        status: 'DRAFT',
-        team: [
-          { id: 'prof-11' },
-          { id: 'prof-15' },
-        ],
+        status: 'draft',
+        team: [{ id: 'prof-11' }, { id: 'prof-15' }],
       });
 
       expect(res.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
@@ -47,7 +40,11 @@ describe('PtsService.createPts', () => {
     });
 
     it('aceita equipe omitida e retorna lista vazia', async () => {
-      const { teamProfessionalIds: _omit, ...withoutTeam } = body;
+      const withoutTeam = {
+        professionalId: body.professionalId,
+        patientId: body.patientId,
+        socialSituation: body.socialSituation,
+      };
 
       const res = await service.createPts(withoutTeam, 'acc-1');
 
@@ -72,9 +69,7 @@ describe('PtsService.createPts', () => {
       repo.patients.add('patient-26');
       repo.patientsWithApprovedActivePts.add('patient-26');
 
-      await expect(
-        service.createPts(body, 'acc-1'),
-      ).resolves.toMatchObject({
+      await expect(service.createPts(body, 'acc-1')).resolves.toMatchObject({
         patient: { id: 'patient-25' },
       });
     });
@@ -84,10 +79,7 @@ describe('PtsService.createPts', () => {
     it('rejeita profissional pertencente a outra conta', async () => {
       await expectApiError(
         () =>
-          service.createPts(
-            { ...body, professionalId: 'prof-20' },
-            'acc-1',
-          ),
+          service.createPts({ ...body, professionalId: 'prof-20' }, 'acc-1'),
         403,
         'PROFESSIONAL_NOT_AUTHORIZED',
       );
@@ -98,10 +90,7 @@ describe('PtsService.createPts', () => {
     it('trata profissional inexistente como não autorizado', async () => {
       await expectApiError(
         () =>
-          service.createPts(
-            { ...body, professionalId: 'prof-999' },
-            'acc-1',
-          ),
+          service.createPts({ ...body, professionalId: 'prof-999' }, 'acc-1'),
         403,
         'PROFESSIONAL_NOT_AUTHORIZED',
       );
@@ -156,9 +145,7 @@ describe('PtsService.createPts', () => {
         'PTS_ACTIVE_EXISTS',
       );
 
-      expect(res.message).toBe(
-        'O paciente já possui um PTS aprovado e ativo.',
-      );
+      expect(res.message).toBe('O paciente já possui um PTS aprovado e ativo.');
       expect(repo.created).toHaveLength(0);
     });
 
@@ -168,11 +155,7 @@ describe('PtsService.createPts', () => {
           service.createPts(
             {
               ...body,
-              teamProfessionalIds: [
-                'prof-11',
-                'prof-777',
-                'prof-888',
-              ],
+              teamProfessionalIds: ['prof-11', 'prof-777', 'prof-888'],
             },
             'acc-1',
           ),
@@ -180,10 +163,7 @@ describe('PtsService.createPts', () => {
         'TEAM_PROFESSIONAL_NOT_FOUND',
       );
 
-      expect(res.professionalIds).toEqual([
-        'prof-777',
-        'prof-888',
-      ]);
+      expect(res.professionalIds).toEqual(['prof-777', 'prof-888']);
       expect(repo.created).toHaveLength(0);
     });
   });

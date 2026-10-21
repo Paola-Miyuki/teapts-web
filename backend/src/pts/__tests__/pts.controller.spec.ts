@@ -1,10 +1,6 @@
-
 import { PtsController } from '../controllers/pts.controller';
 import { PtsService } from '../services/pts.service';
-import {
-  InMemoryPtsRepository,
-  seededRepo,
-} from './in-memory-pts.repository';
+import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 
 const body = {
@@ -30,11 +26,8 @@ describe('PtsController POST /pts', () => {
       id: '100',
       patient: { id: 'patient-25' },
       responsible: { id: 'prof-10' },
-      status: 'DRAFT',
-      team: [
-        { id: 'prof-11' },
-        { id: 'prof-15' },
-      ],
+      status: 'draft',
+      team: [{ id: 'prof-11' }, { id: 'prof-15' }],
     });
   });
 
