@@ -57,11 +57,23 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
   if (kind === 'waiting') {
     items = [{ href: '/home', icon: 'home', label: 'Início' }];
   } else if (kind === 'patient') {
-    items = [{ href: '/home', icon: 'home', label: 'Meu cuidado' }];
+    items = [
+      { href: '/home', icon: 'home', label: 'Meu cuidado' },
+      {
+        href: '/pts/proposals',
+        icon: 'home',
+        label: 'Propostas de PTS',
+      },
+    ];
   } else {
     items = [
       { href: '/home', icon: 'home', label: 'Início' },
       { href: '/professionals', icon: 'people', label: 'Profissionais' },
+      {
+        href: '/pts/novo',
+        icon: 'home',
+        label: 'Criar proposta de PTS',
+      },
     ];
   }
 
