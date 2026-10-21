@@ -6,6 +6,8 @@ import {
   IsArray,
 } from 'class-validator';
 
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
+
 export class CreatePtsRequestDto {
   @IsUUID()
   @IsNotEmpty()
@@ -38,14 +40,15 @@ export interface PtsProfessionalDto {
 
 export class CreatePtsResponseDto {
   id: string;
-  status:
-    'DRAFT' | 'PLANNING' | 'RUNNING' | 'CONCLUDED' | 'CANCELLED' | 'REJECTED';
+  status: PtsStateEnum;
   socialSituation: string;
   createdAt: string;
+
   patient: {
     id: string;
     name: string;
   };
+
   responsible: PtsProfessionalDto;
   team: PtsProfessionalDto[];
 }

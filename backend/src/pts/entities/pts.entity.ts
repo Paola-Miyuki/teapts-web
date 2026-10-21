@@ -17,8 +17,12 @@ export class PtsEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'enum', enum: PtsStateEnum })
-  status: string;
+  @Column({
+    type: 'enum',
+    enum: PtsStateEnum,
+    enumName: 'pts_state_e',
+  })
+  status: PtsStateEnum;
 
   @Column()
   socialSituation: string;
