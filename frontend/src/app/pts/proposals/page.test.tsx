@@ -54,7 +54,7 @@ function proposalResponse(page = 1, totalPages = 1) {
     data: [
       {
         id: '3f2e1d0c-9b8a-4765-a432-10fedcba9876',
-        status: 'DRAFT',
+        status: 'draft',
         socialSituation: 'Situação social de teste.',
         createdAt: '2026-10-15T12:00:00.000Z',
 
