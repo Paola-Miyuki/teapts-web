@@ -10,6 +10,9 @@ estrutura. Para rodar a stack, use o [README da raiz](../README.md):
 - migrations, schemas e conta de teste: seção 5 ("Banco de dados");
 - fluxo de login, rotas, curls e respostas de erro: seção 6 ("Autenticação").
 
+Com a API no ar, a documentação OpenAPI fica em `http://localhost:3000/docs`
+(JSON em `/docs-json`).
+
 ## Scripts
 
 Rode de dentro de `backend/` ou da raiz com `pnpm --dir backend run <script>`.
@@ -60,12 +63,15 @@ No Docker, o Compose troca `DATABASE_HOST` por `postgres` e
 
 ```
 src/
-  main.ts                  bootstrap, ValidationPipe global e porta
+  main.ts                  bootstrap, ValidationPipe global, Swagger e porta
   create-app.ts            CORS, middleware() e errorHandler() do SuperTokens,
                            ValidationPipe global (usado nos testes)
   app.module.ts            ConfigModule + TypeOrmModule + módulos da API
   common/
     validation/create-validation-pipe.ts   ValidationPipe e formato { status, message }
+    swagger/setup-swagger.ts               documento OpenAPI em /docs e /docs-json
+    swagger/error-response.dto.ts          corpos de erro { status, message } e 401 { message }
+    swagger/supertokens-paths.ts           rotas do SDK do SuperTokens, descritas à mão
   accounts/
     services/accounts.service.ts           cria a conta no signup e monta o contexto da sessão
     entities/account.entity.ts
@@ -89,6 +95,7 @@ src/
                                            signInPOST e createNewSession; signOutPOST desligado
     controllers/auth.controller.ts         GET /me e POST /auth/logout
     dto/logout-request.dto.ts              corpo do logout (allSessions)
+    dto/me-response.dto.ts, logout-response.dto.ts   respostas do /me e do logout
     account-context.ts                     valida o payload da sessão
     guards/auth.guard.ts                   adapta o verifySession aos guards do NestJS
     decorators/current-account.decorator.ts   entrega o contexto ao controller
@@ -100,7 +107,9 @@ src/
     seeds/                 dados de desenvolvimento
   health/
     controllers/health.controller.ts       GET /health
+    dto/health-response.dto.ts             respostas 200 e 503
 test/                      testes e2e
+  swagger-plugin-transformer.mjs   plugin do Swagger no ts-jest
 ```
 
 Cada módulo de domínio separa as camadas em `controllers/`, `services/` e
@@ -125,3 +134,27 @@ A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
 totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
+
+## Documentação da API
+
+O `@nestjs/swagger` gera o documento a partir dos controllers e DTOs; o
+`setupSwagger` é chamado no `main.ts`.
+
+- **Plugin do CLI** (`nest-cli.json`): lê os tipos e os decorators do
+  `class-validator` dos arquivos `*.dto.ts`, então os DTOs de entrada não
+  repetem `@ApiProperty`. Use `@ApiPropertyOptional` só para o que o plugin
+  não deduz (ex.: campo com valor padrão, que ele marcaria como obrigatório).
+- **DTOs de resposta são classes**, não `interface`: interface não existe em
+  tempo de execução e não aparece no documento.
+- **Rota nova**: declare `@ApiTags`, as respostas (`@ApiOkResponse` e os
+  erros, com `ErrorResponseDto` ou `UnauthorizedResponseDto`) e, se tiver
+  `AuthGuard`, `@ApiCookieAuth()` e `@ApiBearerAuth()`.
+- **Testes**: o mesmo plugin roda no ts-jest (`astTransformers`, via
+  `test/swagger-plugin-transformer.mjs`), e o `test/swagger.e2e-spec.ts`
+  confere o `/docs-json`. Por isso o ts-jest roda com `isolatedModules: false`
+  (o plugin precisa do programa TypeScript inteiro) e erro de tipo também
+  derruba teste.
+- **Rotas do SuperTokens** (`/auth/signup`, `/auth/signin` e
+  `/auth/session/refresh`) vêm do middleware, não de controllers, e estão
+  escritas à mão em `src/common/swagger/supertokens-paths.ts`. Ao atualizar o
+  `supertokens-node`, confira se o contrato delas mudou.

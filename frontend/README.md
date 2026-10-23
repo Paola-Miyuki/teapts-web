@@ -117,7 +117,8 @@ exemplo.
   `/login`.
 
 O formato da resposta do `/me` e os demais status estão na seção 6 do README
-da raiz.
+da raiz. O contrato completo da API (rotas, corpos e respostas) está no
+Swagger do backend, em `http://localhost:3000/docs`.
 
 ## Testes
 

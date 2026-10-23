@@ -296,6 +296,8 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
 | POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
+| GET | `/docs` | — | interface do Swagger com a documentação da API |
+| GET | `/docs-json` | — | documento OpenAPI (JSON) |
 
 O header `st-auth-mode` escolhe como a sessão trafega:
 
@@ -303,6 +305,14 @@ O header `st-auth-mode` escolhe como a sessão trafega:
 - `st-auth-mode: header` — tokens nos headers de resposta `st-access-token` e `st-refresh-token`, enviados de volta em `Authorization: Bearer <token>` (prático para curl e Postman).
 
 A senha precisa de pelo menos 8 caracteres, com letra e número (regra padrão do SuperTokens). O `name` não pode ser vazio.
+
+**Documentação da API (Swagger):** com o backend no ar, abra `http://localhost:3000/docs`. Ela fica ligada em todos os ambientes e lista todas as rotas acima, com corpo, parâmetros e respostas. Para chamar uma rota protegida pela interface:
+
+1. Rode o `POST /auth/signin` (`rid: emailpassword`).
+2. Com `st-auth-mode: cookie`, o navegador guarda os cookies e as chamadas seguintes já vão autenticadas. Com `st-auth-mode: header`, copie o `st-access-token` da resposta para o **Authorize** (esquema `bearer`).
+3. Chame o `GET /me`.
+
+As rotas do SDK (`/auth/signup`, `/auth/signin` e `/auth/session/refresh`) são descritas à mão no backend; veja "Documentação da API" no [`backend/README.md`](backend/README.md#documentação-da-api).
 
 ### 6.4 Testar com curl
 
