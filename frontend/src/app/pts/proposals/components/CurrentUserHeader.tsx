@@ -6,9 +6,7 @@ import Link from 'next/link';
 
 import styles from '../proposals.module.css';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 type CurrentAccount = {
   accountId?: string;
@@ -27,10 +25,7 @@ type UserInfo = {
 function getProfileLabel(account: CurrentAccount) {
   const role = account.role?.toLowerCase();
 
-  if (
-    role === 'admin' ||
-    role === 'administrator'
-  ) {
+  if (role === 'admin' || role === 'administrator') {
     return 'Administrador';
   }
 
@@ -59,20 +54,16 @@ function getProfileLabel(account: CurrentAccount) {
 export default function CurrentUserHeader() {
   const router = useRouter();
 
-  const [user, setUser] =
-    useState<UserInfo | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadCurrentUser() {
       try {
-        const response = await fetch(
-          `${API_URL}/me`,
-          {
-            credentials: 'include',
-          },
-        );
+        const response = await fetch(`${API_URL}/me`, {
+          credentials: 'include',
+        });
 
         if (cancelled) {
           return;
@@ -92,18 +83,14 @@ export default function CurrentUserHeader() {
           return;
         }
 
-        const account =
-          (await response.json()) as CurrentAccount;
+        const account = (await response.json()) as CurrentAccount;
 
         if (cancelled) {
           return;
         }
 
         setUser({
-          name:
-            account.name?.trim() ||
-            account.email?.trim() ||
-            'Usuário',
+          name: account.name?.trim() || account.email?.trim() || 'Usuário',
           profile: getProfileLabel(account),
         });
       } catch {
@@ -126,10 +113,7 @@ export default function CurrentUserHeader() {
   }, [router]);
 
   return (
-    <Link
-      href="/meu-perfil"
-      className={styles.profileButton}
-    >
+    <Link href="/meu-perfil" className={styles.profileButton}>
       <span className={styles.profileAvatar}>
         <svg
           viewBox="0 0 24 24"
@@ -140,11 +124,7 @@ export default function CurrentUserHeader() {
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <circle
-            cx="12"
-            cy="8"
-            r="3"
-          />
+          <circle cx="12" cy="8" r="3" />
 
           <path d="M5 20a7 7 0 0 1 14 0" />
         </svg>

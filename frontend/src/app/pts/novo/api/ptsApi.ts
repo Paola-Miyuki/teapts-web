@@ -1,18 +1,64 @@
 import { request } from './http';
-import { mockCreatePts, mockMe, mockPatients, mockProfessionals } from './mocks';
-import type { CreatePtsPayload, Patient, Professional, Pts } from '../types';
+import { mockCreatePts, mockPatients, mockProfessionals } from './mocks';
+import type {
+  CreatePtsPayload,
+  PaginatedResponse,
+  Patient,
+  Professional,
+  Pts,
+} from '../types';
 
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS === 'true';
 
-// Rotas de apoio assumidas — ajuste conforme o backend.
-export const getCurrentProfessional = (signal?: AbortSignal): Promise<Professional> =>
-  USE_MOCKS ? Promise.resolve(mockMe) : request<Professional>('/professionals/me', { signal });
+export async function listProfessionals(
+  signal?: AbortSignal,
+  ids?: string[],
+): Promise<Professional[]> {
+  if (USE_MOCKS) {
+    return mockProfessionals.filter(
+      (professional) => !ids || ids.includes(professional.id),
+    );
+  }
 
-export const listEligiblePatients = (signal?: AbortSignal): Promise<Patient[]> =>
-  USE_MOCKS ? Promise.resolve(mockPatients) : request<Patient[]>('/patients?eligibleForPts=true', { signal });
+  const params = new URLSearchParams({
+    page: '1',
+    limit: '100',
+  });
 
-export const listProfessionals = (signal?: AbortSignal): Promise<Professional[]> =>
-  USE_MOCKS ? Promise.resolve(mockProfessionals) : request<Professional[]>('/professionals', { signal });
+  if (ids?.length) {
+    params.set('ids', ids.join(','));
+  }
 
-export const createPts = (payload: CreatePtsPayload): Promise<Pts> =>
-  USE_MOCKS ? mockCreatePts(payload) : request<Pts>('/pts', { method: 'POST', body: JSON.stringify(payload) });
+  const response = await request<PaginatedResponse<Professional>>(
+    `/professionals?${params.toString()}`,
+    { signal },
+  );
+
+  return response.data;
+}
+
+export async function listEligiblePatients(
+  signal?: AbortSignal,
+): Promise<Patient[]> {
+  if (USE_MOCKS) {
+    return mockPatients;
+  }
+
+  // Pendente: o backend ainda não expõe uma consulta confirmada
+  // de pacientes elegíveis para a criação de uma nova proposta.
+  // Não usar /patients/authorized como substituto: essa rota
+  // retorna somente pacientes ligados a PTS ativos autorizados.
+  void signal;
+  throw new Error(
+    'A consulta de pacientes elegíveis para novas propostas ainda não está disponível no backend.',
+  );
+}
+
+export function createPts(payload: CreatePtsPayload): Promise<Pts> {
+  return USE_MOCKS
+    ? mockCreatePts(payload)
+    : request<Pts>('/pts', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+}

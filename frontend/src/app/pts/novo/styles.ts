@@ -5,8 +5,10 @@ export const fieldErrorCls = 'text-[12px] leading-4 text-[#b45309]';
 
 const inputBase =
   'w-full rounded-xl px-[15px] text-[14px] text-slate-900 placeholder:text-slate-500 focus:outline-2 focus:outline-offset-2 transition-colors disabled:opacity-60';
-const inputOk = 'bg-white border border-[#ddddda] focus:outline-slate-900 focus:border-slate-900';
-const inputInvalid = 'bg-[#fffbeb] border border-[#d97706] focus:outline-[#d97706]';
+const inputOk =
+  'bg-white border border-[#ddddda] focus:outline-slate-900 focus:border-slate-900';
+const inputInvalid =
+  'bg-[#fffbeb] border border-[#d97706] focus:outline-[#d97706]';
 
 export const inputCls = (invalid?: boolean) =>
   `${inputBase} h-[46px] py-2.5 ${invalid ? inputInvalid : inputOk}`;

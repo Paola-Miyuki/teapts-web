@@ -1,5 +1,11 @@
 import type { Patient } from '../types';
-import { fieldCls, fieldErrorCls, helpCls, inputCls, labelCls } from '../styles';
+import {
+  fieldCls,
+  fieldErrorCls,
+  helpCls,
+  inputCls,
+  labelCls,
+} from '../styles';
 
 interface Props {
   patients: Patient[];
@@ -9,7 +15,13 @@ interface Props {
   disabled?: boolean;
 }
 
-export function PatientSelect({ patients, value, onChange, error, disabled }: Props) {
+export function PatientSelect({
+  patients,
+  value,
+  onChange,
+  error,
+  disabled,
+}: Props) {
   return (
     <div className={fieldCls}>
       <label htmlFor="patient" className={labelCls}>
@@ -23,7 +35,9 @@ export function PatientSelect({ patients, value, onChange, error, disabled }: Pr
           value={value}
           disabled={disabled}
           aria-invalid={!!error}
-          aria-describedby={error ? 'patient-help patient-error' : 'patient-help'}
+          aria-describedby={
+            error ? 'patient-help patient-error' : 'patient-help'
+          }
           onChange={(e) => onChange(e.target.value)}
           className={`${inputCls(!!error)} appearance-none pr-[44px]`}
         >

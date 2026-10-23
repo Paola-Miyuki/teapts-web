@@ -53,9 +53,9 @@ img {
 }
 
 /* Corrige especificamente o tamanho do avatar da barra lateral/cabeçalho */
-aside img, 
-header img, 
-.avatar img, 
+aside img,
+header img,
+.avatar img,
 .app-brand img {
   width: 36px !important;
   height: 36px !important;

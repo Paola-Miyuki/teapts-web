@@ -1,27 +1,53 @@
 export interface Patient {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface Professional {
-  id: number;
+  id: string;
   name: string;
-  specialty: string;
+  email: string;
+  specialism: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface PtsProfessional {
+  id: string;
+  name: string;
+  specialism: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface CreatePtsPayload {
-  professionalId: number;
-  patientId: number;
+  professionalId: string;
+  patientId: string;
   socialSituation: string;
-  teamProfessionalIds: number[];
+  teamProfessionalIds: string[];
 }
 
+export type PtsStatus =
+  'draft' | 'planning' | 'running' | 'concluded' | 'cancelled' | 'rejected';
+
 export interface Pts {
-  id: number;
-  patientId: number;
-  responsibleProfessionalId: number;
+  id: string;
+  status: PtsStatus;
   socialSituation: string;
-  status: 'DRAFT' | string;
   createdAt: string;
-  teamProfessionalIds: number[];
+  patient: Patient;
+  responsible: PtsProfessional;
+  team: PtsProfessional[];
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }

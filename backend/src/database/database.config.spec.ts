@@ -6,6 +6,8 @@ import { Professional } from '../professionals/entities/professional.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
+import { PtsEntity as Pts } from '../pts/entities/pts.entity';
+import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -66,11 +68,12 @@ describe('getDatabaseOptions', () => {
 
   it('registers the entities and migrations explicitly', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
-      entities: [Account, Patient, Professional],
+      entities: [Account, Patient, Professional, Pts],
       migrations: [
         CreateAccount1791072000000,
         LinkAccountToSupertokens1791148800000,
         CreatePatientAndProfessional1791148860000,
+        CreatePtsTables1791148870000,
       ],
     });
   });

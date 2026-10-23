@@ -1,4 +1,10 @@
-import { fieldCls, fieldErrorCls, helpCls, labelCls, textareaCls } from '../styles';
+import {
+  fieldCls,
+  fieldErrorCls,
+  helpCls,
+  labelCls,
+  textareaCls,
+} from '../styles';
 
 interface Props {
   value: string;
@@ -7,7 +13,12 @@ interface Props {
   disabled?: boolean;
 }
 
-export function SocialSituationInput({ value, onChange, error, disabled }: Props) {
+export function SocialSituationInput({
+  value,
+  onChange,
+  error,
+  disabled,
+}: Props) {
   return (
     <div className={fieldCls}>
       <label htmlFor="social" className={labelCls}>

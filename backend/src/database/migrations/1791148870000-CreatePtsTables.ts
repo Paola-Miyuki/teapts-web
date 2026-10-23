@@ -33,8 +33,12 @@ export class CreatePtsTables1791148870000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS professional_participating_on_therapeutic_journey;`);
-    await queryRunner.query(`DROP TABLE IF EXISTS projeto_terapeutico_singular;`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS professional_participating_on_therapeutic_journey;`,
+    );
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS projeto_terapeutico_singular;`,
+    );
     await queryRunner.query(`DROP TYPE IF EXISTS pts_state_e;`);
   }
 }

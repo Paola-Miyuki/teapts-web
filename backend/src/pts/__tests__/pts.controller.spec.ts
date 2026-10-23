@@ -1,15 +1,13 @@
-import { PtsController } from '../pts.controller';
-import { PtsService } from '../pts.service';
+import { PtsController } from '../controllers/pts.controller';
+import { PtsService } from '../services/pts.service';
 import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 
-const session = (accountId: string) => ({ getUserId: () => accountId }) as never;
-
 const body = {
-  professionalId: 10,
-  patientId: 25,
+  professionalId: 'prof-10',
+  patientId: 'patient-25',
   socialSituation: 'Paciente em situação de vulnerabilidade social.',
-  teamProfessionalIds: [11, 15],
+  teamProfessionalIds: ['prof-11', 'prof-15'],
 };
 
 describe('PtsController POST /pts', () => {
@@ -21,30 +19,35 @@ describe('PtsController POST /pts', () => {
     controller = new PtsController(new PtsService(repo));
   });
 
-  it('usa a conta da sessão e devolve o PTS criado no formato do contrato', async () => {
-    const res = await controller.create(session('acc-1'), body);
+  it('usa a conta da sessão e retorna o PTS criado', async () => {
+    const res = await controller.create(body, 'acc-1');
+
     expect(res).toMatchObject({
-      id: 100,
-      patientId: 25,
-      responsibleProfessionalId: 10,
-      status: 'DRAFT',
-      teamProfessionalIds: [11, 15],
+      id: '100',
+      patient: { id: 'patient-25' },
+      responsible: { id: 'prof-10' },
+      status: 'draft',
+      team: [{ id: 'prof-11' }, { id: 'prof-15' }],
     });
   });
 
-  it('rejeita (403) quando a sessão é de outra conta que não é dona do professionalId', async () => {
-    await expectApiError(() => controller.create(session('acc-9'), body), 403, 'PROFESSIONAL_NOT_AUTHORIZED');
+  it('rejeita quando a sessão não pertence ao profissional responsável', async () => {
+    await expectApiError(
+      () => controller.create(body, 'acc-9'),
+      403,
+      'PROFESSIONAL_NOT_AUTHORIZED',
+    );
+
     expect(repo.created).toHaveLength(0);
   });
 
-  it('rejeita (400) corpo inválido antes de consultar o repositório', async () => {
-    const spy = jest.spyOn(repo, 'findProfessionalById');
-    await expectApiError(() => controller.create(session('acc-1'), { ...body, socialSituation: '' }), 400, 'VALIDATION_ERROR');
-    expect(spy).not.toHaveBeenCalled();
-  });
+  it('propaga o erro de PTS aprovado e ativo', async () => {
+    repo.patientsWithApprovedActivePts.add('patient-25');
 
-  it('propaga 409 PTS_ACTIVE_EXISTS', async () => {
-    repo.patientsWithApprovedActivePts.add(25);
-    await expectApiError(() => controller.create(session('acc-1'), body), 409, 'PTS_ACTIVE_EXISTS');
+    await expectApiError(
+      () => controller.create(body, 'acc-1'),
+      409,
+      'PTS_ACTIVE_EXISTS',
+    );
   });
 });

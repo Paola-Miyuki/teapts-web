@@ -1,11 +1,20 @@
 import { Module } from '@nestjs/common';
-import { PtsController } from './pts.controller';
-import { PtsRepository } from './pts.repository';
-import { PtsRepositoryImpl } from './pts.repository.impl';
-import { PtsService } from './pts.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+import { PtsController } from './controllers/pts.controller';
+import { PtsEntity } from './entities/pts.entity';
+import { PtsRepository } from './repositories/pts.repository';
+import { PtsRepositoryImpl } from './repositories/pts.repository.impl';
+import { PtsService } from './services/pts.service';
+import { Professional } from '../professionals/entities/professional.entity';
+import { Patient } from '../patients/entities/patient.entity';
 
 @Module({
+  imports: [TypeOrmModule.forFeature([PtsEntity, Professional, Patient])],
   controllers: [PtsController],
-  providers: [PtsService, { provide: PtsRepository, useClass: PtsRepositoryImpl }],
+  providers: [
+    PtsService,
+    { provide: PtsRepository, useClass: PtsRepositoryImpl },
+  ],
 })
 export class PtsModule {}

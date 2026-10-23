@@ -12,7 +12,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   let res: Response;
   try {
     // O SuperTokens (initSuperTokens) já intercepta fetch e envia/renova a sessão via cookies.

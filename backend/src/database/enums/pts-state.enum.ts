@@ -1,8 +1,8 @@
 export enum PtsStateEnum {
-  DRAFT = 'DRAFT',
-  PLANNING = 'PLANNING',
-  RUNNING = 'RUNNING',
-  ACTIVE = 'ACTIVE',
-  FINISHED = 'FINISHED',
-  REJECTED = 'REJECTED',
+  DRAFT = 'draft',
+  PLANNING = 'planning',
+  RUNNING = 'running',
+  CONCLUDED = 'concluded',
+  CANCELLED = 'cancelled',
+  REJECTED = 'rejected',
 }
