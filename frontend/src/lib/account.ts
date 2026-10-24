@@ -61,7 +61,7 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
       { href: '/home', icon: 'home', label: 'Meu cuidado' },
       {
         href: '/pts/proposals',
-        icon: 'home',
+        icon: 'clipboard',
         label: 'Propostas de PTS',
       },
     ];
@@ -71,8 +71,8 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
       { href: '/professionals', icon: 'people', label: 'Profissionais' },
       {
         href: '/pts/novo',
-        icon: 'home',
-        label: 'Criar proposta de PTS',
+        icon: 'clipboard',
+        label: 'PTS',
       },
     ];
   }

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import PtsProposalList from './components/PtsProposalList';
+import PtsProposalList from './_components/PtsProposalList';
 
 const mockReplace = jest.fn();
 

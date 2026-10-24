@@ -114,14 +114,6 @@
   font-size: 11px;
 }
 
-.sideNote {
-  margin: 0;
-  padding: 12px 14px 0;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.7;
-}
-
 .workspace {
   min-width: 0;
 }
@@ -277,10 +269,6 @@
 
   .collapsed .brand > span > span,
   .collapsed .navLabel,
-  .collapsed .sideNote {
-    display: none;
-  }
-
   .collapsed .navCaption {
     visibility: hidden;
     margin-inline: 0;
@@ -356,4 +344,49 @@
     flex-direction: column;
     gap: 6px;
   }
+}
+
+.edgeToggle {
+  position: absolute;
+  top: 84px;
+  right: -20px; /* igual à largura: o lado reto encosta na borda da barra */
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 40px; /* altura = 2 x largura */
+  padding: 0;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 20px 20px 0; /* raio = largura: meio círculo perfeito */
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: none;
+  filter: none;
+  transform: none;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+@media (hover: hover) {
+  .edgeToggle:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--fg);
+  }
+}
+
+.edgeToggle:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.edgeIcon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.2;
+  margin-left: -3px; /* centraliza a seta na parte visível do semicírculo */
 }

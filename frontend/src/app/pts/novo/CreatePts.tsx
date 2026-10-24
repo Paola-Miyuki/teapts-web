@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ui from '@/components/ui.module.css';
 import { initSuperTokens } from '@/lib/supertokens';
 import type { Account } from '@/lib/account';
 import {
@@ -17,7 +18,8 @@ import {
   ProfessionalTeamSelect,
   SocialSituationInput,
   SubmitButton,
-} from './components';
+} from './_components';
+import styles from './novo.module.css';
 import {
   inputCls,
   labelCls,
@@ -194,51 +196,31 @@ export function CreatePts({ account }: CreatePtsProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-6 py-10 lg:px-10 lg:py-12">
-      <nav
-        aria-label="Caminho da página"
-        className="flex items-center gap-2 text-[12px] text-slate-500"
-      >
-        <Link href="/pacientes" className="hover:text-slate-900">
-          Início
-        </Link>
-        <span aria-hidden="true">/</span>
-        <span className="text-slate-700">Criar proposta de PTS</span>
-      </nav>
+    <>
+      <div className={ui.heading}>
+        <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
 
-      <header className="mt-12">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
-          Programa Terapêutico Singular
-        </p>
+        <h1>Criar proposta de PTS</h1>
 
-        <h1 className="mt-4 font-serif text-[40px] font-normal leading-[1.1] tracking-tight text-slate-900 md:text-[46px]">
-          Criar proposta de PTS
-        </h1>
-
-        <p className="mt-4 text-[14px] leading-6 text-slate-600">
+        <p>
           Defina o paciente e a equipe para começar um plano de cuidado
           compartilhado.
         </p>
-      </header>
+      </div>
 
-      <div className="mt-10 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_390px]">
+      <div className={styles.layout}>
         {created ? (
           <div
             role="status"
             data-testid="pts-created"
-            className="space-y-6 rounded-[20px] border border-[#e4e4e0] bg-white p-6 sm:p-[30px]"
+            className={`${ui.card} ${styles.created}`}
           >
             <div>
-              <h2 className="font-serif text-[32px] font-normal leading-[1.15] text-slate-900">
-                Proposta criada
-              </h2>
+              <h2 className={styles.createdTitle}>Proposta criada</h2>
 
-              <p className="mt-4 text-[14px] leading-6 text-slate-600">
-                <span className="mr-1.5 inline-flex rounded-full border border-[#ddddda] bg-[#fafaf9] px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                  {created.status}
-                </span>
-                A proposta de {created.patient.name} foi criada como{' '}
-                {created.status}
+              <p className={styles.createdText}>
+                <span className={styles.badge}>{created.status}</span>A proposta
+                de {created.patient.name} foi criada como {created.status}
                 {created.team.length > 0
                   ? ` com ${created.team.length} ${
                       created.team.length === 1
@@ -249,7 +231,7 @@ export function CreatePts({ account }: CreatePtsProps) {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className={styles.actions}>
               <Link href={`/pts/${created.id}`} className={primaryBtnCls}>
                 Abrir proposta
               </Link>
@@ -264,24 +246,20 @@ export function CreatePts({ account }: CreatePtsProps) {
             onSubmit={handleSubmit}
             noValidate
             data-form="pts"
-            className="space-y-6 rounded-[20px] border border-[#e4e4e0] bg-white p-6 sm:p-[30px]"
+            className={`${ui.card} ${styles.form}`}
           >
-            <div className="flex flex-wrap items-center gap-3 pb-1 text-[12px]">
-              <span className="flex items-center gap-2 font-medium text-slate-900">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[11px] font-semibold text-white">
-                  1
-                </span>
+            <div className={styles.steps}>
+              <span className={`${styles.step} ${styles.stepActive}`}>
+                <span className={styles.stepNumber}>1</span>
                 Elaborar proposta
               </span>
 
-              <span aria-hidden="true" className="text-slate-400">
+              <span aria-hidden="true" className={styles.stepSeparator}>
                 —
               </span>
 
-              <span className="flex items-center gap-2 text-slate-500">
-                <span className="grid h-6 w-6 place-items-center rounded-full border border-[#ddddda] text-[11px]">
-                  2
-                </span>
+              <span className={styles.step}>
+                <span className={styles.stepNumber}>2</span>
                 Aprovação do paciente
               </span>
             </div>
@@ -306,7 +284,7 @@ export function CreatePts({ account }: CreatePtsProps) {
                   readOnly
                   value={`${accountProfessionals[0].name} · ${accountProfessionals[0].specialism.name}`}
                   aria-describedby="professional-help"
-                  className={`${inputCls(false)} !bg-[#f5f5f4] text-slate-600`}
+                  className={`${inputCls(false)} ${styles.readonly}`}
                 />
               ) : (
                 <select
@@ -390,7 +368,7 @@ export function CreatePts({ account }: CreatePtsProps) {
               </>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className={styles.actions}>
               <SubmitButton
                 loading={isLoading}
                 disabled={
@@ -400,30 +378,28 @@ export function CreatePts({ account }: CreatePtsProps) {
                 }
               />
 
-              <Link href="/pacientes" className={secondaryBtnCls}>
+              <Link href="/home" className={secondaryBtnCls}>
                 Cancelar
               </Link>
             </div>
           </form>
         )}
 
-        <aside className="border-t border-slate-900 pt-5">
-          <h2 className="font-serif text-[24px] font-normal leading-[1.2] text-slate-900">
-            O primeiro passo é conjunto.
-          </h2>
+        <aside className={styles.aside}>
+          <h2>O primeiro passo é conjunto.</h2>
 
-          <p className="mt-4 text-[12px] leading-[22px] text-slate-500">
+          <p>
             A proposta será apresentada ao paciente. Após a aprovação, o PTS
             entra em planejamento.
           </p>
 
-          <p className="mt-3 text-[12px] leading-[22px] text-slate-500">
+          <p>
             Cada paciente pode ter apenas um PTS aprovado ativo. Outras
             propostas pendentes serão rejeitadas ao escolher uma equipe.
           </p>
         </aside>
       </div>
-    </div>
+    </>
   );
 }
 
