@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import styles from '../novo.module.css';
 import { alertCls } from '../styles';
 
 interface Props {
@@ -11,14 +12,10 @@ export const ErrorMessage = forwardRef<HTMLDivElement, Props>(
   function ErrorMessage({ title, message, onRetry }, ref) {
     return (
       <div className={alertCls} role="alert" tabIndex={-1} ref={ref}>
-        {title && <p className="font-semibold">{title}</p>}
-        <p>{message}</p>
+        {title && <p className={styles.alertTitle}>{title}</p>}
+        <p className={styles.alertMessage}>{message}</p>
         {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-2 min-h-[44px] font-semibold underline"
-          >
+          <button type="button" onClick={onRetry} className={styles.retry}>
             Tentar novamente
           </button>
         )}
