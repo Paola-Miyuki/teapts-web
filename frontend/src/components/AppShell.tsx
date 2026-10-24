@@ -93,8 +93,25 @@ export default function AppShell({
           className={styles.brand}
           aria-label="TEA-PTS, início"
         >
-          <Logo />
+          <Logo caption="Programa Terapêutico Singular" />
         </Link>
+
+        {!isMobile && (
+          <button
+            type="button"
+            className={styles.edgeToggle}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+            aria-controls="sidebar"
+            aria-expanded={expanded}
+            onClick={handleToggle}
+          >
+            <Icon
+              name={expanded ? 'chevronLeft' : 'chevronRight'}
+              className={styles.edgeIcon}
+            />
+          </button>
+        )}
 
         <button
           type="button"
@@ -127,28 +144,24 @@ export default function AppShell({
             <Icon name="logout" className={styles.icon} />
             <span className={styles.navLabel}>Sair da conta</span>
           </LogoutButton>
-
-          <p className={styles.sideNote}>
-            Cuidado singular.
-            <br />
-            Construção compartilhada.
-          </p>
         </div>
       </aside>
 
       <div className={styles.workspace}>
         <header className={styles.appHeader}>
-          <button
-            type="button"
-            className={styles.iconButton}
-            aria-label={toggleLabel}
-            title={toggleLabel}
-            aria-controls="sidebar"
-            aria-expanded={expanded}
-            onClick={handleToggle}
-          >
-            <Icon name="menu" className={styles.icon} />
-          </button>
+          {isMobile && (
+            <button
+              type="button"
+              className={styles.iconButton}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              aria-controls="sidebar"
+              aria-expanded={expanded}
+              onClick={handleToggle}
+            >
+              <Icon name="menu" className={styles.icon} />
+            </button>
+          )}
 
           <div className={styles.headerProfile}>
             <span className={styles.avatar} aria-hidden="true">
@@ -172,10 +185,6 @@ export default function AppShell({
           )}
 
           <section>{children}</section>
-
-          <footer className={styles.footer}>
-            <span>TEA-PTS · Programa Terapêutico Singular</span>
-          </footer>
         </main>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 
 import Logo from '@/components/Logo';
+import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { initSuperTokens } from '@/lib/supertokens';
 import styles from './login.module.css';
@@ -119,17 +120,7 @@ export default function LoginPage() {
         </div>
 
         <button type="button" className={styles.helpButton}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-
-            <path d="M9.6 9a2.4 2.4 0 0 1 4.8 0c0 2-2.4 2-2.4 4M12 16v1" />
-          </svg>
+          <Icon name="help" />
           Precisa de ajuda?
         </button>
       </header>
@@ -211,17 +202,7 @@ export default function LoginPage() {
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword((current) => !current)}
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      aria-hidden="true"
-                    >
-                      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
-
-                      <circle cx="12" cy="12" r="2.5" />
-                    </svg>
+                    <Icon name={showPassword ? 'eyeOff' : 'eye'} />
                   </button>
                 </div>
 
@@ -268,27 +249,6 @@ export default function LoginPage() {
               Criar conta
             </button>
 
-            <p className={styles.secure}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                aria-hidden="true"
-              >
-                <rect x="6" y="10" width="12" height="10" rx="2" />
-
-                <path d="M9 10V7a3 3 0 0 1 6 0v3" />
-
-                <path d="M12 14v2" />
-              </svg>
-
-              <span>
-                Seu acesso respeita as permissões da sua conta.
-                <br />
-                Informações de saúde exigem cuidado e privacidade.
-              </span>
-            </p>
           </div>
         </section>
       </main>

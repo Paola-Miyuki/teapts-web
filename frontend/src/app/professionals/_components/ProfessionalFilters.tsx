@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
+import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import type { ProfessionalSpecialism } from '@/lib/professionals';
 import type { Filters } from './Professionals';
@@ -52,19 +53,7 @@ export default function ProfessionalFilters({
           <span className={ui.label}>Nome</span>
 
           <div className={styles.inputWithIcon}>
-            <svg
-              className={styles.searchIcon}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="10" cy="10" r="6" />
-              <path d="m15 15 6 6" />
-            </svg>
+            <Icon name="search" className={styles.searchIcon} />
 
             <input
               className={ui.input}
