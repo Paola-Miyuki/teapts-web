@@ -11,8 +11,16 @@ const glyphs = {
       <path d="M3 20v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m1 3a5 5 0 0 1 4 5v2" />
     </>
   ),
+  clipboard: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 3h6v3H9zM9 11h6m-6 4h6" />
+    </>
+  ),
   logout: <path d="M9 3H4v18h5M10 12h11m-4-4 4 4-4 4" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  chevronLeft: <path d="m15 6-6 6 6 6" />,
+  chevronRight: <path d="m9 6 6 6-6 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
   clock: (
     <>
@@ -26,6 +34,40 @@ const glyphs = {
     <>
       <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
       <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M13.36 13.36a3 3 0 0 1-4.72-4.72" />
+      <path d="M2 12s3.6-6 10-6a9.97 9.97 0 0 1 5.97 1.94" />
+      <path d="M22 12s-3.6 6-10 6a9.97 9.97 0 0 1-5.97-1.94" />
+      <path d="m3 3 18 18" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.6 9a2.4 2.4 0 0 1 4.8 0c0 2-2.4 2-2.4 4M12 16v1" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="6" y="10" width="12" height="10" rx="2" />
+      <path d="M9 10V7a3 3 0 0 1 6 0v3" />
+      <path d="M12 14v2" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="10" cy="10" r="6" />
+      <path d="m15 15 6 6" />
+    </>
+  ),
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  alertCircle: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v6M12 17h.01" />
     </>
   ),
 };
