@@ -1,5 +1,5 @@
 .heading {
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 
 .heading h1 {
@@ -21,10 +21,10 @@
 }
 
 .eyebrow {
-  margin: 0 0 13px;
+  margin: 0 0 8px;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -35,22 +35,60 @@
   flex: none;
 }
 
+.avatarSm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.avatarMd {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.avatarLg {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 /* Botões */
 
 .btn {
-  min-height: 44px;
-  padding: 11px 17px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 1px solid transparent;
+  height: 40px; /* Altura padrão para toda a aplicação */
+  padding: 0 16px;
   border-radius: 8px;
-  font: inherit;
-  font-size: 12px;
-  text-align: center;
-  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--fg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn:disabled {

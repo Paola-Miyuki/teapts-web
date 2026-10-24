@@ -208,24 +208,6 @@
   flex: none;
 }
 
-.secure {
-  margin: 26px 0 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.7;
-}
-
-.secure svg {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  flex: none;
-}
-
 .footer {
   margin: 0 40px;
   padding: 16px 0 24px;
