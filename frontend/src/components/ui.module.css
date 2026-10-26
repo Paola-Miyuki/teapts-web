@@ -1,3 +1,5 @@
+/* Layout & Cabeçalho */
+
 .heading {
   margin-bottom: 24px;
 }
@@ -28,6 +30,8 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/* Ícones e Avatares */
 
 .icon {
   width: 19px;
@@ -70,7 +74,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px; /* Altura padrão para toda a aplicação */
+  height: 40px;
   padding: 0 16px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -79,7 +83,7 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -88,11 +92,6 @@
 
 .btn:disabled {
   opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -122,7 +121,7 @@
   width: 100%;
 }
 
-/* Cartões e estados */
+/* Cartões e Estados Vazios */
 
 .card {
   background: var(--surface);
@@ -178,7 +177,7 @@
   color: var(--danger);
 }
 
-/* Formulários */
+/* Formulários & Campos */
 
 .field {
   display: flex;
@@ -202,6 +201,7 @@
   color: var(--fg);
   font: inherit;
   font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
 
 .input::placeholder {
@@ -219,12 +219,13 @@
 }
 
 .input[aria-invalid='true'] {
-  border-color: var(--danger);
-  background: var(--danger-soft);
+  border-color: var(--danger, #dc2626);
+  background: var(--danger-soft, #fff5f5);
+  box-shadow: 0 0 0 1px var(--danger, #dc2626);
 }
 
 .input[aria-invalid='true']:focus {
-  outline-color: var(--danger);
+  outline-color: var(--danger, #dc2626);
 }
 
 .input:disabled {
@@ -240,22 +241,99 @@
 }
 
 .fieldError {
-  margin: 0;
-  color: var(--danger);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: var(--danger, #dc2626);
   font-size: 12px;
-  line-height: 1.5;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
+/* Sistema Visual de Alertas & Feedbacks */
+
+/* Base Estrutural do Alerta */
 .alert {
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--danger-border);
-  border-radius: 8px;
-  background: var(--danger-soft);
-  color: var(--danger);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 20px !important; 
+  padding: 14px 16px;
+  border-radius: 10px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  animation: alertSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.alert p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.alert strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Alerta de Sucesso */
+.alertSuccess {
+  border-color: #bbf7d0 !important;
+  border-left: 4px solid #16a34a !important;
+  background-color: #f0fdf4 !important;
+  color: #14532d !important;
+}
+
+/* Crachá circular para o ícone */
+.alertIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #dcfce7;
+  color: #15803d;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alertIcon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.2;
+}
+
+/* Alerta de Erro / Falha */
+.alertError {
+  border-color: #fecaca !important;
+  border-left: 4px solid #dc2626 !important;
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+}
+
+/* Badge circular para ícone de erro */
+.alertIconError {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+@keyframes alertSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsividade */
 
 @media (max-width: 1100px) {
   .heading h1 {
