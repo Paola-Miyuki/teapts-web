@@ -32,7 +32,7 @@ function translateSignupError(message: string) {
     return 'Informe um e-mail válido.';
   }
 
-  return 'Não foi possível concluir o cadastro. Verifique os dados informados.';
+  return 'Verifique os dados informados e tente novamente.';
 }
 
 function requirementClass(met: boolean, typing: boolean) {
@@ -45,9 +45,11 @@ function requirementClass(met: boolean, typing: boolean) {
 
 export default function SignupPage() {
   const router = useRouter();
+
   useEffect(() => {
     initSuperTokens();
   }, []);
+
   // Estados do formulário
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -76,7 +78,7 @@ export default function SignupPage() {
     setError(null);
 
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      setError('Preencha os campos obrigatórios antes de continuar.');
+      setError('Preencha todos os campos obrigatórios antes de continuar.');
       return;
     }
 
@@ -117,7 +119,7 @@ export default function SignupPage() {
         return;
       }
 
-      setError('Não foi possível concluir o cadastro.');
+      setError('Verifique os dados informados e tente novamente.');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(translateSignupError(err.message));
@@ -171,8 +173,14 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
             {error && (
-              <div className={ui.alert} role="alert">
-                {error}
+              <div className={`${ui.alert} ${ui.alertError} ${styles.signupAlert}`} role="alert">
+                <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
+                  <Icon name="alertCircle" />
+                </div>
+                <div>
+                  <strong>Não foi possível concluir o cadastro</strong>
+                  <p>{error}</p>
+                </div>
               </div>
             )}
 

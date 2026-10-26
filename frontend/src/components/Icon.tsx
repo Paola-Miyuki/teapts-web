@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 const glyphs = {
   home: (
     <>
@@ -68,6 +70,13 @@ const glyphs = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v6M12 17h.01" />
+    </>
+  ),
+  check: <polyline points="20 6 9 17 4 12" />,
+  checkCircle: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 12 2 2 4-4" />
     </>
   ),
 };

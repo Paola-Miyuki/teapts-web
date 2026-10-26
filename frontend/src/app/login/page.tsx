@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import type { FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 
 import Logo from '@/components/Logo';
@@ -11,8 +11,10 @@ import ui from '@/components/ui.module.css';
 import { initSuperTokens } from '@/lib/supertokens';
 import styles from './login.module.css';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isRegistered = searchParams.get('registered') === 'true';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -132,6 +134,18 @@ export default function LoginPage() {
 
             <p className={styles.intro}>Acesse sua conta TEA-PTS.</p>
 
+            {isRegistered && (
+              <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
+                <div className={ui.alertIcon}>
+                  <Icon name="check" />
+                </div>
+                <div>
+                  <strong>Conta criada com sucesso!</strong>
+                  <p>Faça login para continuar.</p>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} noValidate>
               <div className={`${ui.field} ${styles.field}`}>
                 <label htmlFor="email" className={ui.label}>
@@ -223,9 +237,9 @@ export default function LoginPage() {
               </div>
 
               {loginError && (
-                <p className={`${ui.alert} ${styles.loginError}`} role="alert">
-                  {loginError}
-                </p>
+                <div className={`${ui.alert} ${ui.alertError}`} role="alert">
+                  <span>{loginError}</span>
+                </div>
               )}
 
               <button
@@ -248,12 +262,19 @@ export default function LoginPage() {
             >
               Criar conta
             </button>
-
           </div>
         </section>
       </main>
 
       <footer className={styles.footer}>TEA-PTS</footer>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
