@@ -84,13 +84,27 @@ export function CreatePts({ account }: CreatePtsProps) {
       listEligiblePatients(controller.signal),
       listProfessionals(controller.signal),
     ])
-      .then(([loadedPatients, loadedProfessionals]) => {
+      .then(([rawPatients, rawProfessionals]) => {
+        // Trata retorno tanto em array direto quanto envelopado em { data: [...] }
+        const loadedPatients: Patient[] = Array.isArray(rawPatients)
+          ? rawPatients
+          : (rawPatients as { data?: Patient[] })?.data ?? [];
+
+        const loadedProfessionals: Professional[] = Array.isArray(rawProfessionals)
+          ? rawProfessionals
+          : (rawProfessionals as { data?: Professional[] })?.data ?? [];
+
+        const accountProfileIds = account?.professionalProfileIds ?? [];
+
         const accountProfessionals = loadedProfessionals.filter(
-          (professional) =>
-            account.professionalProfileIds.includes(professional.id),
+          (professional) => accountProfileIds.includes(professional.id),
         );
 
         if (accountProfessionals.length === 0) {
+          console.warn('Divergência de IDs entre Account e Professional:', {
+            accountProfileIds,
+            loadedProfessionals,
+          });
           throw new Error(
             'Nenhum perfil profissional da conta foi encontrado.',
           );
@@ -105,14 +119,15 @@ export function CreatePts({ account }: CreatePtsProps) {
 
         setLoadStatus('ready');
       })
-      .catch(() => {
+      .catch((error) => {
         if (!controller.signal.aborted) {
+          console.error('ERRO AO CARREGAR DADOS NO CREATE_PTS:', error);
           setLoadStatus('error');
         }
       });
 
     return () => controller.abort();
-  }, [account.professionalProfileIds, reloadKey]);
+  }, [account?.professionalProfileIds, reloadKey]);
 
   useEffect(() => {
     if (submitError) {
@@ -120,8 +135,10 @@ export function CreatePts({ account }: CreatePtsProps) {
     }
   }, [submitError]);
 
+  const accountProfileIds = account?.professionalProfileIds ?? [];
+
   const accountProfessionals = professionals.filter((professional) =>
-    account.professionalProfileIds.includes(professional.id),
+    accountProfileIds.includes(professional.id),
   );
 
   const me =
@@ -129,7 +146,7 @@ export function CreatePts({ account }: CreatePtsProps) {
     null;
 
   const teamOptions = professionals.filter(
-    (professional) => !account.professionalProfileIds.includes(professional.id),
+    (professional) => !accountProfileIds.includes(professional.id),
   );
 
   const toggleTeamMember = (id: string) => {
@@ -146,9 +163,7 @@ export function CreatePts({ account }: CreatePtsProps) {
     setFieldErrors({});
     setSubmitError(null);
     setResponsibleId(
-      account.professionalProfileIds.length === 1
-        ? account.professionalProfileIds[0]
-        : '',
+      accountProfileIds.length === 1 ? accountProfileIds[0] : '',
     );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
@@ -183,6 +198,7 @@ export function CreatePts({ account }: CreatePtsProps) {
 
       setCreated(pts);
     } catch (error) {
+      console.error('ERRO AO CRIAR PROPOSTA DE PTS:', error);
       const mapped = mapCreatePtsError(error);
 
       setSubmitError(mapped);

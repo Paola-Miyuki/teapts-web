@@ -29,12 +29,11 @@ export async function listProfessionals(
     params.set('ids', ids.join(','));
   }
 
-  const response = await request<PaginatedResponse<Professional>>(
-    `/professionals?${params.toString()}`,
-    { signal },
-  );
+  const response = await request<
+    PaginatedResponse<Professional> | Professional[]
+  >(`/professionals?${params.toString()}`, { signal });
 
-  return response.data;
+  return Array.isArray(response) ? response : response.data ?? [];
 }
 
 export async function listEligiblePatients(
@@ -44,21 +43,27 @@ export async function listEligiblePatients(
     return mockPatients;
   }
 
-  // Pendente: o backend ainda não expõe uma consulta confirmada
-  // de pacientes elegíveis para a criação de uma nova proposta.
-  // Não usar /patients/authorized como substituto: essa rota
-  // retorna somente pacientes ligados a PTS ativos autorizados.
-  void signal;
-  throw new Error(
-    'A consulta de pacientes elegíveis para novas propostas ainda não está disponível no backend.',
-  );
+  const params = new URLSearchParams({
+    page: '1',
+    limit: '100',
+  });
+
+  const response = await request<
+    PaginatedResponse<Patient> | Patient[]
+  >(`/patients/authorized?${params.toString()}`, { signal });
+
+  return Array.isArray(response) ? response : response.data ?? [];
 }
 
-export function createPts(payload: CreatePtsPayload): Promise<Pts> {
-  return USE_MOCKS
-    ? mockCreatePts(payload)
-    : request<Pts>('/pts', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+export async function createPts(
+  payload: CreatePtsPayload,
+): Promise<Pts> {
+  if (USE_MOCKS) {
+    return mockCreatePts(payload);
+  }
+
+  return request<Pts>('/pts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

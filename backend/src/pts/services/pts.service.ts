@@ -20,7 +20,6 @@ export class PtsService {
     if (!professional || professional.accountId !== currentAccountId) {
       throw professionalNotAuthorized();
     }
-
     if (!(await this.ptsRepository.patientExists(dto.patientId))) {
       throw patientNotFound();
     }
