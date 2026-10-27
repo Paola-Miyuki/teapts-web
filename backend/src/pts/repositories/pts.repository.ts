@@ -1,26 +1,20 @@
-import { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import { PtsEntity } from '../entities/pts.entity';
 
-export interface ProfessionalRecord {
-  id: string;
-  accountId: string;
-}
-
-export interface CreateDraftInput {
+export type CreateDraftInput = {
   patientId: string;
   responsibleProfessionalId: string;
   socialSituation: string;
-  teamProfessionalIds: string[];
-}
+  teamProfessionalIds?: string[];
+};
 
-/** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
-  abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
+  abstract createDraft(input: CreateDraftInput): Promise<PtsEntity>;
 
-  abstract patientExists(id: string): Promise<boolean>;
+  abstract findPtsById(id: string): Promise<PtsEntity | null>;
 
-  abstract hasApprovedActivePts(patientId: string): Promise<boolean>;
-
-  abstract findExistingProfessionalIds(ids: string[]): Promise<string[]>;
-
-  abstract createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto>;
+  abstract findProposalsByPatientId(
+    patientId: string,
+    page?: number,
+    limit?: number,
+  ): Promise<{ data: PtsEntity[]; total: number }>;
 }

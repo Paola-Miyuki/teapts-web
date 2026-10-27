@@ -1,42 +1,47 @@
 import styles from '../proposals.module.css';
 
 export type ProposalSpecialism = {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
 };
 
 export type ProposalProfessional = {
-  id: string;
-  name: string;
-  specialism: ProposalSpecialism;
+  id?: string;
+  name?: string;
+  specialism?: ProposalSpecialism | null;
 };
 
 export type ProposalPatient = {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
 };
 
 export type ProposalTeamMember = {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
   specialism?: ProposalSpecialism | null;
 };
 
 export type PtsProposal = {
   id: string;
-  status: string;
-  socialSituation: string;
-  createdAt: string;
-  patient: ProposalPatient;
-  responsible: ProposalProfessional;
-  team: ProposalTeamMember[];
+  status?: string;
+  socialSituation?: string;
+  createdAt?: string;
+  patient?: ProposalPatient | string;
+  responsible?: ProposalProfessional;
+  team?: ProposalTeamMember[];
+  [key: string]: any;
 };
 
 type PtsProposalCardProps = {
   proposal: PtsProposal;
 };
 
-function getInitial(name: string) {
+function getInitial(name?: string | null) {
+  if (!name || typeof name !== 'string') {
+    return '?';
+  }
+
   const trimmedName = name.trim();
 
   if (!trimmedName) {
@@ -47,42 +52,75 @@ function getInitial(name: string) {
 }
 
 export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
+  const responsibleName =
+    proposal?.responsible?.name ??
+    proposal?.professional?.name ??
+    proposal?.responsibleProfessional?.name ??
+    proposal?.professionalName ??
+    proposal?.responsibleName ??
+    'Profissional não identificado';
+
+  const specialismName =
+    proposal?.responsible?.specialism?.name ??
+    proposal?.professional?.specialism?.name ??
+    proposal?.responsibleProfessional?.specialism?.name ??
+    proposal?.specialismName ??
+    proposal?.speciality ??
+    'Especialidade não informada';
+
+  const patientName =
+    typeof proposal?.patient === 'object' && proposal?.patient?.name
+      ? proposal.patient.name
+      : typeof proposal?.patient === 'string'
+      ? proposal.patient
+      : proposal?.patientName ?? 'Paciente não informado';
+
+  const teamList = Array.isArray(proposal?.team)
+    ? proposal.team
+    : Array.isArray(proposal?.teamProfessionals)
+    ? proposal.teamProfessionals
+    : [];
+
   return (
     <article className={styles.proposalCard}>
       <div className={styles.personBanner}>
         <div className={styles.professionalIdentity}>
           <span className={styles.proposalAvatar} aria-hidden="true">
-            {getInitial(proposal.responsible.name)}
+            {getInitial(responsibleName)}
           </span>
 
           <div className={styles.personText}>
-            <h2>{proposal.responsible.name}</h2>
+            <h2>{responsibleName}</h2>
 
             <p>
-              {proposal.responsible.specialism.name}
+              {specialismName}
               {' · '}
               profissional responsável
             </p>
           </div>
         </div>
 
-        <span className={styles.statusBadge}>Aguardando sua decisão</span>
+        <span className={styles.statusBadge}>
+          {proposal?.status === 'draft' || !proposal?.status
+            ? 'Aguardando sua decisão'
+            : proposal.status}
+        </span>
       </div>
 
       <div className={styles.metaGrid}>
         <div className={styles.metaBlock}>
           <span className={styles.metaLabel}>Paciente</span>
-          <strong className={styles.metaValue}>{proposal.patient.name}</strong>
+          <strong className={styles.metaValue}>{patientName}</strong>
         </div>
 
         <div className={styles.metaBlock}>
           <span className={styles.metaLabel}>Equipe multidisciplinar</span>
 
-          {proposal.team.length > 0 ? (
+          {teamList.length > 0 ? (
             <strong className={styles.metaValue}>
-              {proposal.team.length === 1
+              {teamList.length === 1
                 ? '1 profissional'
-                : `${proposal.team.length} profissionais`}
+                : `${teamList.length} profissionais`}
             </strong>
           ) : (
             <strong className={styles.metaValue}>Ainda não definida</strong>
@@ -94,30 +132,30 @@ export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
         <h3>Situação social</h3>
 
         <p>
-          {proposal.socialSituation?.trim() || 'Situação social não informada.'}
+          {proposal?.socialSituation?.trim() || 'Situação social não informada.'}
         </p>
       </div>
 
       <div className={styles.teamSection}>
         <h3>Equipe</h3>
 
-        {proposal.team.length === 0 ? (
+        {teamList.length === 0 ? (
           <p className={styles.emptyTeam}>
             A equipe multidisciplinar ainda não possui outros profissionais
             definidos.
           </p>
         ) : (
           <div className={styles.teamList}>
-            {proposal.team.map((member) => (
-              <div key={member.id} className={styles.teamMember}>
+            {teamList.map((member: any) => (
+              <div key={member?.id ?? member?.name} className={styles.teamMember}>
                 <span className={styles.teamAvatar} aria-hidden="true">
-                  {getInitial(member.name)}
+                  {getInitial(member?.name)}
                 </span>
 
                 <div>
-                  <strong>{member.name}</strong>
+                  <strong>{member?.name ?? 'Profissional'}</strong>
 
-                  {member.specialism?.name ? (
+                  {member?.specialism?.name ? (
                     <span className={styles.teamSpecialism}>
                       {member.specialism.name}
                     </span>

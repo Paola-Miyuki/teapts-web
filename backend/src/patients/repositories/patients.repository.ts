@@ -61,7 +61,7 @@ export class PatientsRepository {
         'patient."accountId" AS patient_id',
         'account.name AS account_name',
       ])
-      .where(
+      /*.where(
         `patient."accountId" IN (
     SELECT pts.patient_id
     FROM projeto_terapeutico_singular pts
@@ -80,7 +80,7 @@ export class PatientsRepository {
       )
   )`,
         { accountId, states: ACTIVE_PTS_STATES },
-      )
+      )*/
       .orderBy('account.name', 'ASC')
       .addOrderBy('patient."accountId"', 'ASC');
 

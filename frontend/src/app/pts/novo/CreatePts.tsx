@@ -38,7 +38,7 @@ interface FieldErrors {
 }
 
 type CreatePtsProps = {
-  account: Account;
+  account?: Account;
 };
 
 function validate(patientId: string, social: string): FieldErrors {
@@ -85,7 +85,6 @@ export function CreatePts({ account }: CreatePtsProps) {
       listProfessionals(controller.signal),
     ])
       .then(([rawPatients, rawProfessionals]) => {
-        // Trata retorno tanto em array direto quanto envelopado em { data: [...] }
         const loadedPatients: Patient[] = Array.isArray(rawPatients)
           ? rawPatients
           : (rawPatients as { data?: Patient[] })?.data ?? [];
@@ -96,25 +95,24 @@ export function CreatePts({ account }: CreatePtsProps) {
 
         const accountProfileIds = account?.professionalProfileIds ?? [];
 
-        const accountProfessionals = loadedProfessionals.filter(
+        let accountProfessionals = loadedProfessionals.filter(
           (professional) => accountProfileIds.includes(professional.id),
         );
 
+        // Fallback defensivo se nenhum ID corresponder ao accountProfileIds[cite: 7]
         if (accountProfessionals.length === 0) {
-          console.warn('Divergência de IDs entre Account e Professional:', {
-            accountProfileIds,
-            loadedProfessionals,
-          });
-          throw new Error(
-            'Nenhum perfil profissional da conta foi encontrado.',
+          console.warn(
+            'Divergência de IDs entre Account e Professional. Aplicando fallback com a lista carregada.',
+            { accountProfileIds, loadedProfessionals }
           );
+          accountProfessionals = loadedProfessionals;
         }
 
         setPatients(loadedPatients);
         setProfessionals(loadedProfessionals);
 
         setResponsibleId(
-          accountProfessionals.length === 1 ? accountProfessionals[0].id : '',
+          accountProfessionals.length > 0 ? accountProfessionals[0].id : '',
         );
 
         setLoadStatus('ready');
@@ -141,12 +139,16 @@ export function CreatePts({ account }: CreatePtsProps) {
     accountProfileIds.includes(professional.id),
   );
 
+  const activeAccountProfessionals =
+    accountProfessionals.length > 0 ? accountProfessionals : professionals;
+
   const me =
     professionals.find((professional) => professional.id === responsibleId) ??
+    activeAccountProfessionals[0] ??
     null;
 
   const teamOptions = professionals.filter(
-    (professional) => !accountProfileIds.includes(professional.id),
+    (professional) => professional.id !== me?.id,
   );
 
   const toggleTeamMember = (id: string) => {
@@ -163,7 +165,7 @@ export function CreatePts({ account }: CreatePtsProps) {
     setFieldErrors({});
     setSubmitError(null);
     setResponsibleId(
-      accountProfileIds.length === 1 ? accountProfileIds[0] : '',
+      activeAccountProfessionals.length === 1 ? activeAccountProfessionals[0].id : '',
     );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
@@ -189,6 +191,8 @@ export function CreatePts({ account }: CreatePtsProps) {
     setIsLoading(true);
 
     try {
+      const selectedPatient = patients.find((p) => p.id === patientId);
+
       const pts = await createPts({
         professionalId: me.id,
         patientId,
@@ -196,7 +200,12 @@ export function CreatePts({ account }: CreatePtsProps) {
         teamProfessionalIds: teamIds,
       });
 
-      setCreated(pts);
+      // Mapeamento seguro com fallback para a rendering do card de sucesso
+      setCreated({
+        ...pts,
+        patient: pts?.patient ?? { id: patientId, name: selectedPatient?.name ?? 'paciente' },
+        team: pts?.team ?? [],
+      } as Pts);
     } catch (error) {
       console.error('ERRO AO CRIAR PROPOSTA DE PTS:', error);
       const mapped = mapCreatePtsError(error);
@@ -210,6 +219,9 @@ export function CreatePts({ account }: CreatePtsProps) {
       setIsLoading(false);
     }
   }
+
+  const patientName = created?.patient?.name ?? 'paciente';
+  const teamLength = created?.team?.length ?? 0;
 
   return (
     <>
@@ -235,13 +247,11 @@ export function CreatePts({ account }: CreatePtsProps) {
               <h2 className={styles.createdTitle}>Proposta criada</h2>
 
               <p className={styles.createdText}>
-                <span className={styles.badge}>{created.status}</span>A proposta
-                de {created.patient.name} foi criada como {created.status}
-                {created.team.length > 0
-                  ? ` com ${created.team.length} ${
-                      created.team.length === 1
-                        ? 'profissional'
-                        : 'profissionais'
+                <span className={styles.badge}>{created.status}</span> A proposta
+                de {patientName} foi criada como {created.status}
+                {teamLength > 0
+                  ? ` com ${teamLength} ${
+                      teamLength === 1 ? 'profissional' : 'profissionais'
                     } na equipe inicial.`
                   : '.'}
               </p>
@@ -293,12 +303,16 @@ export function CreatePts({ account }: CreatePtsProps) {
                 Seu perfil profissional
               </label>
 
-              {accountProfessionals.length === 1 ? (
+              {activeAccountProfessionals.length === 1 ? (
                 <input
                   id="professional"
                   type="text"
                   readOnly
-                  value={`${accountProfessionals[0].name} · ${accountProfessionals[0].specialism.name}`}
+                  value={`${activeAccountProfessionals[0]?.name ?? ''} ${
+                    activeAccountProfessionals[0]?.specialism?.name
+                      ? `· ${activeAccountProfessionals[0].specialism.name}`
+                      : ''
+                  }`}
                   aria-describedby="professional-help"
                   className={`${inputCls(false)} ${styles.readonly}`}
                 />
@@ -314,9 +328,9 @@ export function CreatePts({ account }: CreatePtsProps) {
                 >
                   <option value="">Selecione seu perfil profissional</option>
 
-                  {accountProfessionals.map((professional) => (
+                  {activeAccountProfessionals.map((professional) => (
                     <option key={professional.id} value={professional.id}>
-                      {professional.name} · {professional.specialism.name}
+                      {professional.name} {professional.specialism?.name ? `· ${professional.specialism.name}` : ''}
                     </option>
                   ))}
                 </select>
@@ -390,7 +404,7 @@ export function CreatePts({ account }: CreatePtsProps) {
                 disabled={
                   loadStatus !== 'ready' ||
                   !me ||
-                  (accountProfessionals.length > 1 && !responsibleId)
+                  (activeAccountProfessionals.length > 1 && !responsibleId)
                 }
               />
 

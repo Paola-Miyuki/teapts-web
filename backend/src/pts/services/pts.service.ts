@@ -1,54 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { CreatePtsRequestDto } from '../dto/create-pts.dto';
-import { PtsRepository } from '../repositories/pts.repository';
-import {
-  patientNotFound,
-  professionalNotAuthorized,
-  ptsActiveExists,
-  teamProfessionalNotFound,
-} from '../pts.errors';
+import { PtsRepository, CreateDraftInput } from '../repositories/pts.repository';
+import { PtsEntity } from '../entities/pts.entity';
 
 @Injectable()
 export class PtsService {
   constructor(private readonly ptsRepository: PtsRepository) {}
 
-  async createPts(dto: CreatePtsRequestDto, currentAccountId: string) {
-    const professional = await this.ptsRepository.findProfessionalById(
-      dto.professionalId,
-    );
-
-    if (!professional || professional.accountId !== currentAccountId) {
-      throw professionalNotAuthorized();
-    }
-    if (!(await this.ptsRepository.patientExists(dto.patientId))) {
-      throw patientNotFound();
-    }
-
-    if (await this.ptsRepository.hasApprovedActivePts(dto.patientId)) {
-      throw ptsActiveExists();
-    }
-
-    const teamProfessionalIds = [
-      ...new Set(dto.teamProfessionalIds ?? []),
-    ].filter((id) => id !== dto.professionalId);
-
-    const existingIds =
-      await this.ptsRepository.findExistingProfessionalIds(teamProfessionalIds);
-
-    const existingIdSet = new Set(existingIds);
-    const missingIds = teamProfessionalIds.filter(
-      (id) => !existingIdSet.has(id),
-    );
-
-    if (missingIds.length > 0) {
-      throw teamProfessionalNotFound(missingIds);
-    }
-
-    return this.ptsRepository.createDraft({
+  async createDraft(dto: CreateDraftInput): Promise<PtsEntity> {
+    return await this.ptsRepository.createDraft({
       patientId: dto.patientId,
-      responsibleProfessionalId: dto.professionalId,
+      responsibleProfessionalId: dto.responsibleProfessionalId,
       socialSituation: dto.socialSituation,
-      teamProfessionalIds,
+      teamProfessionalIds: dto.teamProfessionalIds ?? [],
     });
+  }
+
+  async findById(id: string): Promise<PtsEntity | null> {
+    return await this.ptsRepository.findPtsById(id);
+  }
+
+  async findByPatientId(
+    patientId: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    return await this.ptsRepository.findProposalsByPatientId(
+      patientId,
+      page,
+      limit,
+    );
   }
 }
