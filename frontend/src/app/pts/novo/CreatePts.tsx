@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import ui from '@/components/ui.module.css';
+import Icon from '@/components/Icon';
 import { initSuperTokens } from '@/lib/supertokens';
 import type { Account } from '@/lib/account';
 import {
@@ -97,24 +98,15 @@ export function CreatePts({ account }: CreatePtsProps) {
 
         const accountProfileIds = account?.professionalProfileIds ?? [];
 
-        let accountProfessionals = loadedProfessionals.filter((professional) =>
+        const ownProfessionals = loadedProfessionals.filter((professional) =>
           accountProfileIds.includes(professional.id),
         );
-
-        // Fallback defensivo se nenhum ID corresponder ao accountProfileIds[cite: 7]
-        if (accountProfessionals.length === 0) {
-          console.warn(
-            'Divergência de IDs entre Account e Professional. Aplicando fallback com a lista carregada.',
-            { accountProfileIds, loadedProfessionals },
-          );
-          accountProfessionals = loadedProfessionals;
-        }
 
         setPatients(loadedPatients);
         setProfessionals(loadedProfessionals);
 
         setResponsibleId(
-          accountProfessionals.length > 0 ? accountProfessionals[0].id : '',
+          ownProfessionals.length === 1 ? ownProfessionals[0].id : '',
         );
 
         setLoadStatus('ready');
@@ -141,13 +133,15 @@ export function CreatePts({ account }: CreatePtsProps) {
     accountProfileIds.includes(professional.id),
   );
 
-  const activeAccountProfessionals =
-    accountProfessionals.length > 0 ? accountProfessionals : professionals;
-
   const me =
-    professionals.find((professional) => professional.id === responsibleId) ??
-    activeAccountProfessionals[0] ??
-    null;
+    accountProfessionals.length === 1
+      ? accountProfessionals[0]
+      : (accountProfessionals.find(
+          (professional) => professional.id === responsibleId,
+        ) ?? null);
+
+  const hasNoProfessionalProfile =
+    loadStatus === 'ready' && !!account && accountProfessionals.length === 0;
 
   const teamOptions = professionals.filter(
     (professional) => professional.id !== me?.id,
@@ -167,9 +161,7 @@ export function CreatePts({ account }: CreatePtsProps) {
     setFieldErrors({});
     setSubmitError(null);
     setResponsibleId(
-      activeAccountProfessionals.length === 1
-        ? activeAccountProfessionals[0].id
-        : '',
+      accountProfessionals.length === 1 ? accountProfessionals[0].id : '',
     );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
@@ -204,7 +196,6 @@ export function CreatePts({ account }: CreatePtsProps) {
         teamProfessionalIds: teamIds,
       });
 
-      // Mapeamento seguro com fallback para a rendering do card de sucesso
       setCreated({
         ...pts,
         patient: pts?.patient ?? {
@@ -235,12 +226,14 @@ export function CreatePts({ account }: CreatePtsProps) {
       <div className={ui.heading}>
         <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
 
-        <h1>Criar proposta de PTS</h1>
+        <h1>{created ? 'Proposta criada' : 'Criar proposta de PTS'}</h1>
 
-        <p>
-          Defina o paciente e a equipe para começar um plano de cuidado
-          compartilhado.
-        </p>
+        {!created && (
+          <p>
+            Defina o paciente e a equipe para começar um plano de cuidado
+            compartilhado.
+          </p>
+        )}
       </div>
 
       <div className={styles.layout}>
@@ -248,25 +241,25 @@ export function CreatePts({ account }: CreatePtsProps) {
           <div
             role="status"
             data-testid="pts-created"
-            className={`${ui.card} ${styles.created}`}
+            className={`${ui.empty} ${styles.successContainer}`}
           >
-            <div>
-              <h2 className={styles.createdTitle}>Proposta criada</h2>
-
-              <p className={styles.createdText}>
-                <span className={styles.badge}>{created.status}</span> A
-                proposta de {patientName} foi criada como {created.status}
-                {teamLength > 0
-                  ? ` com ${teamLength} ${
-                      teamLength === 1 ? 'profissional' : 'profissionais'
-                    } na equipe inicial.`
-                  : '.'}
-              </p>
-            </div>
+            <p>
+              A proposta para <strong>{patientName}</strong> foi criada e
+              aguarda a aprovação do paciente
+              {teamLength > 0
+                ? `, com ${teamLength} ${
+                    teamLength === 1 ? 'profissional' : 'profissionais'
+                  } na equipe inicial`
+                : ''}
+              .
+            </p>
 
             <div className={styles.actions}>
-              <Link href={`/pts/${created.id}`} className={primaryBtnCls}>
-                Abrir proposta
+              <Link
+                href={`/pts/proposals?patientId=${created.patient.id}`}
+                className={primaryBtnCls}
+              >
+                Ver propostas do paciente
               </Link>
 
               <button type="button" onClick={reset} className={secondaryBtnCls}>
@@ -310,40 +303,44 @@ export function CreatePts({ account }: CreatePtsProps) {
                 Seu perfil profissional
               </label>
 
-              {activeAccountProfessionals.length === 1 ? (
+              {accountProfessionals.length === 1 ? (
                 <input
                   id="professional"
                   type="text"
                   readOnly
-                  value={`${activeAccountProfessionals[0]?.name ?? ''} ${
-                    activeAccountProfessionals[0]?.specialism?.name
-                      ? `· ${activeAccountProfessionals[0].specialism.name}`
+                  value={`${accountProfessionals[0]?.name ?? ''} ${
+                    accountProfessionals[0]?.specialism?.name
+                      ? `· ${accountProfessionals[0].specialism.name}`
                       : ''
                   }`}
                   aria-describedby="professional-help"
                   className={`${inputCls(false)} ${styles.readonly}`}
                 />
               ) : (
-                <select
-                  id="professional"
-                  value={responsibleId}
-                  onChange={(event) => setResponsibleId(event.target.value)}
-                  required
-                  disabled={isLoading}
-                  aria-describedby="professional-help"
-                  className={inputCls(false)}
-                >
-                  <option value="">Selecione seu perfil profissional</option>
+                <div className={styles.selectWrap}>
+                  <select
+                    id="professional"
+                    value={responsibleId}
+                    onChange={(event) => setResponsibleId(event.target.value)}
+                    required
+                    disabled={isLoading || accountProfessionals.length === 0}
+                    aria-describedby="professional-help"
+                    className={`${inputCls(false)} ${styles.select}`}
+                  >
+                    <option value="">Selecione seu perfil profissional</option>
 
-                  {activeAccountProfessionals.map((professional) => (
-                    <option key={professional.id} value={professional.id}>
-                      {professional.name}{' '}
-                      {professional.specialism?.name
-                        ? `· ${professional.specialism.name}`
-                        : ''}
-                    </option>
-                  ))}
-                </select>
+                    {accountProfessionals.map((professional) => (
+                      <option key={professional.id} value={professional.id}>
+                        {professional.name}{' '}
+                        {professional.specialism?.name
+                          ? `· ${professional.specialism.name}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+
+                  <Icon name="chevronDown" className={styles.selectChevron} />
+                </div>
               )}
 
               <p id="professional-help" className={helpCls}>
@@ -363,6 +360,13 @@ export function CreatePts({ account }: CreatePtsProps) {
                   setLoadStatus('loading');
                   setReloadKey((key) => key + 1);
                 }}
+              />
+            )}
+
+            {hasNoProfessionalProfile && (
+              <ErrorMessage
+                title="Sem perfil profissional"
+                message="Esta conta não possui perfil profissional. Procure o administrador para cadastrar um."
               />
             )}
 
@@ -411,11 +415,7 @@ export function CreatePts({ account }: CreatePtsProps) {
             <div className={styles.actions}>
               <SubmitButton
                 loading={isLoading}
-                disabled={
-                  loadStatus !== 'ready' ||
-                  !me ||
-                  (activeAccountProfessionals.length > 1 && !responsibleId)
-                }
+                disabled={loadStatus !== 'ready' || !me}
               />
 
               <Link href="/home" className={secondaryBtnCls}>
@@ -425,19 +425,21 @@ export function CreatePts({ account }: CreatePtsProps) {
           </form>
         )}
 
-        <aside className={styles.aside}>
-          <h2>O primeiro passo é conjunto.</h2>
+        {!created && (
+          <aside className={styles.aside}>
+            <h2>O primeiro passo é conjunto.</h2>
 
-          <p>
-            A proposta será apresentada ao paciente. Após a aprovação, o PTS
-            entra em planejamento.
-          </p>
+            <p>
+              A proposta será apresentada ao paciente. Após a aprovação, o PTS
+              entra em planejamento.
+            </p>
 
-          <p>
-            Cada paciente pode ter apenas um PTS aprovado ativo. Outras
-            propostas pendentes serão rejeitadas ao escolher uma equipe.
-          </p>
-        </aside>
+            <p>
+              Cada paciente pode ter apenas um PTS aprovado ativo. Outras
+              propostas pendentes serão rejeitadas ao escolher uma equipe.
+            </p>
+          </aside>
+        )}
       </div>
     </>
   );

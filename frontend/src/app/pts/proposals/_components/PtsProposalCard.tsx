@@ -1,189 +1,127 @@
 import styles from '../proposals.module.css';
 
-export type ProposalSpecialism = {
-  id?: string;
-  name?: string;
-};
-
-export type ProposalProfessional = {
-  id?: string;
-  name?: string;
-  specialism?: ProposalSpecialism | null;
-};
-
-export type ProposalPatient = {
-  id?: string;
-  name?: string;
-};
-
-export type ProposalTeamMember = {
-  id?: string;
-  name?: string;
-  specialism?: ProposalSpecialism | null;
-};
-
 export type PtsProposal = {
   id: string;
   status?: string;
   socialSituation?: string;
-  createdAt?: string;
-  patient?: ProposalPatient | string;
-  responsible?: ProposalProfessional;
-  team?: ProposalTeamMember[];
-  // Nomes alternativos que o card e a lista aceitam, conforme o formato que a
-  // API devolver.
-  patientId?: string;
-  patientName?: string;
-  professional?: ProposalProfessional;
-  responsibleProfessional?: ProposalProfessional;
-  professionalId?: string;
-  responsibleId?: string;
-  responsibleProfessionalId?: string;
-  creatorId?: string;
-  createdById?: string;
-  professionalName?: string;
-  responsibleName?: string;
-  specialismName?: string;
-  speciality?: string;
-  teamProfessionals?: ProposalTeamMember[];
-  [key: string]: unknown;
+  patient?: {
+    id: string;
+    name: string;
+  };
+  responsible?: {
+    name: string;
+    specialism?: {
+      name: string;
+    };
+  };
+  team?: Array<{
+    id: string;
+    name: string;
+    specialism?: {
+      name: string;
+    };
+  }>;
 };
 
-type PtsProposalCardProps = {
+const statusMap: Record<string, string> = {
+  draft: 'Rascunho',
+  pending: 'Aguardando aprovação',
+  accepted: 'Aceita',
+  rejected: 'Rejeitada',
+  completed: 'Concluída',
+};
+
+export default function PtsProposalCard({
+  proposal,
+}: {
   proposal: PtsProposal;
-};
+}) {
+  const profName =
+    proposal.responsible?.name || 'Profissional não identificado';
+  const profSpecialism =
+    proposal.responsible?.specialism?.name || 'Especialidade não informada';
+  const patientName = proposal.patient?.name || 'Paciente não informado';
+  const socialSit =
+    proposal.socialSituation || 'Situação social não preenchida.';
+  const initial = profName.charAt(0).toUpperCase();
 
-function getInitial(name?: string | null) {
-  if (!name || typeof name !== 'string') {
-    return '?';
-  }
-
-  const trimmedName = name.trim();
-
-  if (!trimmedName) {
-    return '?';
-  }
-
-  return trimmedName.charAt(0).toUpperCase();
-}
-
-export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
-  const responsibleName =
-    proposal?.responsible?.name ??
-    proposal?.professional?.name ??
-    proposal?.responsibleProfessional?.name ??
-    proposal?.professionalName ??
-    proposal?.responsibleName ??
-    'Profissional não identificado';
-
-  const specialismName =
-    proposal?.responsible?.specialism?.name ??
-    proposal?.professional?.specialism?.name ??
-    proposal?.responsibleProfessional?.specialism?.name ??
-    proposal?.specialismName ??
-    proposal?.speciality ??
-    'Especialidade não informada';
-
-  const patientName =
-    typeof proposal?.patient === 'object' && proposal?.patient?.name
-      ? proposal.patient.name
-      : typeof proposal?.patient === 'string'
-        ? proposal.patient
-        : (proposal?.patientName ?? 'Paciente não informado');
-
-  const teamList = Array.isArray(proposal?.team)
-    ? proposal.team
-    : Array.isArray(proposal?.teamProfessionals)
-      ? proposal.teamProfessionals
-      : [];
+  const displayStatus = proposal.status
+    ? statusMap[proposal.status.toLowerCase()] || proposal.status
+    : 'Aguardando aprovação';
 
   return (
-    <article className={styles.proposalCard}>
+    <article
+      className={styles.proposalCard}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <div className={styles.personBanner}>
         <div className={styles.professionalIdentity}>
-          <span className={styles.proposalAvatar} aria-hidden="true">
-            {getInitial(responsibleName)}
-          </span>
-
+          <div className={styles.proposalAvatar}>{initial}</div>
           <div className={styles.personText}>
-            <h2>{responsibleName}</h2>
-
-            <p>
-              {specialismName}
-              {' · '}
-              profissional responsável
-            </p>
+            <h2>{profName}</h2>
+            <p>{profSpecialism} &middot; profissional responsável</p>
           </div>
         </div>
-
-        <span className={styles.statusBadge}>
-          {proposal?.status === 'draft' || !proposal?.status
-            ? 'Aguardando sua decisão'
-            : proposal.status}
-        </span>
+        <div className={styles.statusBadge}>{displayStatus}</div>
       </div>
 
       <div className={styles.metaGrid}>
         <div className={styles.metaBlock}>
           <span className={styles.metaLabel}>Paciente</span>
-          <strong className={styles.metaValue}>{patientName}</strong>
+          <span className={styles.metaValue}>
+            <strong>{patientName}</strong>
+          </span>
         </div>
-
         <div className={styles.metaBlock}>
           <span className={styles.metaLabel}>Equipe multidisciplinar</span>
-
-          {teamList.length > 0 ? (
-            <strong className={styles.metaValue}>
-              {teamList.length === 1
-                ? '1 profissional'
-                : `${teamList.length} profissionais`}
-            </strong>
-          ) : (
-            <strong className={styles.metaValue}>Ainda não definida</strong>
-          )}
+          <span className={styles.metaValue}>
+            {proposal.team && proposal.team.length > 0
+              ? `${proposal.team.length} profissional(is)`
+              : 'Ainda não definida'}
+          </span>
         </div>
       </div>
 
       <div className={styles.socialSituation}>
-        <h3>Situação social</h3>
-
-        <p>
-          {proposal?.socialSituation?.trim() ||
-            'Situação social não informada.'}
+        <h3>Situação Social</h3>
+        <p
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {socialSit}
         </p>
       </div>
 
       <div className={styles.teamSection}>
         <h3>Equipe</h3>
-
-        {teamList.length === 0 ? (
-          <p className={styles.emptyTeam}>
-            A equipe multidisciplinar ainda não possui outros profissionais
-            definidos.
-          </p>
-        ) : (
+        {proposal.team && proposal.team.length > 0 ? (
           <div className={styles.teamList}>
-            {teamList.map((member) => (
-              <div
-                key={member?.id ?? member?.name}
-                className={styles.teamMember}
-              >
-                <span className={styles.teamAvatar} aria-hidden="true">
-                  {getInitial(member?.name)}
-                </span>
-
+            {proposal.team.map((member) => (
+              <div key={member.id} className={styles.teamMember}>
+                <div className={styles.teamAvatar}>
+                  {member.name.charAt(0).toUpperCase()}
+                </div>
                 <div>
-                  <strong>{member?.name ?? 'Profissional'}</strong>
-
-                  {member?.specialism?.name ? (
-                    <span className={styles.teamSpecialism}>
-                      {member.specialism.name}
-                    </span>
-                  ) : null}
+                  <strong>{member.name}</strong>
+                  <div className={styles.teamSpecialism}>
+                    {member.specialism?.name || 'Especialidade não informada'}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+        ) : (
+          <p className={styles.emptyTeam}>
+            A equipe multidisciplinar ainda não possui outros profissionais
+            definidos.
+          </p>
         )}
       </div>
     </article>

@@ -184,14 +184,42 @@ Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `mi
 
 > ⚠️ **No Docker, os alvos de migration leem o código compilado** (`dist/database/data-source.js`), porque a imagem final não tem ts-node. Migration que você acabou de escrever só existe no host: rode `make rebuild-backend`, que recompila **e** aplica. `make migrate` sozinho não vê o arquivo novo.
 
-### 5.2 Conta de teste
+
+### 5.2 Contas de teste
+
+Execute o seed para criar ou reutilizar as contas de teste:
 
 ```bash
 make seed                                  # Docker
 pnpm --dir backend run seed:test-user      # local
 ```
 
-Cria o usuário `teste@teapts.local` / `teapts123` **no SuperTokens** e a conta vinculada na tabela `account`, com role `admin`. Precisa do Postgres **e** do SuperTokens no ar. É idempotente: rodar de novo não duplica (se o usuário já existe no SuperTokens, o seed só cria a conta que faltar).
+O seed precisa do PostgreSQL e do SuperTokens em execução.
+
+**Administrador**
+
+- E-mail: `teste@teapts.local`
+- Senha: `teapts123`
+- Papel: `admin`
+
+**Profissional**
+
+- E-mail: `profissional@teapts.local`
+- Senha: `profissional123`
+- Papel: `user`
+- Perfil: psicólogo
+
+**Paciente**
+
+- E-mail: `paciente@teapts.local`
+- Senha: `paciente123`
+- Papel: `user`
+- Perfil: paciente
+
+O seed cria ou reutiliza as contas e garante que exista um perfil de psicólogo para a conta profissional. Ele não redefine a senha de usuários já existentes no SuperTokens.
+
+Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
+
 
 ### 5.3 Testar se o banco está de pé
 

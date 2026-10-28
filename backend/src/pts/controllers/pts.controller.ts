@@ -1,56 +1,95 @@
-import { Controller, Get, Post, Body, Query, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+
+import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
+import { AuthGuard } from '../../auth/guards/auth.guard';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import {
+  ErrorResponseDto,
+  UnauthorizedResponseDto,
+} from '../../common/swagger/error-response.dto';
+import { CreatePtsRequestDto } from '../dto/create-pts.dto';
+import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
+import {
+  GetPtsProposalsResponseDto,
+  PtsProposalResponseDto,
+} from '../dto/pts-proposal-response.dto';
 import { PtsService } from '../services/pts.service';
 
-/** Corpo aceito pelo POST /pts, com os nomes alternativos dos campos. */
-type CreatePtsBody = {
-  patientId: string;
-  socialSituation?: string;
-  social_situation?: string;
-  responsibleProfessionalId?: string;
-  professionalId?: string;
-  responsibleId?: string;
-  teamProfessionalIds?: string[];
-};
+const parseProposalId = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: id',
+    }),
+});
 
-// Tipos só para tirar o `any`, sem mudar o comportamento. O projeto não
-// preenche `req.user` (o contexto fica em `req.accountContext`); ver R2 em
-// `.dev/futuras-alteracoes-modulo-pacientes.md`.
-type RequestWithUser = Request & {
-  user: { professionalProfileId: string };
-};
-
+@ApiTags('pts')
 @Controller('pts')
 export class PtsController {
   constructor(private readonly ptsService: PtsService) {}
 
   @Post()
-  async createDraft(@Body() body: CreatePtsBody, @Req() req: RequestWithUser) {
-    const patientId = body.patientId;
-    const socialSituation = body.socialSituation ?? body.social_situation ?? '';
-    const responsibleProfessionalId =
-      body.responsibleProfessionalId ??
-      body.professionalId ??
-      body.responsibleId ??
-      req.user?.professionalProfileId;
-
-    return await this.ptsService.createDraft({
-      patientId,
-      responsibleProfessionalId,
-      socialSituation,
-      teamProfessionalIds: body.teamProfessionalIds ?? [],
-    });
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async create(
+    @Body() dto: CreatePtsRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.createPts(dto, account.accountId);
   }
 
   @Get('proposals')
-  async findProposals(
-    @Query('patientId') patientId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: GetPtsProposalsResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async findDraftProposals(
+    @Query() query: GetPtsProposalsQueryDto,
+    @CurrentAccount() account: AccountContext,
   ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.ptsService.findDraftProposals(query, account);
+  }
 
-    return await this.ptsService.findByPatientId(patientId, pageNum, limitNum);
+  @Get('proposals/:id')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: PtsProposalResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async findDraftProposalById(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.findDraftProposalById(id, account);
   }
 }

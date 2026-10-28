@@ -2,12 +2,12 @@
   min-height: 0;
 }
 
-/* Caixa de aviso/notificação da página */
+/* Aviso da página */
 .notice {
   margin-bottom: 24px;
-  padding: 12px 16px;
+  padding: 15px 18px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--surface);
   color: var(--muted);
   font-size: 13px;
@@ -18,7 +18,7 @@
   color: var(--fg);
 }
 
-/* Área principal da lista */
+/* Lista de propostas */
 .proposalsArea {
   display: flex;
   flex-direction: column;
@@ -50,12 +50,52 @@
   gap: 16px;
 }
 
-/* Cards das Propostas */
+/* Card da proposta */
 .proposalCard {
   overflow: hidden;
   border: 1px solid var(--border);
+  border-left: 5px solid var(--accent); /* Detalhe visual usando a cor global do sistema */
   border-radius: 12px;
   background: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.proposalCard:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.personBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+  background: var(--bg); /* Fundo contrastante para quebrar o branco */
+}
+
+.socialSituation {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.teamSection {
+  padding: 18px 24px;
+  background: var(--bg); /* Fundo contrastante para a secção da equipa */
 }
 
 .personBanner {
@@ -74,7 +114,7 @@
   gap: 12px;
 }
 
-/* Avatares padronizados (quadrados e proporcionais) */
+/* Avatares */
 .proposalAvatar,
 .teamAvatar {
   display: flex;
@@ -90,9 +130,14 @@
 }
 
 .proposalAvatar {
-  width: 40px;
-  height: 40px;
-  font-size: 13px;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .teamAvatar {
@@ -121,17 +166,18 @@
   font-size: 12px;
 }
 
-/* Badges */
+/* Status da proposta */
 .statusBadge {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 7px;
+  padding: 7px 11px;
   border: 1px solid var(--border);
   border-radius: 999px;
+  background: var(--bg);
   color: var(--fg);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -143,7 +189,7 @@
   content: '';
 }
 
-/* Bloco de metadados */
+/* Metadados */
 .metaGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -177,7 +223,7 @@
   white-space: nowrap;
 }
 
-/* Situação Social */
+/* Situação social */
 .socialSituation {
   padding: 18px 24px;
   border-bottom: 1px solid var(--border);
@@ -216,10 +262,10 @@
 .teamMember {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 11px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg);
 }
 
@@ -248,7 +294,7 @@
   font-size: 13px;
 }
 
-/* Botões e Paginação (altura padronizada em 40px) */
+/* Paginação */
 .pagination {
   display: flex;
   align-items: center;
@@ -257,46 +303,19 @@
   padding: 12px 0;
 }
 
-.paginationButton,
-.retryButton {
-  height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--fg);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.paginationButton:hover:not(:disabled),
-.retryButton:hover {
-  border-color: var(--fg);
-}
-
-.paginationButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 .pageInfo {
   color: var(--muted);
   font-size: 12px;
 }
 
-/* Estados Vazios e de Erro */
+/* Estados vazios e de erro */
 .stateCard {
   display: flex;
   min-height: 220px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: 34px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -349,7 +368,7 @@
   margin-top: 16px;
 }
 
-/* Carregamento (Skeleton) */
+/* Carregamento */
 .loadingArea {
   display: flex;
   flex-direction: column;
@@ -404,6 +423,7 @@
 .loadingText span:first-child {
   width: 60%;
 }
+
 .loadingText span:last-child {
   width: 88%;
 }
@@ -418,9 +438,11 @@
 .loadingBody span:nth-child(1) {
   width: 80%;
 }
+
 .loadingBody span:nth-child(2) {
   width: 95%;
 }
+
 .loadingBody span:nth-child(3) {
   width: 65%;
 }
@@ -430,6 +452,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.46;
   }
@@ -443,6 +466,7 @@
   }
 }
 
+/* Responsividade */
 @media (max-width: 640px) {
   .personBanner {
     align-items: flex-start;
@@ -475,4 +499,51 @@
   .pagination {
     flex-wrap: wrap;
   }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.headerAction {
+  flex: none;
+}
+
+/* Estilização idêntica aos filtros de profissionais */
+.filters {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+
+.filterMain {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-end;
+}
+
+.inputWithIcon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }

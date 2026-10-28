@@ -1,4 +1,3 @@
-import Icon from '@/components/Icon';
 import { primaryBtnCls } from '../styles';
 
 interface Props {
@@ -12,10 +11,9 @@ export function SubmitButton({ loading, disabled }: Props) {
       type="submit"
       disabled={loading || disabled}
       aria-busy={loading}
-      className={`${primaryBtnCls}`}
+      className={primaryBtnCls}
     >
       {loading ? 'Criando proposta...' : 'Criar proposta'}
-      {!loading && <Icon name="arrow" className="h-3.5 w-3.5" />}
     </button>
   );
 }

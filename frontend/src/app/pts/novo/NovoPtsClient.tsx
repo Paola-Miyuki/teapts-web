@@ -1,15 +1,15 @@
 'use client';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
-import CreatePts from './CreatePts'; // Importação default (sem as chaves)
+import CreatePts from './CreatePts';
 
 export default function NovoPtsClient() {
   return (
     <AuthenticatedPage
-      currentHref="/pts/novo"
+      currentHref="/pts/proposals"
       breadcrumb="Criar proposta de PTS"
     >
-      <CreatePts />
+      {(account) => <CreatePts account={account} />}
     </AuthenticatedPage>
   );
 }

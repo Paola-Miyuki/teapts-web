@@ -4,15 +4,36 @@ import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { Patient } from '../../patients/entities/patient.entity';
+import { Professional } from '../../professionals/entities/professional.entity';
+import { Specialism } from '../../professionals/enums/specialism.enum';
 
 const TENANT_ID = 'public';
-const EMAIL = 'teste@teapts.local';
-const PASSWORD = 'teapts123';
-const NAME = 'Usuario de Teste';
 
-// A senha fica so no SuperTokens; o seed precisa do core no ar
-// (SUPERTOKENS_CONNECTION_URI) alem do Postgres.
-// O .env ja foi carregado pelo import de data-source.
+const TEST_USERS = [
+  {
+    email: 'teste@teapts.local',
+    password: 'teapts123',
+    name: 'Usuario de Teste',
+    role: AccountRole.Admin,
+    profile: 'none',
+  },
+  {
+    email: 'profissional@teapts.local',
+    password: 'profissional123',
+    name: 'Profissional de Teste',
+    role: AccountRole.User,
+    profile: 'professional',
+  },
+  {
+    email: 'paciente@teapts.local',
+    password: 'paciente123',
+    name: 'Paciente de Teste',
+    role: AccountRole.User,
+    profile: 'patient',
+  },
+] as const;
+
 function initSupertokens(): void {
   const config = new ConfigService();
 
@@ -36,56 +57,136 @@ function initSupertokens(): void {
   });
 }
 
-// Cria o usuario no SuperTokens ou reaproveita o existente, para o seed
-// poder rodar de novo depois de o banco da aplicacao ser recriado.
-async function findOrCreateSupertokensUserId(): Promise<string> {
-  const signUp = await EmailPassword.signUp(TENANT_ID, EMAIL, PASSWORD);
+async function findOrCreateSupertokensUserId(
+  email: string,
+  password: string,
+): Promise<string> {
+  const signUp = await EmailPassword.signUp(TENANT_ID, email, password);
 
   if (signUp.status === 'OK') {
     return signUp.user.id;
   }
 
   const [existing] = await supertokens.listUsersByAccountInfo(TENANT_ID, {
-    email: EMAIL,
+    email,
   });
 
   if (!existing) {
-    throw new Error(`Nao foi possivel criar ${EMAIL} no SuperTokens`);
+    throw new Error(`Nao foi possivel criar ${email} no SuperTokens`);
   }
 
   return existing.id;
 }
 
-async function createTestUser(): Promise<void> {
-  initSupertokens();
-  const supertokensUserId = await findOrCreateSupertokensUserId();
+async function createOrReuseAccount(
+  user: (typeof TEST_USERS)[number],
+): Promise<Account> {
+  const accounts = dataSource.getRepository(Account);
+  const supertokensUserId = await findOrCreateSupertokensUserId(
+    user.email,
+    user.password,
+  );
 
+  let account = await accounts.findOneBy({ supertokensUserId });
+
+  if (!account) {
+    account = await accounts.findOneBy({ email: user.email });
+  }
+
+  if (account) {
+    if (account.supertokensUserId !== supertokensUserId) {
+      account.supertokensUserId = supertokensUserId;
+    }
+
+    account.name = user.name;
+    account.role = user.role;
+
+    account = await accounts.save(account);
+    console.log(`Conta reutilizada: ${account.email} (${account.role})`);
+    return account;
+  }
+
+  account = await accounts.save(
+    accounts.create({
+      name: user.name,
+      email: user.email,
+      supertokensUserId,
+      role: user.role,
+      lastUpdatedAt: null,
+    }),
+  );
+
+  console.log(`Conta criada: ${account.email} (${account.role})`);
+  return account;
+}
+
+async function ensureProfessionalProfile(account: Account): Promise<void> {
+  const professionals = dataSource.getRepository(Professional);
+
+  const existingProfile = await professionals.findOneBy({
+    accountId: account.id,
+    specialism: Specialism.Psychologist,
+  });
+
+  if (existingProfile) {
+    console.log('Perfil profissional de teste ja existe.');
+    return;
+  }
+
+  const profile = await professionals.save(
+    professionals.create({
+      accountId: account.id,
+      specialism: Specialism.Psychologist,
+    }),
+  );
+
+  console.log(`Perfil profissional criado: ${profile.id}`);
+}
+
+async function ensurePatientProfile(account: Account): Promise<void> {
+  const patients = dataSource.getRepository(Patient);
+
+  const existingProfile = await patients.findOneBy({
+    accountId: account.id,
+  });
+
+  if (existingProfile) {
+    console.log('Perfil de paciente de teste ja existe.');
+    return;
+  }
+
+  await dataSource.query('INSERT INTO "patient" ("accountId") VALUES ($1)', [
+    account.id,
+  ]);
+
+  console.log(`Perfil de paciente criado: ${account.id}`);
+}
+
+async function createTestUsers(): Promise<void> {
+  initSupertokens();
   await dataSource.initialize();
 
   try {
-    const accounts = dataSource.getRepository(Account);
-    const existing = await accounts.findOneBy({ supertokensUserId });
+    for (const user of TEST_USERS) {
+      const account = await createOrReuseAccount(user);
 
-    if (existing) {
-      console.log(`Conta ${EMAIL} ja existe (id ${existing.id}).`);
-      return;
+      if (user.profile === 'professional') {
+        await ensureProfessionalProfile(account);
+      }
+
+      if (user.profile === 'patient') {
+        await ensurePatientProfile(account);
+      }
+
+      console.log(`Login de teste: ${user.email}`);
+      console.log(`Senha de teste: ${user.password}`);
     }
-
-    const account = await accounts.save(
-      accounts.create({
-        name: NAME,
-        email: EMAIL,
-        supertokensUserId,
-        role: AccountRole.Admin,
-        lastUpdatedAt: null,
-      }),
-    );
-
-    console.log(`Conta criada: ${account.email} (id ${account.id})`);
-    console.log(`Senha de teste: ${PASSWORD}`);
   } finally {
     await dataSource.destroy();
   }
 }
 
-void createTestUser();
+void createTestUsers().catch((error: unknown) => {
+  console.error('Erro ao criar contas de teste:', error);
+  process.exitCode = 1;
+});

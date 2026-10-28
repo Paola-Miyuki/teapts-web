@@ -62,7 +62,7 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
       {
         href: '/pts/proposals',
         icon: 'clipboard',
-        label: 'Propostas de PTS',
+        label: 'PTS',
       },
     ];
   } else {
@@ -70,7 +70,7 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
       { href: '/home', icon: 'home', label: 'Início' },
       { href: '/professionals', icon: 'people', label: 'Profissionais' },
       {
-        href: '/pts/novo',
+        href: '/pts/proposals',
         icon: 'clipboard',
         label: 'PTS',
       },

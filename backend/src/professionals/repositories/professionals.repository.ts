@@ -85,8 +85,8 @@ export class ProfessionalsRepository {
 
     const total = await query.clone().getCount();
     const rows = await query
-      .skip((filters.page - 1) * filters.limit)
-      .take(filters.limit)
+      .offset((filters.page - 1) * filters.limit)
+      .limit(filters.limit)
       .getRawMany<ProfessionalRow>();
 
     return { rows, total };
