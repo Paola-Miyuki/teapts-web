@@ -5,11 +5,11 @@ function labels(kind: Parameters<typeof getNavigation>[0]) {
 }
 
 describe('getNavigation', () => {
-  it('mostra o item "Criar perfil de paciente" só para o admin', () => {
-    expect(getNavigation('admin', '/patients/new')).toContainEqual({
-      href: '/patients/new',
-      icon: 'plus',
-      label: 'Criar perfil de paciente',
+  it('mostra o item "Pacientes" só para o admin', () => {
+    expect(getNavigation('admin', '/patients')).toContainEqual({
+      href: '/patients',
+      icon: 'patient',
+      label: 'Pacientes',
       current: true,
     });
   });
@@ -23,7 +23,7 @@ describe('getNavigation', () => {
       'Início',
       'Profissionais',
       'PTS',
-      'Criar perfil de paciente',
+      'Pacientes',
     ]);
   });
 });

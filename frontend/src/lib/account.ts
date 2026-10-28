@@ -77,11 +77,7 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
     ];
 
     if (kind === 'admin') {
-      items.push({
-        href: '/patients/new',
-        icon: 'plus',
-        label: 'Criar perfil de paciente',
-      });
+      items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
     }
   }
 
