@@ -87,23 +87,25 @@ export function CreatePts({ account }: CreatePtsProps) {
       .then(([rawPatients, rawProfessionals]) => {
         const loadedPatients: Patient[] = Array.isArray(rawPatients)
           ? rawPatients
-          : (rawPatients as { data?: Patient[] })?.data ?? [];
+          : ((rawPatients as { data?: Patient[] })?.data ?? []);
 
-        const loadedProfessionals: Professional[] = Array.isArray(rawProfessionals)
+        const loadedProfessionals: Professional[] = Array.isArray(
+          rawProfessionals,
+        )
           ? rawProfessionals
-          : (rawProfessionals as { data?: Professional[] })?.data ?? [];
+          : ((rawProfessionals as { data?: Professional[] })?.data ?? []);
 
         const accountProfileIds = account?.professionalProfileIds ?? [];
 
-        let accountProfessionals = loadedProfessionals.filter(
-          (professional) => accountProfileIds.includes(professional.id),
+        let accountProfessionals = loadedProfessionals.filter((professional) =>
+          accountProfileIds.includes(professional.id),
         );
 
         // Fallback defensivo se nenhum ID corresponder ao accountProfileIds[cite: 7]
         if (accountProfessionals.length === 0) {
           console.warn(
             'Divergência de IDs entre Account e Professional. Aplicando fallback com a lista carregada.',
-            { accountProfileIds, loadedProfessionals }
+            { accountProfileIds, loadedProfessionals },
           );
           accountProfessionals = loadedProfessionals;
         }
@@ -165,7 +167,9 @@ export function CreatePts({ account }: CreatePtsProps) {
     setFieldErrors({});
     setSubmitError(null);
     setResponsibleId(
-      activeAccountProfessionals.length === 1 ? activeAccountProfessionals[0].id : '',
+      activeAccountProfessionals.length === 1
+        ? activeAccountProfessionals[0].id
+        : '',
     );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
@@ -203,7 +207,10 @@ export function CreatePts({ account }: CreatePtsProps) {
       // Mapeamento seguro com fallback para a rendering do card de sucesso
       setCreated({
         ...pts,
-        patient: pts?.patient ?? { id: patientId, name: selectedPatient?.name ?? 'paciente' },
+        patient: pts?.patient ?? {
+          id: patientId,
+          name: selectedPatient?.name ?? 'paciente',
+        },
         team: pts?.team ?? [],
       } as Pts);
     } catch (error) {
@@ -247,8 +254,8 @@ export function CreatePts({ account }: CreatePtsProps) {
               <h2 className={styles.createdTitle}>Proposta criada</h2>
 
               <p className={styles.createdText}>
-                <span className={styles.badge}>{created.status}</span> A proposta
-                de {patientName} foi criada como {created.status}
+                <span className={styles.badge}>{created.status}</span> A
+                proposta de {patientName} foi criada como {created.status}
                 {teamLength > 0
                   ? ` com ${teamLength} ${
                       teamLength === 1 ? 'profissional' : 'profissionais'
@@ -330,7 +337,10 @@ export function CreatePts({ account }: CreatePtsProps) {
 
                   {activeAccountProfessionals.map((professional) => (
                     <option key={professional.id} value={professional.id}>
-                      {professional.name} {professional.specialism?.name ? `· ${professional.specialism.name}` : ''}
+                      {professional.name}{' '}
+                      {professional.specialism?.name
+                        ? `· ${professional.specialism.name}`
+                        : ''}
                     </option>
                   ))}
                 </select>

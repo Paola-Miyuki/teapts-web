@@ -13,6 +13,7 @@ import PtsProposalCard from './PtsProposalCard';
 
 import type { PtsProposal } from './PtsProposalCard';
 import { listEligiblePatients, listProfessionals } from '../../novo/api/ptsApi';
+import type { Patient, Professional } from '../../novo/types';
 
 type CurrentAccount = {
   accountId: string;
@@ -34,6 +35,9 @@ type ProposalsResponse = {
   data?: PtsProposal[];
   pagination?: PaginationData;
 };
+
+// `specialty` é um nome alternativo da especialidade, lido como fallback.
+type ProfessionalLookup = Professional & { specialty?: string };
 
 type ApiErrorResponse = {
   status?: string;
@@ -74,8 +78,10 @@ export default function PtsProposalList() {
   const [proposalError, setProposalError] = useState('');
   const [proposalRetryKey, setProposalRetryKey] = useState(0);
 
-  const [professionalsMap, setProfessionalsMap] = useState<Record<string, any>>({});
-  const [patientsMap, setPatientsMap] = useState<Record<string, any>>({});
+  const [professionalsMap, setProfessionalsMap] = useState<
+    Record<string, ProfessionalLookup>
+  >({});
+  const [patientsMap, setPatientsMap] = useState<Record<string, Patient>>({});
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -94,16 +100,17 @@ export default function PtsProposalList() {
       listEligiblePatients(controller.signal),
     ])
       .then(([profs, pats]) => {
-        const pMap: Record<string, any> = {};
-        const patMap: Record<string, any> = {};
+        const pMap: Record<string, ProfessionalLookup> = {};
+        const patMap: Record<string, Patient> = {};
 
-        const loadedProfs = Array.isArray(profs) ? profs : profs?.data ?? [];
-        const loadedPats = Array.isArray(pats) ? pats : pats?.data ?? [];
+        // As funções do ptsApi já devolvem a lista, sem o envelope `data`.
+        const loadedProfs = Array.isArray(profs) ? profs : [];
+        const loadedPats = Array.isArray(pats) ? pats : [];
 
-        loadedProfs.forEach((p: any) => {
+        loadedProfs.forEach((p) => {
           if (p?.id) pMap[p.id] = p;
         });
-        loadedPats.forEach((p: any) => {
+        loadedPats.forEach((p) => {
           if (p?.id) patMap[p.id] = p;
         });
 
@@ -152,7 +159,9 @@ export default function PtsProposalList() {
         if (patientIdFromUrl) {
           if (!UUID_PATTERN.test(patientIdFromUrl)) {
             setTargetPatientId(null);
-            setContextMessage('O identificador do paciente informado não é válido.');
+            setContextMessage(
+              'O identificador do paciente informado não é válido.',
+            );
             setAccountLoading(false);
             return;
           }
@@ -204,7 +213,9 @@ export default function PtsProposalList() {
       limit: String(PAGE_LIMIT),
     });
 
-    fetch(`${API_URL}/pts/proposals?${params.toString()}`, { credentials: 'include' })
+    fetch(`${API_URL}/pts/proposals?${params.toString()}`, {
+      credentials: 'include',
+    })
       .then(async (response) => {
         if (cancelled) return;
 
@@ -224,14 +235,15 @@ export default function PtsProposalList() {
           return;
         }
 
-        const result = (await response.json()) as ProposalsResponse | PtsProposal[];
+        const result = (await response.json()) as
+          ProposalsResponse | PtsProposal[];
         if (cancelled) return;
 
         setProposalError('');
 
         const loadedData: PtsProposal[] = Array.isArray(result)
           ? result
-          : result?.data ?? [];
+          : (result?.data ?? []);
 
         const loadedPagination: PaginationData = Array.isArray(result)
           ? {
@@ -283,7 +295,8 @@ export default function PtsProposalList() {
   }
 
   if (accountLoading) return <LoadingState />;
-  if (accountError) return <ErrorState message={accountError} onRetry={handleAccountRetry} />;
+  if (accountError)
+    return <ErrorState message={accountError} onRetry={handleAccountRetry} />;
 
   if (!targetPatientId) {
     return (
@@ -295,7 +308,8 @@ export default function PtsProposalList() {
   }
 
   if (proposals === null) return <LoadingState />;
-  if (proposalError) return <ErrorState message={proposalError} onRetry={handleProposalRetry} />;
+  if (proposalError)
+    return <ErrorState message={proposalError} onRetry={handleProposalRetry} />;
 
   if (proposals.length === 0) {
     return (
@@ -307,7 +321,7 @@ export default function PtsProposalList() {
   }
 
   // Preenche dinamicamente todas as chaves de profissional e paciente
-  const enrichedProposals = proposals.map((prop: any) => {
+  const enrichedProposals = proposals.map((prop) => {
     const profId =
       prop.professionalId ||
       prop.responsibleId ||
@@ -317,7 +331,10 @@ export default function PtsProposalList() {
       prop.responsible?.id ||
       prop.professional?.id;
 
-    const patId = prop.patientId || prop.patient?.id || targetPatientId;
+    const patId =
+      prop.patientId ||
+      (typeof prop.patient === 'object' ? prop.patient?.id : undefined) ||
+      targetPatientId;
 
     const matchedProf = profId ? professionalsMap[profId] : null;
     const matchedPat = patId ? patientsMap[patId] : null;
@@ -343,8 +360,8 @@ export default function PtsProposalList() {
       typeof prop.patient === 'object' && prop.patient?.name
         ? prop.patient.name
         : typeof prop.patient === 'string'
-        ? prop.patient
-        : prop.patientName || matchedPat?.name || 'Paciente não informado';
+          ? prop.patient
+          : prop.patientName || matchedPat?.name || 'Paciente não informado';
 
     return {
       ...prop,

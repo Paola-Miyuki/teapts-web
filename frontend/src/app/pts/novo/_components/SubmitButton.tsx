@@ -15,9 +15,7 @@ export function SubmitButton({ loading, disabled }: Props) {
       className={`${primaryBtnCls}`}
     >
       {loading ? 'Criando proposta...' : 'Criar proposta'}
-      {!loading && (
-        <Icon name="arrow" className="h-3.5 w-3.5" />
-      )}
+      {!loading && <Icon name="arrow" className="h-3.5 w-3.5" />}
     </button>
   );
 }

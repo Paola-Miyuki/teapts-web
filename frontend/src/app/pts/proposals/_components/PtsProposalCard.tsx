@@ -30,7 +30,23 @@ export type PtsProposal = {
   patient?: ProposalPatient | string;
   responsible?: ProposalProfessional;
   team?: ProposalTeamMember[];
-  [key: string]: any;
+  // Nomes alternativos que o card e a lista aceitam, conforme o formato que a
+  // API devolver.
+  patientId?: string;
+  patientName?: string;
+  professional?: ProposalProfessional;
+  responsibleProfessional?: ProposalProfessional;
+  professionalId?: string;
+  responsibleId?: string;
+  responsibleProfessionalId?: string;
+  creatorId?: string;
+  createdById?: string;
+  professionalName?: string;
+  responsibleName?: string;
+  specialismName?: string;
+  speciality?: string;
+  teamProfessionals?: ProposalTeamMember[];
+  [key: string]: unknown;
 };
 
 type PtsProposalCardProps = {
@@ -72,14 +88,14 @@ export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
     typeof proposal?.patient === 'object' && proposal?.patient?.name
       ? proposal.patient.name
       : typeof proposal?.patient === 'string'
-      ? proposal.patient
-      : proposal?.patientName ?? 'Paciente não informado';
+        ? proposal.patient
+        : (proposal?.patientName ?? 'Paciente não informado');
 
   const teamList = Array.isArray(proposal?.team)
     ? proposal.team
     : Array.isArray(proposal?.teamProfessionals)
-    ? proposal.teamProfessionals
-    : [];
+      ? proposal.teamProfessionals
+      : [];
 
   return (
     <article className={styles.proposalCard}>
@@ -132,7 +148,8 @@ export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
         <h3>Situação social</h3>
 
         <p>
-          {proposal?.socialSituation?.trim() || 'Situação social não informada.'}
+          {proposal?.socialSituation?.trim() ||
+            'Situação social não informada.'}
         </p>
       </div>
 
@@ -146,8 +163,11 @@ export default function PtsProposalCard({ proposal }: PtsProposalCardProps) {
           </p>
         ) : (
           <div className={styles.teamList}>
-            {teamList.map((member: any) => (
-              <div key={member?.id ?? member?.name} className={styles.teamMember}>
+            {teamList.map((member) => (
+              <div
+                key={member?.id ?? member?.name}
+                className={styles.teamMember}
+              >
                 <span className={styles.teamAvatar} aria-hidden="true">
                   {getInitial(member?.name)}
                 </span>

@@ -269,7 +269,9 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .paginationButton:hover:not(:disabled),
@@ -399,8 +401,12 @@
   animation: pulse 1.4s ease-in-out infinite;
 }
 
-.loadingText span:first-child { width: 60%; }
-.loadingText span:last-child { width: 88%; }
+.loadingText span:first-child {
+  width: 60%;
+}
+.loadingText span:last-child {
+  width: 88%;
+}
 
 .loadingBody {
   display: flex;
@@ -409,13 +415,24 @@
   margin-top: 20px;
 }
 
-.loadingBody span:nth-child(1) { width: 80%; }
-.loadingBody span:nth-child(2) { width: 95%; }
-.loadingBody span:nth-child(3) { width: 65%; }
+.loadingBody span:nth-child(1) {
+  width: 80%;
+}
+.loadingBody span:nth-child(2) {
+  width: 95%;
+}
+.loadingBody span:nth-child(3) {
+  width: 65%;
+}
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.46; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.46;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

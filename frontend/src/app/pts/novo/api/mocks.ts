@@ -9,7 +9,8 @@ import type {
 
 export const MOCK_PROFESSIONAL_ID = 'e24f123a-ce91-4ef2-a0c5-3d196e2515a9';
 export const MOCK_PATIENT_ID = '00000000-0000-4000-8000-000000000025';
-export const MOCK_PATIENT_WITH_ACTIVE_PTS_ID = '00000000-0000-4000-8000-000000000026';
+export const MOCK_PATIENT_WITH_ACTIVE_PTS_ID =
+  '00000000-0000-4000-8000-000000000026';
 
 /** Mapeia todos os UUIDs possíveis do perfil da Felícia Santiago e outros profissionais */
 export const mockProfessionals: Professional[] = [
@@ -63,9 +64,7 @@ function toPtsProfessional(professional: Professional): PtsProfessional {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function mockCreatePts(
-  payload: CreatePtsPayload,
-): Promise<Pts> {
+export async function mockCreatePts(payload: CreatePtsPayload): Promise<Pts> {
   await wait(500);
 
   // 1. Procura se o ID enviado (qualquer uma das variantes) pertence aos autorizados
@@ -82,7 +81,9 @@ export async function mockCreatePts(
   }
 
   // 2. Validação RN008: Paciente
-  const patient = mockPatients.find((item) => item.id === payload.patientId) ?? {
+  const patient = mockPatients.find(
+    (item) => item.id === payload.patientId,
+  ) ?? {
     id: payload.patientId,
     name: 'Paciente Selecionado',
   };
