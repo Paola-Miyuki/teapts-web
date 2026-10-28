@@ -12,14 +12,19 @@ export default function PtsProposalsPage() {
       currentHref="/pts/proposals"
       breadcrumb="Propostas de PTS"
     >
-      <div className={ui.heading}>
-        <div>
-          <p className={ui.eyebrow}>Seu cuidado, sua escolha</p>
-          <h1>Propostas de PTS</h1>
-          <p>Conheça a equipe que vai planejar seu Programa Terapêutico Singular.</p>
+      <div className={styles.header}>
+        <div className={ui.heading}>
+          <div>
+            <p className={ui.eyebrow}>Seu cuidado, sua escolha</p>
+            <h1>Propostas de PTS</h1>
+            <p>Conheça a equipe que vai planejar seu Programa Terapêutico Singular.</p>
+          </div>
         </div>
-        
-        <Link href="/pts/novo" className={`${ui.btn} ${ui.btnPrimary}`}>
+
+        <Link
+          href="/pts/novo"
+          className={`${ui.btn} ${ui.btnPrimary} ${styles.headerAction}`}
+        >
           Novo PTS
         </Link>
       </div>

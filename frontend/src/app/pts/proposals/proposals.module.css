@@ -460,3 +460,15 @@
     flex-wrap: wrap;
   }
 }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.headerAction {
+  flex: none;
+}
