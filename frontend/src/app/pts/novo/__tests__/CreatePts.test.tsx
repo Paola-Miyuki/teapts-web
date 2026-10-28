@@ -98,14 +98,13 @@ describe('CreatePts', () => {
 
     expect(screen.getByLabelText(/Ana Lima/)).toBeInTheDocument();
 
+    const teamCheckboxes = screen.getAllByRole('checkbox');
+
     expect(
-      screen.queryByLabelText(
-        new RegExp(
-          `${mockProfessionals[0].name}.*${mockProfessionals[0].specialism.name}`,
-          'i',
-        ),
+      teamCheckboxes.some(
+        (checkbox) => checkbox.getAttribute('value') === MOCK_PROFESSIONAL_ID,
       ),
-    ).not.toBeInTheDocument();
+    ).toBe(false);
 
     expect(screen.getByLabelText(/seu perfil profissional/i)).toHaveValue(
       `${mockProfessionals[0].name} · ${mockProfessionals[0].specialism.name}`,
@@ -135,21 +134,31 @@ describe('CreatePts', () => {
     await fillForm(user);
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
-    expect(
-      await screen.findByRole('button', { name: /criando proposta/i }),
-    ).toBeDisabled();
+    const ana = mockProfessionals.find(
+      (professional) => professional.name === 'Ana Lima',
+    );
+
+    const bruno = mockProfessionals.find(
+      (professional) => professional.name === 'Bruno Souza',
+    );
+
+    expect(ana).toBeDefined();
+    expect(bruno).toBeDefined();
+
     expect(api.createPts).toHaveBeenCalledWith({
       professionalId: MOCK_PROFESSIONAL_ID,
       patientId: MOCK_PATIENT_ID,
       socialSituation: SOCIAL,
-      teamProfessionalIds: [mockProfessionals[1].id, mockProfessionals[2].id],
+      teamProfessionalIds: [ana!.id, bruno!.id],
     });
 
     resolve(createdPts);
-    expect(await screen.findByTestId('pts-created')).toHaveTextContent('DRAFT');
+    expect(await screen.findByTestId('pts-created')).toHaveTextContent(
+      'A proposta para Maria Silva foi criada e aguarda a aprovação do paciente',
+    );
     expect(
-      screen.getByRole('link', { name: /abrir proposta/i }),
-    ).toHaveAttribute('href', `/pts/${createdPts.id}`);
+      screen.getByRole('link', { name: /ver propostas do paciente/i }),
+    ).toHaveAttribute('href', `/pts/proposals?patientId=${MOCK_PATIENT_ID}`);
   });
 
   it('permite criar sem equipe (opcional)', async () => {

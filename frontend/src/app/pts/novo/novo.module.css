@@ -114,8 +114,13 @@
 .createdText {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
+}
+
+.createdText strong {
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .badge {

@@ -50,7 +50,7 @@ export function PatientSelect({
             </option>
           ))}
         </select>
-        
+
         <Icon name="chevronDown" className={styles.selectChevron} />
       </div>
       <p id="patient-help" className={helpCls}>
