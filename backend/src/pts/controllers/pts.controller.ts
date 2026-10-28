@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -34,10 +35,18 @@ import {
 } from '../dto/pts-proposal-response.dto';
 import { PtsService } from '../services/pts.service';
 
+const parseProposalId = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: id',
+    }),
+});
+
 @ApiTags('pts')
 @Controller('pts')
 export class PtsController {
-  constructor(private readonly ptsService: PtsService) {}
+  constructor(private readonly ptsService: PtsService) { }
 
   @Post()
   @UseGuards(AuthGuard)
@@ -78,7 +87,7 @@ export class PtsController {
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
   async findDraftProposalById(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', parseProposalId) id: string,
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.findDraftProposalById(id, account);
