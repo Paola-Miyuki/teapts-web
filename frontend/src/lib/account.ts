@@ -75,6 +75,10 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
         label: 'PTS',
       },
     ];
+
+    if (kind === 'admin') {
+      items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
+    }
   }
 
   return items.map((item) => ({

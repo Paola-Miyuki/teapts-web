@@ -46,7 +46,7 @@ const parseProposalId = new ParseUUIDPipe({
 @ApiTags('pts')
 @Controller('pts')
 export class PtsController {
-  constructor(private readonly ptsService: PtsService) { }
+  constructor(private readonly ptsService: PtsService) {}
 
   @Post()
   @UseGuards(AuthGuard)

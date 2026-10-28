@@ -11,6 +11,13 @@ const glyphs = {
       <path d="M3 20v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m1 3a5 5 0 0 1 4 5v2" />
     </>
   ),
+  patient: (
+    <>
+      <circle cx="10" cy="7" r="4" />
+      <path d="M3 21v-2a7 7 0 0 1 10.5-6.06" />
+      <path d="M18 21s-4-2.4-4-5.1a2 2 0 0 1 4-.9 2 2 0 0 1 4 .9c0 2.7-4 5.1-4 5.1Z" />
+    </>
+  ),
   clipboard: (
     <>
       <rect x="5" y="4" width="14" height="17" rx="2" />
@@ -77,6 +84,8 @@ const glyphs = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  plus: <path d="M12 4v16M4 12h16" />,
+  trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
 };
 
 export type IconName = keyof typeof glyphs;
