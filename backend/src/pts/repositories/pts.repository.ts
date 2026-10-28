@@ -47,7 +47,7 @@ export abstract class PtsRepository {
     id: string,
   ): Promise<PtsProposalResponseDto | null>;
 
-    abstract hasProposalRelation(
+  abstract hasProposalRelation(
     patientId: string,
     profileIds: string[],
   ): Promise<boolean>;
