@@ -1,9 +1,12 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   CreateDraftInput,
   ProfessionalRecord,
   PtsRepository,
+  type FindPtsProposalsInput,
+  type FindPtsProposalsResult,
 } from '../repositories/pts.repository';
 
 export class InMemoryPtsRepository extends PtsRepository {
@@ -27,6 +30,72 @@ export class InMemoryPtsRepository extends PtsRepository {
 
   async findExistingProfessionalIds(ids: string[]): Promise<string[]> {
     return ids.filter((id) => this.professionals.has(id));
+  }
+
+  private isProfessionalOnProposal(
+    proposal: CreatePtsResponseDto,
+    profileIds: string[],
+  ): boolean {
+    return (
+      profileIds.includes(proposal.responsible.id) ||
+      proposal.team.some((member) => profileIds.includes(member.id))
+    );
+  }
+
+  async findDraftProposals(
+    input: FindPtsProposalsInput,
+  ): Promise<FindPtsProposalsResult> {
+    const { patientId, isPatient, professionalProfileIds, page, limit } = input;
+
+    const draftProposals = this.created.filter(
+      (proposal) =>
+        proposal.patient.id === patientId &&
+        proposal.status === PtsStateEnum.DRAFT,
+    );
+
+    const proposals = isPatient
+      ? draftProposals
+      : draftProposals.filter((proposal) =>
+          this.isProfessionalOnProposal(proposal, professionalProfileIds),
+        );
+
+    const ordered = [...proposals].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+        b.id.localeCompare(a.id),
+    );
+
+    const start = (page - 1) * limit;
+
+    return {
+      rows: ordered.slice(start, start + limit) as PtsProposalResponseDto[],
+      total: ordered.length,
+    };
+  }
+
+  async hasProposalRelation(
+    patientId: string,
+    profileIds: string[],
+  ): Promise<boolean> {
+    if (profileIds.length === 0) {
+      return false;
+    }
+
+    return this.created.some(
+      (proposal) =>
+        proposal.patient.id === patientId &&
+        this.isProfessionalOnProposal(proposal, profileIds),
+    );
+  }
+
+  async findDraftProposalById(
+    id: string,
+  ): Promise<PtsProposalResponseDto | null> {
+    const proposal = this.created.find(
+      (item) => item.id === id && item.status === PtsStateEnum.DRAFT,
+    );
+
+    return (proposal as PtsProposalResponseDto | undefined) ?? null;
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {
