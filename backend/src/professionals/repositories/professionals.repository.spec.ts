@@ -18,8 +18,8 @@ type QueryBuilderMock = {
   orderBy: jest.Mock;
   addOrderBy: jest.Mock;
   clone: jest.Mock;
-  skip: jest.Mock;
-  take: jest.Mock;
+  offset: jest.Mock;
+  limit: jest.Mock;
   getCount: jest.MockedFunction<() => Promise<number>>;
   getRawMany: jest.MockedFunction<() => Promise<ProfessionalRow[]>>;
 };
@@ -32,8 +32,8 @@ function createRepository() {
     orderBy: jest.fn(),
     addOrderBy: jest.fn(),
     clone: jest.fn(),
-    skip: jest.fn(),
-    take: jest.fn(),
+    offset: jest.fn(),
+    limit: jest.fn(),
     getCount: jest.fn<() => Promise<number>>(),
     getRawMany: jest.fn<() => Promise<ProfessionalRow[]>>(),
   };
@@ -44,8 +44,8 @@ function createRepository() {
     query.andWhere,
     query.orderBy,
     query.addOrderBy,
-    query.skip,
-    query.take,
+    query.offset,
+    query.limit,
   ]) {
     method.mockReturnValue(query);
   }
@@ -120,8 +120,8 @@ describe('ProfessionalsRepository.findPaginated', () => {
     expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
     expect(query.addOrderBy).toHaveBeenCalledWith('professional.id', 'ASC');
     expect(query.clone).toHaveBeenCalled();
-    expect(query.skip).toHaveBeenCalledWith(10);
-    expect(query.take).toHaveBeenCalledWith(10);
+    expect(query.offset).toHaveBeenCalledWith(10);
+    expect(query.limit).toHaveBeenCalledWith(10);
   });
 
   it('does not filter when no filter is informed', async () => {
@@ -134,7 +134,7 @@ describe('ProfessionalsRepository.findPaginated', () => {
     ).resolves.toEqual({ rows: [], total: 0 });
 
     expect(query.andWhere).not.toHaveBeenCalled();
-    expect(query.skip).toHaveBeenCalledWith(0);
+    expect(query.offset).toHaveBeenCalledWith(0);
   });
 
   it('propagates database errors to the caller', async () => {
