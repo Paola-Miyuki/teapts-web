@@ -2,6 +2,8 @@ import { PtsController } from '../controllers/pts.controller';
 import { PtsService } from '../services/pts.service';
 import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import { AccountRole } from '../../accounts/enums/account-role.enum';
 
 const body = {
   professionalId: 'prof-10',
