@@ -1,4 +1,5 @@
 import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
 import styles from '../proposals.module.css';
 
 type ErrorStateProps = {
@@ -17,7 +18,11 @@ export default function ErrorState({ message, onRetry }: ErrorStateProps) {
 
       <p>{message}</p>
 
-      <button type="button" className={styles.retryButton} onClick={onRetry}>
+      <button
+        type="button"
+        className={`${ui.btn} ${ui.btnSecondary} ${styles.retryButton}`}
+        onClick={onRetry}
+      >
         Tentar novamente
       </button>
     </div>
