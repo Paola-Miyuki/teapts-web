@@ -1,5 +1,3 @@
-import type { JSX } from 'react';
-
 const glyphs = {
   home: (
     <>
@@ -79,6 +77,8 @@ const glyphs = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  plus: <path d="M12 4v16M4 12h16" />,
+  trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
 };
 
 export type IconName = keyof typeof glyphs;

@@ -75,6 +75,14 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
         label: 'PTS',
       },
     ];
+
+    if (kind === 'admin') {
+      items.push({
+        href: '/patients/new',
+        icon: 'plus',
+        label: 'Criar perfil de paciente',
+      });
+    }
   }
 
   return items.map((item) => ({
