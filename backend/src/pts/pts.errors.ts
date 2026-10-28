@@ -56,3 +56,17 @@ export const teamProfessionalNotFound = (ids: string[]) =>
     `Profissionais da equipe não encontrados: ${ids.join(', ')}.`,
     { professionalIds: ids },
   );
+
+export const ptsProposalForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso às propostas deste paciente.',
+  );
+
+export const ptsProposalNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'PTS_NOT_FOUND',
+    'Proposta de PTS não encontrada.',
+  );
