@@ -209,6 +209,13 @@ O seed precisa do PostgreSQL e do SuperTokens em execução.
 - Papel: `user`
 - Perfil: psicólogo
 
+**Paciente**
+
+- E-mail: `paciente@teapts.local`
+- Senha: `paciente123`
+- Papel: `user`
+- Perfil: paciente
+
 O seed cria ou reutiliza as contas e garante que exista um perfil de psicólogo para a conta profissional. Ele não redefine a senha de usuários já existentes no SuperTokens.
 
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
