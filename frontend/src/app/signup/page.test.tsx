@@ -39,7 +39,7 @@ describe('SignupPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Preencha os campos obrigatórios antes de continuar.',
+      /Preencha todos os campos obrigatórios/i,
     );
     expect(screen.getByLabelText('Criar senha')).toHaveAttribute(
       'aria-invalid',

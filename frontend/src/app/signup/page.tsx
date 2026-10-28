@@ -173,7 +173,10 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
             {error && (
-              <div className={`${ui.alert} ${ui.alertError} ${styles.signupAlert}`} role="alert">
+              <div
+                className={`${ui.alert} ${ui.alertError} ${styles.signupAlert}`}
+                role="alert"
+              >
                 <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
                   <Icon name="alertCircle" />
                 </div>
