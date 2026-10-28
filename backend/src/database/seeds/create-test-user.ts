@@ -4,6 +4,7 @@ import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 
@@ -15,12 +16,21 @@ const TEST_USERS = [
     password: 'teapts123',
     name: 'Usuario de Teste',
     role: AccountRole.Admin,
+    profile: 'none',
   },
   {
     email: 'profissional@teapts.local',
     password: 'profissional123',
     name: 'Profissional de Teste',
     role: AccountRole.User,
+    profile: 'professional',
+  },
+  {
+    email: 'paciente@teapts.local',
+    password: 'paciente123',
+    name: 'Paciente de Teste',
+    role: AccountRole.User,
+    profile: 'patient',
   },
 ] as const;
 
@@ -133,6 +143,25 @@ async function ensureProfessionalProfile(account: Account): Promise<void> {
   console.log(`Perfil profissional criado: ${profile.id}`);
 }
 
+async function ensurePatientProfile(account: Account): Promise<void> {
+  const patients = dataSource.getRepository(Patient);
+
+  const existingProfile = await patients.findOneBy({
+    accountId: account.id,
+  });
+
+  if (existingProfile) {
+    console.log('Perfil de paciente de teste ja existe.');
+    return;
+  }
+
+  await dataSource.query('INSERT INTO "patient" ("accountId") VALUES ($1)', [
+    account.id,
+  ]);
+
+  console.log(`Perfil de paciente criado: ${account.id}`);
+}
+
 async function createTestUsers(): Promise<void> {
   initSupertokens();
   await dataSource.initialize();
@@ -141,8 +170,12 @@ async function createTestUsers(): Promise<void> {
     for (const user of TEST_USERS) {
       const account = await createOrReuseAccount(user);
 
-      if (user.role === AccountRole.User) {
+      if (user.profile === 'professional') {
         await ensureProfessionalProfile(account);
+      }
+
+      if (user.profile === 'patient') {
+        await ensurePatientProfile(account);
       }
 
       console.log(`Login de teste: ${user.email}`);
