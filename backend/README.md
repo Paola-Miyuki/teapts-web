@@ -72,8 +72,14 @@ src/
     swagger/setup-swagger.ts               documento OpenAPI em /docs e /docs-json
     swagger/error-response.dto.ts          corpos de erro { status, message } e 401 { message }
     swagger/supertokens-paths.ts           rotas do SDK do SuperTokens, descritas à mão
+    pagination/pagination-query.dto.ts     page/limit da query (padrão 1 e 20, máximo 50)
+    pagination/pagination.ts               bloco pagination da resposta (toPagination)
   accounts/
-    services/accounts.service.ts           cria a conta no signup e monta o contexto da sessão
+    controllers/accounts.controller.ts     GET /accounts, só admin
+    services/accounts.service.ts           cria a conta no signup, monta o contexto da sessão
+                                           e lista as contas
+    repositories/accounts.repository.ts    query da listagem com filtros e paginação
+    dto/                                   contratos e validação da listagem
     entities/account.entity.ts
     enums/account-role.enum.ts             account_role_e
   professionals/
@@ -85,9 +91,12 @@ src/
     enums/specialism.enum.ts                   specialism_e
   patients/
     controllers/patients.controller.ts         GET /patients/authorized protegido por sessão
-    services/patients.service.ts               erro seguro, contrato e paginação
-    repositories/patients.repository.ts        query de autorização e paginação
-    dto/                                       contratos e validação da consulta
+                                               e POST /patients, só admin
+    services/patients.service.ts               consulta (erro seguro, contrato e paginação)
+                                               e cadastro do perfil de paciente
+    repositories/patients.repository.ts        query de autorização e paginação; gravação do
+                                               perfil (supportContacts como jsonb[])
+    dto/                                       contratos e validação da consulta e do cadastro
     entities/patient.entity.ts
   auth/
     services/supertokens.service.ts        receitas EmailPassword e Session; campo name no
@@ -98,6 +107,7 @@ src/
     dto/me-response.dto.ts, logout-response.dto.ts   respostas do /me e do logout
     account-context.ts                     valida o payload da sessão
     guards/auth.guard.ts                   adapta o verifySession aos guards do NestJS
+    guards/admin.guard.ts                  depois do AuthGuard, exige o papel admin (403)
     decorators/current-account.decorator.ts   entrega o contexto ao controller
     supertokens-exception.filter.ts        erros do SuperTokens no pipeline do NestJS
   database/
@@ -122,18 +132,72 @@ de `src/database/database.config.ts`; senão o TypeORM a ignora.
 ## GET /patients/authorized
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
-`planning` ou `running`, nos quais o profissional logado é responsável ou
-participa da equipe.
+`planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
+responsável ou participa da equipe. **Atenção**: desde o PR #68 esse filtro
+está comentado em `patients.repository.ts`, e a rota lista todos os pacientes.
 
 Parâmetros de query:
 
 - `page`: página, padrão `1`, mínimo `1`;
 - `limit`: quantidade por página, padrão `10`, mínimo `1` e máximo `100`.
 
+Não usa a paginação de `common/pagination` (máximo `50`) porque o `pts/novo`
+pede `limit=100`.
+
 A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
 totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
+
+## GET /accounts
+
+Exige sessão autenticada com papel `admin` e lista as contas para escolher a
+conta (ex.: no cadastro de perfil de paciente), ordenadas por nome.
+
+Parâmetros de query:
+
+- `isPatient`: `true` só contas com perfil de paciente, `false` só contas sem;
+  opcional;
+- `isProfessional`: `true` só contas com perfil profissional, `false` só
+  contas sem; opcional;
+- `page`: página, padrão `1`, mínimo `1`;
+- `limit`: quantidade por página, padrão `20`, mínimo `1` e máximo `50`.
+
+Sem filtros, lista todas as contas. A resposta contém `{ data: [{ id, name }],
+pagination: { page, limit, total, totalPages } }`. Os erros possíveis são
+`400` (`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem
+sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
+(`Não foi possível consultar as contas.`).
+
+## POST /patients
+
+Exige sessão autenticada com papel `admin` e cria o perfil de paciente de uma
+conta existente (RFPAC001). Uma conta tem no máximo um perfil de paciente
+(RN002); contato de suporte não concede tutela (RN017).
+
+Corpo:
+
+```json
+{
+  "accountId": "0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b",
+  "supportContacts": [
+    { "name": "Maria Martins", "description": "Mãe", "email": "maria@exemplo.com", "phone": "(11) 98765-4321" }
+  ]
+}
+```
+
+`supportContacts` é opcional (ausente vira `[]`); em cada contato só `name` é
+obrigatório e `email`, quando informado, precisa ser válido. Os textos são
+salvos sem espaços externos, e campos opcionais vazios são descartados.
+
+Responde `201` com `{ accountId, supportContacts }`. Os erros possíveis são
+`400` (`VALIDATION_ERROR`, com a mensagem do campo), `401` (sem sessão), `403`
+(`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`), `409`
+(`PATIENT_PROFILE_ALREADY_EXISTS`, também em pedidos simultâneos) e `500`
+(`Não foi possível cadastrar o perfil de paciente.`).
+
+O `patientProfileId` da sessão vem do access token: a conta que recebeu o
+perfil só aparece como paciente depois de um novo login.
 
 ## Documentação da API
 
@@ -149,6 +213,9 @@ O `@nestjs/swagger` gera o documento a partir dos controllers e DTOs; o
 - **Rota nova**: declare `@ApiTags`, as respostas (`@ApiOkResponse` e os
   erros, com `ErrorResponseDto` ou `UnauthorizedResponseDto`) e, se tiver
   `AuthGuard`, `@ApiCookieAuth()` e `@ApiBearerAuth()`.
+- **Paginação**: a query de uma listagem nova estende o `PaginationQueryDto`
+  (`common/pagination`), que já documenta `page` e `limit`; a resposta usa o
+  `PaginationResponseDto` e o `toPagination`.
 - **Testes**: o mesmo plugin roda no ts-jest (`astTransformers`, via
   `test/swagger-plugin-transformer.mjs`), e o `test/swagger.e2e-spec.ts`
   confere o `/docs-json`. Por isso o ts-jest roda com `isolatedModules: false`

@@ -5,7 +5,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { Account } from '../src/accounts/entities/account.entity';
+import { Patient } from '../src/patients/entities/patient.entity';
 import { Professional } from '../src/professionals/entities/professional.entity';
+import { PtsEntity } from '../src/pts/entities/pts.entity';
 import { AppModule } from '../src/app.module';
 import { setupSwagger } from '../src/common/swagger/setup-swagger';
 
@@ -61,6 +63,9 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/professionals', 'get'],
   ['/pts/proposals', 'get'],
   ['/pts/proposals/{id}', 'get'],
+  ['/patients/authorized', 'get'],
+  ['/accounts', 'get'],
+  ['/patients', 'post'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -86,6 +91,10 @@ describe('Swagger (e2e)', () => {
       .overrideProvider(getRepositoryToken(Account))
       .useValue({})
       .overrideProvider(getRepositoryToken(Professional))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(Patient))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PtsEntity))
       .useValue({})
       .compile();
 
@@ -121,6 +130,9 @@ describe('Swagger (e2e)', () => {
     expect(paths['/me']).toHaveProperty('get');
     expect(paths['/auth/logout']).toHaveProperty('post');
     expect(paths['/professionals']).toHaveProperty('get');
+    expect(paths['/patients/authorized']).toHaveProperty('get');
+    expect(paths['/accounts']).toHaveProperty('get');
+    expect(paths['/patients']).toHaveProperty('post');
   });
 
   it('declares the cookie and bearer session schemes', async () => {
@@ -180,12 +192,13 @@ describe('Swagger (e2e)', () => {
   });
 
   it.each(NEST_ROUTES)(
-    '%s %s has a tag and a 200 response schema',
+    '%s %s has a tag and a success response schema',
     async (path, method) => {
       const operation = (await getDocument()).paths[path][method];
+      const success = method === 'post' && path === '/patients' ? '201' : '200';
 
       expect(operation.tags?.length).toBeGreaterThan(0);
-      expect(responseSchema(operation, '200')).toBeDefined();
+      expect(responseSchema(operation, success)).toBeDefined();
     },
   );
 
@@ -221,6 +234,16 @@ describe('Swagger (e2e)', () => {
     ['/professionals', 'get', '400'],
     ['/professionals', 'get', '500'],
     ['/auth/logout', 'post', '400'],
+    ['/patients/authorized', 'get', '400'],
+    ['/patients/authorized', 'get', '500'],
+    ['/accounts', 'get', '400'],
+    ['/accounts', 'get', '403'],
+    ['/accounts', 'get', '500'],
+    ['/patients', 'post', '400'],
+    ['/patients', 'post', '403'],
+    ['/patients', 'post', '404'],
+    ['/patients', 'post', '409'],
+    ['/patients', 'post', '500'],
   ])('%s %s answers %s with the error body', async (path, method, status) => {
     const operation = (await getDocument()).paths[path][method];
 
@@ -248,6 +271,61 @@ describe('Swagger (e2e)', () => {
     });
     expect(byName.name).toMatchObject({ required: false });
     expect(byName.specialism).toMatchObject({ required: false });
+  });
+
+  it.each([
+    ['/accounts', 20, 50],
+    ['/patients/authorized', 10, 100],
+  ])(
+    'documents the GET %s pagination defaults and limits',
+    async (path, defaultLimit, maxLimit) => {
+      const parameters = (await getDocument()).paths[path].get.parameters;
+      const byName = Object.fromEntries(
+        (parameters ?? []).map((parameter) => [parameter.name, parameter]),
+      );
+
+      expect(byName.page).toMatchObject({
+        required: false,
+        schema: { type: 'integer', default: 1, minimum: 1 },
+      });
+      expect(byName.limit).toMatchObject({
+        required: false,
+        schema: {
+          type: 'integer',
+          default: defaultLimit,
+          minimum: 1,
+          maximum: maxLimit,
+        },
+      });
+    },
+  );
+
+  it('documents the optional GET /accounts filters', async () => {
+    const parameters = (await getDocument()).paths['/accounts'].get.parameters;
+    const byName = Object.fromEntries(
+      (parameters ?? []).map((parameter) => [parameter.name, parameter]),
+    );
+
+    expect(byName.isPatient).toMatchObject({
+      required: false,
+      schema: { type: 'boolean' },
+    });
+    expect(byName.isProfessional).toMatchObject({
+      required: false,
+      schema: { type: 'boolean' },
+    });
+  });
+
+  it('reads the POST /patients body from the DTO', async () => {
+    const { paths, components } = await getDocument();
+    const schema =
+      paths['/patients'].post.requestBody?.content['application/json']?.schema;
+
+    expect(schema?.$ref).toBe('#/components/schemas/CreatePatientRequestDto');
+    expect(components.schemas.CreatePatientRequestDto.required).toEqual([
+      'accountId',
+    ]);
+    expect(components.schemas.SupportContactDto.required).toEqual(['name']);
   });
 
   it.each(['/auth/signup', '/auth/signin'])(

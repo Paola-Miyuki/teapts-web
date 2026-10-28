@@ -40,11 +40,17 @@ export class PtsController {
   constructor(private readonly ptsService: PtsService) {}
 
   @Post()
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
   async create(
     @Body() dto: CreatePtsRequestDto,
-    @CurrentAccount() accountId: string,
+    @CurrentAccount() account: AccountContext,
   ) {
-    return this.ptsService.createPts(dto, accountId);
+    return this.ptsService.createPts(dto, account.accountId);
   }
 
   @Get('proposals')

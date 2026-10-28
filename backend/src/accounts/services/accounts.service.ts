@@ -1,8 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { toPagination } from '../../common/pagination/pagination';
+import type { GetAccountsRequestDto } from '../dto/get-accounts-request.dto';
+import type { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
+import {
+  type AccountsPage,
+  AccountsRepository,
+} from '../repositories/accounts.repository';
 
 export class AccountIntegrityError extends Error {
   constructor(message = 'Inconsistência nos dados da conta') {
@@ -26,9 +38,12 @@ export interface AccountContext {
 
 @Injectable()
 export class AccountsService {
+  private readonly logger = new Logger(AccountsService.name);
+
   constructor(
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
+    private readonly accountsRepository: AccountsRepository,
   ) {}
 
   async createAccount(dto: CreateForSupertokensUserDto): Promise<Account> {
@@ -80,5 +95,37 @@ export class AccountsService {
     }
 
     return account;
+  }
+
+  /**
+   * Lista as contas (id e nome) para seleção, com filtros opcionais.
+   *
+   * @param request filtros e paginação já validados pelo ValidationPipe
+   * @returns contas da página pedida e metadados da paginação
+   * @throws InternalServerErrorException quando a consulta ao banco falha,
+   *   sem expor o erro original
+   */
+  async findAll(
+    request: GetAccountsRequestDto,
+  ): Promise<GetAccountsResponseDto> {
+    let page: AccountsPage;
+
+    try {
+      page = await this.accountsRepository.findPaginated(request);
+    } catch (error) {
+      this.logger.error('Accounts query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar as contas.',
+      });
+    }
+
+    return {
+      data: page.rows.map((row) => ({
+        id: row.account_id,
+        name: row.account_name,
+      })),
+      pagination: toPagination(request, page.total),
+    };
   }
 }

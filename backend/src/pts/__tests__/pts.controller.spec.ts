@@ -10,6 +10,13 @@ const body = {
   teamProfessionalIds: ['prof-11', 'prof-15'],
 };
 
+const accountOf = (accountId: string): AccountContext => ({
+  accountId,
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: [],
+});
+
 describe('PtsController POST /pts', () => {
   let repo: InMemoryPtsRepository;
   let controller: PtsController;
@@ -20,7 +27,7 @@ describe('PtsController POST /pts', () => {
   });
 
   it('usa a conta da sessão e retorna o PTS criado', async () => {
-    const res = await controller.create(body, 'acc-1');
+    const res = await controller.create(body, accountOf('acc-1'));
 
     expect(res).toMatchObject({
       id: '100',
@@ -33,7 +40,7 @@ describe('PtsController POST /pts', () => {
 
   it('rejeita quando a sessão não pertence ao profissional responsável', async () => {
     await expectApiError(
-      () => controller.create(body, 'acc-9'),
+      () => controller.create(body, accountOf('acc-9')),
       403,
       'PROFESSIONAL_NOT_AUTHORIZED',
     );
@@ -45,7 +52,7 @@ describe('PtsController POST /pts', () => {
     repo.patientsWithApprovedActivePts.add('patient-25');
 
     await expectApiError(
-      () => controller.create(body, 'acc-1'),
+      () => controller.create(body, accountOf('acc-1')),
       409,
       'PTS_ACTIVE_EXISTS',
     );
