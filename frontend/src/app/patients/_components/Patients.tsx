@@ -35,8 +35,6 @@ export default function Patients() {
         <>
           <div className={`${ui.heading} ${styles.heading}`}>
             <div>
-              <p className={ui.eyebrow}>Administração de pacientes</p>
-
               <h1>Pacientes</h1>
 
               <p>
