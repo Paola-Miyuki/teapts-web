@@ -1,20 +1,54 @@
-import { PtsEntity } from '../entities/pts.entity';
+import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 
-export type CreateDraftInput = {
+export interface ProfessionalRecord {
+  id: string;
+  accountId: string;
+}
+
+export interface CreateDraftInput {
   patientId: string;
   responsibleProfessionalId: string;
   socialSituation: string;
-  teamProfessionalIds?: string[];
-};
+  teamProfessionalIds: string[];
+}
 
+export interface FindPtsProposalsInput {
+  accountId: string;
+  patientId: string;
+  isPatient: boolean;
+  professionalProfileIds: string[];
+  page: number;
+  limit: number;
+}
+
+export interface FindPtsProposalsResult {
+  rows: PtsProposalResponseDto[];
+  total: number;
+}
+
+/** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
-  abstract createDraft(input: CreateDraftInput): Promise<PtsEntity>;
+  abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
 
-  abstract findPtsById(id: string): Promise<PtsEntity | null>;
+  abstract patientExists(id: string): Promise<boolean>;
 
-  abstract findProposalsByPatientId(
+  abstract hasApprovedActivePts(patientId: string): Promise<boolean>;
+
+  abstract findExistingProfessionalIds(ids: string[]): Promise<string[]>;
+
+  abstract createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto>;
+
+  abstract findDraftProposals(
+    input: FindPtsProposalsInput,
+  ): Promise<FindPtsProposalsResult>;
+
+  abstract findDraftProposalById(
+    id: string,
+  ): Promise<PtsProposalResponseDto | null>;
+
+  abstract hasProposalRelation(
     patientId: string,
-    page?: number,
-    limit?: number,
-  ): Promise<{ data: PtsEntity[]; total: number }>;
+    profileIds: string[],
+  ): Promise<boolean>;
 }

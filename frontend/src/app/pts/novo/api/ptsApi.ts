@@ -33,7 +33,7 @@ export async function listProfessionals(
     PaginatedResponse<Professional> | Professional[]
   >(`/professionals?${params.toString()}`, { signal });
 
-  return Array.isArray(response) ? response : response.data ?? [];
+  return Array.isArray(response) ? response : (response.data ?? []);
 }
 
 export async function listEligiblePatients(
@@ -48,16 +48,15 @@ export async function listEligiblePatients(
     limit: '100',
   });
 
-  const response = await request<
-    PaginatedResponse<Patient> | Patient[]
-  >(`/patients/authorized?${params.toString()}`, { signal });
+  const response = await request<PaginatedResponse<Patient> | Patient[]>(
+    `/patients/authorized?${params.toString()}`,
+    { signal },
+  );
 
-  return Array.isArray(response) ? response : response.data ?? [];
+  return Array.isArray(response) ? response : (response.data ?? []);
 }
 
-export async function createPts(
-  payload: CreatePtsPayload,
-): Promise<Pts> {
+export async function createPts(payload: CreatePtsPayload): Promise<Pts> {
   if (USE_MOCKS) {
     return mockCreatePts(payload);
   }
