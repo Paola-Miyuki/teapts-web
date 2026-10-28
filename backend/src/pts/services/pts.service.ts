@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { PtsRepository, CreateDraftInput } from '../repositories/pts.repository';
+import {
+  PtsRepository,
+  CreateDraftInput,
+} from '../repositories/pts.repository';
 import { PtsEntity } from '../entities/pts.entity';
 
 @Injectable()

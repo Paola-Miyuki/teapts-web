@@ -1,14 +1,16 @@
-// Este arquivo concentra a consulta de pacientes autorizados no banco.
-// A query usa as entidades existentes e mantém a projeção pública da resposta.
+// Este arquivo concentra o acesso a dados de pacientes: a consulta de
+// pacientes autorizados (projeção pública da resposta) e a gravação do perfil.
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
+import type { SupportContactDto } from '../dto/support-contact.dto';
 import { Patient } from '../entities/patient.entity';
 
 /** Estados de PTS considerados ativos para a consulta. */
-export const ACTIVE_PTS_STATES = ['planning', 'running'];
+export const ACTIVE_PTS_STATES = [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING];
 
 /** Filtros e paginação já validados da consulta de pacientes autorizados. */
 export type AuthorizedPatientsQuery = {
@@ -28,8 +30,14 @@ export type AuthorizedPatientsPage = {
   total: number;
 };
 
+/** Perfil de paciente a gravar. */
+export type NewPatient = {
+  accountId: string;
+  supportContacts: SupportContactDto[];
+};
+
 /**
- * Acesso aos dados dos pacientes autorizados.
+ * Acesso aos dados de pacientes.
  */
 @Injectable()
 export class PatientsRepository {
@@ -91,5 +99,31 @@ export class PatientsRepository {
       .getRawMany<AuthorizedPatientRow>();
 
     return { rows, total };
+  }
+
+  /**
+   * Grava o perfil de paciente.
+   *
+   * O TypeORM grava coluna jsonb com JSON.stringify do valor inteiro, o que
+   * gera um literal inválido para `jsonb[]` ("malformed array literal"). Por
+   * isso cada contato vai como texto JSON, e o banco converte a lista.
+   *
+   * @param patient conta e contatos já normalizados
+   * @throws erro do banco, sem tratamento (ex.: `23505` na PK duplicada)
+   */
+  async insert(patient: NewPatient): Promise<void> {
+    await this.patientRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Patient)
+      .values({
+        accountId: patient.accountId,
+        supportContacts: () => 'CAST(:supportContacts AS jsonb[])',
+      })
+      .setParameter(
+        'supportContacts',
+        patient.supportContacts.map((contact) => JSON.stringify(contact)),
+      )
+      .execute();
   }
 }

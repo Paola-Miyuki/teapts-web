@@ -1,5 +1,8 @@
 import { PtsEntity } from '../entities/pts.entity';
-import { PtsRepository, CreateDraftInput } from '../repositories/pts.repository';
+import {
+  PtsRepository,
+  CreateDraftInput,
+} from '../repositories/pts.repository';
 
 export class InMemoryPtsRepository extends PtsRepository {
   public items: PtsEntity[] = [];
@@ -28,9 +31,7 @@ export class InMemoryPtsRepository extends PtsRepository {
     page: number = 1,
     limit: number = 20,
   ): Promise<{ data: PtsEntity[]; total: number }> {
-    const filtered = this.items.filter(
-      (pts) => pts.patientId === patientId,
-    );
+    const filtered = this.items.filter((pts) => pts.patientId === patientId);
     const start = (page - 1) * limit;
     const data = filtered.slice(start, start + limit);
 
