@@ -184,14 +184,42 @@ Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `mi
 
 > ⚠️ **No Docker, os alvos de migration leem o código compilado** (`dist/database/data-source.js`), porque a imagem final não tem ts-node. Migration que você acabou de escrever só existe no host: rode `make rebuild-backend`, que recompila **e** aplica. `make migrate` sozinho não vê o arquivo novo.
 
-### 5.2 Conta de teste
+
+### 5.2 Contas de teste
+
+Execute o seed para criar ou reutilizar as contas de teste:
 
 ```bash
 make seed                                  # Docker
 pnpm --dir backend run seed:test-user      # local
 ```
 
-Cria o usuário `teste@teapts.local` / `teapts123` **no SuperTokens** e a conta vinculada na tabela `account`, com role `admin`. Precisa do Postgres **e** do SuperTokens no ar. É idempotente: rodar de novo não duplica (se o usuário já existe no SuperTokens, o seed só cria a conta que faltar).
+O seed precisa do PostgreSQL e do SuperTokens em execução.
+
+**Administrador**
+
+- E-mail: `teste@teapts.local`
+- Senha: `teapts123`
+- Papel: `admin`
+
+**Profissional**
+
+- E-mail: `profissional@teapts.local`
+- Senha: `profissional123`
+- Papel: `user`
+- Perfil: psicólogo
+
+**Paciente**
+
+- E-mail: `paciente@teapts.local`
+- Senha: `paciente123`
+- Papel: `user`
+- Perfil: paciente
+
+O seed cria ou reutiliza as contas e garante que exista um perfil de psicólogo para a conta profissional. Ele não redefine a senha de usuários já existentes no SuperTokens.
+
+Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
+
 
 ### 5.3 Testar se o banco está de pé
 
@@ -271,8 +299,8 @@ GET /me
 
 Decisões que valem saber antes de mexer:
 
-- **Não existe endpoint de login próprio.** Signin, signup, refresh e signout são as rotas do SDK; o backend só sobrescreve partes delas em `backend/src/auth/supertokens.service.ts`.
-- **O contexto da conta só entra no token no signin e no signup.** Esses dois fluxos marcam o `userContext` (`teapts.accountContext`) e o `createNewSession` só adiciona `accountId`, `role` e perfis quando vê essa marca. O refresh mantém o payload que já existia.
+- **Não existe endpoint de login próprio.** Login (`/auth/signin`), signup e refresh são as rotas do SDK; o backend só sobrescreve partes delas em `backend/src/auth/supertokens.service.ts`. O logout é o `POST /auth/logout` do `AuthController` (o `/auth/signout` do SDK está desligado).
+- **O contexto da conta só entra no token no login e no signup.** Esses dois fluxos marcam o `userContext` (`teapts.accountContext`) e o `createNewSession` só adiciona `accountId`, `role` e perfis quando vê essa marca. O refresh mantém o payload que já existia.
 - **Os perfis no token são uma foto do momento do login.** Quem criar ou remover um perfil precisa atualizar a sessão (`Session.mergeIntoAccessTokenPayload`) ou exigir login de novo.
 - **Erros de conta respondem `500` genérico**, sem stack trace nem detalhe de infraestrutura, e nenhuma sessão é emitida.
 
@@ -294,8 +322,10 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/signin` | `rid: emailpassword`; `formFields`: `email`, `password` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
-| POST | `/auth/signout` | access token | `200 {"status":"OK"}` |
+| POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
+| GET | `/docs` | — | interface do Swagger com a documentação da API |
+| GET | `/docs-json` | — | documento OpenAPI (JSON) |
 
 O header `st-auth-mode` escolhe como a sessão trafega:
 
@@ -303,6 +333,14 @@ O header `st-auth-mode` escolhe como a sessão trafega:
 - `st-auth-mode: header` — tokens nos headers de resposta `st-access-token` e `st-refresh-token`, enviados de volta em `Authorization: Bearer <token>` (prático para curl e Postman).
 
 A senha precisa de pelo menos 8 caracteres, com letra e número (regra padrão do SuperTokens). O `name` não pode ser vazio.
+
+**Documentação da API (Swagger):** com o backend no ar, abra `http://localhost:3000/docs`. Ela fica ligada em todos os ambientes e lista todas as rotas acima, com corpo, parâmetros e respostas. Para chamar uma rota protegida pela interface:
+
+1. Rode o `POST /auth/signin` (`rid: emailpassword`).
+2. Com `st-auth-mode: cookie`, o navegador guarda os cookies e as chamadas seguintes já vão autenticadas. Com `st-auth-mode: header`, copie o `st-access-token` da resposta para o **Authorize** (esquema `bearer`).
+3. Chame o `GET /me`.
+
+As rotas do SDK (`/auth/signup`, `/auth/signin` e `/auth/session/refresh`) são descritas à mão no backend; veja "Documentação da API" no [`backend/README.md`](backend/README.md#documentação-da-api).
 
 ### 6.4 Testar com curl
 
@@ -332,7 +370,7 @@ ACCESS=$(grep -i '^st-access-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
 REFRESH=$(grep -i '^st-refresh-token:' "$H" | cut -d' ' -f2 | tr -d '\r')
 
 # 4) Logout: revoga a sessão; depois disso o refresh responde 401
-curl -s -X POST "$API/auth/signout" -H "Authorization: Bearer $ACCESS"
+curl -s -X POST "$API/auth/logout" -H "Authorization: Bearer $ACCESS"
 echo
 ```
 
@@ -373,8 +411,8 @@ Respostas que indicam problema:
 
 | Resposta | Causa |
 | --- | --- |
-| signin `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
-| signin/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
+| login (`/auth/signin`) `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
+| login/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
 | signup `200 {"status":"FIELD_ERROR",...}` | `name` vazio ou senha fraca; a mensagem diz qual campo |
 | signup `200 {"status":"EMAIL_ALREADY_EXISTS_ERROR"}` | e-mail já cadastrado |
 | `/me` `401 {"message":"unauthorised"}` | nenhum token chegou: o login não deu `OK` ou faltou `Authorization`/cookie |

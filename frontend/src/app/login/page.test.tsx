@@ -3,9 +3,14 @@ import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 import LoginPage from './page';
 
 const replace = jest.fn();
+const push = jest.fn();
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({
+    push,
+    replace,
+  }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock('@/lib/supertokens', () => ({
@@ -53,12 +58,12 @@ describe('LoginPage', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('goes to the home page after a successful sign-in', async () => {
+  it('goes to the home page after a successful login', async () => {
     signIn.mockResolvedValue({ status: 'OK' });
 
     fillAndSubmit('teste@teapts.local', 'teapts123');
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/home'));
     expect(signIn).toHaveBeenCalledWith({
       formFields: [
         { id: 'email', value: 'teste@teapts.local' },

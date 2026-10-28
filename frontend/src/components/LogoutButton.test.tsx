@@ -30,33 +30,28 @@ describe('LogoutButton', () => {
     });
   });
 
-  it('exibe o botão Sair quando existe sessão ativa', async () => {
-    jest.mocked(fetch).mockResolvedValueOnce(response(null, 200));
-
+  it('exibe o botão Sair', () => {
     render(<LogoutButton />);
 
-    expect(
-      await screen.findByRole('button', { name: 'Sair' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument();
   });
 
-  it('não exibe o botão quando não existe sessão ativa', async () => {
-    jest.mocked(fetch).mockResolvedValueOnce(response(null, 401));
+  it('aceita classe e conteúdo personalizados', () => {
+    render(<LogoutButton className="custom">Sair da conta</LogoutButton>);
 
+    expect(screen.getByRole('button', { name: 'Sair da conta' })).toHaveClass(
+      'custom',
+    );
+  });
+
+  it('não consulta a API antes do clique', () => {
     render(<LogoutButton />);
 
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
-
-    expect(
-      screen.queryByRole('button', { name: 'Sair' }),
-    ).not.toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('envia logout e redireciona para o login', async () => {
-    jest
-      .mocked(fetch)
-      .mockResolvedValueOnce(response(null, 200))
-      .mockResolvedValueOnce(response({ status: 'OK' }, 200));
+    jest.mocked(fetch).mockResolvedValueOnce(response({ status: 'OK' }, 200));
 
     render(<LogoutButton />);
 
@@ -66,7 +61,7 @@ describe('LogoutButton', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenLastCalledWith(
-        'http://localhost:3000/auth/signout',
+        'http://localhost:3000/auth/logout',
         expect.objectContaining({
           method: 'POST',
           credentials: 'include',
@@ -83,7 +78,6 @@ describe('LogoutButton', () => {
   it('trata sessão já expirada como logout concluído', async () => {
     jest
       .mocked(fetch)
-      .mockResolvedValueOnce(response(null, 200))
       .mockResolvedValueOnce(response({ message: 'unauthorised' }, 401));
 
     render(<LogoutButton />);
@@ -96,10 +90,7 @@ describe('LogoutButton', () => {
   });
 
   it('exibe mensagem quando ocorre erro de rede', async () => {
-    jest
-      .mocked(fetch)
-      .mockResolvedValueOnce(response(null, 200))
-      .mockRejectedValueOnce(new Error('network error'));
+    jest.mocked(fetch).mockRejectedValueOnce(new Error('network error'));
 
     render(<LogoutButton />);
 

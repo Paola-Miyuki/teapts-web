@@ -1,0 +1,360 @@
+/* Layout & Cabeçalho */
+
+.heading {
+  margin-bottom: 24px;
+}
+
+.heading h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.heading p:not(.eyebrow) {
+  max-width: 66ch;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Ícones e Avatares */
+
+.icon {
+  width: 19px;
+  height: 19px;
+  flex: none;
+}
+
+.avatarSm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.avatarMd {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.avatarLg {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Botões */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--fg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--fg);
+  font-weight: 650;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: oklch(from var(--accent) calc(l + 0.06) c h);
+  border-color: transparent;
+}
+
+.btnSecondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--fg);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  border-color: var(--fg);
+}
+
+.btnBlock {
+  width: 100%;
+}
+
+/* Cartões e Estados Vazios */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.empty {
+  min-height: 310px;
+  padding: 38px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.emptyIcon {
+  width: 62px;
+  height: 62px;
+  margin-bottom: 23px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted);
+}
+
+.emptyIcon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.empty h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 400;
+}
+
+.empty p {
+  max-width: 52ch;
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.empty[role='alert'] p {
+  color: var(--danger);
+}
+
+/* Formulários & Campos */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.label {
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.input:focus {
+  border-color: var(--fg);
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger, #dc2626);
+  background: var(--danger-soft, #fff5f5);
+  box-shadow: 0 0 0 1px var(--danger, #dc2626);
+}
+
+.input[aria-invalid='true']:focus {
+  outline-color: var(--danger, #dc2626);
+}
+
+.input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.fieldError {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: var(--danger, #dc2626);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Sistema Visual de Alertas & Feedbacks */
+
+/* Base Estrutural do Alerta */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 8px 0 20px !important;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  border: 1px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  animation: alertSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.alert p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.alert strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Alerta de Sucesso */
+.alertSuccess {
+  border-color: #bbf7d0 !important;
+  border-left: 4px solid #16a34a !important;
+  background-color: #f0fdf4 !important;
+  color: #14532d !important;
+}
+
+/* Crachá circular para o ícone */
+.alertIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: #dcfce7;
+  color: #15803d;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alertIcon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.2;
+}
+
+/* Alerta de Erro / Falha */
+.alertError {
+  border-color: #fecaca !important;
+  border-left: 4px solid #dc2626 !important;
+  background-color: #fef2f2 !important;
+  color: #991b1b !important;
+}
+
+/* Badge circular para ícone de erro */
+.alertIconError {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+@keyframes alertSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsividade */
+
+@media (max-width: 1100px) {
+  .heading h1 {
+    font-size: 35px;
+  }
+}
+
+@media (max-width: 920px) {
+  .heading h1 {
+    font-size: 34px;
+  }
+}
+
+@media (max-width: 640px) {
+  .heading h1 {
+    font-size: 33px;
+  }
+}

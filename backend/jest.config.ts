@@ -22,10 +22,26 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)s$': [
       'ts-jest',
-      { useESM: true, tsconfig: { module: 'ESNext' } },
+      {
+        useESM: true,
+        tsconfig: { module: 'ESNext', isolatedModules: false },
+        // Mesmo plugin do nest-cli.json (ver test/swagger-plugin-transformer.mjs).
+        astTransformers: {
+          before: [
+            {
+              path: '<rootDir>/test/swagger-plugin-transformer.mjs',
+              options: { classValidatorShim: true, introspectComments: true },
+            },
+          ],
+        },
+      },
     ],
   },
-  moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+  moduleNameMapper: {
+    // Imports com `.js` que o plugin do Swagger gera (mesmo mapeamento do e2e).
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+    ...pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/main.ts',

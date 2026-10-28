@@ -5,8 +5,10 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { Account } from '../src/database/entities/account.entity';
-import { Professional } from '../src/database/entities/professional.entity';
+import { Account } from '../src/accounts/entities/account.entity';
+import { Patient } from '../src/patients/entities/patient.entity';
+import { Professional } from '../src/professionals/entities/professional.entity';
+import { PtsEntity } from '../src/pts/entities/pts.entity';
 import { AppModule } from '../src/app.module';
 
 // Sobe o AppModule inteiro (Config + TypeOrm + Health) e exercita as rotas por
@@ -26,12 +28,20 @@ describe('AppModule (e2e)', () => {
         query: probe,
         isInitialized: true,
         destroy: async () => undefined,
+        entityMetadatas: [],
+        options: { type: 'postgres' },
+        getRepository: () => ({}),
       } as unknown as DataSource)
       // O repositorio de contas (login) dependeria dos metadados da DataSource.
       .overrideProvider(getRepositoryToken(Account))
       .useValue({})
       // A consulta de profissionais tambem depende do repositorio TypeORM.
       .overrideProvider(getRepositoryToken(Professional))
+      .useValue({})
+      // Pacientes e PTS também dependem dos repositórios TypeORM.
+      .overrideProvider(getRepositoryToken(Patient))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PtsEntity))
       .useValue({})
       .compile();
 

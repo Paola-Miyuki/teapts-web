@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import type { FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 
 import Logo from '@/components/Logo';
+import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
 import { initSuperTokens } from '@/lib/supertokens';
 import styles from './login.module.css';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isRegistered = searchParams.get('registered') === 'true';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,7 +94,7 @@ export default function LoginPage() {
       });
 
       if (response.status === 'OK') {
-        router.replace('/');
+        router.replace('/home');
         return;
       }
 
@@ -118,17 +122,7 @@ export default function LoginPage() {
         </div>
 
         <button type="button" className={styles.helpButton}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-
-            <path d="M9.6 9a2.4 2.4 0 0 1 4.8 0c0 2-2.4 2-2.4 4M12 16v1" />
-          </svg>
+          <Icon name="help" />
           Precisa de ajuda?
         </button>
       </header>
@@ -140,11 +134,26 @@ export default function LoginPage() {
 
             <p className={styles.intro}>Acesse sua conta TEA-PTS.</p>
 
+            {isRegistered && (
+              <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
+                <div className={ui.alertIcon}>
+                  <Icon name="check" />
+                </div>
+                <div>
+                  <strong>Conta criada com sucesso!</strong>
+                  <p>Faça login para continuar.</p>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} noValidate>
-              <div className={styles.field}>
-                <label htmlFor="email">E-mail</label>
+              <div className={`${ui.field} ${styles.field}`}>
+                <label htmlFor="email" className={ui.label}>
+                  E-mail
+                </label>
 
                 <input
+                  className={ui.input}
                   id="email"
                   name="email"
                   type="email"
@@ -166,16 +175,17 @@ export default function LoginPage() {
                   }}
                 />
 
-                {emailError && (
-                  <p className={styles.fieldError}>{emailError}</p>
-                )}
+                {emailError && <p className={ui.fieldError}>{emailError}</p>}
               </div>
 
-              <div className={styles.field}>
-                <label htmlFor="password">Senha</label>
+              <div className={`${ui.field} ${styles.field}`}>
+                <label htmlFor="password" className={ui.label}>
+                  Senha
+                </label>
 
                 <div className={styles.passwordWrapper}>
                   <input
+                    className={ui.input}
                     id="password"
                     name="password"
                     type={showPassword ? 'text' : 'password'}
@@ -206,22 +216,12 @@ export default function LoginPage() {
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword((current) => !current)}
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      aria-hidden="true"
-                    >
-                      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
-
-                      <circle cx="12" cy="12" r="2.5" />
-                    </svg>
+                    <Icon name={showPassword ? 'eyeOff' : 'eye'} />
                   </button>
                 </div>
 
                 {passwordError && (
-                  <p className={styles.fieldError}>{passwordError}</p>
+                  <p className={ui.fieldError}>{passwordError}</p>
                 )}
               </div>
 
@@ -237,14 +237,14 @@ export default function LoginPage() {
               </div>
 
               {loginError && (
-                <p className={styles.loginError} role="alert">
-                  {loginError}
-                </p>
+                <div className={`${ui.alert} ${ui.alertError}`} role="alert">
+                  <span>{loginError}</span>
+                </div>
               )}
 
               <button
                 type="submit"
-                className={styles.submitButton}
+                className={`${ui.btn} ${ui.btnPrimary} ${ui.btnBlock} ${styles.mainButton}`}
                 disabled={loading}
               >
                 {loading ? 'Entrando...' : 'Entrar'}
@@ -257,38 +257,24 @@ export default function LoginPage() {
 
             <button
               type="button"
-              className={styles.signupButton}
-              onClick={() => router.push('/cadastro')}
+              className={`${ui.btn} ${ui.btnSecondary} ${ui.btnBlock} ${styles.mainButton}`}
+              onClick={() => router.push('/signup')}
             >
               Criar conta
             </button>
-
-            <p className={styles.secure}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                aria-hidden="true"
-              >
-                <rect x="6" y="10" width="12" height="10" rx="2" />
-
-                <path d="M9 10V7a3 3 0 0 1 6 0v3" />
-
-                <path d="M12 14v2" />
-              </svg>
-
-              <span>
-                Seu acesso respeita as permissões da sua conta.
-                <br />
-                Informações de saúde exigem cuidado e privacidade.
-              </span>
-            </p>
           </div>
         </section>
       </main>
 
       <footer className={styles.footer}>TEA-PTS</footer>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -59,13 +59,25 @@ src/
       page.tsx             tela de login (EmailPassword.signIn)
       login.module.css     estilos da tela
       page.test.tsx        testes da tela
+    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) e modal "Adicionar paciente"
+      _components/         PatientList, AddPatientModal/AddPatientForm (GET /accounts?isPatient=false e
+                           POST /patients), SupportContactFields/SupportContactList e AdminOnly
   lib/
     supertokens.ts         initSuperTokens(): configura o SDK uma vez
+    api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
+    account.ts             GET /me e menu por perfil (o admin tem "Pacientes")
+    patients.ts            contas com e sem perfil de paciente, cadastro do perfil e isValidPhone
 design/                    layouts de referência (HTML estático)
 public/                    arquivos servidos na raiz do site
 ```
 
 O alias `@/` aponta para `src/` (no `tsconfig.json` e no `jest.config.ts`).
+
+O `request<T>` de `lib/api.ts` lança `ApiError` quando a resposta não é 2xx.
+Além do `status` HTTP, ele guarda o `code` e a `apiMessage` do corpo de erro
+`{ status, message }` da API, quando existem (ex.: `409`
+`PATIENT_PROFILE_ALREADY_EXISTS`). Use a `apiMessage` para mostrar o erro ao
+usuário, com um texto padrão quando ela não vier.
 
 ## Layouts (`design/`)
 
@@ -80,6 +92,9 @@ visual: não importe nada de `design/` no código do app.
   `@tailwindcss/postcss`) e pelo `@import 'tailwindcss'` em `globals.css`.
   Não há `tailwind.config.js`; personalizações vão no CSS, com `@theme`.
 - **CSS Modules** (`*.module.css`) para estilos de uma tela, como no login.
+- **`<dialog>`**: o preflight do Tailwind zera o `margin` de todo elemento,
+  inclusive o `margin: auto` que centraliza o modal. Ponha `margin: auto` na
+  classe do dialog (ex.: `.dialog` em `patients/patients.module.css`).
 
 ## Autenticação
 
@@ -117,10 +132,15 @@ exemplo.
   `/login`.
 
 O formato da resposta do `/me` e os demais status estão na seção 6 do README
-da raiz.
+da raiz. O contrato completo da API (rotas, corpos e respostas) está no
+Swagger do backend, em `http://localhost:3000/docs`.
 
 ## Testes
 
 Jest com `next/jest`, ambiente `jsdom` e Testing Library. Os testes ficam ao
 lado do componente (`*.test.tsx`) e mocam o SDK do SuperTokens e o
 `next/navigation`; veja `src/app/login/page.test.tsx`.
+
+O jsdom não implementa `showModal()`/`close()` do `<dialog>`; o
+`jest.setup.ts` os substitui para os testes de modal (ex.:
+`src/app/patients/page.test.tsx`).

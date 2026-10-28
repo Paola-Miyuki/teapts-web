@@ -14,7 +14,21 @@
   "transform": {
     "^.+\\.(t|j)s$": [
       "ts-jest",
-      { "useESM": true, "tsconfig": { "module": "ESNext" } }
+      {
+        "useESM": true,
+        "tsconfig": { "module": "ESNext", "isolatedModules": false },
+        "astTransformers": {
+          "before": [
+            {
+              "path": "<rootDir>/test/swagger-plugin-transformer.mjs",
+              "options": {
+                "classValidatorShim": true,
+                "introspectComments": true
+              }
+            }
+          ]
+        }
+      }
     ]
   }
 }

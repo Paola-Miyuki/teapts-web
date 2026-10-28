@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import supertokens from 'supertokens-node';
 import { middleware, errorHandler } from 'supertokens-node/framework/express';
-import { SupertokensService } from './auth/supertokens.service';
+import { SupertokensService } from './auth/services/supertokens.service';
+import { createValidationPipe } from './common/validation/create-validation-pipe';
+import { setupSwagger } from './common/swagger/setup-swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -18,6 +20,8 @@ async function bootstrap() {
   app.use(middleware());
 
   app.use(errorHandler());
+  app.useGlobalPipes(createValidationPipe());
+  setupSwagger(app);
   await app.listen(process.env.PORT || 3000);
   console.log('Backend NestJS/SuperTokens a rodar na porta 3000');
 }

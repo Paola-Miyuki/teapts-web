@@ -2,7 +2,8 @@
  * Este teste cobre a lógica dos overrides: conta órfã gera erro, o contexto
  * da conta entra só nas sessões de login e cadastro, o cadastro cria a conta
  * antes da sessão (com compensação se o banco falhar) e credenciais inválidas
- * preservam o contrato. Ele não executa o SuperTokens real.
+ * preservam o contrato. Também cobre o POST /auth/logout próprio, que
+ * substitui o /auth/signout do SDK. Ele não executa o SuperTokens real.
  */
 import { jest } from '@jest/globals';
 import { INestApplication, InternalServerErrorException } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Express, Request, Response } from 'express';
 import request from 'supertest';
+import { createValidationPipe } from '../src/common/validation/create-validation-pipe';
 
 type Payload = Record<string, unknown>;
 type Fn = (input: Payload) => Promise<Payload>;
@@ -58,28 +60,40 @@ jest.unstable_mockModule('supertokens-node/recipe/session', () => ({
   },
 }));
 
+type SessionMiddleware = (
+  request: Request,
+  response: Response,
+  next: (error?: unknown) => void,
+) => Promise<void>;
+
+// Sessão que o verifySession mockado anexa à requisição; sem ela, o
+// AuthGuard responde 401 porque o payload da sessão é inválido.
+let currentSession: Record<string, unknown> | undefined;
+
+const verifySession = jest.fn<(options?: unknown) => SessionMiddleware>(
+  () => async (request, _response, next) => {
+    if (currentSession) {
+      (request as Request & { session?: unknown }).session = currentSession;
+    }
+
+    next();
+  },
+);
+
 jest.unstable_mockModule(
   'supertokens-node/recipe/session/framework/express',
-  () => ({
-    verifySession: jest.fn(
-      () =>
-        async (
-          _request: Request,
-          _response: Response,
-          next: (error?: unknown) => void,
-        ) =>
-          next(),
-    ),
-  }),
+  () => ({ verifySession }),
 );
 
 // Import dinâmico com `.js`: exigido pelo nodenext; o Jest mapeia para `.ts`.
-type AccountsModule = typeof import('../src/accounts/accounts.service.js');
-type SupertokensModule = typeof import('../src/auth/supertokens.service.js');
+type AccountsModule =
+  typeof import('../src/accounts/services/accounts.service.js');
+type SupertokensModule =
+  typeof import('../src/auth/services/supertokens.service.js');
 
 let AccountIntegrityError: AccountsModule['AccountIntegrityError'];
 let AccountsService: AccountsModule['AccountsService'];
-let AuthController: (typeof import('../src/auth/auth.controller.js'))['AuthController'];
+let AuthController: (typeof import('../src/auth/controllers/auth.controller.js'))['AuthController'];
 let AuthGuard: (typeof import('../src/auth/guards/auth.guard.js'))['AuthGuard'];
 let SupertokensService: SupertokensModule['SupertokensService'];
 let ACCOUNT_CONTEXT_FLAG: SupertokensModule['ACCOUNT_CONTEXT_FLAG'];
@@ -89,8 +103,9 @@ let processLogout: SupertokensModule['processLogout'];
 
 beforeAll(async () => {
   ({ AccountIntegrityError, AccountsService } =
-    await import('../src/accounts/accounts.service.js'));
-  ({ AuthController } = await import('../src/auth/auth.controller.js'));
+    await import('../src/accounts/services/accounts.service.js'));
+  ({ AuthController } =
+    await import('../src/auth/controllers/auth.controller.js'));
   ({ AuthGuard } = await import('../src/auth/guards/auth.guard.js'));
   ({
     ACCOUNT_CONTEXT_FLAG,
@@ -98,7 +113,7 @@ beforeAll(async () => {
     SupertokensService,
     processLogout,
     validateName,
-  } = await import('../src/auth/supertokens.service.js'));
+  } = await import('../src/auth/services/supertokens.service.js'));
 });
 
 function field(formFields: FormField[], id: string): unknown {
@@ -263,6 +278,7 @@ describe('authentication integration', () => {
       accountsModule.createNestApplication<NestExpressApplication>();
     // Os overrides registram falhas esperadas; o log poluiria a saída.
     nestApplication.useLogger(false);
+    nestApplication.useGlobalPipes(createValidationPipe());
     (nestApplication as NestExpressApplication).useBodyParser('json');
     app = nestApplication.getHttpAdapter().getInstance();
 
@@ -290,10 +306,11 @@ describe('authentication integration', () => {
   });
 
   afterEach(async () => {
+    currentSession = undefined;
     await nestApplication.close();
   });
 
-  describe('signin', () => {
+  describe('login', () => {
     it('signs in a user with an account and puts the context in the session', async () => {
       const response = await request(app)
         .post('/auth/signin')
@@ -438,7 +455,7 @@ describe('authentication integration', () => {
   });
 
   describe('session', () => {
-    it('does not add the account context outside signin and signup', async () => {
+    it('does not add the account context outside login and signup', async () => {
       const input = {
         userId: accountUserId,
         userContext: {},
@@ -451,6 +468,10 @@ describe('authentication integration', () => {
       expect(createNewSession).toHaveBeenCalledWith(input);
     });
 
+    it('checks the session in the database so a revoked session is refused', () => {
+      expect(verifySession).toHaveBeenCalledWith({ checkDatabase: true });
+    });
+
     it('returns 401 for GET /me without a valid session payload', async () => {
       // verifySession está mockado; o 401 vem do parseAccountContext.
       const response = await request(app).get('/me');
@@ -458,47 +479,83 @@ describe('authentication integration', () => {
       expect(response.status).toBe(401);
     });
 
-    it('revokes the current session and returns OK', async () => {
-      const revokeSession = jest.fn(async () => undefined);
+    it('disables the SDK signout route in favor of POST /auth/logout', () => {
+      expect(sessionApiImplementation.signOutPOST).toBeUndefined();
+    });
+  });
+
+  describe('logout', () => {
+    function createSession() {
       const session = {
         getUserId: () => accountUserId,
-        revokeSession,
-      };
-
-      await expect(
-        sessionApiImplementation.signOutPOST({
-          session,
-          options: {
-            req: {
-              getJSONBody: async () => ({ allSessions: false }),
-            },
-          },
+        getAccessTokenPayload: () => ({
+          accountId: 'account-1',
+          role: 'user',
+          patientProfileId: null,
+          professionalProfileIds: [],
         }),
-      ).resolves.toEqual({ status: 'OK' });
+        revokeSession: jest.fn(async () => undefined),
+      };
+      currentSession = session;
 
-      expect(revokeSession).toHaveBeenCalledTimes(1);
+      return session;
+    }
+
+    it('revokes the current session and returns OK', async () => {
+      const session = createSession();
+
+      const response = await request(app)
+        .post('/auth/logout')
+        .send({ allSessions: false });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: 'OK' });
+      expect(session.revokeSession).toHaveBeenCalledTimes(1);
+      expect(revokeAllSessionsForUser).not.toHaveBeenCalled();
+    });
+
+    it('revokes only the current session when the body is empty', async () => {
+      const session = createSession();
+
+      const response = await request(app).post('/auth/logout');
+
+      expect(response.status).toBe(200);
+      expect(session.revokeSession).toHaveBeenCalledTimes(1);
+      expect(revokeAllSessionsForUser).not.toHaveBeenCalled();
     });
 
     it('revokes every session when allSessions is true', async () => {
-      const revokeSession = jest.fn(async () => undefined);
+      createSession();
       revokeAllSessionsForUser.mockResolvedValue([]);
-      const session = {
-        getUserId: () => accountUserId,
-        revokeSession,
-      };
 
-      await expect(
-        sessionApiImplementation.signOutPOST({
-          session,
-          options: {
-            req: {
-              getJSONBody: async () => ({ allSessions: true }),
-            },
-          },
-        }),
-      ).resolves.toEqual({ status: 'OK' });
+      const response = await request(app)
+        .post('/auth/logout')
+        .send({ allSessions: true });
+
+      expect(response.status).toBe(200);
       expect(revokeAllSessionsForUser).toHaveBeenCalledWith(accountUserId);
       expect(revokeAllSessionsForUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a non-boolean allSessions without revoking the session', async () => {
+      const session = createSession();
+
+      const response = await request(app)
+        .post('/auth/logout')
+        .send({ allSessions: 'yes' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: allSessions',
+      });
+      expect(session.revokeSession).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without a valid session', async () => {
+      const response = await request(app).post('/auth/logout');
+
+      expect(response.status).toBe(401);
     });
 
     it('is idempotent when the current session was already revoked', async () => {

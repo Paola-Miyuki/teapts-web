@@ -1,5 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { AccountRole } from '../database/enums/account-role.enum';
+import { AccountRole } from '../accounts/enums/account-role.enum';
 import { parseAccountContext } from './account-context';
 
 describe('parseAccountContext', () => {
