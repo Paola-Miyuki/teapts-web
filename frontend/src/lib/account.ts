@@ -62,7 +62,7 @@ export function getNavigation(kind: ProfileKind, currentHref: string) {
       {
         href: '/pts/proposals',
         icon: 'clipboard',
-        label: 'Propostas de PTS',
+        label: 'PTS',
       },
     ];
   } else {
