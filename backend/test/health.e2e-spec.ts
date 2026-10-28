@@ -26,6 +26,9 @@ describe('AppModule (e2e)', () => {
         query: probe,
         isInitialized: true,
         destroy: async () => undefined,
+        entityMetadatas: [],
+        options: { type: 'postgres' },
+        getRepository: () => ({}),
       } as unknown as DataSource)
       // O repositorio de contas (login) dependeria dos metadados da DataSource.
       .overrideProvider(getRepositoryToken(Account))
