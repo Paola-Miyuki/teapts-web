@@ -54,8 +54,48 @@
 .proposalCard {
   overflow: hidden;
   border: 1px solid var(--border);
+  border-left: 5px solid var(--accent); /* Detalhe visual usando a cor global do sistema */
   border-radius: 12px;
   background: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.proposalCard:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.personBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+  background: var(--bg); /* Fundo contrastante para quebrar o branco */
+}
+
+.socialSituation {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.teamSection {
+  padding: 18px 24px;
+  background: var(--bg); /* Fundo contrastante para a secção da equipa */
 }
 
 .personBanner {
@@ -471,4 +511,39 @@
 
 .headerAction {
   flex: none;
+}
+
+/* Estilização idêntica aos filtros de profissionais */
+.filters {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+
+.filterMain {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  align-items: flex-end;
+}
+
+.inputWithIcon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }

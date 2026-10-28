@@ -4,24 +4,20 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import styles from '../proposals.module.css';
+import ui from '@/components/ui.module.css';
 
-import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import LoadingState from './LoadingState';
 import Pagination from './Pagination';
 import PtsProposalCard from './PtsProposalCard';
+import EmptyState from './EmptyState';
 
 import type { PtsProposal } from './PtsProposalCard';
+import type { Patient, Professional } from '../../novo/types';
 import { listEligiblePatients, listProfessionals } from '../../novo/api/ptsApi';
 
-type CurrentAccount = {
-  accountId: string;
-  name: string;
-  email: string;
-  role: string;
-  patientProfileId: string | null;
-  professionalProfileIds: string[];
-};
+// 1. Importamos a interface Account do sistema
+import type { Account } from '@/lib/account';
 
 type PaginationData = {
   page: number;
@@ -58,24 +54,26 @@ async function getApiMessage(response: Response, fallback: string) {
   return fallback;
 }
 
-export default function PtsProposalList() {
+// 2. Definimos que o componente recebe { account } do tipo Account
+export default function PtsProposalList({ account }: { account: Account }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const patientIdFromUrl = searchParams.get('patientId')?.trim() ?? '';
-
-  const [targetPatientId, setTargetPatientId] = useState<string | null>(null);
-  const [contextMessage, setContextMessage] = useState('');
-  const [accountLoading, setAccountLoading] = useState(true);
-  const [accountError, setAccountError] = useState('');
-  const [accountRetryKey, setAccountRetryKey] = useState(0);
+  const searchFromUrl = searchParams.get('search')?.trim() ?? '';
 
   const [proposals, setProposals] = useState<PtsProposal[] | null>(null);
   const [proposalError, setProposalError] = useState('');
   const [proposalRetryKey, setProposalRetryKey] = useState(0);
 
-  const [professionalsMap, setProfessionalsMap] = useState<Record<string, any>>({});
-  const [patientsMap, setPatientsMap] = useState<Record<string, any>>({});
+  const [professionalsMap, setProfessionalsMap] = useState<
+    Record<string, Professional>
+  >({});
+  const [patientsMap, setPatientsMap] = useState<Record<string, Patient>>({});
+  const [eligiblePatients, setEligiblePatients] = useState<Patient[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+  const [patientsError, setPatientsError] = useState('');
+  const [supportRetryKey, setSupportRetryKey] = useState(0);
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -85,116 +83,96 @@ export default function PtsProposalList() {
     totalPages: 0,
   });
 
-  // Carrega profissionais e pacientes de apoio para cruzamento defensivo por ID
+  // Carrega pacientes e profissionais independentemente.
   useEffect(() => {
     const controller = new AbortController();
 
-    Promise.all([
-      listProfessionals(controller.signal),
-      listEligiblePatients(controller.signal),
-    ])
-      .then(([profs, pats]) => {
-        const pMap: Record<string, any> = {};
-        const patMap: Record<string, any> = {};
+    listProfessionals(controller.signal)
+      .then((profs) => {
+        if (controller.signal.aborted) return;
 
-        const loadedProfs = Array.isArray(profs) ? profs : profs?.data ?? [];
-        const loadedPats = Array.isArray(pats) ? pats : pats?.data ?? [];
+        const loadedProfs: Professional[] = Array.isArray(profs)
+          ? profs
+          : ((profs as { data?: Professional[] })?.data ?? []);
 
-        loadedProfs.forEach((p: any) => {
-          if (p?.id) pMap[p.id] = p;
-        });
-        loadedPats.forEach((p: any) => {
-          if (p?.id) patMap[p.id] = p;
+        const pMap: Record<string, Professional> = {};
+
+        loadedProfs.forEach((professional) => {
+          if (professional?.id) pMap[professional.id] = professional;
         });
 
         setProfessionalsMap(pMap);
-        setPatientsMap(patMap);
       })
       .catch(() => {
-        // Ignora falhas de dados secundários
+        // A falha não deve impedir a busca de pacientes.
+      });
+
+    listEligiblePatients(controller.signal)
+      .then((pats) => {
+        if (controller.signal.aborted) return;
+
+        const loadedPatients: Patient[] = Array.isArray(pats)
+          ? pats
+          : ((pats as { data?: Patient[] })?.data ?? []);
+
+        const patMap: Record<string, Patient> = {};
+
+        loadedPatients.forEach((patient) => {
+          if (patient?.id) patMap[patient.id] = patient;
+        });
+
+        setPatientsMap(patMap);
+        setEligiblePatients(loadedPatients);
+        setPatientsError('');
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+
+        setPatientsError('Não foi possível carregar a lista de pacientes.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setPatientsLoading(false);
+        }
       });
 
     return () => controller.abort();
-  }, []);
+  }, [supportRetryKey]);
 
+  const invalidPatientId =
+    Boolean(patientIdFromUrl) && !UUID_PATTERN.test(patientIdFromUrl);
+
+  let targetPatientId: string | null = null;
+  let searchNoMatch = false;
+  let searchMultipleMatches = false;
+
+  if (!invalidPatientId) {
+    if (patientIdFromUrl) {
+      targetPatientId = patientIdFromUrl;
+    } else if (account.patientProfileId) {
+      targetPatientId = account.patientProfileId;
+    } else if (searchFromUrl && !patientsLoading && !patientsError) {
+      const term = searchFromUrl.toLocaleLowerCase('pt-BR');
+
+      const matches = eligiblePatients.filter((patient) =>
+        patient.name.toLocaleLowerCase('pt-BR').includes(term),
+      );
+
+      if (matches.length === 1) {
+        targetPatientId = matches[0].id;
+      } else if (matches.length === 0) {
+        searchNoMatch = true;
+      } else {
+        searchMultipleMatches = true;
+      }
+    }
+  }
+
+  // 4. Consulta à API de propostas usando o targetPatientId validado
   useEffect(() => {
-    let cancelled = false;
-
-    fetch(`${API_URL}/me`, { credentials: 'include' })
-      .then(async (response) => {
-        if (cancelled) return;
-
-        if (response.status === 401) {
-          router.replace('/login');
-          return;
-        }
-
-        if (!response.ok) {
-          const message = await getApiMessage(
-            response,
-            'Não foi possível identificar a conta autenticada.',
-          );
-          if (cancelled) return;
-          setAccountError(message);
-          setAccountLoading(false);
-          return;
-        }
-
-        const account = (await response.json()) as CurrentAccount;
-        if (cancelled) return;
-
-        setAccountError('');
-        setContextMessage('');
-        setPage(1);
-        setProposals(null);
-        setProposalError('');
-
-        if (patientIdFromUrl) {
-          if (!UUID_PATTERN.test(patientIdFromUrl)) {
-            setTargetPatientId(null);
-            setContextMessage('O identificador do paciente informado não é válido.');
-            setAccountLoading(false);
-            return;
-          }
-          setTargetPatientId(patientIdFromUrl);
-          setAccountLoading(false);
-          return;
-        }
-
-        if (account.patientProfileId) {
-          setTargetPatientId(account.patientProfileId);
-          setAccountLoading(false);
-          return;
-        }
-
-        if (account.professionalProfileIds?.length > 0) {
-          setTargetPatientId(null);
-          setContextMessage(
-            'Para consultar as propostas, selecione um paciente em que você participa e acesse esta página novamente.',
-          );
-          setAccountLoading(false);
-          return;
-        }
-
-        setTargetPatientId(null);
-        setContextMessage(
-          'Não foi possível identificar um perfil de paciente para consultar as propostas.',
-        );
-        setAccountLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setAccountError('Não foi possível identificar a conta autenticada.');
-        setAccountLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accountRetryKey, patientIdFromUrl, router]);
-
-  useEffect(() => {
-    if (!targetPatientId) return;
+    if (!targetPatientId) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -204,7 +182,9 @@ export default function PtsProposalList() {
       limit: String(PAGE_LIMIT),
     });
 
-    fetch(`${API_URL}/pts/proposals?${params.toString()}`, { credentials: 'include' })
+    fetch(`${API_URL}/pts/proposals?${params.toString()}`, {
+      credentials: 'include',
+    })
       .then(async (response) => {
         if (cancelled) return;
 
@@ -224,14 +204,15 @@ export default function PtsProposalList() {
           return;
         }
 
-        const result = (await response.json()) as ProposalsResponse | PtsProposal[];
+        const result = (await response.json()) as
+          ProposalsResponse | PtsProposal[];
         if (cancelled) return;
 
         setProposalError('');
 
         const loadedData: PtsProposal[] = Array.isArray(result)
           ? result
-          : result?.data ?? [];
+          : (result?.data ?? []);
 
         const loadedPagination: PaginationData = Array.isArray(result)
           ? {
@@ -261,19 +242,16 @@ export default function PtsProposalList() {
     };
   }, [page, proposalRetryKey, router, targetPatientId]);
 
-  function handleAccountRetry() {
-    setAccountLoading(true);
-    setAccountError('');
-    setContextMessage('');
-    setTargetPatientId(null);
-    setProposals(null);
-    setAccountRetryKey((current) => current + 1);
-  }
-
   function handleProposalRetry() {
     setProposals(null);
     setProposalError('');
     setProposalRetryKey((current) => current + 1);
+  }
+
+  function handlePatientsRetry() {
+    setPatientsError('');
+    setPatientsLoading(true);
+    setSupportRetryKey((current) => current + 1);
   }
 
   function handlePageChange(newPage: number) {
@@ -282,69 +260,139 @@ export default function PtsProposalList() {
     setPage(newPage);
   }
 
-  if (accountLoading) return <LoadingState />;
-  if (accountError) return <ErrorState message={accountError} onRetry={handleAccountRetry} />;
-
-  if (!targetPatientId) {
+  if (invalidPatientId) {
     return (
       <EmptyState
-        title={patientIdFromUrl ? 'Paciente inválido' : 'Selecione um paciente'}
-        message={contextMessage}
+        title="Paciente inválido"
+        message="O identificador do paciente informado não é válido."
       />
+    );
+  }
+
+  if (
+    searchFromUrl &&
+    !patientIdFromUrl &&
+    !account.patientProfileId &&
+    patientsLoading
+  ) {
+    return <LoadingState />;
+  }
+
+  if (
+    searchFromUrl &&
+    !patientIdFromUrl &&
+    !account.patientProfileId &&
+    patientsError
+  ) {
+    return <ErrorState message={patientsError} onRetry={handlePatientsRetry} />;
+  }
+
+  if (searchMultipleMatches) {
+    return (
+      <EmptyState
+        title="Mais de um paciente encontrado"
+        message="Sua busca corresponde a vários pacientes. Digite um nome mais completo para identificar o paciente correto."
+      />
+    );
+  }
+
+  if (searchNoMatch) {
+    return (
+      <div className={styles.proposalsArea}>
+        <div
+          className={`${ui.card} ${ui.empty}`}
+          style={{ marginTop: '1rem', padding: '2.5rem', textAlign: 'center' }}
+        >
+          <h2>Nenhum paciente encontrado</h2>
+          <p>
+            Não foi encontrado nenhum paciente com o nome{' '}
+            <strong>&quot;{searchFromUrl}&quot;</strong>. Tente buscar de outra
+            forma ou verifique a ortografia.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado inicial vazio esperando ação (ou se apenas um termo vazio foi pesquisado)
+  if (!targetPatientId && !searchFromUrl) {
+    return (
+      <div className={styles.proposalsArea}>
+        <div className={styles.listHeader}>
+          <div>
+            <h2>Propostas disponíveis</h2>
+            <p>Selecione um paciente para visualizar as propostas.</p>
+          </div>
+        </div>
+        <div
+          className={`${ui.card} ${ui.empty}`}
+          style={{ marginTop: '1rem', padding: '2.5rem', textAlign: 'center' }}
+        >
+          <h2>Nenhum paciente selecionado</h2>
+          <p>
+            Utilize o formulário de busca para encontrar um paciente e
+            visualizar as suas propostas de PTS correspondentes.
+          </p>
+        </div>
+      </div>
     );
   }
 
   if (proposals === null) return <LoadingState />;
-  if (proposalError) return <ErrorState message={proposalError} onRetry={handleProposalRetry} />;
+  if (proposalError)
+    return <ErrorState message={proposalError} onRetry={handleProposalRetry} />;
 
-  if (proposals.length === 0) {
-    return (
-      <EmptyState
-        title="Nenhuma proposta encontrada"
-        message="Não existem propostas de PTS pendentes para este paciente."
-      />
-    );
-  }
+  // Enriquecimento e mapeamento de dados dos cartões com informações dos profissionais
+  const enrichedProposals = proposals.map((prop) => {
+    const rawProp = prop as Record<string, unknown>;
 
-  // Preenche dinamicamente todas as chaves de profissional e paciente
-  const enrichedProposals = proposals.map((prop: any) => {
     const profId =
-      prop.professionalId ||
-      prop.responsibleId ||
-      prop.creatorId ||
-      prop.createdById ||
-      prop.responsibleProfessionalId ||
-      prop.responsible?.id ||
-      prop.professional?.id;
+      (rawProp.professionalId as string) ||
+      (rawProp.responsibleId as string) ||
+      (rawProp.creatorId as string) ||
+      (rawProp.createdById as string) ||
+      (rawProp.responsibleProfessionalId as string) ||
+      (rawProp.responsible as { id?: string })?.id ||
+      (rawProp.professional as { id?: string })?.id;
 
-    const patId = prop.patientId || prop.patient?.id || targetPatientId;
+    const patId =
+      (rawProp.patientId as string) ||
+      (rawProp.patient as { id?: string })?.id ||
+      targetPatientId;
 
-    const matchedProf = profId ? professionalsMap[profId] : null;
-    const matchedPat = patId ? patientsMap[patId] : null;
+    const matchedProf = profId ? professionalsMap[profId] : undefined;
+    const matchedPat = patId ? patientsMap[patId] : undefined;
 
     const resolvedProfName =
-      prop.responsible?.name ||
-      prop.professional?.name ||
-      prop.responsibleProfessional?.name ||
-      prop.professionalName ||
-      prop.responsibleName ||
+      (rawProp.responsible as { name?: string })?.name ||
+      (rawProp.professional as { name?: string })?.name ||
+      (rawProp.responsibleProfessional as { name?: string })?.name ||
+      (rawProp.professionalName as string) ||
+      (rawProp.responsibleName as string) ||
       matchedProf?.name ||
       'Profissional não identificado';
 
     const resolvedSpecialism =
-      prop.responsible?.specialism?.name ||
-      prop.professional?.specialism?.name ||
-      prop.responsibleProfessional?.specialism?.name ||
+      (rawProp.responsible as { specialism?: { name?: string } })?.specialism
+        ?.name ||
+      (rawProp.professional as { specialism?: { name?: string } })?.specialism
+        ?.name ||
+      (rawProp.responsibleProfessional as { specialism?: { name?: string } })
+        ?.specialism?.name ||
       matchedProf?.specialism?.name ||
-      matchedProf?.specialty ||
+      (matchedProf as { specialty?: string })?.specialty ||
       'Especialidade não informada';
 
     const resolvedPatientName =
-      typeof prop.patient === 'object' && prop.patient?.name
-        ? prop.patient.name
-        : typeof prop.patient === 'string'
-        ? prop.patient
-        : prop.patientName || matchedPat?.name || 'Paciente não informado';
+      typeof rawProp.patient === 'object' &&
+      rawProp.patient !== null &&
+      'name' in rawProp.patient
+        ? (rawProp.patient as { name: string }).name
+        : typeof rawProp.patient === 'string'
+          ? rawProp.patient
+          : (rawProp.patientName as string) ||
+            matchedPat?.name ||
+            'Paciente não informado';
 
     return {
       ...prop,
@@ -355,6 +403,7 @@ export default function PtsProposalList() {
         },
       },
       patient: {
+        id: patId ?? '',
         name: resolvedPatientName,
       },
     };
@@ -376,11 +425,24 @@ export default function PtsProposalList() {
         </div>
       </div>
 
-      <div className={styles.proposalList}>
-        {enrichedProposals.map((proposal) => (
-          <PtsProposalCard key={proposal.id} proposal={proposal} />
-        ))}
-      </div>
+      {enrichedProposals.length === 0 ? (
+        <div
+          className={`${ui.card} ${ui.empty}`}
+          style={{ marginTop: '1rem', padding: '2.5rem', textAlign: 'center' }}
+        >
+          <h2>Nenhuma proposta encontrada</h2>
+          <p>
+            Não existem propostas correspondentes aos critérios pesquisados para
+            este paciente.
+          </p>
+        </div>
+      ) : (
+        <div className={styles.proposalList}>
+          {enrichedProposals.map((proposal) => (
+            <PtsProposalCard key={proposal.id} proposal={proposal} />
+          ))}
+        </div>
+      )}
 
       {totalPagesCount > 1 && (
         <Pagination
