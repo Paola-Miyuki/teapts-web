@@ -59,6 +59,8 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/me', 'get'],
   ['/auth/logout', 'post'],
   ['/professionals', 'get'],
+  ['/pts/proposals', 'get'],
+  ['/pts/proposals/{id}', 'get'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -77,6 +79,9 @@ describe('Swagger (e2e)', () => {
         query: async () => [],
         isInitialized: true,
         destroy: async () => undefined,
+        entityMetadatas: [],
+        options: { type: 'postgres' },
+        getRepository: () => ({}),
       } as unknown as DataSource)
       .overrideProvider(getRepositoryToken(Account))
       .useValue({})
@@ -142,6 +147,36 @@ describe('Swagger (e2e)', () => {
     ).toEqual(
       expect.arrayContaining(['page', 'limit', 'name', 'specialism', 'ids']),
     );
+  });
+
+  it('documenta os parâmetros e limites de GET /pts/proposals', async () => {
+    const operation = (await getDocument()).paths['/pts/proposals'].get;
+    const parameters = operation.parameters ?? [];
+    const byName = Object.fromEntries(
+      parameters
+        .filter((parameter) => parameter.in === 'query')
+        .map((parameter) => [parameter.name, parameter]),
+    );
+
+    expect(byName.patientId).toMatchObject({
+      required: true,
+      schema: { type: 'string', format: 'uuid' },
+    });
+
+    expect(byName.page).toMatchObject({
+      required: false,
+      schema: { type: 'integer', default: 1, minimum: 1 },
+    });
+
+    expect(byName.limit).toMatchObject({
+      required: false,
+      schema: {
+        type: 'integer',
+        default: 20,
+        minimum: 1,
+        maximum: 50,
+      },
+    });
   });
 
   it.each(NEST_ROUTES)(
