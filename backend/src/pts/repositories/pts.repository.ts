@@ -27,6 +27,12 @@ export interface FindPtsProposalsResult {
   total: number;
 }
 
+export interface UpdatePtsProposalInput {
+  id: string;
+  socialSituation?: string;
+  teamProfessionalIds?: string[];
+}
+
 /** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
   abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
@@ -46,6 +52,12 @@ export abstract class PtsRepository {
   abstract findDraftProposalById(
     id: string,
   ): Promise<PtsProposalResponseDto | null>;
+
+  abstract findProposalById(id: string): Promise<PtsProposalResponseDto | null>;
+
+  abstract updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto>;
 
   abstract hasProposalRelation(
     patientId: string,

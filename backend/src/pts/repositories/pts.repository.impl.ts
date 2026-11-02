@@ -15,6 +15,7 @@ import {
   type FindPtsProposalsResult,
   type CreateDraftInput,
   type ProfessionalRecord,
+  type UpdatePtsProposalInput,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import { PtsEntity } from '../entities/pts.entity';
@@ -262,6 +263,85 @@ export class PtsRepositoryImpl extends PtsRepository {
       .getOne();
 
     return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
+    const proposal = await this.ptsRepository
+      .createQueryBuilder('proposal')
+      .leftJoinAndSelect('proposal.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('proposal.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('proposal.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('proposal.id = :id', { id })
+      .getOne();
+
+    return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const update: Partial<PtsEntity> = {};
+
+      if (input.socialSituation !== undefined) {
+        update.socialSituation = input.socialSituation;
+      }
+
+      if (Object.keys(update).length > 0) {
+        await queryRunner.manager.update(PtsEntity, input.id, update);
+      }
+
+      if (input.teamProfessionalIds !== undefined) {
+        await queryRunner.query(
+          `DELETE FROM professional_participating_on_therapeutic_journey
+           WHERE therapeutic_journey_id = $1`,
+          [input.id],
+        );
+
+        for (const professionalId of input.teamProfessionalIds) {
+          await queryRunner.query(
+            `INSERT INTO professional_participating_on_therapeutic_journey
+              (professional_id, therapeutic_journey_id)
+             VALUES ($1, $2)`,
+            [professionalId, input.id],
+          );
+        }
+      }
+
+      const proposal = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: input.id },
+        relations: {
+          patient: { account: true },
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!proposal) {
+        throw new Error('Erro ao recuperar a proposta de PTS atualizada.');
+      }
+
+      await queryRunner.commitTransaction();
+
+      return this.toProposalResponse(proposal);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {

@@ -407,6 +407,138 @@ describe('PtsService.findDraftProposalById', () => {
     service = new PtsService(repo);
   });
 
+  describe('PtsService.updatePtsProposal', () => {
+    let repo: InMemoryPtsRepository;
+    let service: PtsService;
+
+    beforeEach(() => {
+      repo = seededRepo();
+      service = new PtsService(repo);
+    });
+
+    const createDraft = async () => {
+      const proposal = await service.createPts(body, 'acc-1');
+      proposal.patient.id = 'acc-patient-25';
+      return proposal;
+    };
+
+    it('permite ao responsável editar a situação social e a equipe', async () => {
+      const proposal = await createDraft();
+
+      const result = await service.updatePtsProposal(
+        proposal.id,
+        {
+          socialSituation: 'Situação social atualizada.',
+          teamProfessionalIds: ['prof-11', 'prof-11', 'prof-10'],
+        },
+        responsibleAccount,
+      );
+
+      expect(result).toMatchObject({
+        id: proposal.id,
+        status: PtsStateEnum.DRAFT,
+        socialSituation: 'Situação social atualizada.',
+        team: [{ id: 'prof-11' }],
+      });
+    });
+
+    it('permite editar somente a situação social', async () => {
+      const proposal = await createDraft();
+
+      const result = await service.updatePtsProposal(
+        proposal.id,
+        { socialSituation: 'Nova situação social.' },
+        responsibleAccount,
+      );
+
+      expect(result.socialSituation).toBe('Nova situação social.');
+      expect(result.team).toHaveLength(2);
+    });
+
+    it('permite substituir a equipe por uma lista vazia', async () => {
+      const proposal = await createDraft();
+
+      const result = await service.updatePtsProposal(
+        proposal.id,
+        { teamProfessionalIds: [] },
+        responsibleAccount,
+      );
+
+      expect(result.team).toEqual([]);
+    });
+
+    it('rejeita edição por outro profissional', async () => {
+      const proposal = await createDraft();
+
+      await expectApiError(
+        () =>
+          service.updatePtsProposal(
+            proposal.id,
+            { socialSituation: 'Alteração indevida.' },
+            otherProfessionalAccount,
+          ),
+        403,
+        'FORBIDDEN',
+      );
+    });
+
+    it('rejeita edição de proposta que não está em DRAFT', async () => {
+      const proposal = await createDraft();
+      proposal.status = PtsStateEnum.PLANNING;
+
+      await expectApiError(
+        () =>
+          service.updatePtsProposal(
+            proposal.id,
+            { socialSituation: 'Não deve alterar.' },
+            responsibleAccount,
+          ),
+        409,
+        'PTS_NOT_DRAFT',
+      );
+    });
+
+    it('rejeita profissional inexistente na equipe', async () => {
+      const proposal = await createDraft();
+
+      const response = await expectApiError(
+        () =>
+          service.updatePtsProposal(
+            proposal.id,
+            { teamProfessionalIds: ['prof-404'] },
+            responsibleAccount,
+          ),
+        404,
+        'PROFESSIONAL_NOT_FOUND',
+      );
+
+      expect(response.professionalIds).toEqual(['prof-404']);
+    });
+
+    it('rejeita edição sem nenhum campo', async () => {
+      const proposal = await createDraft();
+
+      await expectApiError(
+        () => service.updatePtsProposal(proposal.id, {}, responsibleAccount),
+        400,
+        'VALIDATION_ERROR',
+      );
+    });
+
+    it('retorna 404 quando a proposta não existe', async () => {
+      await expectApiError(
+        () =>
+          service.updatePtsProposal(
+            'proposal-404',
+            { socialSituation: 'Nova situação.' },
+            responsibleAccount,
+          ),
+        404,
+        'PTS_NOT_FOUND',
+      );
+    });
+  });
+
   it('permite que o paciente consulte sua própria proposta', async () => {
     const proposal = await service.createPts(body, 'acc-1');
     proposal.patient.id = 'acc-patient-25';

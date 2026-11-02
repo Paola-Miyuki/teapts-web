@@ -4,6 +4,7 @@ import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 const body = {
   professionalId: 'prof-10',
@@ -26,6 +27,38 @@ describe('PtsController POST /pts', () => {
   beforeEach(() => {
     repo = seededRepo();
     controller = new PtsController(new PtsService(repo));
+  });
+
+  describe('PtsController PATCH /pts/proposals/:id', () => {
+    let repo: InMemoryPtsRepository;
+    let controller: PtsController;
+
+    beforeEach(() => {
+      repo = seededRepo();
+      controller = new PtsController(new PtsService(repo));
+    });
+
+    it('atualiza uma proposta pela rota de edição', async () => {
+      const proposal = await controller.create(body, accountOf('acc-1'));
+      proposal.patient.id = 'acc-patient-25';
+
+      const result = await controller.updateProposal(
+        proposal.id,
+        { socialSituation: 'Situação social atualizada.' },
+        {
+          accountId: 'acc-1',
+          role: AccountRole.User,
+          patientProfileId: null,
+          professionalProfileIds: ['prof-10'],
+        },
+      );
+
+      expect(result).toMatchObject({
+        id: proposal.id,
+        socialSituation: 'Situação social atualizada.',
+        status: PtsStateEnum.DRAFT,
+      });
+    });
   });
 
   it('usa a conta da sessão e retorna o PTS criado', async () => {

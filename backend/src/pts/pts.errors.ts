@@ -70,3 +70,18 @@ export const ptsProposalNotFound = () =>
     'PTS_NOT_FOUND',
     'Proposta de PTS não encontrada.',
   );
+
+export const ptsProposalNotDraft = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_DRAFT',
+    'Somente propostas aguardando decisão podem ser editadas.',
+  );
+
+export const professionalNotFound = (ids: string[]) =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'PROFESSIONAL_NOT_FOUND',
+    `Profissionais não encontrados: ${ids.join(', ')}.`,
+    { professionalIds: ids },
+  );
