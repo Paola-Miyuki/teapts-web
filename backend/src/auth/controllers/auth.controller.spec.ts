@@ -143,6 +143,19 @@ describe('AuthController account routes', () => {
     expect(accountsService.updateMe).not.toHaveBeenCalled();
   });
 
+  it('returns 400 instead of 500 for a null PATCH /me field', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/me')
+      .send({ name: null });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um nome válido.',
+    });
+    expect(accountsService.updateMe).not.toHaveBeenCalled();
+  });
+
   it('returns 403 when role is present in PATCH /me', async () => {
     const response = await request(app.getHttpServer())
       .patch('/me')

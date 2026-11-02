@@ -44,6 +44,24 @@ describe('UpdateMeRequestDto', () => {
     });
   });
 
+  it('rejects a null name', async () => {
+    await expect(
+      getErrorBody(UpdateMeRequestDto, { name: null }),
+    ).resolves.toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um nome válido.',
+    });
+  });
+
+  it('rejects a null email', async () => {
+    await expect(
+      getErrorBody(UpdateMeRequestDto, { email: null }),
+    ).resolves.toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um e-mail válido.',
+    });
+  });
+
   it('requires at least one field', async () => {
     await expect(getErrorBody(UpdateMeRequestDto, {})).resolves.toEqual({
       status: 'VALIDATION_ERROR',
@@ -69,6 +87,30 @@ describe('ChangePasswordRequestDto', () => {
     await expect(getErrorBody(ChangePasswordRequestDto, {})).resolves.toEqual({
       status: 'VALIDATION_ERROR',
       message: 'Informe a senha atual.',
+    });
+  });
+
+  it('rejects a null current password', async () => {
+    await expect(
+      getErrorBody(ChangePasswordRequestDto, {
+        currentPassword: null,
+        newPassword: 'NewPassword123',
+      }),
+    ).resolves.toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe a senha atual.',
+    });
+  });
+
+  it('rejects a null new password', async () => {
+    await expect(
+      getErrorBody(ChangePasswordRequestDto, {
+        currentPassword: 'Current123',
+        newPassword: null,
+      }),
+    ).resolves.toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe a nova senha.',
     });
   });
 });
