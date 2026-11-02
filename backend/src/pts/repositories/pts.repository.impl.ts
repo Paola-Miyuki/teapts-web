@@ -15,8 +15,10 @@ import {
   type FindPtsProposalsResult,
   type CreateDraftInput,
   type ProfessionalRecord,
+  type SocialSituationTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -262,6 +264,37 @@ export class PtsRepositoryImpl extends PtsRepository {
       .getOne();
 
     return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: { team: true },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      teamProfessionalIds: (pts.team ?? []).map(
+        (professional) => professional.id,
+      ),
+    };
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    await this.ptsRepository.update(id, { socialSituation });
+
+    return { id, socialSituation };
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
