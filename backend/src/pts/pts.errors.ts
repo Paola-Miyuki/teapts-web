@@ -70,3 +70,17 @@ export const ptsProposalNotFound = () =>
     'PTS_NOT_FOUND',
     'Proposta de PTS não encontrada.',
   );
+
+export const activePtsForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso ao PTS ativo deste paciente.',
+  );
+
+export const activePtsNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'ACTIVE_PTS_NOT_FOUND',
+    'O paciente não possui PTS ativo.',
+  );

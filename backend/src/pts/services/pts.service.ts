@@ -6,6 +6,8 @@ import type {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
 } from '../dto/pts-proposal-response.dto';
+import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import {
@@ -14,6 +16,8 @@ import {
   ptsActiveExists,
   ptsProposalForbidden,
   ptsProposalNotFound,
+  activePtsForbidden,
+  activePtsNotFound,
   teamProfessionalNotFound,
 } from '../pts.errors';
 
@@ -128,5 +132,37 @@ export class PtsService {
     }
 
     return proposal;
+  }
+
+  async findActivePts(
+    query: GetActivePtsQueryDto,
+    account: AccountContext,
+  ): Promise<ActivePtsResponseDto> {
+    const activePts = await this.ptsRepository.findActivePtsByPatientId(
+      query.patientId,
+    );
+
+    if (!activePts) {
+      throw activePtsNotFound();
+    }
+
+    const isPatientOwner = account.patientProfileId === query.patientId;
+    const isProfessionalOnPts =
+      account.professionalProfileIds.includes(activePts.responsible.id) ||
+      activePts.team.some((member) =>
+        account.professionalProfileIds.includes(member.id),
+      );
+
+    if (!isPatientOwner && !isProfessionalOnPts) {
+      throw activePtsForbidden();
+    }
+
+    if (isPatientOwner) {
+      const patientResponse = { ...activePts };
+      delete patientResponse.socialSituation;
+      return patientResponse;
+    }
+
+    return activePts;
   }
 }

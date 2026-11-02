@@ -17,6 +17,7 @@ import {
   type ProfessionalRecord,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -264,6 +265,28 @@ export class PtsRepositoryImpl extends PtsRepository {
     return proposal ? this.toProposalResponse(proposal) : null;
   }
 
+  async findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.patientId = :patientId', { patientId })
+      .andWhere('pts.status IN (:...statuses)', {
+        statuses: [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING],
+      })
+      .orderBy('pts.createdAt', 'DESC')
+      .addOrderBy('pts.id', 'DESC')
+      .getOne();
+
+    return pts ? this.toActiveResponse(pts) : null;
+  }
+
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
     const specialismNames: Record<Specialism, string> = {
       [Specialism.Psychologist]: 'Psicologia',
@@ -293,6 +316,40 @@ export class PtsRepositoryImpl extends PtsRepository {
       },
       responsible: mapProfessional(proposal.responsible),
       team: (proposal.team ?? []).map(mapProfessional),
+    };
+  }
+
+  private toActiveResponse(pts: PtsEntity): ActivePtsResponseDto {
+    const specialismNames: Record<Specialism, string> = {
+      [Specialism.Psychologist]: 'Psicologia',
+      [Specialism.Doctor]: 'Medicina',
+      [Specialism.Physiotherapist]: 'Fisioterapia',
+    };
+
+    const mapProfessional = (professional: Professional) => ({
+      id: professional.id,
+      name: professional.account?.name ?? '',
+      specialism: {
+        id: String(professional.specialism),
+        name:
+          specialismNames[professional.specialism] ??
+          String(professional.specialism),
+      },
+    });
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+      socialSituation: pts.socialSituation,
+      createdAt: pts.createdAt.toISOString(),
+      acceptedAt: pts.acceptedAt?.toISOString() ?? '',
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      patient: {
+        id: pts.patient.accountId,
+        name: pts.patient.account?.name ?? '',
+      },
+      responsible: mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map(mapProfessional),
     };
   }
 }

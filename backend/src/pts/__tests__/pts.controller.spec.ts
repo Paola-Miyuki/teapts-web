@@ -4,6 +4,7 @@ import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 const body = {
   professionalId: 'prof-10',
@@ -37,6 +38,45 @@ describe('PtsController POST /pts', () => {
       responsible: { id: 'prof-10' },
       status: 'draft',
       team: [{ id: 'prof-11' }, { id: 'prof-15' }],
+    });
+  });
+
+  describe('PtsController GET /pts/active', () => {
+    let repo: InMemoryPtsRepository;
+    let controller: PtsController;
+
+    beforeEach(() => {
+      repo = seededRepo();
+      controller = new PtsController(new PtsService(repo));
+      repo.activePts.push({
+        id: 'active-100',
+        status: PtsStateEnum.PLANNING,
+        socialSituation: 'Situação social confidencial.',
+        createdAt: '2026-10-15T12:00:00.000Z',
+        acceptedAt: '2026-10-15T12:30:00.000Z',
+        beganAt: null,
+        patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+        responsible: {
+          id: 'prof-10',
+          name: 'Profissional responsável',
+          specialism: { id: 'psychologist', name: 'Psicologia' },
+        },
+        team: [],
+      });
+    });
+
+    it('retorna a consulta do PTS ativo para o paciente', async () => {
+      const result = await controller.findActive(
+        { patientId: 'acc-patient-25' },
+        {
+          accountId: 'acc-patient-25',
+          role: AccountRole.User,
+          patientProfileId: 'acc-patient-25',
+          professionalProfileIds: [],
+        },
+      );
+
+      expect(result).not.toHaveProperty('socialSituation');
     });
   });
 

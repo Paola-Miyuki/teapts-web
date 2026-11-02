@@ -1,4 +1,5 @@
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 
 export interface ProfessionalRecord {
@@ -46,6 +47,10 @@ export abstract class PtsRepository {
   abstract findDraftProposalById(
     id: string,
   ): Promise<PtsProposalResponseDto | null>;
+
+  abstract findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null>;
 
   abstract hasProposalRelation(
     patientId: string,
