@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   ParseUUIDPipe,
   Post,
@@ -13,6 +14,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCookieAuth,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -28,6 +30,10 @@ import {
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
+import {
+  UpdateSocialSituationRequestDto,
+  UpdateSocialSituationResponseDto,
+} from '../dto/update-social-situation.dto';
 import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import {
   GetPtsProposalsResponseDto,
@@ -91,5 +97,23 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.findDraftProposalById(id, account);
+  }
+
+  @Patch(':id/social-situation')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: UpdateSocialSituationResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiConflictResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async updateSocialSituation(
+    @Param('id', parseProposalId) id: string,
+    @Body() dto: UpdateSocialSituationRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.updateSocialSituation(id, dto, account);
   }
 }

@@ -6,14 +6,23 @@ import type {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
 } from '../dto/pts-proposal-response.dto';
+import type {
+  UpdateSocialSituationRequestDto,
+  UpdateSocialSituationResponseDto,
+} from '../dto/update-social-situation.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
   ptsProposalForbidden,
   ptsProposalNotFound,
+  ptsNotFound,
+  socialSituationForbidden,
+  ptsNotActive,
+  validationError,
   teamProfessionalNotFound,
 } from '../pts.errors';
 
@@ -128,5 +137,48 @@ export class PtsService {
     }
 
     return proposal;
+  }
+
+  async updateSocialSituation(
+    id: string,
+    dto: UpdateSocialSituationRequestDto,
+    account: AccountContext,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    if (!dto.socialSituation?.trim()) {
+      throw validationError([
+        {
+          field: 'socialSituation',
+          message: 'A situação social é obrigatória.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findSocialSituationTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const isProfessionalOnPts =
+      account.professionalProfileIds.includes(pts.responsibleProfessionalId) ||
+      pts.teamProfessionalIds.some((professionalId) =>
+        account.professionalProfileIds.includes(professionalId),
+      );
+
+    if (!isProfessionalOnPts) {
+      throw socialSituationForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    return this.ptsRepository.updateSocialSituation(
+      id,
+      dto.socialSituation.trim(),
+    );
   }
 }
