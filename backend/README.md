@@ -133,8 +133,7 @@ de `src/database/database.config.ts`; senão o TypeORM a ignora.
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
 `planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe. **Atenção**: desde o PR #68 esse filtro
-está comentado em `patients.repository.ts`, e a rota lista todos os pacientes.
+responsável ou participa da equipe.
 
 Parâmetros de query:
 
