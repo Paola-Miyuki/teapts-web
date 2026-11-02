@@ -7,10 +7,10 @@
 import {
   Body,
   Controller,
-  Patch,
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   UnauthorizedException,
@@ -150,13 +150,6 @@ export class AuthController {
     example: {
       status: 'FORBIDDEN',
       message: 'Operação não permitida.',
-    },
-  })
-  @ApiConflictResponse({
-    type: ErrorResponseDto,
-    example: {
-      status: 'EMAIL_ALREADY_EXISTS',
-      message: 'Este e-mail já está cadastrado.',
     },
   })
   async changePassword(
