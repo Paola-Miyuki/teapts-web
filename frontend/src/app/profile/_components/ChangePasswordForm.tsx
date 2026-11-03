@@ -28,6 +28,7 @@ const GENERIC_ERROR =
   'Não foi possível redefinir sua senha. Tente novamente mais tarde.';
 const PASSWORD_REQUIREMENTS_ERROR =
   'A senha precisa ter pelo menos 8 caracteres e conter um número.';
+const SAME_PASSWORD_ERROR = 'A nova senha não pode ser igual à senha atual.';
 
 export default function ChangePasswordForm({
   onCancel,
@@ -70,6 +71,10 @@ export default function ChangePasswordForm({
 
     if (!nextErrors.next && (!passwordHasMinLength || !passwordHasNumber)) {
       nextErrors.next = PASSWORD_REQUIREMENTS_ERROR;
+    }
+
+    if (!nextErrors.next && currentPassword === newPassword) {
+      nextErrors.next = SAME_PASSWORD_ERROR;
     }
 
     setErrors(nextErrors);

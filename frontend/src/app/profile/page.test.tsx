@@ -233,6 +233,26 @@ describe('ProfilePage', () => {
     expect(password).not.toHaveBeenCalled();
   });
 
+  it('impede reutilizar a senha atual sem chamar a API', async () => {
+    const user = userEvent.setup();
+    const { password } = mockApi();
+
+    await renderProfile();
+    await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
+    await user.type(screen.getByLabelText('Senha atual'), 'senha-atual1');
+    await user.type(screen.getByLabelText('Nova senha'), 'senha-atual1');
+    await user.type(
+      screen.getByLabelText('Confirmar nova senha'),
+      'senha-atual1',
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
+
+    expect(
+      screen.getByText('A nova senha não pode ser igual à senha atual.'),
+    ).toBeInTheDocument();
+    expect(password).not.toHaveBeenCalled();
+  });
+
   it('mostra senha atual inválida no campo correspondente', async () => {
     const user = userEvent.setup();
     mockApi({
