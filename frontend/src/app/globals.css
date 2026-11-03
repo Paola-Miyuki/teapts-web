@@ -12,6 +12,16 @@
   --danger-soft: oklch(0.97 0.02 27);
   --danger-border: oklch(0.85 0.08 27);
   --success: oklch(0.51 0.12 166);
+  --success-soft: #f0fdf4;
+  --success-border: #bbf7d0;
+  --success-strong: #15803d;
+  --success-text: #14532d;
+  --danger-soft-strong: #fef2f2;
+  --danger-border-strong: #fecaca;
+  --danger-strong: #dc2626;
+  --danger-text: #991b1b;
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.08);
 
   --font-display:
     'Iowan Old Style', 'Charter', Georgia, 'Times New Roman', serif;

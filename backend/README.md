@@ -136,8 +136,7 @@ de `src/database/database.config.ts`; senão o TypeORM a ignora.
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
 `planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe. **Atenção**: desde o PR #68 esse filtro
-está comentado em `patients.repository.ts`, e a rota lista todos os pacientes.
+responsável ou participa da equipe.
 
 Parâmetros de query:
 
@@ -151,6 +150,22 @@ A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
 totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
+
+## GET /pts/active
+
+Exige sessão autenticada e consulta o PTS ativo do paciente informado. O
+paciente titular recebe os dados sem `socialSituation`; o profissional
+responsável ou integrante da equipe recebe o PTS completo.
+
+Parâmetros de query:
+
+- `patientId`: UUID da conta do paciente.
+
+A resposta contém `{ id, status, socialSituation?, createdAt, acceptedAt,
+beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
+`null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
+(sem sessão), `403` (`FORBIDDEN`) e, somente para o próprio paciente, `404`
+(`ACTIVE_PTS_NOT_FOUND`).
 
 ## GET /accounts
 
@@ -171,6 +186,45 @@ pagination: { page, limit, total, totalPages } }`. Os erros possíveis são
 `400` (`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem
 sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 (`Não foi possível consultar as contas.`).
+
+## PATCH /me
+
+Exige sessão autenticada e atualiza o nome e/ou o e-mail da conta atual. O
+papel da conta não pode ser alterado.
+
+Corpo:
+
+```json
+{
+  "name": "Maria Silva",
+  "email": "maria@exemplo.com"
+}
+```
+
+`name` e `email` são opcionais, mas pelo menos um deve ser informado. O nome é
+removido de espaços externos e o e-mail é removido de espaços externos e
+convertido para minúsculas. Responde `200` com o mesmo corpo do `GET /me`.
+Os erros possíveis são `400` (`VALIDATION_ERROR`), `401` (sem sessão), `403`
+(`FORBIDDEN` quando o corpo tenta alterar `role`), `409`
+(`EMAIL_ALREADY_EXISTS`) e `500` (`Não foi possível atualizar o e-mail.`).
+
+## POST /me/password
+
+Exige sessão autenticada e troca a senha da conta atual pelo SuperTokens.
+
+Corpo:
+
+```json
+{
+  "currentPassword": "senha-atual-123",
+  "newPassword": "nova-senha-456"
+}
+```
+
+Responde `200` com `{ "status": "OK" }`. Os erros possíveis são `400`
+(`VALIDATION_ERROR` para corpo inválido ou senha nova fora da política, e
+`INVALID_CURRENT_PASSWORD` para senha atual incorreta), `401` (sem sessão),
+`403` (`FORBIDDEN`) e `500` (`Não foi possível atualizar a senha.`).
 
 ## POST /patients
 
@@ -241,6 +295,27 @@ A regra entre paciente e profissional fica só na aplicação: um `POST
 /patients` e um `POST /professionals` simultâneos na mesma conta podem passar
 os dois. Os `professionalProfileIds` da sessão vêm do access token: a conta
 que recebeu o perfil só aparece como profissional depois de um novo login.
+
+## PATCH /pts/proposals/:id
+
+Exige sessão autenticada e permite que somente o profissional responsável
+edite uma proposta em estado `draft`.
+
+Corpo (ao menos um campo):
+
+```json
+{
+  "socialSituation": "Mora com a mãe e frequenta a escola municipal.",
+  "teamProfessionalIds": ["5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a"]
+}
+```
+
+`socialSituation` e `teamProfessionalIds` são opcionais; uma lista vazia
+remove a equipe. A resposta `200` retorna a proposta atualizada. Os erros
+possíveis são `400` (`VALIDATION_ERROR` ou
+`TEAM_PROFESSIONAL_NOT_FOUND`), `401` (sem sessão), `403`
+(`PTS_PROPOSAL_EDIT_FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_DRAFT`).
 
 ## Documentação da API
 

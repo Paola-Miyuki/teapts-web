@@ -15,6 +15,7 @@ type AppShellProps = {
   roleLabel: string;
   navCaption: string;
   navItems: NavItem[];
+  currentHref: string;
   breadcrumb?: string;
   children: ReactNode;
 };
@@ -36,6 +37,7 @@ export default function AppShell({
   roleLabel,
   navCaption,
   navItems,
+  currentHref,
   breadcrumb,
   children,
 }: AppShellProps) {
@@ -140,6 +142,16 @@ export default function AppShell({
         </nav>
 
         <div className={styles.sideBottom}>
+          <Link
+            href="/profile"
+            className={styles.navLink}
+            aria-current={currentHref === '/profile' ? 'page' : undefined}
+            title="Meu perfil"
+          >
+            <Icon name="profile" className={styles.icon} />
+            <span className={styles.navLabel}>Meu perfil</span>
+          </Link>
+
           <LogoutButton className={styles.navLink}>
             <Icon name="logout" className={styles.icon} />
             <span className={styles.navLabel}>Sair da conta</span>

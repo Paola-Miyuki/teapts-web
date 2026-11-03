@@ -1,5 +1,7 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   CreateDraftInput,
@@ -7,13 +9,17 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type SocialSituationTarget,
 } from '../repositories/pts.repository';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 
 export class InMemoryPtsRepository extends PtsRepository {
   professionals = new Map<string, ProfessionalRecord>();
   patients = new Set<string>();
   patientsWithApprovedActivePts = new Set<string>();
   created: CreatePtsResponseDto[] = [];
+  activePts: ActivePtsResponseDto[] = [];
+  socialSituationTargets = new Map<string, SocialSituationTarget>();
   private nextId = 100;
 
   async findProfessionalById(id: string): Promise<ProfessionalRecord | null> {
@@ -96,6 +102,56 @@ export class InMemoryPtsRepository extends PtsRepository {
     );
 
     return (proposal as PtsProposalResponseDto | undefined) ?? null;
+  }
+
+  async findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null> {
+    return this.activePts.find((pts) => pts.patient.id === patientId) ?? null;
+  }
+
+  async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
+    return (
+      (this.created.find((proposal) => proposal.id === id) as
+        PtsProposalResponseDto | undefined) ?? null
+    );
+  }
+
+  async updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto> {
+    const proposal = await this.findProposalById(input.id);
+
+    if (!proposal) {
+      throw new Error('Proposta não encontrada.');
+    }
+
+    if (input.socialSituation !== undefined) {
+      proposal.socialSituation = input.socialSituation;
+    }
+
+    if (input.teamProfessionalIds !== undefined) {
+      proposal.team = input.teamProfessionalIds.map((professionalId) => ({
+        id: professionalId,
+        name: `Membro ${professionalId}`,
+        specialism: { id: 'default', name: 'Geral' },
+      }));
+    }
+
+    return proposal;
+  }
+
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    return this.socialSituationTargets.get(id) ?? null;
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    return { id, socialSituation };
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {

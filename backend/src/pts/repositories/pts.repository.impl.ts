@@ -15,13 +15,18 @@ import {
   type FindPtsProposalsResult,
   type CreateDraftInput,
   type ProfessionalRecord,
+  type UpdatePtsProposalInput,
+  type SocialSituationTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
+import { ptsProposalNotDraft } from '../pts.errors';
 
 @Injectable()
 export class PtsRepositoryImpl extends PtsRepository {
@@ -264,24 +269,149 @@ export class PtsRepositoryImpl extends PtsRepository {
     return proposal ? this.toProposalResponse(proposal) : null;
   }
 
-  private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
-    const specialismNames: Record<Specialism, string> = {
-      [Specialism.Psychologist]: 'Psicologia',
-      [Specialism.Doctor]: 'Medicina',
-      [Specialism.Physiotherapist]: 'Fisioterapia',
-    };
+  async findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.patientId = :patientId', { patientId })
+      .andWhere('pts.status IN (:...statuses)', {
+        statuses: [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING],
+      })
+      .orderBy('pts.createdAt', 'DESC')
+      .addOrderBy('pts.id', 'DESC')
+      .getOne();
 
-    const mapProfessional = (professional: Professional) => ({
-      id: professional.id,
-      name: professional.account?.name ?? '',
-      specialism: {
-        id: String(professional.specialism),
-        name:
-          specialismNames[professional.specialism] ??
-          String(professional.specialism),
-      },
+    return pts ? this.toActiveResponse(pts) : null;
+  }
+
+  async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
+    const proposal = await this.ptsRepository
+      .createQueryBuilder('proposal')
+      .leftJoinAndSelect('proposal.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('proposal.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('proposal.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('proposal.id = :id', { id })
+      .getOne();
+
+    return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.id })
+        .getOne();
+
+      if (locked?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotDraft();
+      }
+
+      const update: Partial<PtsEntity> = {};
+
+      if (input.socialSituation !== undefined) {
+        update.socialSituation = input.socialSituation;
+      }
+
+      if (Object.keys(update).length > 0) {
+        await queryRunner.manager.update(PtsEntity, input.id, update);
+      }
+
+      if (input.teamProfessionalIds !== undefined) {
+        await queryRunner.query(
+          `DELETE FROM professional_participating_on_therapeutic_journey
+           WHERE therapeutic_journey_id = $1`,
+          [input.id],
+        );
+
+        for (const professionalId of input.teamProfessionalIds) {
+          await queryRunner.query(
+            `INSERT INTO professional_participating_on_therapeutic_journey
+              (professional_id, therapeutic_journey_id)
+             VALUES ($1, $2)`,
+            [professionalId, input.id],
+          );
+        }
+      }
+
+      const proposal = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: input.id },
+        relations: {
+          patient: { account: true },
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!proposal) {
+        throw new Error('Erro ao recuperar a proposta de PTS atualizada.');
+      }
+
+      await queryRunner.commitTransaction();
+
+      return this.toProposalResponse(proposal);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: { team: true },
     });
 
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      teamProfessionalIds: (pts.team ?? []).map(
+        (professional) => professional.id,
+      ),
+    };
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    await this.ptsRepository.update(id, { socialSituation });
+
+    return { id, socialSituation };
+  }
+
+  private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
     return {
       id: proposal.id,
       status: proposal.status,
@@ -291,8 +421,48 @@ export class PtsRepositoryImpl extends PtsRepository {
         id: proposal.patient.accountId,
         name: proposal.patient.account?.name ?? '',
       },
-      responsible: mapProfessional(proposal.responsible),
-      team: (proposal.team ?? []).map(mapProfessional),
+      responsible: this.mapProfessional(proposal.responsible),
+      team: (proposal.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private toActiveResponse(pts: PtsEntity): ActivePtsResponseDto {
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+      socialSituation: pts.socialSituation,
+      createdAt: pts.createdAt.toISOString(),
+      acceptedAt: pts.acceptedAt?.toISOString() ?? null,
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      patient: {
+        id: pts.patient.accountId,
+        name: pts.patient.account?.name ?? '',
+      },
+      responsible: this.mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private mapProfessional(professional: Professional) {
+    const specialismNames: Record<Specialism, string> = {
+      [Specialism.Psychologist]: 'Psicologia',
+      [Specialism.Doctor]: 'Medicina',
+      [Specialism.Physiotherapist]: 'Fisioterapia',
+    };
+
+    return {
+      id: professional.id,
+      name: professional.account?.name ?? '',
+      specialism: {
+        id: String(professional.specialism),
+        name:
+          specialismNames[professional.specialism] ??
+          String(professional.specialism),
+      },
     };
   }
 }
