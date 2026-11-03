@@ -188,10 +188,10 @@ describe('ProfilePage', () => {
     await renderProfile();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual');
-    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova');
+    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
     await user.type(
       screen.getByLabelText('Confirmar nova senha'),
-      'senha-nova',
+      'senha-nova1',
     );
     await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
@@ -207,7 +207,7 @@ describe('ProfilePage', () => {
         method: 'POST',
         body: JSON.stringify({
           currentPassword: 'senha-atual',
-          newPassword: 'senha-nova',
+          newPassword: 'senha-nova1',
         }),
       }),
     );
@@ -220,7 +220,7 @@ describe('ProfilePage', () => {
     await renderProfile();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual');
-    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova');
+    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
     await user.type(
       screen.getByLabelText('Confirmar nova senha'),
       'outra-senha',
@@ -250,10 +250,10 @@ describe('ProfilePage', () => {
     await renderProfile();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'errada');
-    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova');
+    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
     await user.type(
       screen.getByLabelText('Confirmar nova senha'),
-      'senha-nova',
+      'senha-nova1',
     );
     await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
