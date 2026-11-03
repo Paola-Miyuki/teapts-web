@@ -1,4 +1,4 @@
-// Este arquivo concentra a consulta de profissionais no banco.
+// Este arquivo concentra a consulta e a gravação de profissionais no banco.
 // A busca usa Professional e Account existentes, com filtros combináveis,
 // paginação e projeção explícita dos campos públicos da resposta.
 
@@ -90,5 +90,24 @@ export class ProfessionalsRepository {
       .getRawMany<ProfessionalRow>();
 
     return { rows, total };
+  }
+
+  /**
+   * Grava o perfil profissional.
+   *
+   * @param professional conta e especialidade já validadas pelo service
+   * @returns id gerado para o perfil
+   * @throws erro do banco, sem tratamento (ex.: `23505` na restrição única
+   *   `(accountId, specialism)`)
+   */
+  async insert(
+    professional: Pick<Professional, 'accountId' | 'specialism'>,
+  ): Promise<string> {
+    const result = await this.professionalRepository.insert({
+      accountId: professional.accountId,
+      specialism: professional.specialism,
+    });
+
+    return (result.identifiers[0] as { id: string }).id;
   }
 }
