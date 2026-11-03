@@ -8,6 +8,7 @@ import { LinkAccountToSupertokens1791148800000 } from './migrations/179114880000
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
+import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -74,6 +75,7 @@ describe('getDatabaseOptions', () => {
         LinkAccountToSupertokens1791148800000,
         CreatePatientAndProfessional1791148860000,
         CreatePtsTables1791148870000,
+        AddProfessionalAccountSpecialismUnique1791148880000,
       ],
     });
   });
