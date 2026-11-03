@@ -329,6 +329,20 @@ describe('Swagger (e2e)', () => {
     });
   });
 
+  it('lists the three POST /patients conflicts', async () => {
+    const conflict = (await getDocument()).paths['/patients'].post.responses[
+      '409'
+    ];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'ADMIN_ACCOUNT_NOT_ALLOWED',
+      'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+      'PATIENT_PROFILE_ALREADY_EXISTS',
+    ]);
+  });
+
   it('reads the POST /patients body from the DTO', async () => {
     const { paths, components } = await getDocument();
     const schema =

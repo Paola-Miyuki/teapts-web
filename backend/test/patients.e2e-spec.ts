@@ -158,7 +158,9 @@ describe('patient profile (e2e)', () => {
     signIn('admin');
     accountRepository.findOne.mockResolvedValue({
       id: accountId,
+      role: 'user',
       patientProfile: null,
+      professionalProfiles: [],
     });
     patientsRepository.insert.mockResolvedValue(undefined);
 
@@ -228,6 +230,43 @@ describe('patient profile (e2e)', () => {
       status: 'ACCOUNT_NOT_FOUND',
       message: 'Conta não encontrada.',
     });
+  });
+
+  it.each([
+    [
+      'an admin account',
+      { role: 'admin', professionalProfiles: [] },
+      {
+        status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
+        message: 'Conta de administrador não pode ter perfil de paciente.',
+      },
+    ],
+    [
+      'an account with a professional profile',
+      {
+        role: 'user',
+        professionalProfiles: [{ accountId, specialism: 'doctor' }],
+      },
+      {
+        status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+        message: 'A conta já possui um perfil profissional.',
+      },
+    ],
+  ])('answers 409 for %s', async (_case, account, error) => {
+    signIn('admin');
+    accountRepository.findOne.mockResolvedValue({
+      id: accountId,
+      patientProfile: null,
+      ...account,
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/patients')
+      .send({ accountId });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual(error);
+    expect(patientsRepository.insert).not.toHaveBeenCalled();
   });
 
   it('answers 409 when the account already has a patient profile', async () => {

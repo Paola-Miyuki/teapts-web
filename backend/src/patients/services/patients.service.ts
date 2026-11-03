@@ -12,6 +12,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { toPagination } from '../../common/pagination/pagination';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
@@ -118,12 +119,17 @@ export class PatientsService {
   /**
    * Cria o perfil de paciente de uma conta existente (RFPAC001).
    *
-   * Uma conta tem no máximo um perfil de paciente (RN002); contato de
-   * suporte não concede tutela (RN017).
+   * Uma conta tem no máximo um perfil de paciente (RN002); admin, paciente e
+   * profissional usam contas separadas (RFPAC001.E04); contato de suporte não
+   * concede tutela (RN017).
    *
    * @param request corpo já validado pelo ValidationPipe global
    * @returns perfil criado
    * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
+   * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta é de
+   *   administrador
+   * @throws ConflictException `ACCOUNT_HAS_PROFESSIONAL_PROFILE` quando a
+   *   conta já tem perfil profissional
    * @throws ConflictException `PATIENT_PROFILE_ALREADY_EXISTS` quando a conta
    *   já tem perfil de paciente, inclusive em pedidos simultâneos
    * @throws InternalServerErrorException quando a gravação falha por outro
@@ -132,13 +138,27 @@ export class PatientsService {
   async create(request: CreatePatientRequestDto): Promise<PatientResponseDto> {
     const account = await this.accountRepository.findOne({
       where: { id: request.accountId },
-      relations: { patientProfile: true },
+      relations: { patientProfile: true, professionalProfiles: true },
     });
 
     if (!account) {
       throw new NotFoundException({
         status: 'ACCOUNT_NOT_FOUND',
         message: 'Conta não encontrada.',
+      });
+    }
+
+    if (account.role === AccountRole.Admin) {
+      throw new ConflictException({
+        status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
+        message: 'Conta de administrador não pode ter perfil de paciente.',
+      });
+    }
+
+    if (account.professionalProfiles?.length) {
+      throw new ConflictException({
+        status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+        message: 'A conta já possui um perfil profissional.',
       });
     }
 
