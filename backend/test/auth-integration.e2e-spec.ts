@@ -42,6 +42,8 @@ const revokeAllSessionsForUser =
   jest.fn<(userId: string) => Promise<string[]>>();
 
 jest.unstable_mockModule('supertokens-node', () => ({
+  // O AccountsService importa esta função por nome.
+  convertToRecipeUserId: jest.fn((userId: string) => userId),
   default: {
     init: supertokensInit,
     deleteUser,
