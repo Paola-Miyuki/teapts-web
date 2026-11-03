@@ -59,6 +59,8 @@ function responseSchema(
 const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/health', 'get'],
   ['/me', 'get'],
+  ['/me', 'patch'],
+  ['/me/password', 'post'],
   ['/auth/logout', 'post'],
   ['/professionals', 'get'],
   ['/pts/proposals', 'get'],
@@ -128,6 +130,8 @@ describe('Swagger (e2e)', () => {
 
     expect(paths['/health']).toHaveProperty('get');
     expect(paths['/me']).toHaveProperty('get');
+    expect(paths['/me']).toHaveProperty('patch');
+    expect(paths['/me/password']).toHaveProperty('post');
     expect(paths['/auth/logout']).toHaveProperty('post');
     expect(paths['/professionals']).toHaveProperty('get');
     expect(paths['/patients/authorized']).toHaveProperty('get');
