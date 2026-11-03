@@ -376,6 +376,14 @@ describe('Swagger (e2e)', () => {
     ]);
   });
 
+  it('documents the POST /me/password response with its own DTO', async () => {
+    const operation = (await getDocument()).paths['/me/password'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ChangePasswordResponseDto',
+    );
+  });
+
   it('lists the three POST /professionals conflicts', async () => {
     const conflict = (await getDocument()).paths['/professionals'].post
       .responses['409'];

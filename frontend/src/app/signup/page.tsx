@@ -37,10 +37,10 @@ function translateSignupError(message: string) {
 
 function requirementClass(met: boolean, typing: boolean) {
   if (met) {
-    return styles.requirementMet;
+    return ui.requirementMet;
   }
 
-  return typing ? styles.requirementMissing : '';
+  return typing ? ui.requirementMissing : '';
 }
 
 export default function SignupPage() {
@@ -223,7 +223,7 @@ export default function SignupPage() {
               <label htmlFor="password" className={ui.label}>
                 Criar senha
               </label>
-              <div className={styles.passwordWrapper}>
+              <div className={ui.passwordWrapper}>
                 <input
                   className={ui.input}
                   id="password"
@@ -237,7 +237,7 @@ export default function SignupPage() {
                 />
                 <button
                   type="button"
-                  className={styles.revealButton}
+                  className={ui.revealButton}
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   aria-pressed={showPassword}
@@ -245,8 +245,8 @@ export default function SignupPage() {
                   <Icon name={showPassword ? 'eye' : 'eyeClosed'} />
                 </button>
               </div>
-              <div className={styles.requirements}>
-                <p className={styles.requirementsTitle}>Requisitos da senha</p>
+              <div className={ui.requirements}>
+                <p className={ui.requirementsTitle}>Requisitos da senha</p>
                 <ul>
                   <li
                     className={requirementClass(
@@ -278,7 +278,7 @@ export default function SignupPage() {
               <label htmlFor="confirm-password" className={ui.label}>
                 Repita a senha
               </label>
-              <div className={styles.passwordWrapper}>
+              <div className={ui.passwordWrapper}>
                 <input
                   className={ui.input}
                   id="confirm-password"
@@ -292,7 +292,7 @@ export default function SignupPage() {
                 />
                 <button
                   type="button"
-                  className={styles.revealButton}
+                  className={ui.revealButton}
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   aria-label={
                     showConfirmPassword

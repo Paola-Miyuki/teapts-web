@@ -35,6 +35,7 @@ import { LogoutRequestDto } from '../dto/logout-request.dto';
 import { LogoutResponseDto } from '../dto/logout-response.dto';
 import { MeResponseDto } from '../dto/me-response.dto';
 import { ChangePasswordRequestDto } from '../dto/change-password-request.dto';
+import { ChangePasswordResponseDto } from '../dto/change-password-response.dto';
 import { UpdateMeRequestDto } from '../dto/update-me-request.dto';
 import { processLogout } from '../services/supertokens.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
@@ -125,7 +126,7 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Altera a senha da conta atual' })
   @ApiBody({ type: ChangePasswordRequestDto })
-  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiOkResponse({ type: ChangePasswordResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
     examples: {
@@ -155,7 +156,7 @@ export class AuthController {
   async changePassword(
     @CurrentAccount() account: AccountContext,
     @Body() body: ChangePasswordRequestDto,
-  ): Promise<LogoutResponseDto> {
+  ): Promise<ChangePasswordResponseDto> {
     return this.accountsService.changePassword(account, body);
   }
 
