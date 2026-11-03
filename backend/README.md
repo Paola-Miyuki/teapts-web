@@ -314,7 +314,7 @@ Corpo (ao menos um campo):
 remove a equipe. A resposta `200` retorna a proposta atualizada. Os erros
 possíveis são `400` (`VALIDATION_ERROR` ou
 `TEAM_PROFESSIONAL_NOT_FOUND`), `401` (sem sessão), `403`
-(`PTS_PROPOSAL_EDIT_FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
 (`PTS_NOT_DRAFT`).
 
 ## Documentação da API

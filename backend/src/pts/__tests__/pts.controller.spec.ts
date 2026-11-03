@@ -156,7 +156,7 @@ describe('PtsController PATCH /pts/proposals/:id', () => {
           teamAccount,
         ),
       403,
-      'PTS_PROPOSAL_EDIT_FORBIDDEN',
+      'FORBIDDEN',
     );
   });
 });

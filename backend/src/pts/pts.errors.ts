@@ -67,7 +67,7 @@ export const ptsProposalForbidden = () =>
 export const ptsProposalEditForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,
-    'PTS_PROPOSAL_EDIT_FORBIDDEN',
+    'FORBIDDEN',
     'Somente o responsável pode editar a proposta.',
   );
 

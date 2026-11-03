@@ -600,7 +600,7 @@ describe('PtsService.updatePtsProposal', () => {
           teamAccount,
         ),
       403,
-      'PTS_PROPOSAL_EDIT_FORBIDDEN',
+      'FORBIDDEN',
     );
   });
 
