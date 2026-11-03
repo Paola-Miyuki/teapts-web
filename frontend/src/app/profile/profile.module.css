@@ -100,29 +100,6 @@
   border-top: 1px solid var(--border);
 }
 
-.password {
-  margin-top: 24px;
-  padding: 26px 32px 32px;
-  box-shadow: var(--shadow-card);
-  transition:
-    box-shadow 0.2s ease,
-    transform 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.password:hover {
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-
-.password h2 {
-  margin: 0 0 8px;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 400;
-}
-
 .passwordIntro {
   margin: 0 0 24px;
   color: var(--muted);
@@ -134,12 +111,8 @@
   gap: 18px;
 }
 
-.passwordActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
+.passwordRequirements {
+  margin-top: 10px;
 }
 
 .feedback {
@@ -151,8 +124,7 @@
 }
 
 @media (max-width: 640px) {
-  .card,
-  .password {
+  .card {
     padding: 24px 18px;
   }
 
@@ -167,20 +139,17 @@
     gap: 18px;
   }
 
-  .actions > *,
-  .passwordActions > * {
+  .actions > * {
     flex: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .card,
-  .password {
+  .card {
     transition: none;
   }
 
-  .card:hover,
-  .password:hover {
+  .card:hover {
     transform: none;
   }
 }

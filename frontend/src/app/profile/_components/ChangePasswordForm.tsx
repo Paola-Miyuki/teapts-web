@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -8,6 +8,8 @@ import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { changePassword } from '@/lib/account';
+import patientStyles from '@/app/patients/patients.module.css';
+import signupStyles from '@/app/signup/signup.module.css';
 import styles from '../profile.module.css';
 
 type ChangePasswordFormProps = {
@@ -24,17 +26,22 @@ type PasswordErrors = {
 
 const GENERIC_ERROR =
   'Não foi possível redefinir sua senha. Tente novamente mais tarde.';
+const PASSWORD_REQUIREMENTS_ERROR =
+  'A senha precisa ter pelo menos 8 caracteres e conter um número.';
 
 export default function ChangePasswordForm({
   onCancel,
   onSuccess,
 }: ChangePasswordFormProps) {
   const router = useRouter();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const currentRef = useRef<HTMLInputElement>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [showPasswords, setShowPasswords] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [errors, setErrors] = useState<PasswordErrors>({
     current: '',
     next: '',
@@ -42,6 +49,12 @@ export default function ChangePasswordForm({
     form: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const passwordHasMinLength = newPassword.length >= 8;
+  const passwordHasNumber = /\d/.test(newPassword);
+
+  useEffect(() => {
+    dialogRef.current?.showModal();
+  }, []);
 
   function validate() {
     const nextErrors: PasswordErrors = {
@@ -53,6 +66,10 @@ export default function ChangePasswordForm({
 
     if (!nextErrors.confirmation && newPassword !== confirmation) {
       nextErrors.confirmation = 'A confirmação deve ser igual à nova senha.';
+    }
+
+    if (!nextErrors.next && (!passwordHasMinLength || !passwordHasNumber)) {
+      nextErrors.next = PASSWORD_REQUIREMENTS_ERROR;
     }
 
     setErrors(nextErrors);
@@ -133,10 +150,27 @@ export default function ChangePasswordForm({
   }
 
   return (
-    <section
-      className={`${ui.card} ${styles.password}`}
+    <dialog
+      ref={dialogRef}
+      className={patientStyles.dialog}
       aria-labelledby="password-title"
+      onClose={onCancel}
+      onClick={(event) => {
+        if (event.target === dialogRef.current && !submitting) {
+          onCancel();
+        }
+      }}
     >
+      <button
+        type="button"
+        className={`${patientStyles.iconButton} ${patientStyles.dialogClose}`}
+        aria-label="Fechar janela"
+        onClick={onCancel}
+        disabled={submitting}
+      >
+        <Icon name="close" className={ui.icon} />
+      </button>
+
       <h2 id="password-title">Redefinir senha</h2>
       <p className={styles.passwordIntro}>
         Informe sua senha atual e escolha uma nova senha para sua conta.
@@ -157,24 +191,43 @@ export default function ChangePasswordForm({
             <label htmlFor="current-password" className={ui.label}>
               Senha atual
             </label>
-            <input
-              ref={currentRef}
-              id="current-password"
-              name="currentPassword"
-              type={showPasswords ? 'text' : 'password'}
-              autoComplete="current-password"
-              className={ui.input}
-              value={currentPassword}
-              disabled={submitting}
-              aria-invalid={errors.current ? 'true' : 'false'}
-              aria-describedby={
-                errors.current ? 'current-password-error' : undefined
-              }
-              onChange={(event) => {
-                setCurrentPassword(event.target.value);
-                setErrors((current) => ({ ...current, current: '', form: '' }));
-              }}
-            />
+            <div className={signupStyles.passwordWrapper}>
+              <input
+                ref={currentRef}
+                id="current-password"
+                name="currentPassword"
+                type={showCurrentPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                className={ui.input}
+                value={currentPassword}
+                disabled={submitting}
+                aria-invalid={errors.current ? 'true' : 'false'}
+                aria-describedby={
+                  errors.current ? 'current-password-error' : undefined
+                }
+                onChange={(event) => {
+                  setCurrentPassword(event.target.value);
+                  setErrors((current) => ({
+                    ...current,
+                    current: '',
+                    form: '',
+                  }));
+                }}
+              />
+              <button
+                type="button"
+                className={signupStyles.revealButton}
+                aria-label={
+                  showCurrentPassword
+                    ? 'Ocultar senha atual'
+                    : 'Mostrar senha atual'
+                }
+                aria-pressed={showCurrentPassword}
+                onClick={() => setShowCurrentPassword((current) => !current)}
+              >
+                <Icon name={showCurrentPassword ? 'eye' : 'eyeClosed'} />
+              </button>
+            </div>
             {fieldError('current')}
           </div>
 
@@ -182,21 +235,40 @@ export default function ChangePasswordForm({
             <label htmlFor="new-password" className={ui.label}>
               Nova senha
             </label>
-            <input
-              id="new-password"
-              name="newPassword"
-              type={showPasswords ? 'text' : 'password'}
-              autoComplete="new-password"
-              className={ui.input}
-              value={newPassword}
-              disabled={submitting}
-              aria-invalid={errors.next ? 'true' : 'false'}
-              aria-describedby={errors.next ? 'next-password-error' : undefined}
-              onChange={(event) => {
-                setNewPassword(event.target.value);
-                setErrors((current) => ({ ...current, next: '', form: '' }));
-              }}
-            />
+            <div className={signupStyles.passwordWrapper}>
+              <input
+                id="new-password"
+                name="newPassword"
+                type={showNewPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={ui.input}
+                value={newPassword}
+                disabled={submitting}
+                aria-invalid={errors.next ? 'true' : 'false'}
+                aria-describedby={
+                  errors.next ? 'next-password-error' : undefined
+                }
+                onChange={(event) => {
+                  setNewPassword(event.target.value);
+                  setErrors((current) => ({
+                    ...current,
+                    next: '',
+                    form: '',
+                  }));
+                }}
+              />
+              <button
+                type="button"
+                className={signupStyles.revealButton}
+                aria-label={
+                  showNewPassword ? 'Ocultar nova senha' : 'Mostrar nova senha'
+                }
+                aria-pressed={showNewPassword}
+                onClick={() => setShowNewPassword((current) => !current)}
+              >
+                <Icon name={showNewPassword ? 'eye' : 'eyeClosed'} />
+              </button>
+            </div>
             {fieldError('next')}
           </div>
 
@@ -204,42 +276,81 @@ export default function ChangePasswordForm({
             <label htmlFor="confirm-password" className={ui.label}>
               Confirmar nova senha
             </label>
-            <input
-              id="confirm-password"
-              name="confirmation"
-              type={showPasswords ? 'text' : 'password'}
-              autoComplete="new-password"
-              className={ui.input}
-              value={confirmation}
-              disabled={submitting}
-              aria-invalid={errors.confirmation ? 'true' : 'false'}
-              aria-describedby={
-                errors.confirmation ? 'confirmation-password-error' : undefined
-              }
-              onChange={(event) => {
-                setConfirmation(event.target.value);
-                setErrors((current) => ({
-                  ...current,
-                  confirmation: '',
-                  form: '',
-                }));
-              }}
-            />
+            <div className={signupStyles.passwordWrapper}>
+              <input
+                id="confirm-password"
+                name="confirmation"
+                type={showConfirmation ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={ui.input}
+                value={confirmation}
+                disabled={submitting}
+                aria-invalid={errors.confirmation ? 'true' : 'false'}
+                aria-describedby={
+                  errors.confirmation
+                    ? 'confirmation-password-error'
+                    : undefined
+                }
+                onChange={(event) => {
+                  setConfirmation(event.target.value);
+                  setErrors((current) => ({
+                    ...current,
+                    confirmation: '',
+                    form: '',
+                  }));
+                }}
+              />
+              <button
+                type="button"
+                className={signupStyles.revealButton}
+                aria-label={
+                  showConfirmation
+                    ? 'Ocultar confirmação da senha'
+                    : 'Mostrar confirmação da senha'
+                }
+                aria-pressed={showConfirmation}
+                onClick={() => setShowConfirmation((current) => !current)}
+              >
+                <Icon name={showConfirmation ? 'eye' : 'eyeClosed'} />
+              </button>
+            </div>
             {fieldError('confirmation')}
           </div>
         </div>
 
-        <label>
-          <input
-            type="checkbox"
-            checked={showPasswords}
-            disabled={submitting}
-            onChange={(event) => setShowPasswords(event.target.checked)}
-          />{' '}
-          Mostrar senhas
-        </label>
+        <div
+          className={`${signupStyles.requirements} ${styles.passwordRequirements}`}
+        >
+          <p className={signupStyles.requirementsTitle}>Requisitos da senha</p>
+          <ul>
+            <li
+              className={
+                passwordHasMinLength
+                  ? signupStyles.requirementMet
+                  : newPassword
+                    ? signupStyles.requirementMissing
+                    : ''
+              }
+            >
+              <span aria-hidden="true">{passwordHasMinLength ? '✓' : '•'}</span>{' '}
+              Oito caracteres ou mais
+            </li>
+            <li
+              className={
+                passwordHasNumber
+                  ? signupStyles.requirementMet
+                  : newPassword
+                    ? signupStyles.requirementMissing
+                    : ''
+              }
+            >
+              <span aria-hidden="true">{passwordHasNumber ? '✓' : '•'}</span>{' '}
+              Pelo menos um número
+            </li>
+          </ul>
+        </div>
 
-        <div className={styles.passwordActions}>
+        <div className={styles.actions}>
           <button
             type="button"
             className={`${ui.btn} ${ui.btnSecondary}`}
@@ -257,6 +368,6 @@ export default function ChangePasswordForm({
           </button>
         </div>
       </form>
-    </section>
+    </dialog>
   );
 }
