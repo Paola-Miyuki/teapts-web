@@ -16,13 +16,16 @@ import {
   type CreateDraftInput,
   type ProfessionalRecord,
   type UpdatePtsProposalInput,
+  type SocialSituationTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
+import { ptsProposalNotDraft } from '../pts.errors';
 
 @Injectable()
 export class PtsRepositoryImpl extends PtsRepository {
@@ -290,6 +293,16 @@ export class PtsRepositoryImpl extends PtsRepository {
     try {
       await queryRunner.startTransaction();
 
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.id })
+        .getOne();
+
+      if (locked?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotDraft();
+      }
+
       const update: Partial<PtsEntity> = {};
 
       if (input.socialSituation !== undefined) {
@@ -342,6 +355,37 @@ export class PtsRepositoryImpl extends PtsRepository {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: { team: true },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      teamProfessionalIds: (pts.team ?? []).map(
+        (professional) => professional.id,
+      ),
+    };
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    await this.ptsRepository.update(id, { socialSituation });
+
+    return { id, socialSituation };
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {

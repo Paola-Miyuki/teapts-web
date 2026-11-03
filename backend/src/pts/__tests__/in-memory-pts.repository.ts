@@ -8,13 +8,16 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type SocialSituationTarget,
 } from '../repositories/pts.repository';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 
 export class InMemoryPtsRepository extends PtsRepository {
   professionals = new Map<string, ProfessionalRecord>();
   patients = new Set<string>();
   patientsWithApprovedActivePts = new Set<string>();
   created: CreatePtsResponseDto[] = [];
+  socialSituationTargets = new Map<string, SocialSituationTarget>();
   private nextId = 100;
 
   async findProfessionalById(id: string): Promise<ProfessionalRecord | null> {
@@ -128,6 +131,19 @@ export class InMemoryPtsRepository extends PtsRepository {
     }
 
     return proposal;
+  }
+
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    return this.socialSituationTargets.get(id) ?? null;
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    return { id, socialSituation };
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {

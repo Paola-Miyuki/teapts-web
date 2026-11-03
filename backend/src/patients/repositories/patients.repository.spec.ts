@@ -70,10 +70,8 @@ describe('ACTIVE_PTS_STATES', () => {
   });
 });
 
-// O filtro de autorização (`where` com PTS ativo e equipe) está desligado na
-// `dev` desde o PR #68; o teste segue a consulta atual.
 describe('PatientsRepository.findAuthorizedPaginated', () => {
-  it('returns rows and total with pagination', async () => {
+  it('returns rows and total with authorization and pagination', async () => {
     const { query, typeormRepository, repository } = createRepository();
     const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
     query.getCount.mockResolvedValue(11);
@@ -88,6 +86,26 @@ describe('PatientsRepository.findAuthorizedPaginated', () => {
 
     expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
       'patient',
+    );
+    expect(query.where).toHaveBeenCalledWith(
+      `patient."accountId" IN (
+    SELECT pts.patient_id
+    FROM projeto_terapeutico_singular pts
+    WHERE pts.status IN (:...states)
+      AND (
+        pts.responsible_professional_id IN (
+          SELECT id FROM professional WHERE "accountId" = :accountId
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM professional_participating_on_therapeutic_journey participation
+          INNER JOIN professional ON professional.id = participation.professional_id
+          WHERE participation.therapeutic_journey_id = pts.id
+            AND professional."accountId" = :accountId
+        )
+      )
+  )`,
+      { accountId: 'professional-account', states: ACTIVE_PTS_STATES },
     );
     expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
     expect(query.addOrderBy).toHaveBeenCalledWith('patient."accountId"', 'ASC');

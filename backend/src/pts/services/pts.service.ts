@@ -7,18 +7,26 @@ import type {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
 } from '../dto/pts-proposal-response.dto';
+import type {
+  UpdateSocialSituationRequestDto,
+  UpdateSocialSituationResponseDto,
+} from '../dto/update-social-situation.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
+  ptsProposalEditForbidden,
   ptsProposalForbidden,
-  ptsProposalNotFound,
   ptsProposalNotDraft,
-  professionalNotFound,
-  validationError,
+  ptsProposalNotFound,
+  ptsNotActive,
+  ptsNotFound,
+  socialSituationForbidden,
   teamProfessionalNotFound,
+  validationError,
 } from '../pts.errors';
 
 @Injectable()
@@ -159,10 +167,10 @@ export class PtsService {
     }
 
     if (!account.professionalProfileIds.includes(proposal.responsible.id)) {
-      throw ptsProposalForbidden();
+      throw ptsProposalEditForbidden();
     }
 
-    if (proposal.status !== 'draft') {
+    if (proposal.status !== PtsStateEnum.DRAFT) {
       throw ptsProposalNotDraft();
     }
 
@@ -183,7 +191,7 @@ export class PtsService {
       );
 
       if (missingIds.length > 0) {
-        throw professionalNotFound(missingIds);
+        throw teamProfessionalNotFound(missingIds);
       }
     }
 
@@ -192,5 +200,48 @@ export class PtsService {
       socialSituation: dto.socialSituation,
       teamProfessionalIds,
     });
+  }
+
+  async updateSocialSituation(
+    id: string,
+    dto: UpdateSocialSituationRequestDto,
+    account: AccountContext,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    if (!dto.socialSituation?.trim()) {
+      throw validationError([
+        {
+          field: 'socialSituation',
+          message: 'A situação social é obrigatória.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findSocialSituationTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const isProfessionalOnPts =
+      account.professionalProfileIds.includes(pts.responsibleProfessionalId) ||
+      pts.teamProfessionalIds.some((professionalId) =>
+        account.professionalProfileIds.includes(professionalId),
+      );
+
+    if (!isProfessionalOnPts) {
+      throw socialSituationForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    return this.ptsRepository.updateSocialSituation(
+      id,
+      dto.socialSituation.trim(),
+    );
   }
 }

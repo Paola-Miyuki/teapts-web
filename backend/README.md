@@ -133,8 +133,7 @@ de `src/database/database.config.ts`; senão o TypeORM a ignora.
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
 `planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe. **Atenção**: desde o PR #68 esse filtro
-está comentado em `patients.repository.ts`, e a rota lista todos os pacientes.
+responsável ou participa da equipe.
 
 Parâmetros de query:
 
@@ -198,6 +197,27 @@ Responde `201` com `{ accountId, supportContacts }`. Os erros possíveis são
 
 O `patientProfileId` da sessão vem do access token: a conta que recebeu o
 perfil só aparece como paciente depois de um novo login.
+
+## PATCH /pts/proposals/:id
+
+Exige sessão autenticada e permite que somente o profissional responsável
+edite uma proposta em estado `draft`.
+
+Corpo (ao menos um campo):
+
+```json
+{
+  "socialSituation": "Mora com a mãe e frequenta a escola municipal.",
+  "teamProfessionalIds": ["5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a"]
+}
+```
+
+`socialSituation` e `teamProfessionalIds` são opcionais; uma lista vazia
+remove a equipe. A resposta `200` retorna a proposta atualizada. Os erros
+possíveis são `400` (`VALIDATION_ERROR` ou
+`TEAM_PROFESSIONAL_NOT_FOUND`), `401` (sem sessão), `403`
+(`PTS_PROPOSAL_EDIT_FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_DRAFT`).
 
 ## Documentação da API
 

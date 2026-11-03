@@ -1,5 +1,6 @@
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 
 export interface ProfessionalRecord {
   id: string;
@@ -33,6 +34,13 @@ export interface UpdatePtsProposalInput {
   teamProfessionalIds?: string[];
 }
 
+export interface SocialSituationTarget {
+  id: string;
+  status: string;
+  responsibleProfessionalId: string;
+  teamProfessionalIds: string[];
+}
+
 /** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
   abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
@@ -58,6 +66,15 @@ export abstract class PtsRepository {
   abstract updateDraftProposal(
     input: UpdatePtsProposalInput,
   ): Promise<PtsProposalResponseDto>;
+
+  abstract findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null>;
+
+  abstract updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto>;
 
   abstract hasProposalRelation(
     patientId: string,

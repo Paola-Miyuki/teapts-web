@@ -20,6 +20,20 @@ const accountOf = (accountId: string): AccountContext => ({
   professionalProfileIds: [],
 });
 
+const responsibleAccount: AccountContext = {
+  accountId: 'acc-1',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['prof-10'],
+};
+
+const teamAccount: AccountContext = {
+  accountId: 'acc-2',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['prof-11'],
+};
+
 describe('PtsController POST /pts', () => {
   let repo: InMemoryPtsRepository;
   let controller: PtsController;
@@ -27,38 +41,6 @@ describe('PtsController POST /pts', () => {
   beforeEach(() => {
     repo = seededRepo();
     controller = new PtsController(new PtsService(repo));
-  });
-
-  describe('PtsController PATCH /pts/proposals/:id', () => {
-    let repo: InMemoryPtsRepository;
-    let controller: PtsController;
-
-    beforeEach(() => {
-      repo = seededRepo();
-      controller = new PtsController(new PtsService(repo));
-    });
-
-    it('atualiza uma proposta pela rota de edição', async () => {
-      const proposal = await controller.create(body, accountOf('acc-1'));
-      proposal.patient.id = 'acc-patient-25';
-
-      const result = await controller.updateProposal(
-        proposal.id,
-        { socialSituation: 'Situação social atualizada.' },
-        {
-          accountId: 'acc-1',
-          role: AccountRole.User,
-          patientProfileId: null,
-          professionalProfileIds: ['prof-10'],
-        },
-      );
-
-      expect(result).toMatchObject({
-        id: proposal.id,
-        socialSituation: 'Situação social atualizada.',
-        status: PtsStateEnum.DRAFT,
-      });
-    });
   });
 
   it('usa a conta da sessão e retorna o PTS criado', async () => {
@@ -91,5 +73,76 @@ describe('PtsController POST /pts', () => {
       409,
       'PTS_ACTIVE_EXISTS',
     );
+  });
+});
+
+describe('PtsController PATCH /pts/proposals/:id', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  it('atualiza uma proposta pela rota de edição', async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+
+    const result = await controller.updateProposal(
+      proposal.id,
+      { socialSituation: 'Situação social atualizada.' },
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      socialSituation: 'Situação social atualizada.',
+      status: PtsStateEnum.DRAFT,
+    });
+  });
+
+  it('rejeita edição por integrante da equipe', async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+
+    await expectApiError(
+      () =>
+        controller.updateProposal(
+          proposal.id,
+          { socialSituation: 'Alteração indevida.' },
+          teamAccount,
+        ),
+      403,
+      'PTS_PROPOSAL_EDIT_FORBIDDEN',
+    );
+  });
+});
+
+describe('PtsController PATCH /pts/:id/social-situation', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.socialSituationTargets.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsibleProfessionalId: 'prof-10',
+      teamProfessionalIds: ['prof-11'],
+    });
+  });
+
+  it('atualiza a situação social pela rota', async () => {
+    await expect(
+      controller.updateSocialSituation(
+        'pts-100',
+        { socialSituation: 'Mora com a mãe e a avó.' },
+        teamAccount,
+      ),
+    ).resolves.toEqual({
+      id: 'pts-100',
+      socialSituation: 'Mora com a mãe e a avó.',
+    });
   });
 });

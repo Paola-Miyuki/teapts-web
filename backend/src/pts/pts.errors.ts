@@ -64,6 +64,20 @@ export const ptsProposalForbidden = () =>
     'Você não tem acesso às propostas deste paciente.',
   );
 
+export const ptsProposalEditForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'PTS_PROPOSAL_EDIT_FORBIDDEN',
+    'Somente o responsável pode editar a proposta.',
+  );
+
+export const socialSituationForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente profissionais da equipe podem alterar a situação social.',
+  );
+
 export const ptsProposalNotFound = () =>
   new PtsApiError(
     HttpStatus.NOT_FOUND,
@@ -78,10 +92,12 @@ export const ptsProposalNotDraft = () =>
     'Somente propostas aguardando decisão podem ser editadas.',
   );
 
-export const professionalNotFound = (ids: string[]) =>
+export const ptsNotFound = () =>
+  new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
+
+export const ptsNotActive = () =>
   new PtsApiError(
-    HttpStatus.NOT_FOUND,
-    'PROFESSIONAL_NOT_FOUND',
-    `Profissionais não encontrados: ${ids.join(', ')}.`,
-    { professionalIds: ids },
+    HttpStatus.CONFLICT,
+    'PTS_NOT_ACTIVE',
+    'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
   );
