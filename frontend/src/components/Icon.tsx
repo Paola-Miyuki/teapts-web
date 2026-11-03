@@ -25,6 +25,12 @@ const glyphs = {
     </>
   ),
   logout: <path d="M9 3H4v18h5M10 12h11m-4-4 4 4-4 4" />,
+  profile: (
+    <>
+      <circle cx="12" cy="7" r="4" />
+      <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+    </>
+  ),
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
