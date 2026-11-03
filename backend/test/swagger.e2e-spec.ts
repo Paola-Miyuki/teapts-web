@@ -63,6 +63,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/professionals', 'get'],
   ['/pts/proposals', 'get'],
   ['/pts/proposals/{id}', 'get'],
+  ['/pts/active', 'get'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
   ['/patients', 'post'],

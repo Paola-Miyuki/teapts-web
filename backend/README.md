@@ -133,8 +133,7 @@ de `src/database/database.config.ts`; senão o TypeORM a ignora.
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
 `planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe. **Atenção**: desde o PR #68 esse filtro
-está comentado em `patients.repository.ts`, e a rota lista todos os pacientes.
+responsável ou participa da equipe.
 
 Parâmetros de query:
 
@@ -148,6 +147,22 @@ A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
 totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
+
+## GET /pts/active
+
+Exige sessão autenticada e consulta o PTS ativo do paciente informado. O
+paciente titular recebe os dados sem `socialSituation`; o profissional
+responsável ou integrante da equipe recebe o PTS completo.
+
+Parâmetros de query:
+
+- `patientId`: UUID da conta do paciente.
+
+A resposta contém `{ id, status, socialSituation?, createdAt, acceptedAt,
+beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
+`null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
+(sem sessão), `403` (`FORBIDDEN`) e, somente para o próprio paciente, `404`
+(`ACTIVE_PTS_NOT_FOUND`).
 
 ## GET /accounts
 

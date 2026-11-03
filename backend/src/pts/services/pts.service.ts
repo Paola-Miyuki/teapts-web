@@ -8,8 +8,13 @@ import type {
 } from '../dto/pts-proposal-response.dto';
 import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type {
+  UpdateSocialSituationRequestDto,
+  UpdateSocialSituationResponseDto,
+} from '../dto/update-social-situation.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   patientNotFound,
   professionalNotAuthorized,
@@ -18,6 +23,10 @@ import {
   ptsProposalNotFound,
   activePtsForbidden,
   activePtsNotFound,
+  ptsNotFound,
+  socialSituationForbidden,
+  ptsNotActive,
+  validationError,
   teamProfessionalNotFound,
 } from '../pts.errors';
 
@@ -138,15 +147,24 @@ export class PtsService {
     query: GetActivePtsQueryDto,
     account: AccountContext,
   ): Promise<ActivePtsResponseDto> {
+    const isPatientOwner = account.patientProfileId === query.patientId;
+
+    if (!isPatientOwner && account.professionalProfileIds.length === 0) {
+      throw activePtsForbidden();
+    }
+
     const activePts = await this.ptsRepository.findActivePtsByPatientId(
       query.patientId,
     );
 
     if (!activePts) {
-      throw activePtsNotFound();
+      if (isPatientOwner) {
+        throw activePtsNotFound();
+      }
+
+      throw activePtsForbidden();
     }
 
-    const isPatientOwner = account.patientProfileId === query.patientId;
     const isProfessionalOnPts =
       account.professionalProfileIds.includes(activePts.responsible.id) ||
       activePts.team.some((member) =>
@@ -164,5 +182,48 @@ export class PtsService {
     }
 
     return activePts;
+  }
+
+  async updateSocialSituation(
+    id: string,
+    dto: UpdateSocialSituationRequestDto,
+    account: AccountContext,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    if (!dto.socialSituation?.trim()) {
+      throw validationError([
+        {
+          field: 'socialSituation',
+          message: 'A situação social é obrigatória.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findSocialSituationTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const isProfessionalOnPts =
+      account.professionalProfileIds.includes(pts.responsibleProfessionalId) ||
+      pts.teamProfessionalIds.some((professionalId) =>
+        account.professionalProfileIds.includes(professionalId),
+      );
+
+    if (!isProfessionalOnPts) {
+      throw socialSituationForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    return this.ptsRepository.updateSocialSituation(
+      id,
+      dto.socialSituation.trim(),
+    );
   }
 }

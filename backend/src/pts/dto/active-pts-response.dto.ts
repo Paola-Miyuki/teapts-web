@@ -23,8 +23,8 @@ export class ActivePtsResponseDto {
   @ApiProperty({ example: '2026-10-15T12:00:00.000Z' })
   createdAt!: string;
 
-  @ApiProperty({ example: '2026-10-15T12:30:00.000Z' })
-  acceptedAt!: string;
+  @ApiProperty({ nullable: true, example: null })
+  acceptedAt!: string | null;
 
   @ApiProperty({ nullable: true, example: null })
   beganAt!: string | null;

@@ -64,6 +64,13 @@ export const ptsProposalForbidden = () =>
     'Você não tem acesso às propostas deste paciente.',
   );
 
+export const socialSituationForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente profissionais da equipe podem alterar a situação social.',
+  );
+
 export const ptsProposalNotFound = () =>
   new PtsApiError(
     HttpStatus.NOT_FOUND,
@@ -83,4 +90,14 @@ export const activePtsNotFound = () =>
     HttpStatus.NOT_FOUND,
     'ACTIVE_PTS_NOT_FOUND',
     'O paciente não possui PTS ativo.',
+  );
+
+export const ptsNotFound = () =>
+  new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
+
+export const ptsNotActive = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_ACTIVE',
+    'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
   );

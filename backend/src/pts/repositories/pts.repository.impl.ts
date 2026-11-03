@@ -15,9 +15,11 @@ import {
   type FindPtsProposalsResult,
   type CreateDraftInput,
   type ProfessionalRecord,
+  type SocialSituationTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -287,24 +289,38 @@ export class PtsRepositoryImpl extends PtsRepository {
     return pts ? this.toActiveResponse(pts) : null;
   }
 
-  private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
-    const specialismNames: Record<Specialism, string> = {
-      [Specialism.Psychologist]: 'Psicologia',
-      [Specialism.Doctor]: 'Medicina',
-      [Specialism.Physiotherapist]: 'Fisioterapia',
-    };
-
-    const mapProfessional = (professional: Professional) => ({
-      id: professional.id,
-      name: professional.account?.name ?? '',
-      specialism: {
-        id: String(professional.specialism),
-        name:
-          specialismNames[professional.specialism] ??
-          String(professional.specialism),
-      },
+  async findSocialSituationTarget(
+    id: string,
+  ): Promise<SocialSituationTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: { team: true },
     });
 
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      teamProfessionalIds: (pts.team ?? []).map(
+        (professional) => professional.id,
+      ),
+    };
+  }
+
+  async updateSocialSituation(
+    id: string,
+    socialSituation: string,
+  ): Promise<UpdateSocialSituationResponseDto> {
+    await this.ptsRepository.update(id, { socialSituation });
+
+    return { id, socialSituation };
+  }
+
+  private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
     return {
       id: proposal.id,
       status: proposal.status,
@@ -314,19 +330,40 @@ export class PtsRepositoryImpl extends PtsRepository {
         id: proposal.patient.accountId,
         name: proposal.patient.account?.name ?? '',
       },
-      responsible: mapProfessional(proposal.responsible),
-      team: (proposal.team ?? []).map(mapProfessional),
+      responsible: this.mapProfessional(proposal.responsible),
+      team: (proposal.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
     };
   }
 
   private toActiveResponse(pts: PtsEntity): ActivePtsResponseDto {
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+      socialSituation: pts.socialSituation,
+      createdAt: pts.createdAt.toISOString(),
+      acceptedAt: pts.acceptedAt?.toISOString() ?? null,
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      patient: {
+        id: pts.patient.accountId,
+        name: pts.patient.account?.name ?? '',
+      },
+      responsible: this.mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private mapProfessional(professional: Professional) {
     const specialismNames: Record<Specialism, string> = {
       [Specialism.Psychologist]: 'Psicologia',
       [Specialism.Doctor]: 'Medicina',
       [Specialism.Physiotherapist]: 'Fisioterapia',
     };
 
-    const mapProfessional = (professional: Professional) => ({
+    return {
       id: professional.id,
       name: professional.account?.name ?? '',
       specialism: {
@@ -335,21 +372,6 @@ export class PtsRepositoryImpl extends PtsRepository {
           specialismNames[professional.specialism] ??
           String(professional.specialism),
       },
-    });
-
-    return {
-      id: pts.id,
-      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
-      socialSituation: pts.socialSituation,
-      createdAt: pts.createdAt.toISOString(),
-      acceptedAt: pts.acceptedAt?.toISOString() ?? '',
-      beganAt: pts.beganAt?.toISOString() ?? null,
-      patient: {
-        id: pts.patient.accountId,
-        name: pts.patient.account?.name ?? '',
-      },
-      responsible: mapProfessional(pts.responsible),
-      team: (pts.team ?? []).map(mapProfessional),
     };
   }
 }

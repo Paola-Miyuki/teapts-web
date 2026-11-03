@@ -30,10 +30,10 @@ export class PtsEntity {
   @CreateDateColumn()
   createdAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
   acceptedAt: Date | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
   beganAt: Date | null;
 
   @Column({ name: 'patient_id' })
