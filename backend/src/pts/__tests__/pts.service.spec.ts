@@ -4,6 +4,7 @@ import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { PtsService } from '../services/pts.service';
 import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 
 const body = {
   professionalId: 'prof-10',
@@ -58,6 +59,13 @@ const patientAndTeamAccount: AccountContext = {
 const noProfileAccount: AccountContext = {
   accountId: 'acc-none',
   role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: [],
+};
+
+const adminAccount: AccountContext = {
+  accountId: 'acc-admin',
+  role: AccountRole.Admin,
   patientProfileId: null,
   professionalProfileIds: [],
 };
@@ -395,6 +403,129 @@ describe('PtsService.findDraftProposals', () => {
       total: 2,
       totalPages: 2,
     });
+  });
+});
+
+describe('PtsService.findActivePts', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const activePts: ActivePtsResponseDto = {
+    id: 'active-100',
+    status: PtsStateEnum.PLANNING,
+    socialSituation: 'Situação social confidencial.',
+    createdAt: '2026-10-15T12:00:00.000Z',
+    acceptedAt: '2026-10-15T12:30:00.000Z',
+    beganAt: null,
+    patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+    responsible: {
+      id: 'prof-10',
+      name: 'Profissional responsável',
+      specialism: { id: 'psychologist', name: 'Psicologia' },
+    },
+    team: [
+      {
+        id: 'prof-11',
+        name: 'Profissional da equipe',
+        specialism: { id: 'doctor', name: 'Medicina' },
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    repo.activePts.push(activePts);
+    service = new PtsService(repo);
+  });
+
+  it('retorna o PTS sem situação social para o paciente titular', async () => {
+    const result = await service.findActivePts(
+      { patientId: 'acc-patient-25' },
+      patientAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      acceptedAt: activePts.acceptedAt,
+      beganAt: null,
+    });
+    expect(result).not.toHaveProperty('socialSituation');
+  });
+
+  it('retorna o PTS completo para o responsável', async () => {
+    await expect(
+      service.findActivePts(
+        { patientId: 'acc-patient-25' },
+        responsibleAccount,
+      ),
+    ).resolves.toMatchObject({
+      socialSituation: activePts.socialSituation,
+      responsible: { id: 'prof-10' },
+      team: [{ id: 'prof-11' }],
+    });
+  });
+
+  it('retorna o PTS completo para um integrante da equipe', async () => {
+    await expect(
+      service.findActivePts({ patientId: 'acc-patient-25' }, teamAccount),
+    ).resolves.toMatchObject({ id: 'active-100' });
+  });
+
+  it('rejeita profissional sem vínculo', async () => {
+    await expectApiError(
+      () =>
+        service.findActivePts(
+          { patientId: 'acc-patient-25' },
+          otherProfessionalAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('rejeita conta sem perfil antes de consultar o PTS', async () => {
+    await expectApiError(
+      () =>
+        service.findActivePts(
+          { patientId: 'acc-patient-25' },
+          noProfileAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('rejeita administrador sem perfil de paciente ou profissional', async () => {
+    await expectApiError(
+      () =>
+        service.findActivePts({ patientId: 'acc-patient-25' }, adminAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('rejeita paciente que consulta outro paciente', async () => {
+    await expectApiError(
+      () =>
+        service.findActivePts(
+          { patientId: 'acc-patient-25' },
+          otherPatientAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('retorna 404 quando não existe PTS ativo para o paciente titular', async () => {
+    repo.activePts.length = 0;
+
+    await expectApiError(
+      () =>
+        service.findActivePts({ patientId: 'acc-patient-25' }, patientAccount),
+      404,
+      'ACTIVE_PTS_NOT_FOUND',
+    );
   });
 });
 

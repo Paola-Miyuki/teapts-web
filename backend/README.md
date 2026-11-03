@@ -148,6 +148,22 @@ totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
 
+## GET /pts/active
+
+Exige sessão autenticada e consulta o PTS ativo do paciente informado. O
+paciente titular recebe os dados sem `socialSituation`; o profissional
+responsável ou integrante da equipe recebe o PTS completo.
+
+Parâmetros de query:
+
+- `patientId`: UUID da conta do paciente.
+
+A resposta contém `{ id, status, socialSituation?, createdAt, acceptedAt,
+beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
+`null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
+(sem sessão), `403` (`FORBIDDEN`) e, somente para o próprio paciente, `404`
+(`ACTIVE_PTS_NOT_FOUND`).
+
 ## GET /accounts
 
 Exige sessão autenticada com papel `admin` e lista as contas para escolher a

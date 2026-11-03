@@ -31,6 +31,8 @@ import {
 } from '../../common/swagger/error-response.dto';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
 import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
+import { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
+import { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
@@ -98,6 +100,22 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.findDraftProposalById(id, account);
+  }
+
+  @Get('active')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: ActivePtsResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async findActive(
+    @Query() query: GetActivePtsQueryDto,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.findActivePts(query, account);
   }
 
   @Patch('proposals/:id')

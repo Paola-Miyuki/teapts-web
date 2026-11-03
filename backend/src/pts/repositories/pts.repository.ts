@@ -1,4 +1,5 @@
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 
@@ -60,6 +61,10 @@ export abstract class PtsRepository {
   abstract findDraftProposalById(
     id: string,
   ): Promise<PtsProposalResponseDto | null>;
+
+  abstract findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null>;
 
   abstract findProposalById(id: string): Promise<PtsProposalResponseDto | null>;
 

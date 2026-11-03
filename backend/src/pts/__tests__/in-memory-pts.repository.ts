@@ -1,5 +1,6 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
@@ -17,6 +18,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   patients = new Set<string>();
   patientsWithApprovedActivePts = new Set<string>();
   created: CreatePtsResponseDto[] = [];
+  activePts: ActivePtsResponseDto[] = [];
   socialSituationTargets = new Map<string, SocialSituationTarget>();
   private nextId = 100;
 
@@ -100,6 +102,12 @@ export class InMemoryPtsRepository extends PtsRepository {
     );
 
     return (proposal as PtsProposalResponseDto | undefined) ?? null;
+  }
+
+  async findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null> {
+    return this.activePts.find((pts) => pts.patient.id === patientId) ?? null;
   }
 
   async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {

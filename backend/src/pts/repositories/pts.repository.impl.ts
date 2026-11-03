@@ -19,6 +19,7 @@ import {
   type SocialSituationTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -268,6 +269,28 @@ export class PtsRepositoryImpl extends PtsRepository {
     return proposal ? this.toProposalResponse(proposal) : null;
   }
 
+  async findActivePtsByPatientId(
+    patientId: string,
+  ): Promise<ActivePtsResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.patientId = :patientId', { patientId })
+      .andWhere('pts.status IN (:...statuses)', {
+        statuses: [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING],
+      })
+      .orderBy('pts.createdAt', 'DESC')
+      .addOrderBy('pts.id', 'DESC')
+      .getOne();
+
+    return pts ? this.toActiveResponse(pts) : null;
+  }
+
   async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
     const proposal = await this.ptsRepository
       .createQueryBuilder('proposal')
@@ -389,23 +412,6 @@ export class PtsRepositoryImpl extends PtsRepository {
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
-    const specialismNames: Record<Specialism, string> = {
-      [Specialism.Psychologist]: 'Psicologia',
-      [Specialism.Doctor]: 'Medicina',
-      [Specialism.Physiotherapist]: 'Fisioterapia',
-    };
-
-    const mapProfessional = (professional: Professional) => ({
-      id: professional.id,
-      name: professional.account?.name ?? '',
-      specialism: {
-        id: String(professional.specialism),
-        name:
-          specialismNames[professional.specialism] ??
-          String(professional.specialism),
-      },
-    });
-
     return {
       id: proposal.id,
       status: proposal.status,
@@ -415,8 +421,48 @@ export class PtsRepositoryImpl extends PtsRepository {
         id: proposal.patient.accountId,
         name: proposal.patient.account?.name ?? '',
       },
-      responsible: mapProfessional(proposal.responsible),
-      team: (proposal.team ?? []).map(mapProfessional),
+      responsible: this.mapProfessional(proposal.responsible),
+      team: (proposal.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private toActiveResponse(pts: PtsEntity): ActivePtsResponseDto {
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+      socialSituation: pts.socialSituation,
+      createdAt: pts.createdAt.toISOString(),
+      acceptedAt: pts.acceptedAt?.toISOString() ?? null,
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      patient: {
+        id: pts.patient.accountId,
+        name: pts.patient.account?.name ?? '',
+      },
+      responsible: this.mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private mapProfessional(professional: Professional) {
+    const specialismNames: Record<Specialism, string> = {
+      [Specialism.Psychologist]: 'Psicologia',
+      [Specialism.Doctor]: 'Medicina',
+      [Specialism.Physiotherapist]: 'Fisioterapia',
+    };
+
+    return {
+      id: professional.id,
+      name: professional.account?.name ?? '',
+      specialism: {
+        id: String(professional.specialism),
+        name:
+          specialismNames[professional.specialism] ??
+          String(professional.specialism),
+      },
     };
   }
 }
