@@ -48,5 +48,9 @@ export function useAccount() {
     setRetryKey((current) => current + 1);
   }
 
-  return { account, error, retry };
+  function updateAccount(nextAccount: Account) {
+    setAccount(nextAccount);
+  }
+
+  return { account, error, retry, updateAccount };
 }
