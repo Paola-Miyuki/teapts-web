@@ -168,6 +168,45 @@ pagination: { page, limit, total, totalPages } }`. Os erros possíveis são
 sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 (`Não foi possível consultar as contas.`).
 
+## PATCH /me
+
+Exige sessão autenticada e atualiza o nome e/ou o e-mail da conta atual. O
+papel da conta não pode ser alterado.
+
+Corpo:
+
+```json
+{
+  "name": "Maria Silva",
+  "email": "maria@exemplo.com"
+}
+```
+
+`name` e `email` são opcionais, mas pelo menos um deve ser informado. O nome é
+removido de espaços externos e o e-mail é removido de espaços externos e
+convertido para minúsculas. Responde `200` com o mesmo corpo do `GET /me`.
+Os erros possíveis são `400` (`VALIDATION_ERROR`), `401` (sem sessão), `403`
+(`FORBIDDEN` quando o corpo tenta alterar `role`), `409`
+(`EMAIL_ALREADY_EXISTS`) e `500` (`Não foi possível atualizar o e-mail.`).
+
+## POST /me/password
+
+Exige sessão autenticada e troca a senha da conta atual pelo SuperTokens.
+
+Corpo:
+
+```json
+{
+  "currentPassword": "senha-atual-123",
+  "newPassword": "nova-senha-456"
+}
+```
+
+Responde `200` com `{ "status": "OK" }`. Os erros possíveis são `400`
+(`VALIDATION_ERROR` para corpo inválido ou senha nova fora da política, e
+`INVALID_CURRENT_PASSWORD` para senha atual incorreta), `401` (sem sessão),
+`403` (`FORBIDDEN`) e `500` (`Não foi possível atualizar a senha.`).
+
 ## POST /patients
 
 Exige sessão autenticada com papel `admin` e cria o perfil de paciente de uma

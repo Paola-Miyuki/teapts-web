@@ -151,15 +151,6 @@
   height: 19px;
 }
 
-.revealButton[aria-pressed='true']::after {
-  content: '';
-  position: absolute;
-  width: 21px;
-  height: 1.5px;
-  background: currentColor;
-  transform: rotate(-45deg);
-}
-
 .requirements {
   padding: 10px 14px;
   border: 1px solid var(--border);

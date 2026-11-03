@@ -216,7 +216,7 @@ function LoginForm() {
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword((current) => !current)}
                   >
-                    <Icon name={showPassword ? 'eyeOff' : 'eye'} />
+                    <Icon name={showPassword ? 'eye' : 'eyeClosed'} />
                   </button>
                 </div>
 

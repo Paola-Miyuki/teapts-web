@@ -10,6 +10,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   UnauthorizedException,
@@ -18,7 +19,11 @@ import {
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiCookieAuth,
+  ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiOperation,
   ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -29,6 +34,8 @@ import { CurrentAccount } from '../decorators/current-account.decorator';
 import { LogoutRequestDto } from '../dto/logout-request.dto';
 import { LogoutResponseDto } from '../dto/logout-response.dto';
 import { MeResponseDto } from '../dto/me-response.dto';
+import { ChangePasswordRequestDto } from '../dto/change-password-request.dto';
+import { UpdateMeRequestDto } from '../dto/update-me-request.dto';
 import { processLogout } from '../services/supertokens.service';
 import { AccountsService } from '../../accounts/services/accounts.service';
 import type { AccountContext } from '../../accounts/services/accounts.service';
@@ -78,6 +85,78 @@ export class AuthController {
       patientProfileId: account.patientProfileId,
       professionalProfileIds: account.professionalProfileIds,
     };
+  }
+
+  @Patch('me')
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Atualiza os dados da conta atual' })
+  @ApiBody({ type: UpdateMeRequestDto })
+  @ApiOkResponse({ type: MeResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um e-mail válido.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Não é permitido alterar o papel da conta.',
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'EMAIL_ALREADY_EXISTS',
+      message: 'Este e-mail já está cadastrado.',
+    },
+  })
+  async updateMe(
+    @CurrentAccount() account: AccountContext,
+    @Body() body: UpdateMeRequestDto,
+  ): Promise<MeResponseDto> {
+    return this.accountsService.updateMe(account, body);
+  }
+
+  @Post('me/password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Altera a senha da conta atual' })
+  @ApiBody({ type: ChangePasswordRequestDto })
+  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      validation: {
+        summary: 'Política de senha',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'A senha deve conter pelo menos 8 caracteres.',
+        },
+      },
+      currentPassword: {
+        summary: 'Senha atual inválida',
+        value: {
+          status: 'INVALID_CURRENT_PASSWORD',
+          message: 'A senha atual está incorreta.',
+        },
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Operação não permitida.',
+    },
+  })
+  async changePassword(
+    @CurrentAccount() account: AccountContext,
+    @Body() body: ChangePasswordRequestDto,
+  ): Promise<LogoutResponseDto> {
+    return this.accountsService.changePassword(account, body);
   }
 
   @Post('auth/logout')
