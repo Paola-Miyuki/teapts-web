@@ -84,10 +84,13 @@ src/
     enums/account-role.enum.ts             account_role_e
   professionals/
     controllers/professionals.controller.ts    GET /professionals protegido por sessão
-    services/professionals.service.ts          erro seguro, contrato e paginação
-    repositories/professionals.repository.ts   query com filtros e paginação
-    dto/                                       contratos e validação da consulta
-    entities/professional.entity.ts
+                                               e POST /professionals, só admin
+    services/professionals.service.ts          consulta (erro seguro, contrato e paginação)
+                                               e cadastro do perfil profissional
+    repositories/professionals.repository.ts   query com filtros e paginação; gravação
+                                               do perfil
+    dto/                                       contratos e validação da consulta e do cadastro
+    entities/professional.entity.ts            unique (accountId, specialism)
     enums/specialism.enum.ts                   specialism_e
   patients/
     controllers/patients.controller.ts         GET /patients/authorized protegido por sessão
@@ -192,12 +195,52 @@ salvos sem espaços externos, e campos opcionais vazios são descartados.
 
 Responde `201` com `{ accountId, supportContacts }`. Os erros possíveis são
 `400` (`VALIDATION_ERROR`, com a mensagem do campo), `401` (sem sessão), `403`
-(`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`), `409`
-(`PATIENT_PROFILE_ALREADY_EXISTS`, também em pedidos simultâneos) e `500`
-(`Não foi possível cadastrar o perfil de paciente.`).
+(`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`), `409` e `500`
+(`Não foi possível cadastrar o perfil de paciente.`). O `409` sai, nesta ordem
+de checagem, com:
+
+- `ADMIN_ACCOUNT_NOT_ALLOWED`: conta de administrador;
+- `ACCOUNT_HAS_PROFESSIONAL_PROFILE`: conta que já tem perfil profissional
+  (admin, paciente e profissional usam contas separadas, RFPAC001.E04);
+- `PATIENT_PROFILE_ALREADY_EXISTS`: conta que já tem perfil de paciente,
+  também em pedidos simultâneos.
 
 O `patientProfileId` da sessão vem do access token: a conta que recebeu o
 perfil só aparece como paciente depois de um novo login.
+
+## POST /professionals
+
+Exige sessão autenticada com papel `admin` e cria um perfil profissional para
+uma conta de usuário comum (RFPRO002). Uma conta pode ter vários perfis
+profissionais, um por especialidade (RN002).
+
+Corpo:
+
+```json
+{ "accountId": "0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b", "specialism": "psychologist" }
+```
+
+`accountId` é um UUID, e `specialism` é `psychologist`, `doctor` ou
+`physiotherapist` (`specialism_e`).
+
+Responde `201` com `{ id, accountId, name, email, specialism: { id, name },
+deactivatedAt }`; `specialism` tem o mesmo formato do `GET /professionals`, e
+`deactivatedAt` é sempre `null` até a desativação (RFPRO004) existir. Os erros
+possíveis são `400` (`VALIDATION_ERROR`, com a mensagem do campo), `401` (sem
+sessão), `403` (`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`), `409` e `500`
+(`Não foi possível cadastrar o perfil profissional.`). O `409` sai, nesta
+ordem de checagem, com:
+
+- `ADMIN_ACCOUNT_NOT_ALLOWED`: conta de administrador;
+- `ACCOUNT_HAS_PATIENT_PROFILE`: conta que já tem perfil de paciente;
+- `PROFESSIONAL_PROFILE_ALREADY_EXISTS`: conta que já tem perfil com a mesma
+  especialidade. A restrição única `UQ_professional_account_specialism`
+  (`accountId`, `specialism`) garante a regra também em pedidos simultâneos.
+
+A regra entre paciente e profissional fica só na aplicação: um `POST
+/patients` e um `POST /professionals` simultâneos na mesma conta podem passar
+os dois. Os `professionalProfileIds` da sessão vêm do access token: a conta
+que recebeu o perfil só aparece como profissional depois de um novo login.
 
 ## Documentação da API
 
