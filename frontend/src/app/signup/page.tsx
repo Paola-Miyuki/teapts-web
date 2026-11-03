@@ -242,7 +242,7 @@ export default function SignupPage() {
                   aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   aria-pressed={showPassword}
                 >
-                  <Icon name="eye" />
+                  <Icon name={showPassword ? 'eye' : 'eyeClosed'} />
                 </button>
               </div>
               <div className={styles.requirements}>
@@ -301,7 +301,7 @@ export default function SignupPage() {
                   }
                   aria-pressed={showConfirmPassword}
                 >
-                  <Icon name="eye" />
+                  <Icon name={showConfirmPassword ? 'eye' : 'eyeClosed'} />
                 </button>
               </div>
             </div>
