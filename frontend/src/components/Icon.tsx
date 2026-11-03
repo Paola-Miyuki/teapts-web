@@ -25,6 +25,12 @@ const glyphs = {
     </>
   ),
   logout: <path d="M9 3H4v18h5M10 12h11m-4-4 4 4-4 4" />,
+  profile: (
+    <>
+      <circle cx="12" cy="7" r="4" />
+      <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+    </>
+  ),
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
@@ -41,6 +47,12 @@ const glyphs = {
     <>
       <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
       <circle cx="12" cy="12" r="2.5" />
+    </>
+  ),
+  eyeClosed: (
+    <>
+      <path d="M3 12c2.5 2.5 5.5 3.75 9 3.75s6.5-1.25 9-3.75" />
+      <path d="M7 14.5 5.5 17M12 15.75V18M17 14.5l1.5 2.5" />
     </>
   ),
   eyeOff: (

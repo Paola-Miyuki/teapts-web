@@ -1,6 +1,7 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   CreateDraftInput,
@@ -107,6 +108,37 @@ export class InMemoryPtsRepository extends PtsRepository {
     patientId: string,
   ): Promise<ActivePtsResponseDto | null> {
     return this.activePts.find((pts) => pts.patient.id === patientId) ?? null;
+  }
+
+  async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
+    return (
+      (this.created.find((proposal) => proposal.id === id) as
+        PtsProposalResponseDto | undefined) ?? null
+    );
+  }
+
+  async updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto> {
+    const proposal = await this.findProposalById(input.id);
+
+    if (!proposal) {
+      throw new Error('Proposta não encontrada.');
+    }
+
+    if (input.socialSituation !== undefined) {
+      proposal.socialSituation = input.socialSituation;
+    }
+
+    if (input.teamProfessionalIds !== undefined) {
+      proposal.team = input.teamProfessionalIds.map((professionalId) => ({
+        id: professionalId,
+        name: `Membro ${professionalId}`,
+        specialism: { id: 'default', name: 'Geral' },
+      }));
+    }
+
+    return proposal;
   }
 
   async findSocialSituationTarget(

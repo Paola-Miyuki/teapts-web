@@ -29,6 +29,12 @@ export interface FindPtsProposalsResult {
   total: number;
 }
 
+export interface UpdatePtsProposalInput {
+  id: string;
+  socialSituation?: string;
+  teamProfessionalIds?: string[];
+}
+
 export interface SocialSituationTarget {
   id: string;
   status: string;
@@ -59,6 +65,12 @@ export abstract class PtsRepository {
   abstract findActivePtsByPatientId(
     patientId: string,
   ): Promise<ActivePtsResponseDto | null>;
+
+  abstract findProposalById(id: string): Promise<PtsProposalResponseDto | null>;
+
+  abstract updateDraftProposal(
+    input: UpdatePtsProposalInput,
+  ): Promise<PtsProposalResponseDto>;
 
   abstract findSocialSituationTarget(
     id: string,

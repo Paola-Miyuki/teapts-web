@@ -1,0 +1,155 @@
+.main {
+  width: 100%;
+  max-width: 1080px;
+}
+
+.card {
+  width: 100%;
+  padding: 36px;
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.personBanner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 104px;
+  margin: -4px -4px 0;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  background: var(--bg);
+}
+
+.avatar {
+  width: 58px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.personBanner h2 {
+  margin: 0 0 7px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.personBanner p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  padding: 32px 0;
+}
+
+.details dt {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.detailsEdit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 26px 0 2px;
+}
+
+.note {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-start;
+  margin-top: 30px;
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
+}
+
+.passwordIntro {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.passwordFields {
+  display: grid;
+  gap: 18px;
+}
+
+.passwordRequirements {
+  margin-top: 10px;
+}
+
+.feedback {
+  margin-bottom: 20px;
+}
+
+.load {
+  min-height: 180px;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 24px 18px;
+  }
+
+  .personBanner {
+    margin-inline: -2px;
+    padding-inline: 16px;
+  }
+
+  .details,
+  .detailsEdit {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .actions > * {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}

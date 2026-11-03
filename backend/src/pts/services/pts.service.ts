@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
+import type { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
 import type { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import type {
   GetPtsProposalsResponseDto,
@@ -19,15 +20,17 @@ import {
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
+  ptsProposalEditForbidden,
   ptsProposalForbidden,
+  ptsProposalNotDraft,
   ptsProposalNotFound,
   activePtsForbidden,
   activePtsNotFound,
+  ptsNotActive,
   ptsNotFound,
   socialSituationForbidden,
-  ptsNotActive,
-  validationError,
   teamProfessionalNotFound,
+  validationError,
 } from '../pts.errors';
 
 @Injectable()
@@ -182,6 +185,66 @@ export class PtsService {
     }
 
     return activePts;
+  }
+
+  async updatePtsProposal(
+    id: string,
+    dto: UpdatePtsProposalRequestDto,
+    account: AccountContext,
+  ): Promise<PtsProposalResponseDto> {
+    if (
+      dto.socialSituation === undefined &&
+      dto.teamProfessionalIds === undefined
+    ) {
+      throw validationError([
+        {
+          field: 'body',
+          message:
+            'Informe socialSituation e/ou teamProfessionalIds para editar a proposta.',
+        },
+      ]);
+    }
+
+    const proposal = await this.ptsRepository.findProposalById(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (!account.professionalProfileIds.includes(proposal.responsible.id)) {
+      throw ptsProposalEditForbidden();
+    }
+
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotDraft();
+    }
+
+    let teamProfessionalIds: string[] | undefined;
+
+    if (dto.teamProfessionalIds !== undefined) {
+      teamProfessionalIds = [...new Set(dto.teamProfessionalIds)].filter(
+        (professionalId) => professionalId !== proposal.responsible.id,
+      );
+
+      const existingIds =
+        await this.ptsRepository.findExistingProfessionalIds(
+          teamProfessionalIds,
+        );
+      const existingIdSet = new Set(existingIds);
+      const missingIds = teamProfessionalIds.filter(
+        (professionalId) => !existingIdSet.has(professionalId),
+      );
+
+      if (missingIds.length > 0) {
+        throw teamProfessionalNotFound(missingIds);
+      }
+    }
+
+    return this.ptsRepository.updateDraftProposal({
+      id,
+      socialSituation: dto.socialSituation,
+      teamProfessionalIds,
+    });
   }
 
   async updateSocialSituation(

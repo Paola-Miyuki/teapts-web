@@ -17,7 +17,13 @@ import ui from './ui.module.css';
 type AuthenticatedPageProps = {
   currentHref: string;
   breadcrumb?: string | ((kind: ProfileKind) => string | undefined);
-  children: ReactNode | ((account: Account, kind: ProfileKind) => ReactNode);
+  children:
+    | ReactNode
+    | ((
+        account: Account,
+        kind: ProfileKind,
+        updateAccount: (account: Account) => void,
+      ) => ReactNode);
 };
 
 // Carrega a conta e envolve a página na estrutura padrão (barra lateral e cabeçalho).
@@ -26,7 +32,7 @@ export default function AuthenticatedPage({
   breadcrumb,
   children,
 }: AuthenticatedPageProps) {
-  const { account, error, retry } = useAccount();
+  const { account, error, retry, updateAccount } = useAccount();
 
   if (error) {
     return (
@@ -49,6 +55,7 @@ export default function AuthenticatedPage({
   if (!account) {
     return (
       <div className={styles.status} role="status">
+        <span className={styles.loader} aria-hidden="true" />
         <p>Carregando sua conta...</p>
       </div>
     );
@@ -62,11 +69,14 @@ export default function AuthenticatedPage({
       roleLabel={ROLE_LABELS[kind]}
       navCaption={isPatientArea(kind) ? 'Meu cuidado' : 'Área de trabalho'}
       navItems={getNavigation(kind, currentHref)}
+      currentHref={currentHref}
       breadcrumb={
         typeof breadcrumb === 'function' ? breadcrumb(kind) : breadcrumb
       }
     >
-      {typeof children === 'function' ? children(account, kind) : children}
+      {typeof children === 'function'
+        ? children(account, kind, updateAccount)
+        : children}
     </AppShell>
   );
 }

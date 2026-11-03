@@ -15,6 +15,34 @@ export function getMe() {
   return request<Account>('/me');
 }
 
+export type UpdateAccountInput = {
+  name?: string;
+  email?: string;
+};
+
+// PATCH /me: atualiza somente os campos informados da conta atual.
+export function updateMe(input: UpdateAccountInput) {
+  return request<Account>('/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+// POST /me/password: troca a senha pelo provedor de autenticação.
+export function changePassword(input: ChangePasswordInput) {
+  return request<{ status: 'OK' }>('/me/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
 export type ProfileKind = 'admin' | 'professional' | 'patient' | 'waiting';
 
 export type NavItem = {
