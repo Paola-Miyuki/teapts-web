@@ -288,10 +288,10 @@
 
 /* Alerta de Sucesso */
 .alertSuccess {
-  border-color: #bbf7d0 !important;
-  border-left: 4px solid #16a34a !important;
-  background-color: #f0fdf4 !important;
-  color: #14532d !important;
+  border-color: var(--success-border) !important;
+  border-left: 4px solid var(--success-strong) !important;
+  background-color: var(--success-soft) !important;
+  color: var(--success-text) !important;
 }
 
 /* Crachá circular para o ícone */
@@ -302,8 +302,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background-color: #dcfce7;
-  color: #15803d;
+  background-color: color-mix(in oklch, var(--success) 18%, white);
+  color: var(--success-strong);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -316,16 +316,16 @@
 
 /* Alerta de Erro / Falha */
 .alertError {
-  border-color: #fecaca !important;
-  border-left: 4px solid #dc2626 !important;
-  background-color: #fef2f2 !important;
-  color: #991b1b !important;
+  border-color: var(--danger-border-strong) !important;
+  border-left: 4px solid var(--danger-strong) !important;
+  background-color: var(--danger-soft-strong) !important;
+  color: var(--danger-text) !important;
 }
 
 /* Badge circular para ícone de erro */
 .alertIconError {
-  background-color: #fee2e2;
-  color: #dc2626;
+  background-color: color-mix(in oklch, var(--danger) 18%, white);
+  color: var(--danger-strong);
 }
 
 @keyframes alertSlideIn {
