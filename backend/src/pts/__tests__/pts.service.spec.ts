@@ -398,7 +398,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 });
 
-describe('PtsService.findDraftProposalById', () => {
+describe('PtsService.updatePtsProposal', () => {
   let repo: InMemoryPtsRepository;
   let service: PtsService;
 
@@ -407,102 +407,234 @@ describe('PtsService.findDraftProposalById', () => {
     service = new PtsService(repo);
   });
 
-  describe('PtsService.updateSocialSituation', () => {
-    let repo: InMemoryPtsRepository;
-    let service: PtsService;
+  const createDraft = async () => {
+    const proposal = await service.createPts(body, 'acc-1');
+    proposal.patient.id = 'acc-patient-25';
+    return proposal;
+  };
 
-    beforeEach(() => {
-      repo = seededRepo();
-      service = new PtsService(repo);
-      repo.socialSituationTargets.set('pts-100', {
-        id: 'pts-100',
-        status: PtsStateEnum.PLANNING,
-        responsibleProfessionalId: 'prof-10',
-        teamProfessionalIds: ['prof-11'],
-      });
-    });
+  it('permite ao responsável editar a situação social e a equipe', async () => {
+    const proposal = await createDraft();
 
-    it('permite ao responsável atualizar a situação social do PTS ativo', async () => {
-      await expect(
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: 'Situação social atualizada.' },
-          responsibleAccount,
-        ),
-      ).resolves.toEqual({
-        id: 'pts-100',
+    const result = await service.updatePtsProposal(
+      proposal.id,
+      {
         socialSituation: 'Situação social atualizada.',
-      });
-    });
+        teamProfessionalIds: ['prof-11', 'prof-11', 'prof-10'],
+      },
+      responsibleAccount,
+    );
 
-    it('permite que um membro da equipe atualize a situação social', async () => {
-      await expect(
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: 'Atualização feita pela equipe.' },
+    expect(result).toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.DRAFT,
+      socialSituation: 'Situação social atualizada.',
+      team: [{ id: 'prof-11' }],
+    });
+  });
+
+  it('permite editar somente a situação social', async () => {
+    const proposal = await createDraft();
+
+    const result = await service.updatePtsProposal(
+      proposal.id,
+      { socialSituation: 'Nova situação social.' },
+      responsibleAccount,
+    );
+
+    expect(result.socialSituation).toBe('Nova situação social.');
+    expect(result.team).toHaveLength(2);
+  });
+
+  it('permite substituir a equipe por uma lista vazia', async () => {
+    const proposal = await createDraft();
+
+    const result = await service.updatePtsProposal(
+      proposal.id,
+      { teamProfessionalIds: [] },
+      responsibleAccount,
+    );
+
+    expect(result.team).toEqual([]);
+  });
+
+  it('rejeita edição por integrante da equipe', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          proposal.id,
+          { socialSituation: 'Alteração indevida.' },
           teamAccount,
         ),
-      ).resolves.toMatchObject({ id: 'pts-100' });
+      403,
+      'PTS_PROPOSAL_EDIT_FORBIDDEN',
+    );
+  });
+
+  it('rejeita edição de proposta que não está em DRAFT', async () => {
+    const proposal = await createDraft();
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          proposal.id,
+          { socialSituation: 'Não deve alterar.' },
+          responsibleAccount,
+        ),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+  });
+
+  it('rejeita profissional inexistente na equipe', async () => {
+    const proposal = await createDraft();
+
+    const response = await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          proposal.id,
+          { teamProfessionalIds: ['prof-404'] },
+          responsibleAccount,
+        ),
+      400,
+      'TEAM_PROFESSIONAL_NOT_FOUND',
+    );
+
+    expect(response.professionalIds).toEqual(['prof-404']);
+  });
+
+  it('rejeita edição sem nenhum campo', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => service.updatePtsProposal(proposal.id, {}, responsibleAccount),
+      400,
+      'VALIDATION_ERROR',
+    );
+  });
+
+  it('retorna 404 quando a proposta não existe', async () => {
+    await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          'proposal-404',
+          { socialSituation: 'Nova situação.' },
+          responsibleAccount,
+        ),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+});
+
+describe('PtsService.updateSocialSituation', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+    repo.socialSituationTargets.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.PLANNING,
+      responsibleProfessionalId: 'prof-10',
+      teamProfessionalIds: ['prof-11'],
+    });
+  });
+
+  it('permite ao responsável atualizar a situação social do PTS ativo', async () => {
+    await expect(
+      service.updateSocialSituation(
+        'pts-100',
+        { socialSituation: 'Situação social atualizada.' },
+        responsibleAccount,
+      ),
+    ).resolves.toEqual({
+      id: 'pts-100',
+      socialSituation: 'Situação social atualizada.',
+    });
+  });
+
+  it('permite que um membro da equipe atualize a situação social', async () => {
+    await expect(
+      service.updateSocialSituation(
+        'pts-100',
+        { socialSituation: 'Atualização feita pela equipe.' },
+        teamAccount,
+      ),
+    ).resolves.toMatchObject({ id: 'pts-100' });
+  });
+
+  it('rejeita profissional sem vínculo com o PTS', async () => {
+    await expectApiError(
+      () =>
+        service.updateSocialSituation(
+          'pts-100',
+          { socialSituation: 'Alteração indevida.' },
+          otherProfessionalAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('rejeita PTS fora de PLANNING ou RUNNING', async () => {
+    repo.socialSituationTargets.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.DRAFT,
+      responsibleProfessionalId: 'prof-10',
+      teamProfessionalIds: ['prof-11'],
     });
 
-    it('rejeita profissional sem vínculo com o PTS', async () => {
-      await expectApiError(
-        () =>
-          service.updateSocialSituation(
-            'pts-100',
-            { socialSituation: 'Alteração indevida.' },
-            otherProfessionalAccount,
-          ),
-        403,
-        'FORBIDDEN',
-      );
-    });
+    await expectApiError(
+      () =>
+        service.updateSocialSituation(
+          'pts-100',
+          { socialSituation: 'Não deve alterar.' },
+          responsibleAccount,
+        ),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+  });
 
-    it('rejeita PTS fora de PLANNING ou RUNNING', async () => {
-      repo.socialSituationTargets.set('pts-100', {
-        id: 'pts-100',
-        status: PtsStateEnum.DRAFT,
-        responsibleProfessionalId: 'prof-10',
-        teamProfessionalIds: ['prof-11'],
-      });
+  it('rejeita situação social vazia', async () => {
+    await expectApiError(
+      () =>
+        service.updateSocialSituation(
+          'pts-100',
+          { socialSituation: '   ' },
+          responsibleAccount,
+        ),
+      400,
+      'VALIDATION_ERROR',
+    );
+  });
 
-      await expectApiError(
-        () =>
-          service.updateSocialSituation(
-            'pts-100',
-            { socialSituation: 'Não deve alterar.' },
-            responsibleAccount,
-          ),
-        409,
-        'PTS_NOT_ACTIVE',
-      );
-    });
+  it('retorna 404 quando o PTS não existe', async () => {
+    await expectApiError(
+      () =>
+        service.updateSocialSituation(
+          'pts-404',
+          { socialSituation: 'Nova situação.' },
+          responsibleAccount,
+        ),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+});
 
-    it('rejeita situação social vazia', async () => {
-      await expectApiError(
-        () =>
-          service.updateSocialSituation(
-            'pts-100',
-            { socialSituation: '   ' },
-            responsibleAccount,
-          ),
-        400,
-        'VALIDATION_ERROR',
-      );
-    });
+describe('PtsService.findDraftProposalById', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
 
-    it('retorna 404 quando o PTS não existe', async () => {
-      await expectApiError(
-        () =>
-          service.updateSocialSituation(
-            'pts-404',
-            { socialSituation: 'Nova situação.' },
-            responsibleAccount,
-          ),
-        404,
-        'PTS_NOT_FOUND',
-      );
-    });
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
   });
 
   it('permite que o paciente consulte sua própria proposta', async () => {

@@ -3,9 +3,9 @@ import {
   Body,
   Controller,
   Get,
-  Patch,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -30,15 +30,16 @@ import {
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
-import {
-  UpdateSocialSituationRequestDto,
-  UpdateSocialSituationResponseDto,
-} from '../dto/update-social-situation.dto';
 import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
 } from '../dto/pts-proposal-response.dto';
+import { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
+import {
+  UpdateSocialSituationRequestDto,
+  UpdateSocialSituationResponseDto,
+} from '../dto/update-social-situation.dto';
 import { PtsService } from '../services/pts.service';
 
 const parseProposalId = new ParseUUIDPipe({
@@ -97,6 +98,24 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.findDraftProposalById(id, account);
+  }
+
+  @Patch('proposals/:id')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: PtsProposalResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiConflictResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async updateProposal(
+    @Param('id', parseProposalId) id: string,
+    @Body() dto: UpdatePtsProposalRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.updatePtsProposal(id, dto, account);
   }
 
   @Patch(':id/social-situation')
