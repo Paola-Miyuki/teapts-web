@@ -1,5 +1,5 @@
 // Este arquivo valida o contrato HTTP da listagem de contas, incluindo o
-// ValidationPipe global e a restrição ao administrador.
+// ValidationPipe global, a busca `q` e a restrição ao administrador.
 
 import { jest } from '@jest/globals';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
@@ -34,7 +34,9 @@ describe('GET /accounts', () => {
     };
     accountsService = {
       findAll: jest.fn(async () => ({
-        data: [{ id: 'account-1', name: 'Maria Silva' }],
+        data: [
+          { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        ],
         pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
       })),
     };
@@ -76,7 +78,9 @@ describe('GET /accounts', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      data: [{ id: 'account-1', name: 'Maria Silva' }],
+      data: [
+        { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+      ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });
     expect(accountsService.findAll).toHaveBeenCalledWith(
@@ -91,6 +95,45 @@ describe('GET /accounts', () => {
       page: 1,
       limit: 20,
     });
+  });
+
+  it('passes the trimmed search with the filters to the service', async () => {
+    await request(app.getHttpServer())
+      .get('/accounts')
+      .query({ q: '  mari  ', isPatient: 'true', page: '2' })
+      .expect(200);
+
+    expect(accountsService.findAll).toHaveBeenCalledWith({
+      q: 'mari',
+      isPatient: true,
+      page: 2,
+      limit: 20,
+    });
+  });
+
+  it('lists without search when q has only spaces', async () => {
+    await request(app.getHttpServer())
+      .get('/accounts')
+      .query({ q: '   ' })
+      .expect(200);
+
+    expect(accountsService.findAll).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+    });
+  });
+
+  it('returns 400 ERROR for an invalid search without calling the service', async () => {
+    const response = await request(app.getHttpServer()).get(
+      '/accounts?q=mari&q=ana',
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'ERROR',
+      message: 'Parâmetro inválido: q',
+    });
+    expect(accountsService.findAll).not.toHaveBeenCalled();
   });
 
   it('returns 400 ERROR for an invalid filter without calling the service', async () => {

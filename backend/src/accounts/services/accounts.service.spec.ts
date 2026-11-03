@@ -298,14 +298,22 @@ describe('AccountsService', () => {
 
   describe('findAll', () => {
     it('passes the filters and returns only the public summary', async () => {
-      const request = { page: 2, limit: 20, isPatient: false };
+      const request = { page: 2, limit: 20, isPatient: false, q: 'mari' };
       accountsRepository.findPaginated.mockResolvedValue({
-        rows: [{ account_id: 'account-1', account_name: 'Maria Silva' }],
+        rows: [
+          {
+            account_id: 'account-1',
+            account_name: 'Maria Silva',
+            account_email: 'maria@exemplo.com',
+          },
+        ],
         total: 21,
       });
 
       await expect(service.findAll(request)).resolves.toEqual({
-        data: [{ id: 'account-1', name: 'Maria Silva' }],
+        data: [
+          { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        ],
         pagination: { page: 2, limit: 20, total: 21, totalPages: 2 },
       });
       expect(accountsRepository.findPaginated).toHaveBeenCalledWith(request);

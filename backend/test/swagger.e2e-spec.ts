@@ -319,11 +319,17 @@ describe('Swagger (e2e)', () => {
     },
   );
 
-  it('documents the optional GET /accounts filters', async () => {
+  it('documents the optional GET /accounts search and filters', async () => {
     const parameters = (await getDocument()).paths['/accounts'].get.parameters;
     const byName = Object.fromEntries(
       (parameters ?? []).map((parameter) => [parameter.name, parameter]),
     );
+
+    expect(byName.q).toMatchObject({
+      required: false,
+      description: expect.stringContaining('e-mail'),
+      schema: { type: 'string' },
+    });
 
     expect(byName.isPatient).toMatchObject({
       required: false,
@@ -333,6 +339,16 @@ describe('Swagger (e2e)', () => {
       required: false,
       schema: { type: 'boolean' },
     });
+  });
+
+  it('returns the email of each GET /accounts item', async () => {
+    const { components } = await getDocument();
+
+    expect(components.schemas.AccountSummaryResponseDto.required).toEqual([
+      'id',
+      'name',
+      'email',
+    ]);
   });
 
   it('lists the three POST /patients conflicts', async () => {

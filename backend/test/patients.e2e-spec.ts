@@ -136,21 +136,34 @@ describe('patient profile (e2e)', () => {
   it('lists the accounts without a patient profile to an admin', async () => {
     signIn('admin');
     accountsRepository.findPaginated.mockResolvedValue({
-      rows: [{ account_id: accountId, account_name: 'João Martins' }],
+      rows: [
+        {
+          account_id: accountId,
+          account_name: 'João Martins',
+          account_email: 'joao@exemplo.com',
+        },
+      ],
       total: 1,
     });
 
     const response = await request(app.getHttpServer())
       .get('/accounts')
-      .query({ isPatient: 'false', page: 1, limit: 20 });
+      .query({ isPatient: 'false', q: ' joão ', page: 1, limit: 20 });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      data: [{ id: accountId, name: 'João Martins' }],
+      data: [
+        { id: accountId, name: 'João Martins', email: 'joao@exemplo.com' },
+      ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });
     expect(accountsRepository.findPaginated).toHaveBeenCalledWith(
-      expect.objectContaining({ isPatient: false, page: 1, limit: 20 }),
+      expect.objectContaining({
+        isPatient: false,
+        q: 'joão',
+        page: 1,
+        limit: 20,
+      }),
     );
   });
 
@@ -180,6 +193,15 @@ describe('patient profile (e2e)', () => {
 
     expect(response.status).toBe(401);
     expect(patientsRepository.insert).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 to GET /accounts without a session', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/accounts')
+      .query({ q: 'joão' });
+
+    expect(response.status).toBe(401);
+    expect(accountsRepository.findPaginated).not.toHaveBeenCalled();
   });
 
   it.each([

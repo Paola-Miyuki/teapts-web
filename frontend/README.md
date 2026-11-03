@@ -59,14 +59,23 @@ src/
       page.tsx             tela de login (EmailPassword.signIn)
       login.module.css     estilos da tela
       page.test.tsx        testes da tela
-    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) e modal "Adicionar paciente"
-      _components/         PatientList, AddPatientModal/AddPatientForm (GET /accounts?isPatient=false e
-                           POST /patients), SupportContactFields/SupportContactList e AdminOnly
+    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) com busca por nome ou
+                           e-mail (termo em /patients?q=) e modal "Adicionar paciente"
+      _components/         PatientSearch e PatientList (busca `q`, página 1 ao mudar o termo, resultados
+                           anteriores mantidos no carregamento), AddPatientModal/AddPatientForm,
+                           AccountCombobox (combobox ARIA da conta: GET /accounts?isPatient=false&
+                           isProfessional=false&q=; POST /patients), SupportContactFields/SupportContactList
+                           e AdminOnly
+  hooks/
+    useAccount.ts          GET /me da sessão
+    useDebouncedSearch.ts  busca da NFUS003: debounce de 300 ms, trim, mínimo de 2 caracteres, Enter
+                           busca na hora, clear(); use nas telas com busca por texto
   lib/
     supertokens.ts         initSuperTokens(): configura o SDK uma vez
     api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
     account.ts             GET /me e menu por perfil (o admin tem "Pacientes")
-    patients.ts            contas com e sem perfil de paciente, cadastro do perfil e isValidPhone
+    patients.ts            contas com perfil de paciente e sem perfil de paciente nem profissional (com `q` e
+                           `signal` para cancelar), cadastro do perfil e isValidPhone
 design/                    layouts de referência (HTML estático)
 public/                    arquivos servidos na raiz do site
 ```

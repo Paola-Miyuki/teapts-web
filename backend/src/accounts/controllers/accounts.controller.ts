@@ -32,8 +32,9 @@ export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
   /**
-   * Retorna as contas (id e nome) paginadas, com filtros opcionais de perfil
-   * de paciente e de perfil profissional.
+   * Retorna as contas de usuário (id, nome e e-mail) paginadas, com a busca
+   * `q` por nome ou e-mail e os filtros opcionais de perfil de paciente e de
+   * perfil profissional. Contas de admin nunca aparecem.
    *
    * @param query parâmetros já normalizados
    * @returns contas e dados de paginação

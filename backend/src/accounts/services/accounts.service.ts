@@ -229,7 +229,8 @@ export class AccountsService {
   }
 
   /**
-   * Lista as contas (id e nome) para seleção, com filtros opcionais.
+   * Lista as contas de usuário (id, nome e e-mail) para seleção, com a busca
+   * e os filtros opcionais.
    *
    * @param request filtros e paginação já validados pelo ValidationPipe
    * @returns contas da página pedida e metadados da paginação
@@ -255,6 +256,7 @@ export class AccountsService {
       data: page.rows.map((row) => ({
         id: row.account_id,
         name: row.account_name,
+        email: row.account_email,
       })),
       pagination: toPagination(request, page.total),
     };

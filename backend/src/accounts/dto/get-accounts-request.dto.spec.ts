@@ -1,5 +1,5 @@
 // Este arquivo testa a validação e a normalização da query da listagem de
-// contas: filtros booleanos opcionais e paginação herdada.
+// contas: busca `q`, filtros booleanos opcionais e paginação herdada.
 
 import { BadRequestException } from '@nestjs/common';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
@@ -31,6 +31,25 @@ describe('GetAccountsRequestDto', () => {
     });
   });
 
+  it.each([
+    [{ q: 'mari' }, { q: 'mari' }],
+    [{ q: '  Maria Silva  ' }, { q: 'Maria Silva' }],
+    [{ q: '' }, {}],
+    [{ q: '   ' }, {}],
+  ])('normalizes the search %j', async (query, expected) => {
+    await expect(normalize(query)).resolves.toEqual({
+      page: 1,
+      limit: 20,
+      ...expected,
+    });
+  });
+
+  it('combines the search with the profile filters', async () => {
+    await expect(
+      normalize({ q: ' mari ', isPatient: 'true', page: '2' }),
+    ).resolves.toEqual({ q: 'mari', isPatient: true, page: 2, limit: 20 });
+  });
+
   it('inherits the shared pagination', async () => {
     await expect(
       normalize({ isPatient: 'false', page: '2', limit: '50' }),
@@ -42,6 +61,7 @@ describe('GetAccountsRequestDto', () => {
     ['isPatient', { isPatient: '1' }],
     ['isProfessional', { isProfessional: 'TRUE ' }],
     ['limit', { limit: '51' }],
+    ['q', { q: ['mari', 'ana'] }],
   ])('rejects an invalid %s parameter', async (parameter, query) => {
     const error: unknown = await normalize(query).catch((e: unknown) => e);
 

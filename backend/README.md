@@ -78,7 +78,7 @@ src/
     controllers/accounts.controller.ts     GET /accounts, só admin
     services/accounts.service.ts           cria a conta no signup, monta o contexto da sessão
                                            e lista as contas
-    repositories/accounts.repository.ts    query da listagem com filtros e paginação
+    repositories/accounts.repository.ts    query da listagem (só contas user) com busca, filtros e paginação
     dto/                                   contratos e validação da listagem
     entities/account.entity.ts
     enums/account-role.enum.ts             account_role_e
@@ -169,11 +169,16 @@ beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
 
 ## GET /accounts
 
-Exige sessão autenticada com papel `admin` e lista as contas para escolher a
-conta (ex.: no cadastro de perfil de paciente), ordenadas por nome.
+Exige sessão autenticada com papel `admin` e lista as contas de usuário para
+escolher a conta (ex.: no cadastro de perfil de paciente ou profissional),
+ordenadas por nome. Contas de admin nunca aparecem, porque não recebem perfil
+de paciente nem profissional (RN002).
 
 Parâmetros de query:
 
+- `q`: busca parcial por nome ou e-mail, sem diferenciar maiúsculas; os espaços
+  externos são removidos, `%`, `_` e `\` valem como texto e vazio equivale a
+  sem busca; opcional;
 - `isPatient`: `true` só contas com perfil de paciente, `false` só contas sem;
   opcional;
 - `isProfessional`: `true` só contas com perfil profissional, `false` só
@@ -181,8 +186,10 @@ Parâmetros de query:
 - `page`: página, padrão `1`, mínimo `1`;
 - `limit`: quantidade por página, padrão `20`, mínimo `1` e máximo `50`.
 
-Sem filtros, lista todas as contas. A resposta contém `{ data: [{ id, name }],
-pagination: { page, limit, total, totalPages } }`. Os erros possíveis são
+A busca e os filtros se combinam e entram antes da paginação, então o `total`
+já vem filtrado. Sem busca nem filtros, lista todas as contas de usuário. A
+resposta contém `{ data: [{ id, name, email }], pagination: { page, limit,
+total, totalPages } }`. Os erros possíveis são
 `400` (`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem
 sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 (`Não foi possível consultar as contas.`).

@@ -8,61 +8,81 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { getPatientAccounts, type AccountsResponse } from '@/lib/patients';
 import styles from '../patients.module.css';
+import AdminOnly from './AdminOnly';
 
 const PAGE_LIMIT = 10;
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase();
 }
 
 type PatientListProps = {
+  // Termo de busca efetivo (já com debounce, trim e mínimo de 2 caracteres).
+  term: string;
   onAdd: () => void;
+  onClearSearch: () => void;
 };
 
-export default function PatientList({ onAdd }: PatientListProps) {
+export default function PatientList({
+  term,
+  onAdd,
+  onClearSearch,
+}: PatientListProps) {
   const router = useRouter();
 
-  const [page, setPage] = useState(1);
+  // Mudar o termo volta à página 1, sem precisar de efeito extra.
+  const [pageState, setPageState] = useState({ term, page: 1 });
+  const page = pageState.term === term ? pageState.page : 1;
   const [retryKey, setRetryKey] = useState(0);
-  // null = carregando.
-  const [result, setResult] = useState<AccountsResponse | null>(null);
-  const [error, setError] = useState(false);
+
+  // Cada consulta tem uma chave; a resposta e o erro guardam a chave de
+  // origem. Assim a lista anterior continua na tela enquanto a nova carrega.
+  const key = `${term}\n${page}\n${retryKey}`;
+  const [last, setLast] = useState<{
+    key: string;
+    term: string;
+    response: AccountsResponse;
+  } | null>(null);
+  const [failure, setFailure] = useState<{
+    key: string;
+    error: unknown;
+  } | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    getPatientAccounts(page, PAGE_LIMIT)
+    getPatientAccounts(page, PAGE_LIMIT, { q: term, signal: controller.signal })
       .then((response) => {
-        if (!cancelled) {
-          setResult(response);
+        if (!controller.signal.aborted) {
+          setLast({ key, term, response });
         }
       })
-      .catch((reason: unknown) => {
-        if (cancelled) {
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
           return;
         }
 
-        if (reason instanceof ApiError && reason.status === 401) {
+        if (error instanceof ApiError && error.status === 401) {
           router.replace('/login');
           return;
         }
 
-        setError(true);
+        setFailure({ key, error });
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [page, retryKey, router]);
+    return () => controller.abort();
+  }, [key, page, router, term]);
 
-  function load(nextPage: number) {
-    setResult(null);
-    setError(false);
-    setPage(nextPage);
-    setRetryKey((current) => current + 1);
-  }
+  if (failure?.key === key) {
+    const { error } = failure;
 
-  if (error) {
+    if (error instanceof ApiError && error.status === 403) {
+      return (
+        <AdminOnly message="Somente administradores podem consultar e adicionar pacientes." />
+      );
+    }
+
     return (
       <div className={ui.empty} role="alert">
         <div className={ui.emptyIcon}>
@@ -71,12 +91,16 @@ export default function PatientList({ onAdd }: PatientListProps) {
 
         <h2>Não foi possível carregar os pacientes</h2>
 
-        <p>Verifique sua conexão e tente novamente.</p>
+        <p>
+          {error instanceof ApiError && error.apiMessage
+            ? error.apiMessage
+            : LOAD_ERROR}
+        </p>
 
         <button
           type="button"
           className={`${ui.btn} ${ui.btnSecondary}`}
-          onClick={() => load(page)}
+          onClick={() => setRetryKey((current) => current + 1)}
         >
           Tentar novamente
         </button>
@@ -84,7 +108,7 @@ export default function PatientList({ onAdd }: PatientListProps) {
     );
   }
 
-  if (!result) {
+  if (!last) {
     return (
       <div className={ui.empty} role="status" aria-live="polite">
         <div className={styles.loader} />
@@ -94,11 +118,34 @@ export default function PatientList({ onAdd }: PatientListProps) {
     );
   }
 
-  const { data: patients, pagination } = result;
+  const loading = last.key !== key;
+  const { data: patients, pagination } = last.response;
 
   if (patients.length === 0) {
+    if (last.term) {
+      return (
+        <div className={ui.empty} aria-busy={loading}>
+          <div className={ui.emptyIcon}>
+            <Icon name="search" />
+          </div>
+
+          <h2>Nenhum paciente encontrado</h2>
+
+          <p>Nenhum resultado para “{last.term}”. Revise o nome ou o e-mail.</p>
+
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnSecondary}`}
+            onClick={onClearSearch}
+          >
+            Limpar busca
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <div className={ui.empty}>
+      <div className={ui.empty} aria-busy={loading}>
         <div className={ui.emptyIcon}>
           <Icon name="patient" />
         </div>
@@ -119,16 +166,20 @@ export default function PatientList({ onAdd }: PatientListProps) {
     );
   }
 
+  const count = last.term
+    ? `${pagination.total} ${pagination.total === 1 ? 'paciente encontrado' : 'pacientes encontrados'}`
+    : `${pagination.total} ${pagination.total === 1 ? 'paciente' : 'pacientes'}`;
+
   return (
     <>
-      <div className={`${ui.card} ${styles.tableCard}`}>
+      <div
+        className={`${ui.card} ${styles.tableCard} ${loading ? styles.refreshing : ''}`}
+        aria-busy={loading}
+      >
         <div className={styles.tableHeader}>
           <h2>Pacientes cadastrados</h2>
 
-          <p>
-            {pagination.total}{' '}
-            {pagination.total === 1 ? 'paciente' : 'pacientes'}
-          </p>
+          <p aria-live="polite">{loading ? 'Buscando...' : count}</p>
         </div>
 
         <ul className={styles.list} aria-label="Pacientes">
@@ -140,7 +191,7 @@ export default function PatientList({ onAdd }: PatientListProps) {
 
               <div>
                 <strong>{patient.name}</strong>
-                <small>Perfil de paciente</small>
+                <small>{patient.email}</small>
               </div>
             </li>
           ))}
@@ -152,21 +203,21 @@ export default function PatientList({ onAdd }: PatientListProps) {
           <button
             type="button"
             className={`${ui.btn} ${ui.btnSecondary}`}
-            disabled={page <= 1}
-            onClick={() => load(page - 1)}
+            disabled={pagination.page <= 1}
+            onClick={() => setPageState({ term, page: pagination.page - 1 })}
           >
             Anterior
           </button>
 
           <span>
-            Página {page} de {pagination.totalPages}
+            Página {pagination.page} de {pagination.totalPages}
           </span>
 
           <button
             type="button"
             className={`${ui.btn} ${ui.btnSecondary}`}
-            disabled={page >= pagination.totalPages}
-            onClick={() => load(page + 1)}
+            disabled={pagination.page >= pagination.totalPages}
+            onClick={() => setPageState({ term, page: pagination.page + 1 })}
           >
             Próxima
           </button>
