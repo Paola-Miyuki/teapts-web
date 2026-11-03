@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import styles from '../patients.module.css';
 import AddPatientForm from './AddPatientForm';
 
 type AddPatientModalProps = {
@@ -40,7 +39,7 @@ export default function AddPatientModal({
   return (
     <dialog
       ref={dialogRef}
-      className={styles.dialog}
+      className={ui.dialog}
       aria-labelledby="add-patient-title"
       onClose={onClose}
       onClick={(event) => {
@@ -54,7 +53,7 @@ export default function AddPatientModal({
         <>
           <button
             type="button"
-            className={`${styles.iconButton} ${styles.dialogClose}`}
+            className={`${ui.iconButton} ${ui.dialogClose}`}
             aria-label="Fechar janela"
             onClick={onClose}
           >

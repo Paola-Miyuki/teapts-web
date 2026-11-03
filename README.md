@@ -277,7 +277,7 @@ A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita
 | Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
 | Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role` e o vínculo `supertokens_user_id` |
 
-A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` (no máximo um) e `professional` (vários).
+A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` (no máximo um) e `professional` (vários, um por especialidade). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
 
 ```text
 POST /auth/signup (email, password, name)

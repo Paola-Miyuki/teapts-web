@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useRouter } from 'next/navigation';
@@ -280,6 +280,33 @@ describe('ProfilePage', () => {
     expect(
       await screen.findByText('A senha atual está incorreta.'),
     ).toBeInTheDocument();
+  });
+
+  it('mantém o modal de senha aberto no Esc enquanto o envio está pendente', async () => {
+    const user = userEvent.setup();
+    const password = jest.fn().mockReturnValue(new Promise<Response>(() => {}));
+    mockApi({ password });
+
+    await renderProfile();
+    await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
+
+    const idleEscape = new Event('cancel', { cancelable: true });
+    fireEvent(screen.getByRole('dialog'), idleEscape);
+    expect(idleEscape.defaultPrevented).toBe(false);
+
+    await user.type(screen.getByLabelText('Senha atual'), 'senha-atual1');
+    await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
+    await user.type(
+      screen.getByLabelText('Confirmar nova senha'),
+      'senha-nova1',
+    );
+    await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
+
+    const pendingEscape = new Event('cancel', { cancelable: true });
+    fireEvent(screen.getByRole('dialog'), pendingEscape);
+
+    expect(pendingEscape.defaultPrevented).toBe(true);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('redireciona para login quando GET /me retorna 401', async () => {

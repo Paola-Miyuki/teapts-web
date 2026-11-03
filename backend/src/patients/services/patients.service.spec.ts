@@ -10,6 +10,9 @@ import {
 } from '@nestjs/common';
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
+import { AccountRole } from '../../accounts/enums/account-role.enum';
+import type { Professional } from '../../professionals/entities/professional.entity';
+import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import type { Patient } from '../entities/patient.entity';
@@ -117,7 +120,9 @@ describe('PatientsService.create', () => {
     const { accountRepository, repository, service } = createService();
     accountRepository.findOne.mockResolvedValue({
       id: accountId,
+      role: AccountRole.User,
       patientProfile: null,
+      professionalProfiles: [],
     });
     repository.insert.mockResolvedValue(undefined);
 
@@ -127,7 +132,7 @@ describe('PatientsService.create', () => {
 
     expect(accountRepository.findOne).toHaveBeenCalledWith({
       where: { id: accountId },
-      relations: { patientProfile: true },
+      relations: { patientProfile: true, professionalProfiles: true },
     });
     expect(repository.insert).toHaveBeenCalledWith({
       accountId,
@@ -185,6 +190,62 @@ describe('PatientsService.create', () => {
       message: 'Conta não encontrada.',
     });
     expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 ADMIN_ACCOUNT_NOT_ALLOWED for an admin account', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      id: accountId,
+      role: AccountRole.Admin,
+      patientProfile: null,
+      professionalProfiles: [],
+    });
+
+    const error = await service.create({ accountId }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
+      message: 'Conta de administrador não pode ter perfil de paciente.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 ACCOUNT_HAS_PROFESSIONAL_PROFILE for a professional account', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      id: accountId,
+      role: AccountRole.User,
+      patientProfile: null,
+      professionalProfiles: [
+        { accountId, specialism: Specialism.Doctor } as Professional,
+      ],
+    });
+
+    const error = await service.create({ accountId }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+      message: 'A conta já possui um perfil profissional.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('checks the professional profile before the patient profile', async () => {
+    const { accountRepository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      id: accountId,
+      role: AccountRole.User,
+      patientProfile: { accountId } as Patient,
+      professionalProfiles: [
+        { accountId, specialism: Specialism.Doctor } as Professional,
+      ],
+    });
+
+    await expect(service.create({ accountId })).rejects.toMatchObject({
+      response: { status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE' },
+    });
   });
 
   it('returns 409 when the account already has a patient profile', async () => {

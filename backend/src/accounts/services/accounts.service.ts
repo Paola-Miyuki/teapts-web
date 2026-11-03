@@ -8,8 +8,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { convertToRecipeUserId } from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
-import type RecipeUserId from 'supertokens-node/lib/build/recipeUserId';
 import { Repository } from 'typeorm';
 import { toPagination } from '../../common/pagination/pagination';
 import type { ChangePasswordRequestDto } from '../../auth/dto/change-password-request.dto';
@@ -49,12 +49,6 @@ const EMAIL_ALREADY_EXISTS_RESPONSE = {
   status: 'EMAIL_ALREADY_EXISTS',
   message: 'Este e-mail já está cadastrado.',
 };
-
-function toRecipeUserId(value: string): RecipeUserId {
-  return {
-    getAsString: () => value,
-  } as RecipeUserId;
-}
 
 @Injectable()
 export class AccountsService {
@@ -143,7 +137,7 @@ export class AccountsService {
       }
 
       const emailUpdate = await EmailPassword.updateEmailOrPassword({
-        recipeUserId: toRecipeUserId(account.supertokensUserId),
+        recipeUserId: convertToRecipeUserId(account.supertokensUserId),
         email: nextEmail,
       });
 
@@ -169,7 +163,7 @@ export class AccountsService {
       if (emailChanged) {
         try {
           await EmailPassword.updateEmailOrPassword({
-            recipeUserId: toRecipeUserId(account.supertokensUserId),
+            recipeUserId: convertToRecipeUserId(account.supertokensUserId),
             email: account.email,
           });
         } catch (rollbackError) {
@@ -212,7 +206,7 @@ export class AccountsService {
     }
 
     const passwordUpdate = await EmailPassword.updateEmailOrPassword({
-      recipeUserId: toRecipeUserId(account.supertokensUserId),
+      recipeUserId: convertToRecipeUserId(account.supertokensUserId),
       password: request.newPassword,
       applyPasswordPolicy: true,
       tenantIdForPasswordPolicy: SUPERTOKENS_TENANT_ID,

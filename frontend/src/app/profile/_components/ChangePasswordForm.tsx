@@ -8,8 +8,6 @@ import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { changePassword } from '@/lib/account';
-import patientStyles from '@/app/patients/patients.module.css';
-import signupStyles from '@/app/signup/signup.module.css';
 import styles from '../profile.module.css';
 
 type ChangePasswordFormProps = {
@@ -157,8 +155,13 @@ export default function ChangePasswordForm({
   return (
     <dialog
       ref={dialogRef}
-      className={patientStyles.dialog}
+      className={ui.dialog}
       aria-labelledby="password-title"
+      onCancel={(event) => {
+        if (submitting) {
+          event.preventDefault();
+        }
+      }}
       onClose={onCancel}
       onClick={(event) => {
         if (event.target === dialogRef.current && !submitting) {
@@ -168,7 +171,7 @@ export default function ChangePasswordForm({
     >
       <button
         type="button"
-        className={`${patientStyles.iconButton} ${patientStyles.dialogClose}`}
+        className={`${ui.iconButton} ${ui.dialogClose}`}
         aria-label="Fechar janela"
         onClick={onCancel}
         disabled={submitting}
@@ -196,7 +199,7 @@ export default function ChangePasswordForm({
             <label htmlFor="current-password" className={ui.label}>
               Senha atual
             </label>
-            <div className={signupStyles.passwordWrapper}>
+            <div className={ui.passwordWrapper}>
               <input
                 ref={currentRef}
                 id="current-password"
@@ -221,7 +224,7 @@ export default function ChangePasswordForm({
               />
               <button
                 type="button"
-                className={signupStyles.revealButton}
+                className={ui.revealButton}
                 aria-label={
                   showCurrentPassword
                     ? 'Ocultar senha atual'
@@ -240,7 +243,7 @@ export default function ChangePasswordForm({
             <label htmlFor="new-password" className={ui.label}>
               Nova senha
             </label>
-            <div className={signupStyles.passwordWrapper}>
+            <div className={ui.passwordWrapper}>
               <input
                 id="new-password"
                 name="newPassword"
@@ -264,7 +267,7 @@ export default function ChangePasswordForm({
               />
               <button
                 type="button"
-                className={signupStyles.revealButton}
+                className={ui.revealButton}
                 aria-label={
                   showNewPassword ? 'Ocultar nova senha' : 'Mostrar nova senha'
                 }
@@ -281,7 +284,7 @@ export default function ChangePasswordForm({
             <label htmlFor="confirm-password" className={ui.label}>
               Confirmar nova senha
             </label>
-            <div className={signupStyles.passwordWrapper}>
+            <div className={ui.passwordWrapper}>
               <input
                 id="confirm-password"
                 name="confirmation"
@@ -307,7 +310,7 @@ export default function ChangePasswordForm({
               />
               <button
                 type="button"
-                className={signupStyles.revealButton}
+                className={ui.revealButton}
                 aria-label={
                   showConfirmation
                     ? 'Ocultar confirmação da senha'
@@ -323,17 +326,15 @@ export default function ChangePasswordForm({
           </div>
         </div>
 
-        <div
-          className={`${signupStyles.requirements} ${styles.passwordRequirements}`}
-        >
-          <p className={signupStyles.requirementsTitle}>Requisitos da senha</p>
+        <div className={`${ui.requirements} ${styles.passwordRequirements}`}>
+          <p className={ui.requirementsTitle}>Requisitos da senha</p>
           <ul>
             <li
               className={
                 passwordHasMinLength
-                  ? signupStyles.requirementMet
+                  ? ui.requirementMet
                   : newPassword
-                    ? signupStyles.requirementMissing
+                    ? ui.requirementMissing
                     : ''
               }
             >
@@ -343,9 +344,9 @@ export default function ChangePasswordForm({
             <li
               className={
                 passwordHasNumber
-                  ? signupStyles.requirementMet
+                  ? ui.requirementMet
                   : newPassword
-                    ? signupStyles.requirementMissing
+                    ? ui.requirementMissing
                     : ''
               }
             >

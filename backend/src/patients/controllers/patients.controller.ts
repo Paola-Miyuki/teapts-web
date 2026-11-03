@@ -103,9 +103,28 @@ export class PatientsController {
   })
   @ApiConflictResponse({
     type: ErrorResponseDto,
-    example: {
-      status: 'PATIENT_PROFILE_ALREADY_EXISTS',
-      message: 'A conta já possui perfil de paciente.',
+    examples: {
+      ADMIN_ACCOUNT_NOT_ALLOWED: {
+        summary: 'Conta de administrador',
+        value: {
+          status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
+          message: 'Conta de administrador não pode ter perfil de paciente.',
+        },
+      },
+      ACCOUNT_HAS_PROFESSIONAL_PROFILE: {
+        summary: 'Conta com perfil profissional',
+        value: {
+          status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+          message: 'A conta já possui um perfil profissional.',
+        },
+      },
+      PATIENT_PROFILE_ALREADY_EXISTS: {
+        summary: 'Conta que já tem perfil de paciente',
+        value: {
+          status: 'PATIENT_PROFILE_ALREADY_EXISTS',
+          message: 'A conta já possui perfil de paciente.',
+        },
+      },
     },
   })
   @ApiInternalServerErrorResponse({

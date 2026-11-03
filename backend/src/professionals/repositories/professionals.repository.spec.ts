@@ -145,3 +145,53 @@ describe('ProfessionalsRepository.findPaginated', () => {
     await expect(repository.findPaginated(filters)).rejects.toBe(failure);
   });
 });
+
+describe('ProfessionalsRepository.insert', () => {
+  function createInsertRepository() {
+    const typeormRepository = {
+      insert:
+        jest.fn<
+          (
+            values: Pick<Professional, 'accountId' | 'specialism'>,
+          ) => Promise<{ identifiers: { id: string }[] }>
+        >(),
+    };
+    const repository = new ProfessionalsRepository(
+      typeormRepository as unknown as Repository<Professional>,
+    );
+
+    return { typeormRepository, repository };
+  }
+
+  it('saves the profile linked to the account and returns the generated id', async () => {
+    const { typeormRepository, repository } = createInsertRepository();
+    typeormRepository.insert.mockResolvedValue({
+      identifiers: [{ id: 'professional-1' }],
+    });
+
+    await expect(
+      repository.insert({
+        accountId: 'account-1',
+        specialism: Specialism.Doctor,
+      }),
+    ).resolves.toBe('professional-1');
+
+    expect(typeormRepository.insert).toHaveBeenCalledWith({
+      accountId: 'account-1',
+      specialism: Specialism.Doctor,
+    });
+  });
+
+  it('propagates database errors to the caller', async () => {
+    const { typeormRepository, repository } = createInsertRepository();
+    const failure = new Error('duplicate key value');
+    typeormRepository.insert.mockRejectedValue(failure);
+
+    await expect(
+      repository.insert({
+        accountId: 'account-1',
+        specialism: Specialism.Doctor,
+      }),
+    ).rejects.toBe(failure);
+  });
+});

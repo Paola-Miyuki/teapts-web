@@ -92,9 +92,12 @@ visual: não importe nada de `design/` no código do app.
   `@tailwindcss/postcss`) e pelo `@import 'tailwindcss'` em `globals.css`.
   Não há `tailwind.config.js`; personalizações vão no CSS, com `@theme`.
 - **CSS Modules** (`*.module.css`) para estilos de uma tela, como no login.
+  O que mais de uma tela usa (modal, botão de ícone, campo de senha com
+  requisitos) fica em `components/ui.module.css`; uma tela não importa o CSS
+  de outra.
 - **`<dialog>`**: o preflight do Tailwind zera o `margin` de todo elemento,
   inclusive o `margin: auto` que centraliza o modal. Ponha `margin: auto` na
-  classe do dialog (ex.: `.dialog` em `patients/patients.module.css`).
+  classe do dialog (ex.: `.dialog` em `components/ui.module.css`).
 
 ## Autenticação
 

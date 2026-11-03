@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { RecipeUserId } from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import { AccountRole } from '../enums/account-role.enum';
 import type {
@@ -131,6 +132,9 @@ describe('AccountsService', () => {
       expect(updateEmailOrPassword).toHaveBeenCalledWith(
         expect.objectContaining({ email: 'ana@example.com' }),
       );
+      const [{ recipeUserId }] = updateEmailOrPassword.mock.calls[0];
+      expect(recipeUserId).toBeInstanceOf(RecipeUserId);
+      expect(recipeUserId.getAsString()).toBe('user-1');
       expect(accountRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           email: 'ana@example.com',
@@ -152,6 +156,25 @@ describe('AccountsService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
 
       expect(updateEmailOrPassword).not.toHaveBeenCalled();
+      expect(accountRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when only SuperTokens already has the email', async () => {
+      const updateEmailOrPassword = jest
+        .spyOn(EmailPassword, 'updateEmailOrPassword')
+        .mockResolvedValue({ status: 'EMAIL_ALREADY_EXISTS_ERROR' });
+      accountRepository.findOne
+        .mockResolvedValueOnce(account as never)
+        .mockResolvedValueOnce(null as never);
+
+      await expect(
+        service.updateMe(accountContext, { email: 'other@example.com' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { status: 'EMAIL_ALREADY_EXISTS' },
+      });
+
+      expect(updateEmailOrPassword).toHaveBeenCalledTimes(1);
       expect(accountRepository.save).not.toHaveBeenCalled();
     });
 

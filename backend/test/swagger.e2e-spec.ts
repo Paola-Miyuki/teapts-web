@@ -27,7 +27,12 @@ type OpenApiParameter = {
   schema?: OpenApiSchema;
 };
 type OpenApiResponse = {
-  content?: { 'application/json'?: { schema?: OpenApiSchema } };
+  content?: {
+    'application/json'?: {
+      schema?: OpenApiSchema;
+      examples?: Record<string, { value: unknown }>;
+    };
+  };
 };
 type OpenApiOperation = {
   tags?: string[];
@@ -70,6 +75,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
   ['/patients', 'post'],
+  ['/professionals', 'post'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -139,6 +145,7 @@ describe('Swagger (e2e)', () => {
     expect(paths['/patients/authorized']).toHaveProperty('get');
     expect(paths['/accounts']).toHaveProperty('get');
     expect(paths['/patients']).toHaveProperty('post');
+    expect(paths['/professionals']).toHaveProperty('post');
   });
 
   it('declares the cookie and bearer session schemes', async () => {
@@ -201,7 +208,8 @@ describe('Swagger (e2e)', () => {
     '%s %s has a tag and a success response schema',
     async (path, method) => {
       const operation = (await getDocument()).paths[path][method];
-      const success = method === 'post' && path === '/patients' ? '201' : '200';
+      const created = ['/patients', '/professionals'].includes(path);
+      const success = method === 'post' && created ? '201' : '200';
 
       expect(operation.tags?.length).toBeGreaterThan(0);
       expect(responseSchema(operation, success)).toBeDefined();
@@ -250,6 +258,11 @@ describe('Swagger (e2e)', () => {
     ['/patients', 'post', '404'],
     ['/patients', 'post', '409'],
     ['/patients', 'post', '500'],
+    ['/professionals', 'post', '400'],
+    ['/professionals', 'post', '403'],
+    ['/professionals', 'post', '404'],
+    ['/professionals', 'post', '409'],
+    ['/professionals', 'post', '500'],
   ])('%s %s answers %s with the error body', async (path, method, status) => {
     const operation = (await getDocument()).paths[path][method];
 
@@ -322,6 +335,20 @@ describe('Swagger (e2e)', () => {
     });
   });
 
+  it('lists the three POST /patients conflicts', async () => {
+    const conflict = (await getDocument()).paths['/patients'].post.responses[
+      '409'
+    ];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'ADMIN_ACCOUNT_NOT_ALLOWED',
+      'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+      'PATIENT_PROFILE_ALREADY_EXISTS',
+    ]);
+  });
+
   it('reads the POST /patients body from the DTO', async () => {
     const { paths, components } = await getDocument();
     const schema =
@@ -332,6 +359,42 @@ describe('Swagger (e2e)', () => {
       'accountId',
     ]);
     expect(components.schemas.SupportContactDto.required).toEqual(['name']);
+  });
+
+  it('reads the POST /professionals body from the DTO', async () => {
+    const { paths, components } = await getDocument();
+    const schema =
+      paths['/professionals'].post.requestBody?.content['application/json']
+        ?.schema;
+
+    expect(schema?.$ref).toBe(
+      '#/components/schemas/CreateProfessionalRequestDto',
+    );
+    expect(components.schemas.CreateProfessionalRequestDto.required).toEqual([
+      'accountId',
+      'specialism',
+    ]);
+  });
+
+  it('documents the POST /me/password response with its own DTO', async () => {
+    const operation = (await getDocument()).paths['/me/password'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ChangePasswordResponseDto',
+    );
+  });
+
+  it('lists the three POST /professionals conflicts', async () => {
+    const conflict = (await getDocument()).paths['/professionals'].post
+      .responses['409'];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'ADMIN_ACCOUNT_NOT_ALLOWED',
+      'ACCOUNT_HAS_PATIENT_PROFILE',
+      'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
+    ]);
   });
 
   it.each(['/auth/signup', '/auth/signin'])(

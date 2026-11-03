@@ -42,7 +42,7 @@ export default function SupportContactList({
 
           <button
             type="button"
-            className={styles.iconButton}
+            className={ui.iconButton}
             aria-label={`Remover contato ${contact.name}`}
             onClick={() => onRemove(index)}
           >
