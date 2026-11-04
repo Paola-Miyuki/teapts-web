@@ -5,21 +5,20 @@ import type { ProfileKind } from '@/lib/account';
 import HomeContent from './HomeContent';
 
 function getBreadcrumb(kind: ProfileKind) {
-  if (kind === 'patient') {
-    return 'Meu cuidado';
-  }
-
-  if (kind === 'waiting') {
-    return 'Aguardando perfil';
-  }
-
-  return undefined;
+  return {
+    admin: undefined,
+    professional: undefined,
+    patient: 'Meu cuidado',
+    waiting: 'Aguardando perfil',
+  }[kind];
 }
 
 export default function Home() {
   return (
     <AuthenticatedPage currentHref="/home" breadcrumb={getBreadcrumb}>
-      {(account, kind) => <HomeContent kind={kind} name={account.name} />}
+      {(account, kind) => (
+        <HomeContent account={account} kind={kind} name={account.name} />
+      )}
     </AuthenticatedPage>
   );
 }

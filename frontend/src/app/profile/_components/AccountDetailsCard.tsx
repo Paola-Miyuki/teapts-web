@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
+import { can } from '@/lib/permissions';
 import {
   ROLE_LABELS,
   updateMe,
@@ -51,6 +52,8 @@ export default function AccountDetailsCard({
     form: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const canUpdate = can(account, 'updateOwnAccount');
+  const canChangePassword = can(account, 'changeOwnPassword');
 
   useEffect(() => {
     if (editing) {
@@ -294,21 +297,25 @@ export default function AccountDetailsCard({
           </p>
 
           <div className={styles.actions}>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnSecondary}`}
-              onClick={startEditing}
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnPrimary}`}
-              onClick={onResetPassword}
-            >
-              <Icon name="lock" className={ui.icon} />
-              Redefinir senha
-            </button>
+            {canUpdate && (
+              <button
+                type="button"
+                className={`${ui.btn} ${ui.btnSecondary}`}
+                onClick={startEditing}
+              >
+                Editar
+              </button>
+            )}
+            {canChangePassword && (
+              <button
+                type="button"
+                className={`${ui.btn} ${ui.btnPrimary}`}
+                onClick={onResetPassword}
+              >
+                <Icon name="lock" className={ui.icon} />
+                Redefinir senha
+              </button>
+            )}
           </div>
         </>
       )}

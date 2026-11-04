@@ -15,6 +15,7 @@ type AppShellProps = {
   roleLabel: string;
   navCaption: string;
   navItems: NavItem[];
+  canLogout: boolean;
   currentHref: string;
   breadcrumb?: string;
   children: ReactNode;
@@ -37,6 +38,7 @@ export default function AppShell({
   roleLabel,
   navCaption,
   navItems,
+  canLogout,
   currentHref,
   breadcrumb,
   children,
@@ -152,10 +154,12 @@ export default function AppShell({
             <span className={styles.navLabel}>Meu perfil</span>
           </Link>
 
-          <LogoutButton className={styles.navLink}>
-            <Icon name="logout" className={styles.icon} />
-            <span className={styles.navLabel}>Sair da conta</span>
-          </LogoutButton>
+          {canLogout && (
+            <LogoutButton className={styles.navLink}>
+              <Icon name="logout" className={styles.icon} />
+              <span className={styles.navLabel}>Sair da conta</span>
+            </LogoutButton>
+          )}
         </div>
       </aside>
 

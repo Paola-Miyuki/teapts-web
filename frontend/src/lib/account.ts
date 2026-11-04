@@ -1,5 +1,9 @@
 import type { IconName } from '@/components/Icon';
 import { request } from '@/lib/api';
+import { can, getProfileKind } from '@/lib/permissions';
+import type { PermissionAction, PermissionUser, ProfileKind } from '@/lib/permissions';
+export type { ProfileKind } from '@/lib/permissions';
+export { getProfileKind } from '@/lib/permissions';
 
 export type Account = {
   accountId: string;
@@ -9,6 +13,8 @@ export type Account = {
   patientProfileId: string | null;
   professionalProfileIds: string[];
 };
+
+export type AccountPermissionUser = PermissionUser;
 
 // GET /me: conta da sessão atual.
 export function getMe() {
@@ -43,12 +49,11 @@ export function changePassword(input: ChangePasswordInput) {
   });
 }
 
-export type ProfileKind = 'admin' | 'professional' | 'patient' | 'waiting';
-
 export type NavItem = {
   href: string;
   icon: IconName;
   label: string;
+  action: PermissionAction;
   current?: boolean;
 };
 
@@ -59,57 +64,60 @@ export const ROLE_LABELS: Record<ProfileKind, string> = {
   waiting: 'Aguardando perfil',
 };
 
-export function getProfileKind(account: Account): ProfileKind {
-  if (account.role === 'admin') {
-    return 'admin';
-  }
-
-  if (account.professionalProfileIds.length > 0) {
-    return 'professional';
-  }
-
-  if (account.patientProfileId) {
-    return 'patient';
-  }
-
-  return 'waiting';
-}
+const HOME_LABELS: Record<ProfileKind, string> = {
+  admin: 'Início',
+  professional: 'Início',
+  patient: 'Meu cuidado',
+  waiting: 'Início',
+};
 
 export function isPatientArea(kind: ProfileKind) {
   return kind === 'patient' || kind === 'waiting';
 }
 
-export function getNavigation(kind: ProfileKind, currentHref: string) {
-  let items: NavItem[];
+export function getNavigation(account: Account, currentHref: string) {
+  const kind = getProfileKind(account);
+  const items: NavItem[] = [
+    {
+      href: '/home',
+      icon: 'home',
+      action: 'viewHome',
+      label: HOME_LABELS[kind],
+    },
+  ];
 
-  if (kind === 'waiting') {
-    items = [{ href: '/home', icon: 'home', label: 'Início' }];
-  } else if (kind === 'patient') {
-    items = [
-      { href: '/home', icon: 'home', label: 'Meu cuidado' },
-      {
-        href: '/pts/proposals',
-        icon: 'clipboard',
-        label: 'PTS',
-      },
-    ];
-  } else {
-    items = [
-      { href: '/home', icon: 'home', label: 'Início' },
-      { href: '/professionals', icon: 'people', label: 'Profissionais' },
-      {
-        href: '/pts/proposals',
-        icon: 'clipboard',
-        label: 'PTS',
-      },
-    ];
-
-    if (kind === 'admin') {
-      items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
-    }
+  if (can(account, 'viewProfessionalDirectory')) {
+    items.push({
+      href: '/professionals',
+      icon: 'people',
+      label: 'Profissionais',
+      action: 'viewProfessionalDirectory',
+    });
   }
 
-  return items.map((item) => ({
+  if (can(account, 'viewPtsProposals')) {
+    items.push({
+      href: '/pts/proposals',
+      icon: 'clipboard',
+      label: 'PTS',
+      action: 'viewPtsProposals',
+    });
+  }
+
+  if (can(account, 'viewPatientRegistry')) {
+    items.push({
+      href: '/patients',
+      icon: 'patient',
+      label: 'Pacientes',
+      action: 'viewPatientRegistry',
+    });
+  }
+
+  const visibleItems = items.filter((item) =>
+    can(account, item.action, { profileKind: kind }),
+  );
+
+  return visibleItems.map((item) => ({
     ...item,
     current: item.href === currentHref,
   }));
