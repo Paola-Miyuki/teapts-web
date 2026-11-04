@@ -26,7 +26,7 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
       <div className={ui.heading}>
         <p className={ui.eyebrow}>{EYEBROWS[kind]}</p>
 
-        <h1>{firstName ? `Boas-vindas, ${firstName}.` : 'Boas-vindas.'}</h1>
+        <h1>{firstName ? `Boas-vindas, ${firstName}` : 'Boas-vindas'}</h1>
 
         <p>
           {isPatientArea
@@ -68,14 +68,9 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
       ) : (
         <div className={styles.welcomePanel}>
           <div>
-            <p className={styles.panelEyebrow}>Equipe de cuidado</p>
-
-            <h2>Encontre profissionais para compor a equipe.</h2>
-
-            <p>
-              Consulte os profissionais cadastrados e encontre integrantes para
-              compor a equipe multidisciplinar.
-            </p>
+            <h2>
+              Encontre profissionais para compor a equipe multidisciplinar
+            </h2>
 
             <Link
               href="/professionals"

@@ -132,7 +132,7 @@ function LoginForm() {
           <div className={styles.formWrapper}>
             <h1 id="login-title">Bem-vindo de volta!</h1>
 
-            <p className={styles.intro}>Acesse sua conta TEA-PTS.</p>
+            <p className={styles.intro}></p>
 
             {isRegistered && (
               <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
@@ -265,8 +265,6 @@ function LoginForm() {
           </div>
         </section>
       </main>
-
-      <footer className={styles.footer}>TEA-PTS</footer>
     </div>
   );
 }

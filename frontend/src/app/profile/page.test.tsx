@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { useRouter } from 'next/navigation';
@@ -95,10 +101,16 @@ describe('ProfilePage', () => {
         'As permissões de acesso dependem dos perfis e dos vínculos autorizados para a sua conta.',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Meu perfil' })).toHaveAttribute(
+    // O perfil fica no cabeçalho (não na barra lateral) e marca a página.
+    expect(screen.getByRole('link', { name: /^Meu perfil: / })).toHaveAttribute(
       'aria-current',
       'page',
     );
+    expect(
+      within(screen.getByRole('complementary')).queryByRole('link', {
+        name: /Meu perfil/,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('edita somente o nome e atualiza o cartão e o cabeçalho', async () => {

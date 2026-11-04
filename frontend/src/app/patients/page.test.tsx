@@ -946,7 +946,7 @@ describe('PatientsPage', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    it('mostra a mensagem própria sem resultados e limpa a busca', async () => {
+    it('mostra a mensagem própria sem resultados e limpa pelo ✕', async () => {
       const user = userEvent.setup();
       mockApi({ accounts: accountsByTerm({ zzz: [] }) });
 
@@ -960,7 +960,9 @@ describe('PatientsPage', () => {
         await screen.findByText('Nenhuma conta encontrada para “zzz”.'),
       ).toBeInTheDocument();
 
-      await user.click(dialog.getByRole('button', { name: 'Limpar busca' }));
+      await user.click(
+        dialog.getByRole('button', { name: 'Limpar campo da conta' }),
+      );
 
       expect(select).toHaveValue('');
       expect(
@@ -1184,7 +1186,7 @@ describe('PatientsPage', () => {
       expect(list.getAllByText('Não informado')).toHaveLength(3);
     });
 
-    it('descarta o contato sem fechar o modal', async () => {
+    it('exclui o contato sem fechar o modal', async () => {
       const user = userEvent.setup();
       mockApi();
 
@@ -1195,9 +1197,7 @@ describe('PatientsPage', () => {
         dialog.getByRole('button', { name: 'Adicionar contato' }),
       );
       await user.type(dialog.getByLabelText('Nome do contato'), 'Maria');
-      await user.click(
-        dialog.getByRole('button', { name: 'Descartar contato' }),
-      );
+      await user.click(dialog.getByRole('button', { name: 'Excluir contato' }));
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(

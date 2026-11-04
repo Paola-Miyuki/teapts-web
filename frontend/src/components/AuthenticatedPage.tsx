@@ -3,12 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { useAccount } from '@/hooks/useAccount';
-import {
-  getNavigation,
-  getProfileKind,
-  isPatientArea,
-  ROLE_LABELS,
-} from '@/lib/account';
+import { getNavigation, getProfileKind, ROLE_LABELS } from '@/lib/account';
 import type { Account, ProfileKind } from '@/lib/account';
 import AppShell from './AppShell';
 import styles from './AppShell.module.css';
@@ -67,7 +62,6 @@ export default function AuthenticatedPage({
     <AppShell
       userName={account.name}
       roleLabel={ROLE_LABELS[kind]}
-      navCaption={isPatientArea(kind) ? 'Meu cuidado' : 'Área de trabalho'}
       navItems={getNavigation(kind, currentHref)}
       currentHref={currentHref}
       breadcrumb={

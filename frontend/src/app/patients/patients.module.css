@@ -300,19 +300,23 @@
 
 .searchIcon {
   position: absolute;
+  top: 50%;
   left: 14px;
   width: 16px;
   height: 16px;
   color: var(--muted);
+  transform: translateY(-50%);
   pointer-events: none;
 }
 
-.searchInput,
-.comboboxInput {
+/* Seletores com mais especificidade que .input (ui.module.css), senão o
+   padding do campo ignora o espaço do ícone e do ✕. */
+.search .searchInput,
+.search .comboboxInput {
   padding-right: 48px;
 }
 
-.searchInput {
+.search .searchInput {
   padding-left: 40px;
 }
 

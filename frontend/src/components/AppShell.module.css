@@ -13,7 +13,7 @@
 .status h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: 600;
   text-wrap: balance;
 }
 
@@ -56,15 +56,8 @@
   text-decoration: none;
 }
 
-.navCaption {
-  margin: 18px 14px 10px;
-  color: var(--muted);
-  font: 10px var(--font-mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 .nav {
+  margin-top: 18px;
   display: grid;
   gap: 5px;
 }
@@ -81,7 +74,7 @@
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -151,14 +144,28 @@
   display: none;
 }
 
+/* Perfil à direita do cabeçalho: leva a /profile. */
 .headerProfile {
   min-height: 46px;
   margin-left: auto;
-  padding: 6px 8px;
+  padding: 6px 12px 6px 6px;
   display: flex;
   align-items: center;
   gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: inherit;
   font-size: 12px;
+  text-decoration: none;
+}
+
+.headerProfile:hover {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+.headerProfile[aria-current='page'] {
+  border-color: var(--fg);
 }
 
 .avatar {
@@ -198,7 +205,7 @@
   align-items: center;
   gap: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .breadcrumb a {
@@ -222,7 +229,7 @@
   gap: 20px;
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* Carregamento e erro */
@@ -288,14 +295,21 @@
     justify-content: center;
   }
 
+  /* display: none (e não visibility: hidden), senão o texto escondido
+     continua ocupando largura e tira o ícone do centro. */
   .collapsed .brand > span > span,
-  .collapsed .navLabel,
-  .collapsed .navCaption {
-    visibility: hidden;
-    margin-inline: 0;
+  .collapsed .navLabel {
+    display: none;
   }
 
+  .collapsed .brand > span {
+    gap: 0;
+  }
+
+  /* Quadrado centrado: ícone e página atual no mesmo eixo. */
   .collapsed .navLink {
+    width: 46px;
+    margin-inline: auto;
     justify-content: center;
     padding-inline: 0;
     gap: 0;

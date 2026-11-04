@@ -29,20 +29,20 @@ seed (seção 5.2 do README da raiz).
 
 ## Scripts
 
-| Script                             | O que faz                                    |
-| ---------------------------------- | -------------------------------------------- |
-| `dev`                              | servidor de desenvolvimento (use `-p 3001`)  |
-| `build` / `start`                  | build de produção / serve o build            |
-| `test` / `test:cov` / `test:watch` | Jest + Testing Library (jsdom)               |
-| `lint` / `typecheck`               | ESLint / `tsc --noEmit`                      |
-| `format` / `format:check`          | Prettier, alterando ou só conferindo         |
+| Script                             | O que faz                                   |
+| ---------------------------------- | ------------------------------------------- |
+| `dev`                              | servidor de desenvolvimento (use `-p 3001`) |
+| `build` / `start`                  | build de produção / serve o build           |
+| `test` / `test:cov` / `test:watch` | Jest + Testing Library (jsdom)              |
+| `lint` / `typecheck`               | ESLint / `tsc --noEmit`                     |
+| `format` / `format:check`          | Prettier, alterando ou só conferindo        |
 
 ## Variáveis de ambiente
 
-| Variável              | Padrão                  | Uso                                              |
-| --------------------- | ----------------------- | ------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | endereço da API usado pelo SDK                   |
-| `PORT`                | `3001`                  | ignorado pelo `next dev` (use `-p 3001`)         |
+| Variável              | Padrão                  | Uso                                      |
+| --------------------- | ----------------------- | ---------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | endereço da API usado pelo SDK           |
+| `PORT`                | `3001`                  | ignorado pelo `next dev` (use `-p 3001`) |
 
 As `NEXT_PUBLIC_*` entram no bundle no build: mudou o `.env`, pare o
 `pnpm dev` e suba de novo.

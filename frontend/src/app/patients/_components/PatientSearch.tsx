@@ -14,8 +14,6 @@ type PatientSearchProps = {
   onClear: () => void;
 };
 
-// Busca por nome ou e-mail (NFUS003): sem botão; Enter busca na hora, Esc e ✕
-// limpam.
 export default function PatientSearch({
   value,
   isTooShort,

@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
 import PtsProposalList from './_components/PtsProposalList';
+import PtsProposalsPage from './page';
 import type { Account } from '@/lib/account';
 import { listEligiblePatients } from '../novo/api/ptsApi';
 
@@ -273,5 +276,36 @@ describe('PtsProposalList', () => {
     ).toBeInTheDocument();
 
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('PtsProposalsPage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    global.fetch = jest.fn((url: string) =>
+      url.endsWith('/me')
+        ? jsonResponse(patientAccount())
+        : jsonResponse(proposalResponse()),
+    ) as jest.Mock;
+  });
+
+  it('explica a escolha da proposta numa ajuda ao lado do título', async () => {
+    const user = userEvent.setup();
+
+    render(<PtsProposalsPage />);
+
+    const help = await screen.findByRole('button', {
+      name: 'Ajuda: Como funciona a escolha da proposta',
+    });
+
+    expect(help).toHaveAccessibleDescription(
+      'Só uma proposta pode ser aceita por vez. Quando uma é aceita, as outras propostas pendentes são rejeitadas automaticamente.',
+    );
+    expect(screen.queryByText(/Uma equipe por vez/)).not.toBeInTheDocument();
+
+    await user.click(help);
+
+    expect(help).toHaveAttribute('aria-expanded', 'true');
   });
 });

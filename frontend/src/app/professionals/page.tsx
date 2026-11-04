@@ -6,8 +6,6 @@ export default function ProfessionalsPage() {
   return (
     <AuthenticatedPage currentHref="/professionals" breadcrumb="Profissionais">
       <div className={ui.heading}>
-        <p className={ui.eyebrow}>Equipe de cuidado</p>
-
         <h1>Profissionais</h1>
 
         <p>

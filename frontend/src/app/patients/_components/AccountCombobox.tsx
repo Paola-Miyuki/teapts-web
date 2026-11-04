@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import Icon from '@/components/Icon';
@@ -37,6 +37,7 @@ export default function AccountCombobox({
 }: AccountComboboxProps) {
   const router = useRouter();
   const listId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const search = useDebouncedSearch();
   const { term } = search;
@@ -103,6 +104,9 @@ export default function AccountCombobox({
     onChange(null);
     search.clear();
     setActiveIndex(-1);
+    // O ✕ devolve o foco ao campo e mostra a lista completa de novo.
+    inputRef.current?.focus();
+    setOpen(true);
   }
 
   function handleChange(text: string) {
@@ -188,6 +192,7 @@ export default function AccountCombobox({
       <div className={styles.search}>
         <input
           id={id}
+          ref={inputRef}
           type="text"
           role="combobox"
           className={`${ui.input} ${styles.comboboxInput}`}
@@ -261,17 +266,6 @@ export default function AccountCombobox({
       {open && message && (
         <div className={styles.comboboxStatus} role="status" aria-live="polite">
           <p>{message}</p>
-
-          {last?.term && options.length === 0 && !loading && (
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnSecondary}`}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => search.clear()}
-            >
-              Limpar busca
-            </button>
-          )}
         </div>
       )}
 
