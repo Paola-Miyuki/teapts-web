@@ -1,3 +1,6 @@
+import Link from 'next/link';
+
+import ui from '@/components/ui.module.css';
 import styles from '../proposals.module.css';
 
 export type PtsProposal = {
@@ -9,6 +12,7 @@ export type PtsProposal = {
     name: string;
   };
   responsible?: {
+    id?: string;
     name: string;
     specialism?: {
       name: string;
@@ -33,8 +37,10 @@ const statusMap: Record<string, string> = {
 
 export default function PtsProposalCard({
   proposal,
+  canEdit = false,
 }: {
   proposal: PtsProposal;
+  canEdit?: boolean;
 }) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
@@ -65,7 +71,24 @@ export default function PtsProposalCard({
             <p>{profSpecialism} &middot; profissional responsável</p>
           </div>
         </div>
-        <div className={styles.statusBadge}>{displayStatus}</div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <div className={styles.statusBadge}>{displayStatus}</div>
+
+          {canEdit && (
+            <Link
+              href={`/pts/proposals/${proposal.id}/edit`}
+              className={`${ui.btn} ${ui.btnSecondary}`}
+            >
+              Editar proposta
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className={styles.metaGrid}>

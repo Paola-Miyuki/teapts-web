@@ -61,6 +61,7 @@ export default function PtsProposalList({ account }: { account: Account }) {
 
   const patientIdFromUrl = searchParams.get('patientId')?.trim() ?? '';
   const searchFromUrl = searchParams.get('search')?.trim() ?? '';
+  const wasUpdated = searchParams.get('updated') === '1';
 
   const [proposals, setProposals] = useState<PtsProposal[] | null>(null);
   const [proposalError, setProposalError] = useState('');
@@ -397,6 +398,7 @@ export default function PtsProposalList({ account }: { account: Account }) {
     return {
       ...prop,
       responsible: {
+        id: profId ?? '',
         name: resolvedProfName,
         specialism: {
           name: resolvedSpecialism,
@@ -415,6 +417,12 @@ export default function PtsProposalList({ account }: { account: Account }) {
 
   return (
     <div className={styles.proposalsArea}>
+      {wasUpdated && (
+        <div className={styles.notice} role="status">
+          <strong>Proposta atualizada.</strong>
+        </div>
+      )}
+
       <div className={styles.listHeader}>
         <div>
           <h2>Propostas disponíveis</h2>
@@ -438,9 +446,22 @@ export default function PtsProposalList({ account }: { account: Account }) {
         </div>
       ) : (
         <div className={styles.proposalList}>
-          {enrichedProposals.map((proposal) => (
-            <PtsProposalCard key={proposal.id} proposal={proposal} />
-          ))}
+          {enrichedProposals.map((proposal) => {
+            const canEdit =
+              proposal.status?.toUpperCase() === 'DRAFT' &&
+              Boolean(proposal.responsible?.id) &&
+              account.professionalProfileIds.includes(
+                proposal.responsible?.id ?? '',
+              );
+
+            return (
+              <PtsProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                canEdit={canEdit}
+              />
+            );
+          })}
         </div>
       )}
 
