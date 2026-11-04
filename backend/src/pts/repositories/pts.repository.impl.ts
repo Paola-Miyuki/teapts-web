@@ -17,10 +17,12 @@ import {
   type ProfessionalRecord,
   type UpdatePtsProposalInput,
   type SocialSituationTarget,
+  type ProposalDecisionTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -410,6 +412,128 @@ export class PtsRepositoryImpl extends PtsRepository {
 
     return { id, socialSituation };
   }
+
+  // --- Implementação dos métodos da RFPTS003 ---
+
+  async findProposalForDecision(
+    id: string,
+  ): Promise<ProposalDecisionTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      select: { id: true, status: true, patientId: true },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum,
+      patientId: pts.patientId,
+    };
+  }
+
+  async approveProposal(
+    id: string,
+    patientId: string,
+  ): Promise<PtsDecisionResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const now = new Date();
+
+      // 1. Atualiza a proposta alvo para PLANNING e define acceptedAt
+      await queryRunner.manager.update(PtsEntity, id, {
+        status: PtsStateEnum.PLANNING,
+        acceptedAt: now,
+      });
+
+      // 2. Rejeita todas as outras propostas em DRAFT do mesmo paciente na mesma operação atômica
+      await queryRunner.manager
+        .createQueryBuilder()
+        .update(PtsEntity)
+        .set({
+          status: PtsStateEnum.REJECTED,
+          rejectedAt: now,
+        })
+        .where('patientId = :patientId', { patientId })
+        .andWhere('status = :status', { status: PtsStateEnum.DRAFT })
+        .andWhere('id != :id', { id })
+        .execute();
+
+      const updatedPts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id },
+      });
+
+      if (!updatedPts) {
+        throw new Error('Erro ao recuperar a proposta aprovada.');
+      }
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id: updatedPts.id,
+        status: PtsStateEnum.PLANNING,
+        acceptedAt: updatedPts.acceptedAt?.toISOString() ?? null,
+        rejectedAt: updatedPts.rejectedAt?.toISOString() ?? null,
+      };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async rejectProposal(id: string): Promise<PtsDecisionResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const now = new Date();
+
+      await queryRunner.manager.update(PtsEntity, id, {
+        status: PtsStateEnum.REJECTED,
+        rejectedAt: now,
+      });
+
+      const updatedPts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id },
+      });
+
+      if (!updatedPts) {
+        throw new Error('Erro ao recuperar a proposta rejeitada.');
+      }
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id: updatedPts.id,
+        status: PtsStateEnum.REJECTED,
+        acceptedAt: updatedPts.acceptedAt?.toISOString() ?? null,
+        rejectedAt: updatedPts.rejectedAt?.toISOString() ?? null,
+      };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  // --- Mapeadores Auxiliares ---
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
     return {
