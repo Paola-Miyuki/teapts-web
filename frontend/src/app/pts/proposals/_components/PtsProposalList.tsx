@@ -14,10 +14,14 @@ import EmptyState from './EmptyState';
 
 import type { PtsProposal } from './PtsProposalCard';
 import type { Patient, Professional } from '../../novo/types';
-import { listEligiblePatients, listProfessionals } from '../../novo/api/ptsApi';
+import {
+  listAuthorizedPatients,
+  listProfessionals,
+} from '../../novo/api/ptsApi';
 
 // 1. Importamos a interface Account do sistema
 import type { Account } from '@/lib/account';
+import { can } from '@/lib/permissions';
 
 type PaginationData = {
   page: number;
@@ -71,7 +75,9 @@ export default function PtsProposalList({ account }: { account: Account }) {
   >({});
   const [patientsMap, setPatientsMap] = useState<Record<string, Patient>>({});
   const [eligiblePatients, setEligiblePatients] = useState<Patient[]>([]);
-  const [patientsLoading, setPatientsLoading] = useState(true);
+  const [patientsLoading, setPatientsLoading] = useState(() =>
+    can(account, 'viewAuthorizedPatients'),
+  );
   const [patientsError, setPatientsError] = useState('');
   const [supportRetryKey, setSupportRetryKey] = useState(0);
 
@@ -83,44 +89,40 @@ export default function PtsProposalList({ account }: { account: Account }) {
     totalPages: 0,
   });
 
-  // Carrega pacientes e profissionais independentemente.
+  // Apenas profissionais consultam a lista de pacientes autorizados.
   useEffect(() => {
     const controller = new AbortController();
 
-    listProfessionals(controller.signal)
-      .then((profs) => {
+    if (!can(account, 'viewAuthorizedPatients')) {
+      return () => controller.abort();
+    }
+
+    Promise.all([
+      listProfessionals(controller.signal),
+      listAuthorizedPatients(controller.signal),
+    ])
+      .then(([profs, pats]) => {
         if (controller.signal.aborted) return;
 
         const loadedProfs: Professional[] = Array.isArray(profs)
           ? profs
           : ((profs as { data?: Professional[] })?.data ?? []);
+        const loadedPatients: Patient[] = Array.isArray(pats)
+          ? pats
+          : ((pats as { data?: Patient[] })?.data ?? []);
 
         const pMap: Record<string, Professional> = {};
+        const patMap: Record<string, Patient> = {};
 
         loadedProfs.forEach((professional) => {
           if (professional?.id) pMap[professional.id] = professional;
         });
 
-        setProfessionalsMap(pMap);
-      })
-      .catch(() => {
-        // A falha não deve impedir a busca de pacientes.
-      });
-
-    listEligiblePatients(controller.signal)
-      .then((pats) => {
-        if (controller.signal.aborted) return;
-
-        const loadedPatients: Patient[] = Array.isArray(pats)
-          ? pats
-          : ((pats as { data?: Patient[] })?.data ?? []);
-
-        const patMap: Record<string, Patient> = {};
-
         loadedPatients.forEach((patient) => {
           if (patient?.id) patMap[patient.id] = patient;
         });
 
+        setProfessionalsMap(pMap);
         setPatientsMap(patMap);
         setEligiblePatients(loadedPatients);
         setPatientsError('');
@@ -137,7 +139,7 @@ export default function PtsProposalList({ account }: { account: Account }) {
       });
 
     return () => controller.abort();
-  }, [supportRetryKey]);
+  }, [account, supportRetryKey]);
 
   const invalidPatientId =
     Boolean(patientIdFromUrl) && !UUID_PATTERN.test(patientIdFromUrl);

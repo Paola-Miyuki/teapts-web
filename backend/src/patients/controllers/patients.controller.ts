@@ -3,7 +3,15 @@
 // O ValidationPipe global valida a query e o corpo, e o controller delega ao
 // PatientsService.
 
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -72,6 +80,43 @@ export class PatientsController {
     @Query() query: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
     return this.patientsService.findAuthorized(account.accountId, query);
+  }
+
+  /**
+   * Retorna pacientes sem PTS ativo para criação de uma nova proposta.
+   *
+   * Diferente de `/patients/authorized`, esta consulta não exige vínculo
+   * prévio com um PTS; exige somente que a conta tenha perfil profissional.
+   */
+  @Get('patients/available-for-pts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: GetAuthorizedPatientsResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao profissional.',
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar os pacientes disponíveis.',
+    },
+  })
+  async findAvailableForPts(
+    @CurrentAccount() account: AccountContext,
+    @Query() query: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    if (account.professionalProfileIds.length === 0) {
+      throw new ForbiddenException({
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao profissional.',
+      });
+    }
+
+    return this.patientsService.findAvailableForPts(query);
   }
 
   /**

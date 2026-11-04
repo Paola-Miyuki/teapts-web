@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PtsProposalList from './_components/PtsProposalList';
 import type { Account } from '@/lib/account';
-import { listEligiblePatients } from '../novo/api/ptsApi';
+import { listAuthorizedPatients } from '../novo/api/ptsApi';
 
 const mockReplace = jest.fn();
 
@@ -19,6 +19,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('../novo/api/ptsApi', () => ({
   listProfessionals: jest.fn(() => Promise.resolve([])),
   listEligiblePatients: jest.fn(() => Promise.resolve([])),
+  listAuthorizedPatients: jest.fn(() => Promise.resolve([])),
 }));
 
 const PATIENT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
@@ -132,6 +133,7 @@ describe('PtsProposalList', () => {
     render(<PtsProposalList account={professionalAccount()} />);
 
     expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=1&limit=20`,
       { credentials: 'include' },
@@ -219,7 +221,7 @@ describe('PtsProposalList', () => {
     mockSearchParams = new URLSearchParams('search=Paciente%20Teste');
 
     jest
-      .mocked(listEligiblePatients)
+      .mocked(listAuthorizedPatients)
       .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
 
     (global.fetch as jest.Mock).mockImplementationOnce(() =>
@@ -240,7 +242,7 @@ describe('PtsProposalList', () => {
     mockSearchParams = new URLSearchParams('search=Paciente%20Inexistente');
 
     jest
-      .mocked(listEligiblePatients)
+      .mocked(listAuthorizedPatients)
       .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
 
     render(<PtsProposalList account={professionalAccount()} />);
@@ -257,7 +259,7 @@ describe('PtsProposalList', () => {
 
     mockSearchParams = new URLSearchParams('search=Maria');
 
-    jest.mocked(listEligiblePatients).mockResolvedValueOnce([
+    jest.mocked(listAuthorizedPatients).mockResolvedValueOnce([
       { id: PATIENT_ID, name: 'Maria Silva' },
       { id: secondPatientId, name: 'Maria Souza' },
     ]);

@@ -33,6 +33,8 @@ function createService() {
           filters: GetAuthorizedPatientsRequestDto,
         ) => Promise<AuthorizedPatientsPage>
       >(),
+    findAvailableForPtsPaginated:
+      jest.fn<(filters: GetAuthorizedPatientsRequestDto) => Promise<AuthorizedPatientsPage>>(),
   };
   const accountRepository = {
     findOne: jest.fn<(options: unknown) => Promise<Partial<Account> | null>>(),
@@ -79,6 +81,39 @@ describe('PatientsService.findAuthorized', () => {
     ).resolves.toMatchObject({
       data: [],
       pagination: { total: 0, totalPages: 0 },
+    });
+  });
+
+  describe('PatientsService.findAvailableForPts', () => {
+    it('returns patients that can receive a new proposal', async () => {
+      const { repository, service } = createService();
+      repository.findAvailableForPtsPaginated.mockResolvedValue({
+        rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+        total: 1,
+      });
+
+      await expect(
+        service.findAvailableForPts({ page: 1, limit: 10 }),
+      ).resolves.toEqual({
+        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      });
+    });
+
+    it('returns a safe internal error when the available-patients query fails', async () => {
+      const { repository, service } = createService();
+      repository.findAvailableForPtsPaginated.mockRejectedValue(
+        new Error('database connection details'),
+      );
+
+      await expect(
+        service.findAvailableForPts({ page: 1, limit: 10 }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 'ERROR',
+          message: 'Não foi possível consultar os pacientes disponíveis.',
+        },
+      });
     });
   });
 

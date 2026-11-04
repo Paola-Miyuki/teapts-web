@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
+import { can } from '@/lib/permissions';
 
 import LoadingState from './_components/LoadingState';
 import PtsProposalList from './_components/PtsProposalList';
@@ -45,12 +46,14 @@ function ProposalsContent({ account }: { account: Account }) {
 
   return (
     <>
-      <PtsProposalFilters
-        key={searchFromUrl}
-        filters={{ search: searchFromUrl }}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-      />
+      {can(account, 'viewAuthorizedPatients') && (
+        <PtsProposalFilters
+          key={searchFromUrl}
+          filters={{ search: searchFromUrl }}
+          onApply={handleApplyFilters}
+          onClear={handleClearFilters}
+        />
+      )}
 
       <Suspense fallback={<LoadingState />}>
         <PtsProposalList
@@ -67,6 +70,7 @@ export default function PtsProposalsPage() {
     <AuthenticatedPage
       currentHref="/pts/proposals"
       breadcrumb="Propostas de PTS"
+      requiredAction="viewPtsProposals"
     >
       {(account: Account) => (
         <>
@@ -82,12 +86,14 @@ export default function PtsProposalsPage() {
               </div>
             </div>
 
-            <Link
-              href="/pts/novo"
-              className={`${ui.btn} ${ui.btnPrimary} ${styles.headerAction}`}
-            >
-              Novo PTS
-            </Link>
+            {can(account, 'createPts') && (
+              <Link
+                href="/pts/novo"
+                className={`${ui.btn} ${ui.btnPrimary} ${styles.headerAction}`}
+              >
+                Novo PTS
+              </Link>
+            )}
           </div>
 
           <div className={styles.notice}>

@@ -33,8 +33,10 @@ const statusMap: Record<string, string> = {
 
 export default function PtsProposalCard({
   proposal,
+  showSocialSituation = true,
 }: {
   proposal: PtsProposal;
+  showSocialSituation?: boolean;
 }) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
@@ -85,19 +87,21 @@ export default function PtsProposalCard({
         </div>
       </div>
 
-      <div className={styles.socialSituation}>
-        <h3>Situação Social</h3>
-        <p
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {socialSit}
-        </p>
-      </div>
+      {showSocialSituation && (
+        <div className={styles.socialSituation}>
+          <h3>Situação Social</h3>
+          <p
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {socialSit}
+          </p>
+        </div>
+      )}
 
       <div className={styles.teamSection}>
         <h3>Equipe</h3>

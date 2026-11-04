@@ -38,9 +38,11 @@ export type CreatePatientBody = {
 
 export type PatientProfile = CreatePatientBody;
 
-// GET /accounts: 1ª página das contas sem perfil de paciente (só admin).
+// GET /accounts: contas sem perfil de paciente e sem perfil profissional.
 export function getAccountsWithoutPatientProfile() {
-  return request<AccountsResponse>('/accounts?isPatient=false&page=1&limit=20');
+  return request<AccountsResponse>(
+    '/accounts?isPatient=false&isProfessional=false&page=1&limit=20',
+  );
 }
 
 // GET /accounts: contas com perfil de paciente, paginadas (só admin).

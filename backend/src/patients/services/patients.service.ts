@@ -117,6 +117,35 @@ export class PatientsService {
   }
 
   /**
+   * Busca pacientes disponíveis para criação de uma nova proposta de PTS.
+   */
+  async findAvailableForPts(
+    request: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    let page: AuthorizedPatientsPage;
+
+    try {
+      page = await this.patientsRepository.findAvailableForPtsPaginated(request);
+    } catch (error) {
+      this.logger.error('Available patients query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar os pacientes disponíveis.',
+      });
+    }
+
+    const { rows, total } = page;
+
+    return {
+      data: rows.map((row) => ({
+        id: row.patient_id,
+        name: row.account_name,
+      })),
+      pagination: toPagination(request, total),
+    };
+  }
+
+  /**
    * Cria o perfil de paciente de uma conta existente (RFPAC001).
    *
    * Uma conta tem no máximo um perfil de paciente (RN002); admin, paciente e

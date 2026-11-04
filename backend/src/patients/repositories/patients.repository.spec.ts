@@ -124,6 +124,34 @@ describe('PatientsRepository.findAuthorizedPaginated', () => {
   });
 });
 
+describe('PatientsRepository.findAvailableForPtsPaginated', () => {
+  it('returns patients without an active PTS', async () => {
+    const { query, typeormRepository, repository } = createRepository();
+    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
+    query.getCount.mockResolvedValue(1);
+    query.getRawMany.mockResolvedValue([row]);
+
+    await expect(
+      repository.findAvailableForPtsPaginated({ page: 1, limit: 10 }),
+    ).resolves.toEqual({ rows: [row], total: 1 });
+
+    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
+      'patient',
+    );
+    expect(query.where).toHaveBeenCalledWith(
+      `NOT EXISTS (
+    SELECT 1
+    FROM projeto_terapeutico_singular pts
+    WHERE pts.patient_id = patient."accountId"
+      AND pts.status IN (:...states)
+  )`,
+      { states: ACTIVE_PTS_STATES },
+    );
+    expect(query.offset).toHaveBeenCalledWith(0);
+    expect(query.limit).toHaveBeenCalledWith(10);
+  });
+});
+
 describe('PatientsRepository.insert', () => {
   function createInsertRepository() {
     const insertQuery = {
