@@ -31,11 +31,20 @@ const statusMap: Record<string, string> = {
   completed: 'Concluída',
 };
 
+interface PtsProposalCardProps {
+  proposal: PtsProposal;
+  isPatient?: boolean;
+  onOpenDecisionModal?: (
+    proposalId: string,
+    type: 'approve' | 'reject',
+  ) => void;
+}
+
 export default function PtsProposalCard({
   proposal,
-}: {
-  proposal: PtsProposal;
-}) {
+  isPatient = false,
+  onOpenDecisionModal,
+}: PtsProposalCardProps) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
   const profSpecialism =
@@ -124,6 +133,67 @@ export default function PtsProposalCard({
           </p>
         )}
       </div>
+
+      {/* Ações de aprovação / rejeição exclusivas para o paciente */}
+      {isPatient && onOpenDecisionModal && (
+        <div className="mt-5 flex items-center justify-end gap-3 border-t border-gray-100 pt-4 px-5 pb-5">
+          <button
+            type="button"
+            onClick={() => onOpenDecisionModal(proposal.id, 'reject')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffc107';
+              e.currentTarget.style.color = '#1f2937';
+              e.currentTarget.style.borderColor = '#ffc107';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.color = '#ff0000';
+              e.currentTarget.style.borderColor = '#d1d5db';
+            }}
+            style={{
+              backgroundColor: 'transparent',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Rejeitar
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenDecisionModal(proposal.id, 'approve')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffc107';
+              e.currentTarget.style.color = '#1f2937';
+              e.currentTarget.style.borderColor = '#ffc107';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.color = '#374151';
+              e.currentTarget.style.borderColor = '#d1d5db';
+            }}
+            style={{
+              backgroundColor: '#ffffff',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            Escolher esta equipe
+          </button>
+        </div>
+      )}
     </article>
   );
 }

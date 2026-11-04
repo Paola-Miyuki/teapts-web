@@ -36,6 +36,15 @@ type ApiErrorResponse = {
   message?: string;
 };
 
+type PtsProposalListProps = {
+  account: Account;
+  isPatient?: boolean;
+  onOpenDecisionModal?: (
+    proposalId: string,
+    type: 'approve' | 'reject',
+  ) => void;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 const PAGE_LIMIT = 20;
 
@@ -54,8 +63,11 @@ async function getApiMessage(response: Response, fallback: string) {
   return fallback;
 }
 
-// 2. Definimos que o componente recebe { account } do tipo Account
-export default function PtsProposalList({ account }: { account: Account }) {
+export default function PtsProposalList({
+  account,
+  isPatient = false,
+  onOpenDecisionModal,
+}: PtsProposalListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -439,7 +451,12 @@ export default function PtsProposalList({ account }: { account: Account }) {
       ) : (
         <div className={styles.proposalList}>
           {enrichedProposals.map((proposal) => (
-            <PtsProposalCard key={proposal.id} proposal={proposal} />
+            <PtsProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              isPatient={isPatient}
+              onOpenDecisionModal={onOpenDecisionModal}
+            />
           ))}
         </div>
       )}
