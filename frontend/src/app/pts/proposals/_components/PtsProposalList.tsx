@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import styles from '../proposals.module.css';
+import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 
 import ErrorState from './ErrorState';
@@ -11,13 +12,16 @@ import LoadingState from './LoadingState';
 import Pagination from './Pagination';
 import PtsProposalCard from './PtsProposalCard';
 import EmptyState from './EmptyState';
+import ProposalDecisionDialog from './ProposalDecisionDialog';
 
 import type { PtsProposal } from './PtsProposalCard';
 import type { Patient, Professional } from '../../novo/types';
 import { listEligiblePatients, listProfessionals } from '../../novo/api/ptsApi';
+import { decideProposal, type ProposalDecision } from '../api';
+import { ApiError } from '@/lib/api';
 
 // 1. Importamos a interface Account do sistema
-import type { Account } from '@/lib/account';
+import { getProfileKind, type Account } from '@/lib/account';
 
 type PaginationData = {
   page: number;
@@ -36,13 +40,9 @@ type ApiErrorResponse = {
   message?: string;
 };
 
-type PtsProposalListProps = {
-  account: Account;
-  isPatient?: boolean;
-  onOpenDecisionModal?: (
-    proposalId: string,
-    type: 'approve' | 'reject',
-  ) => void;
+type PendingDecision = {
+  proposalId: string;
+  decision: ProposalDecision;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
@@ -63,11 +63,8 @@ async function getApiMessage(response: Response, fallback: string) {
   return fallback;
 }
 
-export default function PtsProposalList({
-  account,
-  isPatient = false,
-  onOpenDecisionModal,
-}: PtsProposalListProps) {
+// 2. Definimos que o componente recebe { account } do tipo Account
+export default function PtsProposalList({ account }: { account: Account }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -86,6 +83,14 @@ export default function PtsProposalList({
   const [patientsLoading, setPatientsLoading] = useState(true);
   const [patientsError, setPatientsError] = useState('');
   const [supportRetryKey, setSupportRetryKey] = useState(0);
+
+  const [pendingDecision, setPendingDecision] =
+    useState<PendingDecision | null>(null);
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [decisionError, setDecisionError] = useState('');
+  const [decisionFeedback, setDecisionFeedback] = useState('');
+
+  const isPatient = getProfileKind(account) === 'patient';
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -266,6 +271,65 @@ export default function PtsProposalList({
     setSupportRetryKey((current) => current + 1);
   }
 
+  function handleDecide(proposalId: string, decision: ProposalDecision) {
+    setDecisionError('');
+    setDecisionFeedback('');
+    setPendingDecision({ proposalId, decision });
+  }
+
+  function handleDecisionClose() {
+    setPendingDecision(null);
+    setDecisionError('');
+  }
+
+  async function handleDecisionConfirm() {
+    if (!pendingDecision) return;
+
+    const { proposalId, decision } = pendingDecision;
+    // Ao sair da página, o botão segue desabilitado até a navegação terminar.
+    let leaving = false;
+
+    setDecisionSubmitting(true);
+    setDecisionError('');
+
+    try {
+      await decideProposal(proposalId, decision);
+
+      if (decision === 'approve') {
+        leaving = true;
+        router.push('/pts');
+        return;
+      }
+
+      setProposals(
+        (current) =>
+          current?.filter((proposal) => proposal.id !== proposalId) ?? null,
+      );
+      setPagination((current) => ({
+        ...current,
+        total: Math.max(current.total - 1, 0),
+      }));
+      setPendingDecision(null);
+      setDecisionFeedback('Proposta rejeitada.');
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        leaving = true;
+        router.replace('/login');
+        return;
+      }
+
+      setDecisionError(
+        error instanceof ApiError && error.apiMessage
+          ? error.apiMessage
+          : 'Não foi possível registrar sua decisão. Tente de novo.',
+      );
+    } finally {
+      if (!leaving) {
+        setDecisionSubmitting(false);
+      }
+    }
+  }
+
   function handlePageChange(newPage: number) {
     setProposals(null);
     setProposalError('');
@@ -437,6 +501,19 @@ export default function PtsProposalList({
         </div>
       </div>
 
+      {decisionFeedback && (
+        <div
+          className={`${ui.alert} ${ui.alertSuccess}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
+          </div>
+          <span>{decisionFeedback}</span>
+        </div>
+      )}
+
       {enrichedProposals.length === 0 ? (
         <div
           className={`${ui.card} ${ui.empty}`}
@@ -454,8 +531,7 @@ export default function PtsProposalList({
             <PtsProposalCard
               key={proposal.id}
               proposal={proposal}
-              isPatient={isPatient}
-              onOpenDecisionModal={onOpenDecisionModal}
+              onDecide={isPatient ? handleDecide : undefined}
             />
           ))}
         </div>
@@ -468,6 +544,14 @@ export default function PtsProposalList({
           onPageChange={handlePageChange}
         />
       )}
+
+      <ProposalDecisionDialog
+        decision={pendingDecision?.decision ?? null}
+        submitting={decisionSubmitting}
+        error={decisionError}
+        onConfirm={handleDecisionConfirm}
+        onClose={handleDecisionClose}
+      />
     </div>
   );
 }

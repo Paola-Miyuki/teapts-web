@@ -1,83 +1,131 @@
-import React from 'react';
+'use client';
 
-interface ProposalDecisionDialogProps {
-  isOpen: boolean;
-  type: 'approve' | 'reject' | null;
-  isLoading: boolean;
-  errorMessage: string | null;
+import { useEffect, useRef } from 'react';
+
+import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
+
+import type { ProposalDecision } from '../api';
+import styles from '../proposals.module.css';
+
+type ProposalDecisionDialogProps = {
+  decision: ProposalDecision | null;
+  submitting: boolean;
+  error: string;
   onConfirm: () => void;
-  onCancel: () => void;
-}
+  onClose: () => void;
+};
 
+const COPY: Record<
+  ProposalDecision,
+  { title: string; message: string; confirm: string }
+> = {
+  approve: {
+    title: 'Aceitar proposta?',
+    message:
+      'As outras propostas pendentes serão rejeitadas e o PTS entra em planejamento.',
+    confirm: 'Escolher esta equipe',
+  },
+  reject: {
+    title: 'Rejeitar proposta?',
+    message:
+      'A proposta sai da sua lista. As outras continuam aguardando sua decisão.',
+    confirm: 'Rejeitar',
+  },
+};
+
+// <dialog> nativo, como o AddPatientModal: showModal() prende o foco e o Esc
+// fecha. Durante o envio, o Esc e o clique no fundo não fecham.
 export default function ProposalDecisionDialog({
-  isOpen,
-  type,
-  isLoading,
-  errorMessage,
+  decision,
+  submitting,
+  error,
   onConfirm,
-  onCancel,
+  onClose,
 }: ProposalDecisionDialogProps) {
-  if (!isOpen || !type) return null;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const open = decision !== null;
 
-  const isApprove = type === 'approve';
+  useEffect(() => {
+    const dialog = dialogRef.current;
+
+    if (!dialog) {
+      return;
+    }
+
+    if (open && !dialog.open) {
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
+
+  function handleClose() {
+    if (!submitting) {
+      onClose();
+    }
+  }
+
+  const copy = decision ? COPY[decision] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-bold text-gray-900">
-          {isApprove ? 'Aceitar proposta?' : 'Rejeitar proposta?'}
-        </h3>
+    <dialog
+      ref={dialogRef}
+      className={ui.dialog}
+      aria-labelledby="proposal-decision-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        handleClose();
+      }}
+      onClose={handleClose}
+      onClick={(event) => {
+        if (event.target === dialogRef.current) {
+          handleClose();
+        }
+      }}
+    >
+      {copy && (
+        <>
+          <button
+            type="button"
+            className={`${ui.iconButton} ${ui.dialogClose}`}
+            aria-label="Fechar janela"
+            onClick={handleClose}
+            disabled={submitting}
+          >
+            <Icon name="close" className={ui.icon} />
+          </button>
 
-        <p className="mt-2 text-sm text-gray-600">
-          {isApprove
-            ? 'As outras propostas pendentes serão rejeitadas e o PTS entrará em fase de planejamento.'
-            : 'Tem certeza de que deseja rejeitar esta proposta de PTS?'}
-        </p>
+          <h2 id="proposal-decision-title">{copy.title}</h2>
 
-        {errorMessage && (
-          <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-            {errorMessage}
+          <p>{copy.message}</p>
+
+          {error && (
+            <div className={`${ui.alert} ${ui.alertError}`} role="alert">
+              <p>{error}</p>
+            </div>
+          )}
+
+          <div className={styles.decisionActions}>
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnSecondary}`}
+              onClick={handleClose}
+              disabled={submitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnPrimary}`}
+              onClick={onConfirm}
+              disabled={submitting}
+            >
+              {submitting ? 'Enviando...' : copy.confirm}
+            </button>
           </div>
-        )}
-
-        <div className="mt-6 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isLoading}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isLoading}
-            style={{
-              backgroundColor: isApprove ? '#ffc107' : '#dc2626',
-              color: isApprove ? '#1f2937' : '#ffffff',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              opacity: isLoading ? 0.5 : 1,
-              transition: 'background-color 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            {isLoading
-              ? 'Enviando...'
-              : isApprove
-                ? 'Confirmar Escolha'
-                : 'Confirmar Rejeição'}
-          </button>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </dialog>
   );
 }

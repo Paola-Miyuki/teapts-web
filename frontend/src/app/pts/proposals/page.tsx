@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -13,9 +13,7 @@ import PtsProposalList from './_components/PtsProposalList';
 import PtsProposalFilters, {
   type ProposalFilters,
 } from './_components/PtsProposalFilters';
-import ProposalDecisionDialog from './_components/ProposalDecisionDialog';
 import styles from './proposals.module.css';
-import { getProfileKind } from '@/lib/account';
 
 function ProposalsContent({ account }: { account: Account }) {
   const router = useRouter();
@@ -23,17 +21,6 @@ function ProposalsContent({ account }: { account: Account }) {
 
   const searchFromUrl = searchParams.get('search')?.trim() ?? '';
   const patientIdFromUrl = searchParams.get('patientId')?.trim() ?? '';
-
-  // Novos estados para a issue RFPTS003
-  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(
-    null,
-  );
-  const [dialogType, setDialogType] = useState<'approve' | 'reject' | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   function updateUrl(search: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -56,61 +43,6 @@ function ProposalsContent({ account }: { account: Account }) {
     updateUrl('');
   }
 
-  // Funções de controle do modal e da API
-  const handleOpenModal = (proposalId: string, type: 'approve' | 'reject') => {
-    setSelectedProposalId(proposalId);
-    setDialogType(type);
-    setErrorMessage(null);
-  };
-
-  const handleCloseModal = () => {
-    if (isLoading) return;
-    setSelectedProposalId(null);
-    setDialogType(null);
-    setErrorMessage(null);
-  };
-
-  const handleConfirmDecision = async () => {
-    if (!selectedProposalId || !dialogType) return;
-
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const endpoint = `/pts/proposals/${selectedProposalId}/${dialogType}`;
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
-
-      if (response.status === 401) {
-        router.push('/login');
-        return;
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao processar solicitação.');
-      }
-
-      if (dialogType === 'approve') {
-        router.push('/pts');
-      } else {
-        setFeedbackMessage('Proposta rejeitada.');
-        handleCloseModal();
-        router.refresh();
-      }
-    } catch (err: unknown) {
-      const errorObj = err as Error;
-      setErrorMessage(errorObj.message || 'Erro de comunicação.');
-    }
-  };
-
-  const isPatient = getProfileKind(account) === 'patient';
-
   return (
     <>
       <PtsProposalFilters
@@ -120,29 +52,12 @@ function ProposalsContent({ account }: { account: Account }) {
         onClear={handleClearFilters}
       />
 
-      {feedbackMessage && (
-        <div className="mb-4 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-700 border border-emerald-200">
-          {feedbackMessage}
-        </div>
-      )}
-
       <Suspense fallback={<LoadingState />}>
         <PtsProposalList
           key={`${patientIdFromUrl}:${searchFromUrl}`}
           account={account}
-          isPatient={isPatient}
-          onOpenDecisionModal={handleOpenModal}
         />
       </Suspense>
-
-      <ProposalDecisionDialog
-        isOpen={!!dialogType}
-        type={dialogType}
-        isLoading={isLoading}
-        errorMessage={errorMessage}
-        onConfirm={handleConfirmDecision}
-        onCancel={handleCloseModal}
-      />
     </>
   );
 }
