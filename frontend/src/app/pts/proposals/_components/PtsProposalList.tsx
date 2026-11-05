@@ -441,7 +441,11 @@ export default function PtsProposalList({ account }: { account: Account }) {
       ) : (
         <div className={styles.proposalList}>
           {enrichedProposals.map((proposal) => (
-            <PtsProposalCard key={proposal.id} proposal={proposal} />
+            <PtsProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              showSocialSituation={can(account, 'viewPtsSocialSituation')}
+            />
           ))}
         </div>
       )}

@@ -177,9 +177,7 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
-      expect(
-        await screen.findByText('Acesso restrito ao administrador'),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
       expect(
         screen.getByRole('link', { name: 'Voltar para o início' }),
       ).toHaveAttribute('href', '/home');

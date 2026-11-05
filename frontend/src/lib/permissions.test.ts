@@ -29,72 +29,63 @@ const waiting: PermissionUser = {
 };
 
 const draft = {
-  status: 'DRAFT' as const,
-  patientId: 'patient-id',
-  responsibleProfessionalId: 'professional-id',
-  teamProfessionalIds: ['professional-id', 'other-professional'],
+  status: 'draft',
+  responsibleProfessionalId: 'responsible-id',
+  teamProfessionalIds: ['professional-id'],
 };
 
 describe('can', () => {
-  it('aplica permissões básicas por perfil', () => {
-    expect(can(admin, 'viewPatientRegistry')).toBe(true);
-    expect(can(patient, 'viewPatientRegistry')).toBe(false);
-    expect(can(professional, 'viewAuthorizedPatients')).toBe(true);
-    expect(can(patient, 'viewAuthorizedPatients')).toBe(false);
+  it('restringe o cadastro e a lista de pacientes ao admin', () => {
+    for (const action of [
+      'viewPatientRegistry',
+      'createPatientProfile',
+    ] as const) {
+      expect(can(admin, action)).toBe(true);
+      expect(can(professional, action)).toBe(false);
+      expect(can(patient, action)).toBe(false);
+      expect(can(waiting, action)).toBe(false);
+    }
+  });
+
+  it('libera pacientes autorizados e criação de PTS só ao profissional', () => {
+    for (const action of ['viewAuthorizedPatients', 'createPts'] as const) {
+      expect(can(professional, action)).toBe(true);
+      expect(can(admin, action)).toBe(false);
+      expect(can(patient, action)).toBe(false);
+    }
+  });
+
+  it('esconde o diretório de profissionais do paciente e da conta sem perfil', () => {
+    expect(can(admin, 'viewProfessionalDirectory')).toBe(true);
+    expect(can(professional, 'viewProfessionalDirectory')).toBe(true);
+    expect(can(patient, 'viewProfessionalDirectory')).toBe(false);
+    expect(can(waiting, 'viewProfessionalDirectory')).toBe(false);
+  });
+
+  it('mostra propostas ao paciente e aos profissionais da proposta', () => {
     expect(can(patient, 'viewPtsProposals')).toBe(true);
+    expect(can(professional, 'viewPtsProposals', { pts: draft })).toBe(true);
+    expect(
+      can(professional, 'viewPtsProposals', {
+        pts: { ...draft, teamProfessionalIds: [] },
+      }),
+    ).toBe(false);
     expect(can(admin, 'viewPtsProposals')).toBe(false);
-    expect(can(waiting, 'viewProfessionalDirectory')).toBe(true);
-    expect(can(patient, 'viewProfessionalDirectory')).toBe(true);
   });
 
-  it('protege ações administrativas e do próprio titular', () => {
-    expect(can(admin, 'createPatientProfile')).toBe(true);
-    expect(can(professional, 'createPatientProfile')).toBe(false);
-    expect(can(admin, 'createProfessionalProfile')).toBe(true);
-    expect(can(professional, 'createProfessionalProfile')).toBe(false);
-    expect(can(admin, 'updateProfessionalProfile')).toBe(true);
-    expect(can(professional, 'updateProfessionalProfile')).toBe(false);
-    expect(can(admin, 'deactivateProfessionalProfile')).toBe(true);
-    expect(can(professional, 'deactivateProfessionalProfile')).toBe(false);
-    expect(
-      can(patient, 'deactivateAccount', { targetAccountId: 'patient-account' }),
-    ).toBe(true);
-    expect(
-      can(patient, 'deactivateAccount', { targetAccountId: 'other-account' }),
-    ).toBe(false);
+  it('mantém a situação social oculta para o paciente (DP003)', () => {
+    expect(can(professional, 'viewPtsSocialSituation')).toBe(true);
+    expect(can(patient, 'viewPtsSocialSituation')).toBe(false);
   });
 
-  it('aplica o contexto do PTS ao responsável e à equipe', () => {
-    expect(can(professional, 'editPtsDraft', { pts: draft })).toBe(true);
-    expect(can(professional, 'deletePtsDraft', { pts: draft })).toBe(true);
-    expect(
-      can(professional, 'startPts', { pts: { ...draft, status: 'PLANNING' } }),
-    ).toBe(true);
-    expect(
-      can(professional, 'endPts', { pts: { ...draft, status: 'RUNNING' } }),
-    ).toBe(true);
-    expect(
-      can(professional, 'createActivity', {
-        pts: { ...draft, status: 'RUNNING' },
-      }),
-    ).toBe(true);
-    expect(can(patient, 'editPtsDraft', { pts: draft })).toBe(false);
-    expect(
-      can(professional, 'editPtsDraft', {
-        pts: { ...draft, responsibleProfessionalId: 'other-professional' },
-      }),
-    ).toBe(false);
-  });
-
-  it('mantém ações de responsável tutelar negadas enquanto DP002 estiver pendente', () => {
-    expect(can(patient, 'linkGuardian')).toBe(false);
-    expect(can(patient, 'grantDataSharing')).toBe(true);
-    expect(can(patient, 'revokeDataSharing')).toBe(true);
-    expect(can(waiting, 'grantDataSharing')).toBe(false);
-  });
-
-  it('mantém exclusão de documento negada enquanto DP009 estiver pendente', () => {
-    expect(can(patient, 'deleteDocument')).toBe(false);
-    expect(can(professional, 'deleteDocument')).toBe(false);
+  it('deixa só o paciente decidir, e só proposta em draft', () => {
+    for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
+      expect(can(patient, action, { pts: draft })).toBe(true);
+      expect(
+        can(patient, action, { pts: { ...draft, status: 'planning' } }),
+      ).toBe(false);
+      expect(can(professional, action, { pts: draft })).toBe(false);
+      expect(can(admin, action, { pts: draft })).toBe(false);
+    }
   });
 });

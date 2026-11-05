@@ -138,16 +138,18 @@ describe('HomePage', () => {
     expect(
       screen.getByText('Profissional', { selector: 'small' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Consultar PTS' }),
-    ).toHaveAttribute('href', '/pts/proposals');
+    expect(screen.getByRole('link', { name: 'Consultar PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
     expect(screen.getByRole('link', { name: 'PTS' })).toHaveAttribute(
       'href',
       '/pts/proposals',
     );
-    expect(
-      screen.getByRole('link', { name: 'Profissionais' }),
-    ).toHaveAttribute('href', '/professionals');
+    expect(screen.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
+      'href',
+      '/professionals',
+    );
   });
 
   it('mostra a área administrativa para administradores', async () => {

@@ -67,15 +67,10 @@ export default function AuthenticatedPage({
 
   const kind = getProfileKind(account);
 
-  if (requiredAction && !can(account, requiredAction, { profileKind: kind })) {
-    const restrictedTitle =
-      requiredAction === 'viewPatientRegistry'
-        ? 'Acesso restrito ao administrador'
-        : 'Acesso restrito';
-
+  if (requiredAction && !can(account, requiredAction)) {
     return (
       <div className={styles.status} role="alert">
-        <h1>{restrictedTitle}</h1>
+        <h1>Acesso restrito</h1>
         <p>Você não tem permissão para acessar esta área.</p>
         <Link href="/home" className={`${ui.btn} ${ui.btnSecondary}`}>
           Voltar para o início
@@ -90,7 +85,6 @@ export default function AuthenticatedPage({
       roleLabel={ROLE_LABELS[kind]}
       navCaption={isPatientArea(kind) ? 'Meu cuidado' : 'Área de trabalho'}
       navItems={getNavigation(account, currentHref)}
-      canLogout={can(account, 'logout')}
       currentHref={currentHref}
       breadcrumb={
         typeof breadcrumb === 'function' ? breadcrumb(kind) : breadcrumb

@@ -22,7 +22,7 @@ const EYEBROWS: Record<ProfileKind, string> = {
 export default function HomeContent({ account, kind, name }: HomeContentProps) {
   const firstName = name.trim().split(/\s+/)[0] ?? '';
   const patientCare = can(account, 'viewOwnCare');
-  const waitingHome = can(account, 'viewWaitingHome', { profileKind: kind });
+  const waitingHome = can(account, 'viewWaitingHome');
   const patientArea = patientCare || waitingHome;
 
   return (

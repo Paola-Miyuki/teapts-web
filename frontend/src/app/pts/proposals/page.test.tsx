@@ -114,7 +114,9 @@ describe('PtsProposalList', () => {
 
     expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
     expect(screen.getByText('Paciente Teste')).toBeInTheDocument();
-    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Situação social de teste.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Integrante Teste')).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(

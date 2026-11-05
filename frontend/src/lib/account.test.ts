@@ -24,7 +24,6 @@ describe('getNavigation', () => {
       href: '/patients',
       icon: 'patient',
       label: 'Pacientes',
-      action: 'viewPatientRegistry',
       current: true,
     });
   });
@@ -62,9 +61,8 @@ describe('getNavigation', () => {
     ).toEqual(['Início', 'Profissionais', 'PTS']);
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Meu cuidado',
-      'Profissionais',
       'PTS',
     ]);
-    expect(labels(account())).toEqual(['Início', 'Profissionais']);
+    expect(labels(account())).toEqual(['Início']);
   });
 });

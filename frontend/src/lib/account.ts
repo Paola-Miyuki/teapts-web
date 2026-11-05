@@ -1,9 +1,8 @@
 import type { IconName } from '@/components/Icon';
 import { request } from '@/lib/api';
-import { can, getProfileKind } from '@/lib/permissions';
-import type { PermissionAction, PermissionUser, ProfileKind } from '@/lib/permissions';
-export type { ProfileKind } from '@/lib/permissions';
-export { getProfileKind } from '@/lib/permissions';
+import { can, getProfileKind, type ProfileKind } from '@/lib/permissions';
+
+export { getProfileKind, type ProfileKind } from '@/lib/permissions';
 
 export type Account = {
   accountId: string;
@@ -13,8 +12,6 @@ export type Account = {
   patientProfileId: string | null;
   professionalProfileIds: string[];
 };
-
-export type AccountPermissionUser = PermissionUser;
 
 // GET /me: conta da sessão atual.
 export function getMe() {
@@ -53,7 +50,6 @@ export type NavItem = {
   href: string;
   icon: IconName;
   label: string;
-  action: PermissionAction;
   current?: boolean;
 };
 
@@ -76,13 +72,11 @@ export function isPatientArea(kind: ProfileKind) {
 }
 
 export function getNavigation(account: Account, currentHref: string) {
-  const kind = getProfileKind(account);
   const items: NavItem[] = [
     {
       href: '/home',
       icon: 'home',
-      action: 'viewHome',
-      label: HOME_LABELS[kind],
+      label: HOME_LABELS[getProfileKind(account)],
     },
   ];
 
@@ -91,33 +85,18 @@ export function getNavigation(account: Account, currentHref: string) {
       href: '/professionals',
       icon: 'people',
       label: 'Profissionais',
-      action: 'viewProfessionalDirectory',
     });
   }
 
   if (can(account, 'viewPtsProposals')) {
-    items.push({
-      href: '/pts/proposals',
-      icon: 'clipboard',
-      label: 'PTS',
-      action: 'viewPtsProposals',
-    });
+    items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }
 
   if (can(account, 'viewPatientRegistry')) {
-    items.push({
-      href: '/patients',
-      icon: 'patient',
-      label: 'Pacientes',
-      action: 'viewPatientRegistry',
-    });
+    items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
   }
 
-  const visibleItems = items.filter((item) =>
-    can(account, item.action, { profileKind: kind }),
-  );
-
-  return visibleItems.map((item) => ({
+  return items.map((item) => ({
     ...item,
     current: item.href === currentHref,
   }));
