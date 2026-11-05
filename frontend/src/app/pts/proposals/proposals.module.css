@@ -547,3 +547,26 @@
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* Decisão do paciente: ações do card e do diálogo */
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.decisionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .cardActions > *,
+  .decisionActions > * {
+    flex: 1;
+  }
+}

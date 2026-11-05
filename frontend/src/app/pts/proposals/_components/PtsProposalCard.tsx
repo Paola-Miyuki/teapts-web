@@ -1,3 +1,6 @@
+import ui from '@/components/ui.module.css';
+
+import type { ProposalDecision } from '../api';
 import styles from '../proposals.module.css';
 
 export type PtsProposal = {
@@ -31,13 +34,18 @@ const statusMap: Record<string, string> = {
   completed: 'Concluída',
 };
 
+type PtsProposalCardProps = {
+  proposal: PtsProposal;
+  showSocialSituation?: boolean;
+  // Só o paciente decide: sem o callback, o card não mostra as ações.
+  onDecide?: (proposalId: string, decision: ProposalDecision) => void;
+};
+
 export default function PtsProposalCard({
   proposal,
   showSocialSituation = true,
-}: {
-  proposal: PtsProposal;
-  showSocialSituation?: boolean;
-}) {
+  onDecide,
+}: PtsProposalCardProps) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
   const profSpecialism =
@@ -128,6 +136,25 @@ export default function PtsProposalCard({
           </p>
         )}
       </div>
+
+      {onDecide && (
+        <div className={styles.cardActions}>
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnPrimary}`}
+            onClick={() => onDecide(proposal.id, 'approve')}
+          >
+            Escolher esta equipe
+          </button>
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnSecondary}`}
+            onClick={() => onDecide(proposal.id, 'reject')}
+          >
+            Rejeitar
+          </button>
+        </div>
+      )}
     </article>
   );
 }

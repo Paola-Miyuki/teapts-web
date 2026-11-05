@@ -330,6 +330,35 @@ possíveis são `400` (`VALIDATION_ERROR` ou
 (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
 (`PTS_NOT_DRAFT`).
 
+## POST /pts/proposals/:id/approve e /reject
+
+Exige sessão autenticada; só o paciente dono decide uma proposta em
+`draft`. Não há corpo.
+
+- **approve**: a proposta vai para `planning` com `acceptedAt`, e as demais
+  `draft` do paciente vão para `rejected` com `rejectedAt`, na mesma
+  transação.
+- **reject**: só a proposta escolhida vai para `rejected` com `rejectedAt`.
+
+A resposta `200` retorna a proposta decidida:
+
+```json
+{
+  "id": "3f2e1d0c-9b8a-4765-a432-10fedcba9876",
+  "status": "planning",
+  "acceptedAt": "2026-10-15T12:30:00.000Z",
+  "rejectedAt": null
+}
+```
+
+Os erros possíveis são `400` (`id` que não é UUID), `401` (sem sessão),
+`403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409` (`PTS_NOT_DRAFT` ou,
+na aprovação, `ACTIVE_PTS_ALREADY_EXISTS`).
+
+A transação trava os PTS do paciente (`pessimistic_write`, em ordem de
+`id`) e refaz as checagens, então duas decisões simultâneas não deixam dois
+PTS ativos nem rejeitam um PTS já aprovado.
+
 ## Documentação da API
 
 O `@nestjs/swagger` gera o documento a partir dos controllers e DTOs; o
