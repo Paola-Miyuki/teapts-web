@@ -151,6 +151,19 @@ totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 (`Parâmetro inválido: X`), `401` (sem sessão) e `500`
 (`Não foi possível consultar os pacientes autorizados.`).
 
+## GET /patients/available-for-pts
+
+Exige sessão autenticada de uma conta com perfil profissional e lista os
+pacientes que podem receber uma nova proposta: os que não têm PTS em
+`planning` ou `running`. Proposta em `draft` não impede uma nova. Não exige
+vínculo prévio com o paciente; é a lista que o `pts/novo` usa para escolher o
+paciente.
+
+Usa os mesmos parâmetros e a mesma resposta de `GET /patients/authorized`.
+Os erros possíveis são `400` (`Parâmetro inválido: X`), `401` (sem sessão),
+`403` (`FORBIDDEN`, conta sem perfil profissional) e `500`
+(`Não foi possível consultar os pacientes disponíveis.`).
+
 ## GET /pts/active
 
 Exige sessão autenticada e consulta o PTS ativo do paciente informado. O

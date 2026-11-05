@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 
 import { useAccount } from '@/hooks/useAccount';
 import {
@@ -10,12 +11,14 @@ import {
   ROLE_LABELS,
 } from '@/lib/account';
 import type { Account, ProfileKind } from '@/lib/account';
+import { can, type PermissionAction } from '@/lib/permissions';
 import AppShell from './AppShell';
 import styles from './AppShell.module.css';
 import ui from './ui.module.css';
 
 type AuthenticatedPageProps = {
   currentHref: string;
+  requiredAction?: PermissionAction;
   breadcrumb?: string | ((kind: ProfileKind) => string | undefined);
   children:
     | ReactNode
@@ -29,6 +32,7 @@ type AuthenticatedPageProps = {
 // Carrega a conta e envolve a página na estrutura padrão (barra lateral e cabeçalho).
 export default function AuthenticatedPage({
   currentHref,
+  requiredAction,
   breadcrumb,
   children,
 }: AuthenticatedPageProps) {
@@ -63,12 +67,24 @@ export default function AuthenticatedPage({
 
   const kind = getProfileKind(account);
 
+  if (requiredAction && !can(account, requiredAction)) {
+    return (
+      <div className={styles.status} role="alert">
+        <h1>Acesso restrito</h1>
+        <p>Você não tem permissão para acessar esta área.</p>
+        <Link href="/home" className={`${ui.btn} ${ui.btnSecondary}`}>
+          Voltar para o início
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <AppShell
       userName={account.name}
       roleLabel={ROLE_LABELS[kind]}
       navCaption={isPatientArea(kind) ? 'Meu cuidado' : 'Área de trabalho'}
-      navItems={getNavigation(kind, currentHref)}
+      navItems={getNavigation(account, currentHref)}
       currentHref={currentHref}
       breadcrumb={
         typeof breadcrumb === 'function' ? breadcrumb(kind) : breadcrumb

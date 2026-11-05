@@ -36,12 +36,14 @@ const statusMap: Record<string, string> = {
 
 type PtsProposalCardProps = {
   proposal: PtsProposal;
+  showSocialSituation?: boolean;
   // Só o paciente decide: sem o callback, o card não mostra as ações.
   onDecide?: (proposalId: string, decision: ProposalDecision) => void;
 };
 
 export default function PtsProposalCard({
   proposal,
+  showSocialSituation = true,
   onDecide,
 }: PtsProposalCardProps) {
   const profName =
@@ -93,19 +95,21 @@ export default function PtsProposalCard({
         </div>
       </div>
 
-      <div className={styles.socialSituation}>
-        <h3>Situação Social</h3>
-        <p
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {socialSit}
-        </p>
-      </div>
+      {showSocialSituation && (
+        <div className={styles.socialSituation}>
+          <h3>Situação Social</h3>
+          <p
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {socialSit}
+          </p>
+        </div>
+      )}
 
       <div className={styles.teamSection}>
         <h3>Equipe</h3>

@@ -4,6 +4,7 @@
 // conversão para o contrato público e os metadados da paginação.
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -12,6 +13,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { toPagination } from '../../common/pagination/pagination';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
@@ -102,6 +104,45 @@ export class PatientsService {
       throw new InternalServerErrorException({
         status: 'ERROR',
         message: 'Não foi possível consultar os pacientes autorizados.',
+      });
+    }
+
+    const { rows, total } = page;
+
+    return {
+      data: rows.map((row) => ({
+        id: row.patient_id,
+        name: row.account_name,
+      })),
+      pagination: toPagination(request, total),
+    };
+  }
+
+  /**
+   * Busca pacientes disponíveis para criação de uma nova proposta de PTS.
+   * Só a conta com perfil profissional consulta (RFPTS001).
+   */
+  async findAvailableForPts(
+    account: AccountContext,
+    request: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    if (account.professionalProfileIds.length === 0) {
+      throw new ForbiddenException({
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao profissional.',
+      });
+    }
+
+    let page: AuthorizedPatientsPage;
+
+    try {
+      page =
+        await this.patientsRepository.findAvailableForPtsPaginated(request);
+    } catch (error) {
+      this.logger.error('Available patients query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar os pacientes disponíveis.',
       });
     }
 

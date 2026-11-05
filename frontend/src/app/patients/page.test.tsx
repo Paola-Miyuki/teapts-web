@@ -15,7 +15,7 @@ const mockedUseRouter = useRouter as jest.Mock;
 
 const API = 'http://localhost:3000';
 const PATIENTS_URL = `${API}/accounts?isPatient=true&page=1&limit=10`;
-const ACCOUNTS_URL = `${API}/accounts?isPatient=false&page=1&limit=20`;
+const ACCOUNTS_URL = `${API}/accounts?isPatient=false&isProfessional=false&page=1&limit=20`;
 
 const ACCOUNT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
 
@@ -177,9 +177,10 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
+      expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
       expect(
-        await screen.findByText('Acesso restrito ao administrador'),
-      ).toBeInTheDocument();
+        screen.getByRole('link', { name: 'Voltar para o início' }),
+      ).toHaveAttribute('href', '/home');
       expect(
         screen.queryByRole('button', { name: 'Adicionar paciente' }),
       ).not.toBeInTheDocument();

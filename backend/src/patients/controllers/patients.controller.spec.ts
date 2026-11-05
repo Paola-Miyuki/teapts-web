@@ -120,6 +120,68 @@ describe('GET /patients/authorized', () => {
   });
 });
 
+describe('GET /patients/available-for-pts', () => {
+  let app: INestApplication;
+  let currentAccount: AccountContext;
+  let guardCanActivate: jest.Mock;
+  let patientsService: {
+    findAvailableForPts: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    currentAccount = {
+      ...accountContext,
+      professionalProfileIds: ['professional-1'],
+    };
+    guardCanActivate = jest.fn((context: unknown) => {
+      const req = (context as ExecutionContext).switchToHttp().getRequest<{
+        accountContext?: AccountContext;
+      }>();
+      req.accountContext = currentAccount;
+      return true;
+    });
+    patientsService = {
+      findAvailableForPts: jest.fn(async () => ({
+        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      })),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PatientsController],
+      providers: [
+        { provide: PatientsService, useValue: patientsService },
+        AuthGuard,
+        AdminGuard,
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: guardCanActivate })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('returns patients without an active PTS for professionals', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/patients/available-for-pts')
+      .query({ page: 1, limit: 10 });
+
+    expect(response.status).toBe(200);
+    expect(patientsService.findAvailableForPts).toHaveBeenCalledWith(
+      currentAccount,
+      expect.objectContaining({ page: 1, limit: 10 }),
+    );
+  });
+});
+
 describe('POST /patients', () => {
   const accountId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
   const body = {

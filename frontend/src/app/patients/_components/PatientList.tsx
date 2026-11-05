@@ -17,9 +17,10 @@ function getInitial(name: string) {
 
 type PatientListProps = {
   onAdd: () => void;
+  canAdd: boolean;
 };
 
-export default function PatientList({ onAdd }: PatientListProps) {
+export default function PatientList({ onAdd, canAdd }: PatientListProps) {
   const router = useRouter();
 
   const [page, setPage] = useState(1);
@@ -107,14 +108,16 @@ export default function PatientList({ onAdd }: PatientListProps) {
 
         <p>Adicione uma conta já cadastrada como paciente para começar.</p>
 
-        <button
-          type="button"
-          className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
-          onClick={onAdd}
-        >
-          <Icon name="plus" className={ui.icon} />
-          Adicionar paciente
-        </button>
+        {canAdd && (
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
+            onClick={onAdd}
+          >
+            <Icon name="plus" className={ui.icon} />
+            Adicionar paciente
+          </button>
+        )}
       </div>
     );
   }
