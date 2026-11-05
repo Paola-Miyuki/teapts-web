@@ -106,6 +106,20 @@ export const ptsProposalNotDraft = () =>
     'Somente propostas aguardando decisão podem ser editadas.',
   );
 
+export const ptsProposalNotPending = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_DRAFT',
+    'A proposta não está mais aguardando decisão.',
+  );
+
+export const activePtsAlreadyExists = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'ACTIVE_PTS_ALREADY_EXISTS',
+    'O paciente já possui um PTS aprovado e ativo.',
+  );
+
 export const ptsNotFound = () =>
   new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
 

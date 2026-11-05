@@ -34,6 +34,9 @@ export class PtsEntity {
   acceptedAt: Date | null;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
+  rejectedAt: Date | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
   beganAt: Date | null;
 
   @Column({ name: 'patient_id' })

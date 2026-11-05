@@ -17,16 +17,22 @@ import {
   type ProfessionalRecord,
   type UpdatePtsProposalInput,
   type SocialSituationTarget,
+  type ProposalDecisionTarget,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
-import { ptsProposalNotDraft } from '../pts.errors';
+import {
+  activePtsAlreadyExists,
+  ptsProposalNotDraft,
+  ptsProposalNotPending,
+} from '../pts.errors';
 
 @Injectable()
 export class PtsRepositoryImpl extends PtsRepository {
@@ -409,6 +415,140 @@ export class PtsRepositoryImpl extends PtsRepository {
     await this.ptsRepository.update(id, { socialSituation });
 
     return { id, socialSituation };
+  }
+
+  async findProposalForDecision(
+    id: string,
+  ): Promise<ProposalDecisionTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      select: { id: true, status: true, patientId: true },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum,
+      patientId: pts.patientId,
+    };
+  }
+
+  async approveProposal(
+    id: string,
+    patientId: string,
+  ): Promise<PtsDecisionResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava todos os PTS do paciente, sempre na mesma ordem: duas decisões
+      // simultâneas esperam uma pela outra e não terminam com dois PTS ativos.
+      const patientPts = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.patientId = :patientId', { patientId })
+        .orderBy('pts.id')
+        .getMany();
+
+      const proposal = patientPts.find((pts) => pts.id === id);
+
+      if (proposal?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotPending();
+      }
+
+      if (
+        patientPts.some(
+          (pts) =>
+            pts.status === PtsStateEnum.PLANNING ||
+            pts.status === PtsStateEnum.RUNNING,
+        )
+      ) {
+        throw activePtsAlreadyExists();
+      }
+
+      const now = new Date();
+      const otherDraftIds = patientPts
+        .filter((pts) => pts.id !== id && pts.status === PtsStateEnum.DRAFT)
+        .map((pts) => pts.id);
+
+      await queryRunner.manager.update(PtsEntity, id, {
+        status: PtsStateEnum.PLANNING,
+        acceptedAt: now,
+      });
+
+      if (otherDraftIds.length > 0) {
+        await queryRunner.manager.update(
+          PtsEntity,
+          { id: In(otherDraftIds) },
+          { status: PtsStateEnum.REJECTED, rejectedAt: now },
+        );
+      }
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id,
+        status: PtsStateEnum.PLANNING,
+        acceptedAt: now.toISOString(),
+        rejectedAt: null,
+      };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async rejectProposal(id: string): Promise<PtsDecisionResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id })
+        .getOne();
+
+      if (locked?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotPending();
+      }
+
+      const now = new Date();
+
+      await queryRunner.manager.update(PtsEntity, id, {
+        status: PtsStateEnum.REJECTED,
+        rejectedAt: now,
+      });
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id,
+        status: PtsStateEnum.REJECTED,
+        acceptedAt: null,
+        rejectedAt: now.toISOString(),
+      };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
