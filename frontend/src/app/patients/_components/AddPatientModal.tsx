@@ -10,6 +10,7 @@ type AddPatientModalProps = {
   open: boolean;
   onClose: () => void;
   onAdded: (name: string) => void;
+  canCreate: boolean;
 };
 
 // <dialog> nativo: showModal() prende o foco e o Esc fecha (evento close).
@@ -19,6 +20,7 @@ export default function AddPatientModal({
   open,
   onClose,
   onAdded,
+  canCreate,
 }: AddPatientModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -49,7 +51,7 @@ export default function AddPatientModal({
         }
       }}
     >
-      {open && (
+      {open && canCreate && (
         <>
           <button
             type="button"

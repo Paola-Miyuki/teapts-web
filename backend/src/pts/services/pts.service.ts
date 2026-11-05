@@ -13,10 +13,12 @@ import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
+  activePtsAlreadyExists,
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
@@ -24,6 +26,7 @@ import {
   ptsProposalForbidden,
   ptsProposalNotDraft,
   ptsProposalNotFound,
+  ptsProposalNotPending,
   activePtsForbidden,
   activePtsNotFound,
   ptsNotActive,
@@ -288,5 +291,48 @@ export class PtsService {
       id,
       dto.socialSituation.trim(),
     );
+  }
+
+  async approveProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    const proposal = await this.findDecidableProposal(id, account);
+
+    if (await this.ptsRepository.hasApprovedActivePts(proposal.patientId)) {
+      throw activePtsAlreadyExists();
+    }
+
+    return this.ptsRepository.approveProposal(id, proposal.patientId);
+  }
+
+  async rejectProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    await this.findDecidableProposal(id, account);
+
+    return this.ptsRepository.rejectProposal(id);
+  }
+
+  private async findDecidableProposal(id: string, account: AccountContext) {
+    const proposal = await this.ptsRepository.findProposalForDecision(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      account.patientProfileId === null ||
+      proposal.patientId !== account.patientProfileId
+    ) {
+      throw ptsProposalForbidden();
+    }
+
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotPending();
+    }
+
+    return proposal;
   }
 }

@@ -8,7 +8,6 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { getPatientAccounts, type AccountsResponse } from '@/lib/patients';
 import styles from '../patients.module.css';
-import AdminOnly from './AdminOnly';
 
 const PAGE_LIMIT = 10;
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
@@ -22,12 +21,14 @@ type PatientListProps = {
   term: string;
   onAdd: () => void;
   onClearSearch: () => void;
+  canAdd: boolean;
 };
 
 export default function PatientList({
   term,
   onAdd,
   onClearSearch,
+  canAdd,
 }: PatientListProps) {
   const router = useRouter();
 
@@ -76,12 +77,6 @@ export default function PatientList({
 
   if (failure?.key === key) {
     const { error } = failure;
-
-    if (error instanceof ApiError && error.status === 403) {
-      return (
-        <AdminOnly message="Somente administradores podem consultar e adicionar pacientes." />
-      );
-    }
 
     return (
       <div className={ui.empty} role="alert">
@@ -154,14 +149,16 @@ export default function PatientList({
 
         <p>Adicione uma conta já cadastrada como paciente para começar.</p>
 
-        <button
-          type="button"
-          className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
-          onClick={onAdd}
-        >
-          <Icon name="plus" className={ui.icon} />
-          Adicionar paciente
-        </button>
+        {canAdd && (
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
+            onClick={onAdd}
+          >
+            <Icon name="plus" className={ui.icon} />
+            Adicionar paciente
+          </button>
+        )}
       </div>
     );
   }

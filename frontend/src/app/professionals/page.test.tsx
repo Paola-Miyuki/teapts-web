@@ -84,9 +84,13 @@ describe('ProfessionalsPage', () => {
       screen.getByRole('navigation', { name: 'Menu principal' }),
     );
 
+    expect(menu.getByRole('link', { name: 'PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
     expect(menu.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
-      'aria-current',
-      'page',
+      'href',
+      '/professionals',
     );
 
     expect(menu.getByRole('link', { name: 'Início' })).not.toHaveAttribute(

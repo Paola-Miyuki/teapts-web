@@ -75,6 +75,36 @@ export class PatientsController {
   }
 
   /**
+   * Retorna pacientes sem PTS ativo para criação de uma nova proposta.
+   *
+   * Diferente de `/patients/authorized`, esta consulta não exige vínculo
+   * prévio com um PTS; exige somente que a conta tenha perfil profissional.
+   */
+  @Get('patients/available-for-pts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: GetAuthorizedPatientsResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao profissional.',
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar os pacientes disponíveis.',
+    },
+  })
+  async findAvailableForPts(
+    @CurrentAccount() account: AccountContext,
+    @Query() query: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    return this.patientsService.findAvailableForPts(account, query);
+  }
+
+  /**
    * Cria o perfil de paciente de uma conta existente (RFPAC001).
    *
    * @param body conta e contatos de suporte já validados

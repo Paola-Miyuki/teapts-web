@@ -9,6 +9,7 @@ import HelpTooltip from '@/components/HelpTooltip';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
+import { can } from '@/lib/permissions';
 
 import LoadingState from './_components/LoadingState';
 import PtsProposalList from './_components/PtsProposalList';
@@ -35,6 +36,7 @@ export default function PtsProposalsPage() {
     <AuthenticatedPage
       currentHref="/pts/proposals"
       breadcrumb="Propostas de PTS"
+      requiredAction="viewPtsProposals"
     >
       {(account: Account) => (
         <>
@@ -60,13 +62,15 @@ export default function PtsProposalsPage() {
               </div>
             </div>
 
-            <Link
-              href="/pts/novo"
-              className={`${ui.btn} ${ui.btnPrimary} ${styles.headerAction}`}
-            >
-              <Icon name="plus" className={ui.icon} />
-              Novo PTS
-            </Link>
+            {can(account, 'createPts') && (
+              <Link
+                href="/pts/novo"
+                className={`${ui.btn} ${ui.btnPrimary} ${styles.headerAction}`}
+              >
+                <Icon name="plus" className={ui.icon} />
+                Novo PTS
+              </Link>
+            )}
           </div>
 
           <Suspense fallback={<LoadingState />}>

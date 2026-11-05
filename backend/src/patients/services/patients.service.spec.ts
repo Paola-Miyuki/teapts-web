@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
@@ -30,6 +31,12 @@ function createService() {
       jest.fn<
         (
           accountId: string,
+          filters: GetAuthorizedPatientsRequestDto,
+        ) => Promise<AuthorizedPatientsPage>
+      >(),
+    findAvailableForPtsPaginated:
+      jest.fn<
+        (
           filters: GetAuthorizedPatientsRequestDto,
         ) => Promise<AuthorizedPatientsPage>
       >(),
@@ -79,6 +86,67 @@ describe('PatientsService.findAuthorized', () => {
     ).resolves.toMatchObject({
       data: [],
       pagination: { total: 0, totalPages: 0 },
+    });
+  });
+
+  describe('PatientsService.findAvailableForPts', () => {
+    const professionalAccount: AccountContext = {
+      accountId: 'account-1',
+      role: AccountRole.User,
+      patientProfileId: null,
+      professionalProfileIds: ['professional-1'],
+    };
+
+    it('blocks accounts without a professional profile', async () => {
+      const { repository, service } = createService();
+
+      await expect(
+        service.findAvailableForPts(
+          { ...professionalAccount, professionalProfileIds: [] },
+          { page: 1, limit: 10 },
+        ),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { status: 'FORBIDDEN' },
+      });
+      expect(repository.findAvailableForPtsPaginated).not.toHaveBeenCalled();
+    });
+
+    it('returns patients that can receive a new proposal', async () => {
+      const { repository, service } = createService();
+      repository.findAvailableForPtsPaginated.mockResolvedValue({
+        rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+        total: 1,
+      });
+
+      await expect(
+        service.findAvailableForPts(professionalAccount, {
+          page: 1,
+          limit: 10,
+        }),
+      ).resolves.toEqual({
+        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      });
+    });
+
+    it('returns a safe internal error when the available-patients query fails', async () => {
+      const { repository, service } = createService();
+      repository.findAvailableForPtsPaginated.mockRejectedValue(
+        new Error('database connection details'),
+      );
+
+      await expect(
+        service.findAvailableForPts(professionalAccount, {
+          page: 1,
+          limit: 10,
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 'ERROR',
+          message: 'Não foi possível consultar os pacientes disponíveis.',
+        },
+      });
     });
   });
 

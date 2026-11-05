@@ -123,7 +123,7 @@ describe('HomePage', () => {
     );
   });
 
-  it('mostra o início do profissional com acesso aos profissionais', async () => {
+  it('mostra o início do profissional com acesso aos PTS', async () => {
     mockMe(
       200,
       account({ name: 'Kaio Felipe', professionalProfileIds: ['pro-uuid'] }),
@@ -138,9 +138,14 @@ describe('HomePage', () => {
     expect(
       screen.getByText('Profissional', { selector: 'small' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Consultar profissionais' }),
-    ).toHaveAttribute('href', '/professionals');
+    expect(screen.getByRole('link', { name: 'Consultar PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
+    expect(screen.getByRole('link', { name: 'PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
     expect(screen.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
       'href',
       '/professionals',

@@ -194,9 +194,10 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
+      expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
       expect(
-        await screen.findByText('Acesso restrito ao administrador'),
-      ).toBeInTheDocument();
+        screen.getByRole('link', { name: 'Voltar para o início' }),
+      ).toHaveAttribute('href', '/home');
       expect(
         screen.queryByRole('button', { name: 'Adicionar paciente' }),
       ).not.toBeInTheDocument();
@@ -771,27 +772,6 @@ describe('PatientsPage', () => {
         `${API}/accounts?isPatient=true&q=ana&page=1&limit=10`,
         expect.anything(),
       );
-    });
-
-    it('mostra o bloqueio de admin quando a lista responde 403', async () => {
-      mockApi({
-        list: jest.fn().mockResolvedValue(
-          mockResponse({
-            status: 403,
-            ok: false,
-            data: {
-              status: 'FORBIDDEN',
-              message: 'Acesso restrito ao administrador.',
-            },
-          }),
-        ),
-      });
-
-      render(<PatientsPage />);
-
-      expect(
-        await screen.findByText('Acesso restrito ao administrador'),
-      ).toBeInTheDocument();
     });
 
     it('mostra a message da API quando a lista falha', async () => {
