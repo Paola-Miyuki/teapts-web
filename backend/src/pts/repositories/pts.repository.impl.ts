@@ -28,7 +28,11 @@ import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
-import { ptsProposalNotDraft } from '../pts.errors';
+import {
+  activePtsAlreadyExists,
+  ptsProposalNotDraft,
+  ptsProposalNotPending,
+} from '../pts.errors';
 
 @Injectable()
 export class PtsRepositoryImpl extends PtsRepository {
@@ -413,8 +417,6 @@ export class PtsRepositoryImpl extends PtsRepository {
     return { id, socialSituation };
   }
 
-  // --- Implementação dos métodos da RFPTS003 ---
-
   async findProposalForDecision(
     id: string,
   ): Promise<ProposalDecisionTarget | null> {
@@ -445,42 +447,56 @@ export class PtsRepositoryImpl extends PtsRepository {
     try {
       await queryRunner.startTransaction();
 
-      const now = new Date();
+      // Trava todos os PTS do paciente, sempre na mesma ordem: duas decisões
+      // simultâneas esperam uma pela outra e não terminam com dois PTS ativos.
+      const patientPts = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.patientId = :patientId', { patientId })
+        .orderBy('pts.id')
+        .getMany();
 
-      // 1. Atualiza a proposta alvo para PLANNING e define acceptedAt
+      const proposal = patientPts.find((pts) => pts.id === id);
+
+      if (proposal?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotPending();
+      }
+
+      if (
+        patientPts.some(
+          (pts) =>
+            pts.status === PtsStateEnum.PLANNING ||
+            pts.status === PtsStateEnum.RUNNING,
+        )
+      ) {
+        throw activePtsAlreadyExists();
+      }
+
+      const now = new Date();
+      const otherDraftIds = patientPts
+        .filter((pts) => pts.id !== id && pts.status === PtsStateEnum.DRAFT)
+        .map((pts) => pts.id);
+
       await queryRunner.manager.update(PtsEntity, id, {
         status: PtsStateEnum.PLANNING,
         acceptedAt: now,
       });
 
-      // 2. Rejeita todas as outras propostas em DRAFT do mesmo paciente na mesma operação atômica
-      await queryRunner.manager
-        .createQueryBuilder()
-        .update(PtsEntity)
-        .set({
-          status: PtsStateEnum.REJECTED,
-          rejectedAt: now,
-        })
-        .where('patientId = :patientId', { patientId })
-        .andWhere('status = :status', { status: PtsStateEnum.DRAFT })
-        .andWhere('id != :id', { id })
-        .execute();
-
-      const updatedPts = await queryRunner.manager.findOne(PtsEntity, {
-        where: { id },
-      });
-
-      if (!updatedPts) {
-        throw new Error('Erro ao recuperar a proposta aprovada.');
+      if (otherDraftIds.length > 0) {
+        await queryRunner.manager.update(
+          PtsEntity,
+          { id: In(otherDraftIds) },
+          { status: PtsStateEnum.REJECTED, rejectedAt: now },
+        );
       }
 
       await queryRunner.commitTransaction();
 
       return {
-        id: updatedPts.id,
+        id,
         status: PtsStateEnum.PLANNING,
-        acceptedAt: updatedPts.acceptedAt?.toISOString() ?? null,
-        rejectedAt: updatedPts.rejectedAt?.toISOString() ?? null,
+        acceptedAt: now.toISOString(),
+        rejectedAt: null,
       };
     } catch (error) {
       if (queryRunner.isTransactionActive) {
@@ -500,6 +516,16 @@ export class PtsRepositoryImpl extends PtsRepository {
     try {
       await queryRunner.startTransaction();
 
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id })
+        .getOne();
+
+      if (locked?.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotPending();
+      }
+
       const now = new Date();
 
       await queryRunner.manager.update(PtsEntity, id, {
@@ -507,21 +533,13 @@ export class PtsRepositoryImpl extends PtsRepository {
         rejectedAt: now,
       });
 
-      const updatedPts = await queryRunner.manager.findOne(PtsEntity, {
-        where: { id },
-      });
-
-      if (!updatedPts) {
-        throw new Error('Erro ao recuperar a proposta rejeitada.');
-      }
-
       await queryRunner.commitTransaction();
 
       return {
-        id: updatedPts.id,
+        id,
         status: PtsStateEnum.REJECTED,
-        acceptedAt: updatedPts.acceptedAt?.toISOString() ?? null,
-        rejectedAt: updatedPts.rejectedAt?.toISOString() ?? null,
+        acceptedAt: null,
+        rejectedAt: now.toISOString(),
       };
     } catch (error) {
       if (queryRunner.isTransactionActive) {
@@ -532,8 +550,6 @@ export class PtsRepositoryImpl extends PtsRepository {
       await queryRunner.release();
     }
   }
-
-  // --- Mapeadores Auxiliares ---
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {
     return {

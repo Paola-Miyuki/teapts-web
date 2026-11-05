@@ -18,6 +18,7 @@ import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
+  activePtsAlreadyExists,
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
@@ -25,6 +26,7 @@ import {
   ptsProposalForbidden,
   ptsProposalNotDraft,
   ptsProposalNotFound,
+  ptsProposalNotPending,
   activePtsForbidden,
   activePtsNotFound,
   ptsNotActive,
@@ -295,26 +297,10 @@ export class PtsService {
     id: string,
     account: AccountContext,
   ): Promise<PtsDecisionResponseDto> {
-    const proposal = await this.ptsRepository.findProposalForDecision(id);
-
-    if (!proposal) {
-      throw ptsProposalNotFound();
-    }
-
-    const isPatientOwner =
-      account.patientProfileId !== null &&
-      proposal.patientId === account.patientProfileId;
-
-    if (!isPatientOwner) {
-      throw ptsProposalForbidden();
-    }
-
-    if (proposal.status !== PtsStateEnum.DRAFT) {
-      throw ptsProposalNotDraft();
-    }
+    const proposal = await this.findDecidableProposal(id, account);
 
     if (await this.ptsRepository.hasApprovedActivePts(proposal.patientId)) {
-      throw ptsActiveExists();
+      throw activePtsAlreadyExists();
     }
 
     return this.ptsRepository.approveProposal(id, proposal.patientId);
@@ -324,24 +310,29 @@ export class PtsService {
     id: string,
     account: AccountContext,
   ): Promise<PtsDecisionResponseDto> {
+    await this.findDecidableProposal(id, account);
+
+    return this.ptsRepository.rejectProposal(id);
+  }
+
+  private async findDecidableProposal(id: string, account: AccountContext) {
     const proposal = await this.ptsRepository.findProposalForDecision(id);
 
     if (!proposal) {
       throw ptsProposalNotFound();
     }
 
-    const isPatientOwner =
-      account.patientProfileId !== null &&
-      proposal.patientId === account.patientProfileId;
-
-    if (!isPatientOwner) {
+    if (
+      account.patientProfileId === null ||
+      proposal.patientId !== account.patientProfileId
+    ) {
       throw ptsProposalForbidden();
     }
 
     if (proposal.status !== PtsStateEnum.DRAFT) {
-      throw ptsProposalNotDraft();
+      throw ptsProposalNotPending();
     }
 
-    return this.ptsRepository.rejectProposal(id);
+    return proposal;
   }
 }

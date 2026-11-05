@@ -94,7 +94,6 @@ export abstract class PtsRepository {
     profileIds: string[],
   ): Promise<boolean>;
 
-  // --- Novos métodos para a RFPTS003 ---
   abstract findProposalForDecision(
     id: string,
   ): Promise<ProposalDecisionTarget | null>;

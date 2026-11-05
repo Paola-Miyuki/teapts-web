@@ -157,8 +157,6 @@ export class PtsController {
     return this.ptsService.updateSocialSituation(id, dto, account);
   }
 
-  // --- Novos Endpoints para Aprovação e Rejeição (RFPTS003) ---
-
   @Post('proposals/:id/approve')
   @UseGuards(AuthGuard)
   @ApiCookieAuth()

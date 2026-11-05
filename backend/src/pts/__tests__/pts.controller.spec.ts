@@ -189,3 +189,59 @@ describe('PtsController PATCH /pts/:id/social-situation', () => {
     });
   });
 });
+
+describe('PtsController POST /pts/proposals/:id/approve|reject', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  const patientAccount: AccountContext = {
+    ...accountOf('acc-patient-25'),
+    patientProfileId: 'acc-patient-25',
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  const createDraft = async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+    return proposal;
+  };
+
+  it('aprova a proposta pela rota de aprovação', async () => {
+    const proposal = await createDraft();
+
+    const result = await controller.approveProposal(
+      proposal.id,
+      patientAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.PLANNING,
+    });
+  });
+
+  it('rejeita a proposta pela rota de rejeição', async () => {
+    const proposal = await createDraft();
+
+    const result = await controller.rejectProposal(proposal.id, patientAccount);
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.REJECTED,
+    });
+  });
+
+  it('nega a decisão a quem não é o paciente', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => controller.approveProposal(proposal.id, responsibleAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+});

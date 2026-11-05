@@ -861,3 +861,147 @@ describe('PtsService.findDraftProposalById', () => {
     );
   });
 });
+
+describe('PtsService.approveProposal', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+  });
+
+  const createDraft = async (patientId = 'acc-patient-25') => {
+    const proposal = await service.createPts(body, 'acc-1');
+    proposal.patient.id = patientId;
+    return proposal;
+  };
+
+  it('aprova a proposta e rejeita os demais DRAFT do paciente', async () => {
+    const chosen = await createDraft();
+    const other = await createDraft();
+    const otherPatientDraft = await createDraft('acc-patient-30');
+
+    const result = await service.approveProposal(chosen.id, patientAccount);
+
+    expect(result).toMatchObject({
+      id: chosen.id,
+      status: PtsStateEnum.PLANNING,
+      rejectedAt: null,
+    });
+    expect(result.acceptedAt).toEqual(expect.any(String));
+    expect(chosen.status).toBe(PtsStateEnum.PLANNING);
+    expect(other.status).toBe(PtsStateEnum.REJECTED);
+    expect(otherPatientDraft.status).toBe(PtsStateEnum.DRAFT);
+  });
+
+  it('retorna 404 quando a proposta não existe', async () => {
+    await expectApiError(
+      () => service.approveProposal('missing', patientAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('nega a proposta de outro paciente', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => service.approveProposal(proposal.id, otherPatientAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect(proposal.status).toBe(PtsStateEnum.DRAFT);
+  });
+
+  it('nega conta sem perfil de paciente, mesmo o responsável', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => service.approveProposal(proposal.id, responsibleAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('não decide proposta fora de DRAFT', async () => {
+    const proposal = await createDraft();
+    proposal.status = PtsStateEnum.REJECTED;
+
+    const response = await expectApiError(
+      () => service.approveProposal(proposal.id, patientAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+    expect(response.message).toBe(
+      'A proposta não está mais aguardando decisão.',
+    );
+  });
+
+  it('não aprova quando o paciente já tem PTS ativo', async () => {
+    const proposal = await createDraft();
+    repo.patientsWithApprovedActivePts.add('acc-patient-25');
+
+    await expectApiError(
+      () => service.approveProposal(proposal.id, patientAccount),
+      409,
+      'ACTIVE_PTS_ALREADY_EXISTS',
+    );
+    expect(proposal.status).toBe(PtsStateEnum.DRAFT);
+  });
+});
+
+describe('PtsService.rejectProposal', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+  });
+
+  const createDraft = async () => {
+    const proposal = await service.createPts(body, 'acc-1');
+    proposal.patient.id = 'acc-patient-25';
+    return proposal;
+  };
+
+  it('rejeita só a proposta escolhida', async () => {
+    const chosen = await createDraft();
+    const other = await createDraft();
+
+    const result = await service.rejectProposal(chosen.id, patientAccount);
+
+    expect(result).toMatchObject({
+      id: chosen.id,
+      status: PtsStateEnum.REJECTED,
+      acceptedAt: null,
+    });
+    expect(result.rejectedAt).toEqual(expect.any(String));
+    expect(chosen.status).toBe(PtsStateEnum.REJECTED);
+    expect(other.status).toBe(PtsStateEnum.DRAFT);
+  });
+
+  it('nega a proposta de outro paciente', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => service.rejectProposal(proposal.id, otherPatientAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect(proposal.status).toBe(PtsStateEnum.DRAFT);
+  });
+
+  it('não decide proposta fora de DRAFT', async () => {
+    const proposal = await createDraft();
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () => service.rejectProposal(proposal.id, patientAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+    expect(proposal.status).toBe(PtsStateEnum.PLANNING);
+  });
+});
