@@ -176,19 +176,9 @@ describe('GET /patients/available-for-pts', () => {
 
     expect(response.status).toBe(200);
     expect(patientsService.findAvailableForPts).toHaveBeenCalledWith(
+      currentAccount,
       expect.objectContaining({ page: 1, limit: 10 }),
     );
-  });
-
-  it('blocks accounts without a professional profile', async () => {
-    currentAccount.professionalProfileIds = [];
-
-    const response = await request(app.getHttpServer()).get(
-      '/patients/available-for-pts',
-    );
-
-    expect(response.status).toBe(403);
-    expect(patientsService.findAvailableForPts).not.toHaveBeenCalled();
   });
 });
 

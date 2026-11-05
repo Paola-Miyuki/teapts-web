@@ -3,15 +3,7 @@
 // O ValidationPipe global valida a query e o corpo, e o controller delega ao
 // PatientsService.
 
-import {
-  Body,
-  Controller,
-  ForbiddenException,
-  Get,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -109,14 +101,7 @@ export class PatientsController {
     @CurrentAccount() account: AccountContext,
     @Query() query: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
-    if (account.professionalProfileIds.length === 0) {
-      throw new ForbiddenException({
-        status: 'FORBIDDEN',
-        message: 'Acesso restrito ao profissional.',
-      });
-    }
-
-    return this.patientsService.findAvailableForPts(query);
+    return this.patientsService.findAvailableForPts(account, query);
   }
 
   /**

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
@@ -34,7 +35,11 @@ function createService() {
         ) => Promise<AuthorizedPatientsPage>
       >(),
     findAvailableForPtsPaginated:
-      jest.fn<(filters: GetAuthorizedPatientsRequestDto) => Promise<AuthorizedPatientsPage>>(),
+      jest.fn<
+        (
+          filters: GetAuthorizedPatientsRequestDto,
+        ) => Promise<AuthorizedPatientsPage>
+      >(),
   };
   const accountRepository = {
     findOne: jest.fn<(options: unknown) => Promise<Partial<Account> | null>>(),
@@ -85,6 +90,28 @@ describe('PatientsService.findAuthorized', () => {
   });
 
   describe('PatientsService.findAvailableForPts', () => {
+    const professionalAccount: AccountContext = {
+      accountId: 'account-1',
+      role: AccountRole.User,
+      patientProfileId: null,
+      professionalProfileIds: ['professional-1'],
+    };
+
+    it('blocks accounts without a professional profile', async () => {
+      const { repository, service } = createService();
+
+      await expect(
+        service.findAvailableForPts(
+          { ...professionalAccount, professionalProfileIds: [] },
+          { page: 1, limit: 10 },
+        ),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: { status: 'FORBIDDEN' },
+      });
+      expect(repository.findAvailableForPtsPaginated).not.toHaveBeenCalled();
+    });
+
     it('returns patients that can receive a new proposal', async () => {
       const { repository, service } = createService();
       repository.findAvailableForPtsPaginated.mockResolvedValue({
@@ -93,7 +120,10 @@ describe('PatientsService.findAuthorized', () => {
       });
 
       await expect(
-        service.findAvailableForPts({ page: 1, limit: 10 }),
+        service.findAvailableForPts(professionalAccount, {
+          page: 1,
+          limit: 10,
+        }),
       ).resolves.toEqual({
         data: [{ id: 'patient-1', name: 'Maria Silva' }],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
@@ -107,7 +137,10 @@ describe('PatientsService.findAuthorized', () => {
       );
 
       await expect(
-        service.findAvailableForPts({ page: 1, limit: 10 }),
+        service.findAvailableForPts(professionalAccount, {
+          page: 1,
+          limit: 10,
+        }),
       ).rejects.toMatchObject({
         response: {
           status: 'ERROR',
