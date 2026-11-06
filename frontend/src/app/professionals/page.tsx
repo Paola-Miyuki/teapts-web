@@ -4,10 +4,12 @@ import Professionals from './_components/Professionals';
 
 export default function ProfessionalsPage() {
   return (
-    <AuthenticatedPage currentHref="/professionals" breadcrumb="Profissionais">
+    <AuthenticatedPage
+      currentHref="/professionals"
+      breadcrumb="Profissionais"
+      requiredAction="viewProfessionalDirectory"
+    >
       <div className={ui.heading}>
-        <p className={ui.eyebrow}>Equipe de cuidado</p>
-
         <h1>Profissionais</h1>
 
         <p>

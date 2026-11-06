@@ -189,7 +189,7 @@ export default function SupportContactFields({
           className={`${ui.btn} ${ui.btnSecondary}`}
           onClick={onCancel}
         >
-          Descartar contato
+          Excluir contato
         </button>
 
         <button

@@ -1,8 +1,9 @@
 // Este arquivo define e normaliza os parâmetros da listagem de contas.
-// Os filtros são opcionais: sem filtros, a listagem traz todas as contas.
+// A busca e os filtros são opcionais: sem eles, a listagem traz todas as
+// contas.
 
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import {
   PaginationQueryDto,
   invalidParameter,
@@ -25,9 +26,32 @@ function toBoolean({ value }: { value: unknown }): unknown {
 }
 
 /**
+ * Remove os espaços externos da busca; vazio ou só espaços viram busca não
+ * informada (NFUS003). Outro tipo segue como está e falha no `IsString`.
+ */
+function toSearchTerm({ value }: { value: unknown }): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const term = value.trim();
+
+  return term === '' ? undefined : term;
+}
+
+/**
  * Parâmetros da listagem de contas, já normalizados pelo pipe.
  */
 export class GetAccountsRequestDto extends PaginationQueryDto {
+  /**
+   * Busca parcial por nome ou e-mail, sem diferenciar maiúsculas.
+   * @example mari
+   */
+  @Transform(toSearchTerm)
+  @IsOptional()
+  @IsString(invalidParameter('q'))
+  q?: string;
+
   /** `true`: só contas com perfil de paciente; `false`: só contas sem. */
   @Transform(toBoolean)
   @IsOptional()

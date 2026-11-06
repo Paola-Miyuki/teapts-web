@@ -79,7 +79,7 @@ describe('GET /patients/authorized', () => {
       pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
     });
     expect(patientsService.findAuthorized).toHaveBeenCalledWith(
-      'account-1',
+      accountContext,
       expect.objectContaining({ page: 1, limit: 10 }),
     );
   });
@@ -90,7 +90,7 @@ describe('GET /patients/authorized', () => {
       .query({ page: '2', limit: '25' });
 
     expect(patientsService.findAuthorized).toHaveBeenCalledWith(
-      'account-1',
+      accountContext,
       expect.objectContaining({ page: 2, limit: 25 }),
     );
   });
@@ -117,6 +117,68 @@ describe('GET /patients/authorized', () => {
 
     expect(response.status).toBe(403);
     expect(patientsService.findAuthorized).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /patients/available-for-pts', () => {
+  let app: INestApplication;
+  let currentAccount: AccountContext;
+  let guardCanActivate: jest.Mock;
+  let patientsService: {
+    findAvailableForPts: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    currentAccount = {
+      ...accountContext,
+      professionalProfileIds: ['professional-1'],
+    };
+    guardCanActivate = jest.fn((context: unknown) => {
+      const req = (context as ExecutionContext).switchToHttp().getRequest<{
+        accountContext?: AccountContext;
+      }>();
+      req.accountContext = currentAccount;
+      return true;
+    });
+    patientsService = {
+      findAvailableForPts: jest.fn(async () => ({
+        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      })),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PatientsController],
+      providers: [
+        { provide: PatientsService, useValue: patientsService },
+        AuthGuard,
+        AdminGuard,
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: guardCanActivate })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('returns patients without an active PTS for professionals', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/patients/available-for-pts')
+      .query({ page: 1, limit: 10 });
+
+    expect(response.status).toBe(200);
+    expect(patientsService.findAvailableForPts).toHaveBeenCalledWith(
+      currentAccount,
+      expect.objectContaining({ page: 1, limit: 10 }),
+    );
   });
 });
 

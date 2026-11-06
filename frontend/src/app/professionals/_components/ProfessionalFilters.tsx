@@ -103,11 +103,6 @@ export default function ProfessionalFilters({
             setIds(event.target.value);
           }}
         />
-
-        <small className={ui.hint}>
-          Use este campo somente quando precisar consultar profissionais
-          específicos.
-        </small>
       </label>
 
       <div className={styles.filterActions}>

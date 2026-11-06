@@ -29,20 +29,20 @@ seed (seção 5.2 do README da raiz).
 
 ## Scripts
 
-| Script                             | O que faz                                    |
-| ---------------------------------- | -------------------------------------------- |
-| `dev`                              | servidor de desenvolvimento (use `-p 3001`)  |
-| `build` / `start`                  | build de produção / serve o build            |
-| `test` / `test:cov` / `test:watch` | Jest + Testing Library (jsdom)               |
-| `lint` / `typecheck`               | ESLint / `tsc --noEmit`                      |
-| `format` / `format:check`          | Prettier, alterando ou só conferindo         |
+| Script                             | O que faz                                   |
+| ---------------------------------- | ------------------------------------------- |
+| `dev`                              | servidor de desenvolvimento (use `-p 3001`) |
+| `build` / `start`                  | build de produção / serve o build           |
+| `test` / `test:cov` / `test:watch` | Jest + Testing Library (jsdom)              |
+| `lint` / `typecheck`               | ESLint / `tsc --noEmit`                     |
+| `format` / `format:check`          | Prettier, alterando ou só conferindo        |
 
 ## Variáveis de ambiente
 
-| Variável              | Padrão                  | Uso                                              |
-| --------------------- | ----------------------- | ------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | endereço da API usado pelo SDK                   |
-| `PORT`                | `3001`                  | ignorado pelo `next dev` (use `-p 3001`)         |
+| Variável              | Padrão                  | Uso                                      |
+| --------------------- | ----------------------- | ---------------------------------------- |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | endereço da API usado pelo SDK           |
+| `PORT`                | `3001`                  | ignorado pelo `next dev` (use `-p 3001`) |
 
 As `NEXT_PUBLIC_*` entram no bundle no build: mudou o `.env`, pare o
 `pnpm dev` e suba de novo.
@@ -54,19 +54,45 @@ src/
   app/
     layout.tsx             layout raiz e fontes
     globals.css            @import 'tailwindcss' e estilos globais
-    page.tsx               página inicial
+    page.tsx               redireciona para /home
     login/
       page.tsx             tela de login (EmailPassword.signIn)
       login.module.css     estilos da tela
       page.test.tsx        testes da tela
-    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) e modal "Adicionar paciente"
-      _components/         PatientList, AddPatientModal/AddPatientForm (GET /accounts?isPatient=false e
-                           POST /patients), SupportContactFields/SupportContactList e AdminOnly
+    signup/                cadastro de conta (EmailPassword.signUp); volta para /login?registered=true
+    home/                  início por perfil: área de trabalho, "Meu cuidado" do paciente ou
+                           "Aguardando perfil" para a conta sem perfil
+    profile/               meu perfil: dados da conta (GET/PATCH /me) e troca de senha
+                           (POST /me/password)
+    professionals/         consulta de profissionais (GET /professionals) com filtros de nome e
+                           especialidade e paginação
+    pts/
+      novo/                criar proposta de PTS: paciente (GET /patients/available-for-pts),
+                           equipe (GET /professionals) e POST /pts; o admin escolhe o profissional
+                           responsável
+      proposals/           propostas de PTS do paciente (GET /pts/proposals?patientId=); o
+                           profissional e o admin escolhem o paciente (GET /patients/authorized) e o
+                           paciente (ou o admin, em nome dele) aprova ou rejeita (POST /pts/proposals/:id/approve e /reject)
+    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) com busca por nome ou
+                           e-mail (termo em /patients?q=) e modal "Adicionar paciente"
+      _components/         PatientSearch e PatientList (busca `q`, página 1 ao mudar o termo, resultados
+                           anteriores mantidos no carregamento), AddPatientModal/AddPatientForm,
+                           AccountCombobox (combobox ARIA da conta: GET /accounts?isPatient=false&
+                           isProfessional=false&q=; POST /patients) e SupportContactFields/SupportContactList
+  components/              AppShell (sidebar e cabeçalho), AuthenticatedPage (sessão, perfil e
+                           "Acesso restrito"), LogoutButton, HelpTooltip, Icon e Logo
+  hooks/
+    useAccount.ts          GET /me da sessão
+    useDebouncedSearch.ts  busca da NFUS003: debounce de 300 ms, trim, mínimo de 2 caracteres, Enter
+                           busca na hora, clear(); use nas telas com busca por texto
   lib/
     supertokens.ts         initSuperTokens(): configura o SDK uma vez
     api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
-    account.ts             GET /me e menu por perfil (o admin tem "Pacientes")
-    patients.ts            contas com e sem perfil de paciente, cadastro do perfil e isValidPhone
+    account.ts             GET /me, PATCH /me, POST /me/password e menu por perfil
+    permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
+    professionals.ts       GET /professionals
+    patients.ts            contas com perfil de paciente e sem perfil de paciente nem profissional (com `q` e
+                           `signal` para cancelar), cadastro do perfil e isValidPhone
 design/                    layouts de referência (HTML estático)
 public/                    arquivos servidos na raiz do site
 ```
@@ -78,6 +104,26 @@ Além do `status` HTTP, ele guarda o `code` e a `apiMessage` do corpo de erro
 `{ status, message }` da API, quando existem (ex.: `409`
 `PATIENT_PROFILE_ALREADY_EXISTS`). Use a `apiMessage` para mostrar o erro ao
 usuário, com um texto padrão quando ela não vier.
+
+## Telas
+
+Toda tela autenticada usa `AuthenticatedPage`: sem sessão, vai para `/login`;
+sem a permissão de `requiredAction` (`src/lib/permissions.ts`), mostra
+"Acesso restrito". O admin tem todas as permissões (RN022), menos
+`viewOwnCare` e `viewWaitingHome`, que só escolhem o início, e aprovar ou
+rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation` (`src/lib/account.ts`).
+
+| Rota | Tela | Acesso (`requiredAction`) | Layout |
+| --- | --- | --- | --- |
+| `/` | redireciona para `/home` | — | — |
+| `/login` | Entrar | pública | `teapts-login.html` |
+| `/signup` | Criar conta | pública | `cadastro.html` |
+| `/home` | Início, Meu cuidado ou Aguardando perfil | conta da sessão | `inicio-paciente.html`, `aguardando-perfil.html` |
+| `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
+| `/patients` | Pacientes cadastrados e "Adicionar paciente" | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
+| `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | — |
+| `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
+| `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 
 ## Layouts (`design/`)
 

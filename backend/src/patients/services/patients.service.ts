@@ -4,6 +4,7 @@
 // conversão para o contrato público e os metadados da paginação.
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -12,7 +13,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { isAdmin } from '../../auth/account-context';
 import { toPagination } from '../../common/pagination/pagination';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
@@ -80,28 +83,72 @@ export class PatientsService {
   /**
    * Busca pacientes relacionados a PTS ativos aos quais a conta tem acesso.
    *
-   * @param accountId identificador da conta autenticada
+   * O administrador recebe todos os pacientes cadastrados (RN022).
+   *
+   * @param account contexto da conta autenticada
    * @param request parâmetros já validados pelo ValidationPipe global
    * @returns pacientes autorizados e metadados da paginação
    * @throws InternalServerErrorException quando a consulta ao banco falha,
    *   sem expor o erro original
    */
   async findAuthorized(
-    accountId: string,
+    account: AccountContext,
     request: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
     let page: AuthorizedPatientsPage;
 
     try {
-      page = await this.patientsRepository.findAuthorizedPaginated(
-        accountId,
-        request,
-      );
+      page = isAdmin(account)
+        ? await this.patientsRepository.findAllPaginated(request)
+        : await this.patientsRepository.findAuthorizedPaginated(
+            account.accountId,
+            request,
+          );
     } catch (error) {
       this.logger.error('Authorized patients query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
         message: 'Não foi possível consultar os pacientes autorizados.',
+      });
+    }
+
+    const { rows, total } = page;
+
+    return {
+      data: rows.map((row) => ({
+        id: row.patient_id,
+        name: row.account_name,
+      })),
+      pagination: toPagination(request, total),
+    };
+  }
+
+  /**
+   * Busca pacientes disponíveis para criação de uma nova proposta de PTS.
+   * Só a conta com perfil profissional ou o administrador consulta (RFPTS001,
+   * RN022).
+   */
+  async findAvailableForPts(
+    account: AccountContext,
+    request: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    if (!isAdmin(account) && account.professionalProfileIds.length === 0) {
+      throw new ForbiddenException({
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao profissional.',
+      });
+    }
+
+    let page: AuthorizedPatientsPage;
+
+    try {
+      page =
+        await this.patientsRepository.findAvailableForPtsPaginated(request);
+    } catch (error) {
+      this.logger.error('Available patients query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar os pacientes disponíveis.',
       });
     }
 

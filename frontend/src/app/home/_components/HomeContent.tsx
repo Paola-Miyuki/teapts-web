@@ -2,10 +2,12 @@ import Link from 'next/link';
 
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import type { ProfileKind } from '@/lib/account';
+import type { Account, ProfileKind } from '@/lib/account';
+import { can } from '@/lib/permissions';
 import styles from '../home.module.css';
 
 type HomeContentProps = {
+  account: Account;
   kind: ProfileKind;
   name: string;
 };
@@ -17,25 +19,27 @@ const EYEBROWS: Record<ProfileKind, string> = {
   waiting: 'Área do paciente',
 };
 
-export default function HomeContent({ kind, name }: HomeContentProps) {
+export default function HomeContent({ account, kind, name }: HomeContentProps) {
   const firstName = name.trim().split(/\s+/)[0] ?? '';
-  const isPatientArea = kind === 'patient' || kind === 'waiting';
+  const patientCare = can(account, 'viewOwnCare');
+  const waitingHome = can(account, 'viewWaitingHome');
+  const patientArea = patientCare || waitingHome;
 
   return (
     <>
       <div className={ui.heading}>
         <p className={ui.eyebrow}>{EYEBROWS[kind]}</p>
 
-        <h1>{firstName ? `Boas-vindas, ${firstName}.` : 'Boas-vindas.'}</h1>
+        <h1>{firstName ? `Boas-vindas, ${firstName}` : 'Boas-vindas'}</h1>
 
         <p>
-          {isPatientArea
+          {patientArea
             ? 'Um espaço para acompanhar seu cuidado e as pessoas que fazem parte dele.'
             : 'Acompanhe seus pacientes e construa planos de cuidado com a equipe multidisciplinar.'}
         </p>
       </div>
 
-      {kind === 'waiting' ? (
+      {waitingHome ? (
         <div className={ui.empty}>
           <div className={ui.emptyIcon}>
             <Icon name="clock" />
@@ -48,7 +52,7 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
             associado a ela. Aguarde até que seu perfil seja criado.
           </p>
         </div>
-      ) : kind === 'patient' ? (
+      ) : patientCare ? (
         <div className={styles.welcomePanel}>
           <div>
             <p className={styles.panelEyebrow}>Seu próximo passo</p>
@@ -65,17 +69,37 @@ export default function HomeContent({ kind, name }: HomeContentProps) {
             <span>PTS</span>
           </div>
         </div>
-      ) : (
+      ) : kind === 'professional' ? (
         <div className={styles.welcomePanel}>
           <div>
             <p className={styles.panelEyebrow}>Equipe de cuidado</p>
 
-            <h2>Encontre profissionais para compor a equipe.</h2>
+            <h2>Acompanhe seus planos de cuidado.</h2>
 
             <p>
-              Consulte os profissionais cadastrados e encontre integrantes para
-              compor a equipe multidisciplinar.
+              Consulte os PTS dos seus pacientes e crie novas propostas para
+              iniciar o planejamento do cuidado.
             </p>
+
+            <Link
+              href="/pts/proposals"
+              className={`${ui.btn} ${ui.btnPrimary}`}
+            >
+              Consultar PTS
+              <Icon name="arrow" className={ui.icon} />
+            </Link>
+          </div>
+
+          <div className={styles.welcomeDiagram} aria-hidden="true">
+            <span>PTS</span>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.welcomePanel}>
+          <div>
+            <h2>
+              Encontre profissionais para compor a equipe multidisciplinar
+            </h2>
 
             <Link
               href="/professionals"

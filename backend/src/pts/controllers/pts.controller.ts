@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -42,6 +44,7 @@ import {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsService } from '../services/pts.service';
 
 const parseProposalId = new ParseUUIDPipe({
@@ -68,7 +71,7 @@ export class PtsController {
     @Body() dto: CreatePtsRequestDto,
     @CurrentAccount() account: AccountContext,
   ) {
-    return this.ptsService.createPts(dto, account.accountId);
+    return this.ptsService.createPts(dto, account);
   }
 
   @Get('proposals')
@@ -152,5 +155,41 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.updateSocialSituation(id, dto, account);
+  }
+
+  @Post('proposals/:id/approve')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: PtsDecisionResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiConflictResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async approveProposal(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    return this.ptsService.approveProposal(id, account);
+  }
+
+  @Post('proposals/:id/reject')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: PtsDecisionResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiConflictResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async rejectProposal(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    return this.ptsService.rejectProposal(id, account);
   }
 }

@@ -124,6 +124,56 @@ describe('PatientsRepository.findAuthorizedPaginated', () => {
   });
 });
 
+describe('PatientsRepository.findAllPaginated', () => {
+  it('returns every patient with the same projection and order', async () => {
+    const { query, typeormRepository, repository } = createRepository();
+    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
+    query.getCount.mockResolvedValue(11);
+    query.getRawMany.mockResolvedValue([row]);
+
+    await expect(
+      repository.findAllPaginated({ page: 2, limit: 10 }),
+    ).resolves.toEqual({ rows: [row], total: 11 });
+
+    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
+      'patient',
+    );
+    expect(query.where).not.toHaveBeenCalled();
+    expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
+    expect(query.addOrderBy).toHaveBeenCalledWith('patient."accountId"', 'ASC');
+    expect(query.offset).toHaveBeenCalledWith(10);
+    expect(query.limit).toHaveBeenCalledWith(10);
+  });
+});
+
+describe('PatientsRepository.findAvailableForPtsPaginated', () => {
+  it('returns patients without an active PTS', async () => {
+    const { query, typeormRepository, repository } = createRepository();
+    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
+    query.getCount.mockResolvedValue(1);
+    query.getRawMany.mockResolvedValue([row]);
+
+    await expect(
+      repository.findAvailableForPtsPaginated({ page: 1, limit: 10 }),
+    ).resolves.toEqual({ rows: [row], total: 1 });
+
+    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
+      'patient',
+    );
+    expect(query.where).toHaveBeenCalledWith(
+      `NOT EXISTS (
+    SELECT 1
+    FROM projeto_terapeutico_singular pts
+    WHERE pts.patient_id = patient."accountId"
+      AND pts.status IN (:...states)
+  )`,
+      { states: ACTIVE_PTS_STATES },
+    );
+    expect(query.offset).toHaveBeenCalledWith(0);
+    expect(query.limit).toHaveBeenCalledWith(10);
+  });
+});
+
 describe('PatientsRepository.insert', () => {
   function createInsertRepository() {
     const insertQuery = {

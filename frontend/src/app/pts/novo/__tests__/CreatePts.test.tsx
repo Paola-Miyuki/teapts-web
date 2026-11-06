@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '../api/http';
 import * as api from '../api/ptsApi';
@@ -244,5 +244,69 @@ describe('CreatePts', () => {
     );
 
     expect(await screen.findByLabelText(/^paciente$/i)).toBeInTheDocument();
+  });
+});
+
+describe('CreatePts com administrador (RN022/DP017)', () => {
+  const adminAccount: Account = {
+    accountId: '00000000-0000-4000-8000-0000000000aa',
+    name: 'Admin',
+    email: 'admin@example.com',
+    role: 'admin',
+    patientProfileId: null,
+    professionalProfileIds: [],
+  };
+
+  it('escolhe o profissional responsável entre todos e envia o professionalId', async () => {
+    const user = userEvent.setup();
+    (api.createPts as jest.Mock).mockResolvedValue(createdPts);
+
+    render(<CreatePts account={adminAccount} />);
+    await screen.findByLabelText(/^paciente$/i);
+
+    const select = screen.getByLabelText(/profissional responsável/i);
+
+    expect(
+      screen.queryByText(/sem perfil profissional/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('O profissional escolhido será o responsável pelo PTS.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /criar proposta/i }),
+    ).toBeDisabled();
+
+    // Placeholder mais todos os profissionais, não só os da conta.
+    expect(within(select).getAllByRole('option')).toHaveLength(
+      mockProfessionals.length + 1,
+    );
+
+    await user.selectOptions(select, mockProfessionals[1].id);
+    await user.selectOptions(
+      screen.getByLabelText(/^paciente$/i),
+      MOCK_PATIENT_ID,
+    );
+    await user.type(screen.getByLabelText(/situação social/i), SOCIAL);
+
+    // O responsável escolhido sai das opções da equipe.
+    expect(
+      screen
+        .getAllByRole('checkbox')
+        .some(
+          (checkbox) =>
+            checkbox.getAttribute('value') === mockProfessionals[1].id,
+        ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: /criar proposta/i }));
+
+    await waitFor(() =>
+      expect(api.createPts).toHaveBeenCalledWith({
+        professionalId: mockProfessionals[1].id,
+        patientId: MOCK_PATIENT_ID,
+        socialSituation: SOCIAL,
+        teamProfessionalIds: [],
+      }),
+    );
   });
 });

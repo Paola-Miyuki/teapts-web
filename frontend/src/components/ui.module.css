@@ -8,9 +8,9 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 40px;
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.12;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -102,7 +102,6 @@
   background: var(--accent);
   border-color: var(--accent);
   color: var(--fg);
-  font-weight: 650;
 }
 
 .btnPrimary:hover:not(:disabled) {
@@ -165,7 +164,7 @@
   margin: 0 0 12px;
   font-family: var(--font-display);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: 600;
 }
 
 .empty p {
@@ -190,8 +189,8 @@
 
 .label {
   color: var(--fg);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .input {
@@ -369,7 +368,7 @@
   padding-right: 30px;
   font-family: var(--font-display);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.2;
 }
 

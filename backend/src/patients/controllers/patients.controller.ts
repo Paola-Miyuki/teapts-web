@@ -47,7 +47,8 @@ export class PatientsController {
    * Retorna pacientes autorizados, filtrados por PTS ativo e paginados.
    *
    * O accountId é obtido do contexto autenticado, e o responsável do PTS
-   * conta como membro da equipe, conforme a RN005.
+   * conta como membro da equipe, conforme a RN005. O administrador recebe
+   * todos os pacientes cadastrados (RN022).
    *
    * @param account contexto da conta autenticada
    * @param query parâmetros já normalizados
@@ -71,7 +72,38 @@ export class PatientsController {
     @CurrentAccount() account: AccountContext,
     @Query() query: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
-    return this.patientsService.findAuthorized(account.accountId, query);
+    return this.patientsService.findAuthorized(account, query);
+  }
+
+  /**
+   * Retorna pacientes sem PTS ativo para criação de uma nova proposta.
+   *
+   * Diferente de `/patients/authorized`, esta consulta não exige vínculo
+   * prévio com um PTS; exige que a conta tenha perfil profissional ou seja de
+   * administrador (RN022).
+   */
+  @Get('patients/available-for-pts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: GetAuthorizedPatientsResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao profissional.',
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar os pacientes disponíveis.',
+    },
+  })
+  async findAvailableForPts(
+    @CurrentAccount() account: AccountContext,
+    @Query() query: GetAuthorizedPatientsRequestDto,
+  ): Promise<GetAuthorizedPatientsResponseDto> {
+    return this.patientsService.findAvailableForPts(account, query);
   }
 
   /**

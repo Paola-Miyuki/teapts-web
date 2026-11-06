@@ -13,10 +13,13 @@ import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import { isAdmin } from '../../auth/account-context';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
+  activePtsAlreadyExists,
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
@@ -24,6 +27,7 @@ import {
   ptsProposalForbidden,
   ptsProposalNotDraft,
   ptsProposalNotFound,
+  ptsProposalNotPending,
   activePtsForbidden,
   activePtsNotFound,
   ptsNotActive,
@@ -37,12 +41,15 @@ import {
 export class PtsService {
   constructor(private readonly ptsRepository: PtsRepository) {}
 
-  async createPts(dto: CreatePtsRequestDto, currentAccountId: string) {
+  async createPts(dto: CreatePtsRequestDto, account: AccountContext) {
     const professional = await this.ptsRepository.findProfessionalById(
       dto.professionalId,
     );
 
-    if (!professional || professional.accountId !== currentAccountId) {
+    if (
+      !professional ||
+      (!isAdmin(account) && professional.accountId !== account.accountId)
+    ) {
       throw professionalNotAuthorized();
     }
 
@@ -82,10 +89,11 @@ export class PtsService {
     query: GetPtsProposalsQueryDto,
     account: AccountContext,
   ): Promise<GetPtsProposalsResponseDto> {
+    const admin = isAdmin(account);
     const isPatient = account.patientProfileId === query.patientId;
     const profileIds = account.professionalProfileIds;
 
-    if (!isPatient && profileIds.length === 0) {
+    if (!admin && !isPatient && profileIds.length === 0) {
       throw ptsProposalForbidden();
     }
 
@@ -93,12 +101,14 @@ export class PtsService {
       accountId: account.accountId,
       patientId: query.patientId,
       isPatient,
+      isAdmin: admin,
       professionalProfileIds: profileIds,
       page: query.page,
       limit: query.limit,
     });
 
     if (
+      !admin &&
       !isPatient &&
       result.total === 0 &&
       !(await this.ptsRepository.hasProposalRelation(
@@ -139,7 +149,7 @@ export class PtsService {
       profileIds.includes(proposal.responsible.id) ||
       proposal.team.some((member) => profileIds.includes(member.id));
 
-    if (!isPatientOwner && !isProfessionalOnProposal) {
+    if (!isAdmin(account) && !isPatientOwner && !isProfessionalOnProposal) {
       throw ptsProposalForbidden();
     }
 
@@ -150,9 +160,14 @@ export class PtsService {
     query: GetActivePtsQueryDto,
     account: AccountContext,
   ): Promise<ActivePtsResponseDto> {
+    const admin = isAdmin(account);
     const isPatientOwner = account.patientProfileId === query.patientId;
 
-    if (!isPatientOwner && account.professionalProfileIds.length === 0) {
+    if (
+      !admin &&
+      !isPatientOwner &&
+      account.professionalProfileIds.length === 0
+    ) {
       throw activePtsForbidden();
     }
 
@@ -161,7 +176,7 @@ export class PtsService {
     );
 
     if (!activePts) {
-      if (isPatientOwner) {
+      if (admin || isPatientOwner) {
         throw activePtsNotFound();
       }
 
@@ -174,7 +189,7 @@ export class PtsService {
         account.professionalProfileIds.includes(member.id),
       );
 
-    if (!isPatientOwner && !isProfessionalOnPts) {
+    if (!admin && !isPatientOwner && !isProfessionalOnPts) {
       throw activePtsForbidden();
     }
 
@@ -211,7 +226,10 @@ export class PtsService {
       throw ptsProposalNotFound();
     }
 
-    if (!account.professionalProfileIds.includes(proposal.responsible.id)) {
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(proposal.responsible.id)
+    ) {
       throw ptsProposalEditForbidden();
     }
 
@@ -273,7 +291,7 @@ export class PtsService {
         account.professionalProfileIds.includes(professionalId),
       );
 
-    if (!isProfessionalOnPts) {
+    if (!isAdmin(account) && !isProfessionalOnPts) {
       throw socialSituationForbidden();
     }
 
@@ -288,5 +306,49 @@ export class PtsService {
       id,
       dto.socialSituation.trim(),
     );
+  }
+
+  async approveProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    const proposal = await this.findDecidableProposal(id, account);
+
+    if (await this.ptsRepository.hasApprovedActivePts(proposal.patientId)) {
+      throw activePtsAlreadyExists();
+    }
+
+    return this.ptsRepository.approveProposal(id, proposal.patientId);
+  }
+
+  async rejectProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    await this.findDecidableProposal(id, account);
+
+    return this.ptsRepository.rejectProposal(id);
+  }
+
+  private async findDecidableProposal(id: string, account: AccountContext) {
+    const proposal = await this.ptsRepository.findProposalForDecision(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      (account.patientProfileId === null ||
+        proposal.patientId !== account.patientProfileId)
+    ) {
+      throw ptsProposalForbidden();
+    }
+
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotPending();
+    }
+
+    return proposal;
   }
 }

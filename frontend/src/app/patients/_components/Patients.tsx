@@ -1,18 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { can } from '@/lib/permissions';
 import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
-import AdminOnly from './AdminOnly';
 import PatientList from './PatientList';
+import PatientSearch from './PatientSearch';
 
 // Só o admin consulta e adiciona pacientes; os demais veem o bloqueio, sem
 // chamar a API.
 export default function Patients() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // O termo fica na URL (/patients?q=) para manter a busca ao recarregar,
+  // voltar ou compartilhar o link.
+  const search = useDebouncedSearch({
+    initialTerm: searchParams.get('q') ?? '',
+    onTermChange: (term) =>
+      router.replace(
+        term ? `/patients?q=${encodeURIComponent(term)}` : '/patients',
+        {
+          scroll: false,
+        },
+      ),
+  });
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [success, setSuccess] = useState('');
   // Muda a cada paciente adicionado, para a lista recarregar.
@@ -30,8 +49,12 @@ export default function Patients() {
   }
 
   return (
-    <AuthenticatedPage currentHref="/patients" breadcrumb="Pacientes">
-      {(_account, kind) => (
+    <AuthenticatedPage
+      currentHref="/patients"
+      breadcrumb="Pacientes"
+      requiredAction="viewPatientRegistry"
+    >
+      {(account) => (
         <>
           <div className={`${ui.heading} ${styles.heading}`}>
             <div>
@@ -43,7 +66,7 @@ export default function Patients() {
               </p>
             </div>
 
-            {kind === 'admin' && (
+            {can(account, 'createPatientProfile') && (
               <button
                 type="button"
                 className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
@@ -55,32 +78,43 @@ export default function Patients() {
             )}
           </div>
 
-          {kind === 'admin' ? (
-            <>
-              {success && (
-                <div
-                  className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
-                  role="status"
-                >
-                  <div className={ui.alertIcon}>
-                    <Icon name="checkCircle" />
-                  </div>
-
-                  <span>{success}</span>
+          <>
+            {success && (
+              <div
+                className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
+                role="status"
+              >
+                <div className={ui.alertIcon}>
+                  <Icon name="checkCircle" />
                 </div>
-              )}
 
-              <PatientList key={listKey} onAdd={openAdd} />
+                <span>{success}</span>
+              </div>
+            )}
 
-              <AddPatientModal
-                open={isAddOpen}
-                onClose={() => setIsAddOpen(false)}
-                onAdded={handleAdded}
-              />
-            </>
-          ) : (
-            <AdminOnly message="Somente administradores podem consultar e adicionar pacientes." />
-          )}
+            <PatientSearch
+              value={search.input}
+              isTooShort={search.isTooShort}
+              onChange={search.setInput}
+              onCommit={search.commit}
+              onClear={search.clear}
+            />
+
+            <PatientList
+              key={listKey}
+              term={search.term}
+              onAdd={openAdd}
+              onClearSearch={search.clear}
+              canAdd={can(account, 'createPatientProfile')}
+            />
+
+            <AddPatientModal
+              open={isAddOpen}
+              onClose={() => setIsAddOpen(false)}
+              onAdded={handleAdded}
+              canCreate={can(account, 'createPatientProfile')}
+            />
+          </>
         </>
       )}
     </AuthenticatedPage>

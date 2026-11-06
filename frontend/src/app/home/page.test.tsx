@@ -67,7 +67,7 @@ describe('HomePage', () => {
 
     render(<HomePage />);
 
-    await screen.findByRole('heading', { name: 'Boas-vindas, Priscila.' });
+    await screen.findByRole('heading', { name: 'Boas-vindas, Priscila' });
 
     expect(global.fetch).toHaveBeenCalledWith('http://localhost:3000/me', {
       credentials: 'include',
@@ -123,7 +123,7 @@ describe('HomePage', () => {
     );
   });
 
-  it('mostra o início do profissional com acesso aos profissionais', async () => {
+  it('mostra o início do profissional com acesso aos PTS', async () => {
     mockMe(
       200,
       account({ name: 'Kaio Felipe', professionalProfileIds: ['pro-uuid'] }),
@@ -132,15 +132,20 @@ describe('HomePage', () => {
     render(<HomePage />);
 
     expect(
-      await screen.findByRole('heading', { name: 'Boas-vindas, Kaio.' }),
+      await screen.findByRole('heading', { name: 'Boas-vindas, Kaio' }),
     ).toBeInTheDocument();
     expect(screen.getByText('Área profissional')).toBeInTheDocument();
     expect(
       screen.getByText('Profissional', { selector: 'small' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Consultar profissionais' }),
-    ).toHaveAttribute('href', '/professionals');
+    expect(screen.getByRole('link', { name: 'Consultar PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
+    expect(screen.getByRole('link', { name: 'PTS' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
     expect(screen.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
       'href',
       '/professionals',
@@ -172,7 +177,7 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Boas-vindas, Priscila.' }),
+      await screen.findByRole('heading', { name: 'Boas-vindas, Priscila' }),
     ).toBeInTheDocument();
   });
 
@@ -192,6 +197,20 @@ describe('HomePage', () => {
     expect(
       screen.getByRole('button', { name: 'Expandir barra lateral' }),
     ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('leva ao perfil pela foto do usuário no cabeçalho', async () => {
+    mockMe(200, account());
+
+    render(<HomePage />);
+
+    const profile = await screen.findByRole('link', {
+      name: /^Meu perfil: Priscila/,
+    });
+
+    expect(profile).toHaveAttribute('href', '/profile');
+    expect(profile.closest('header')).not.toBeNull();
+    expect(screen.queryByText('Área de trabalho')).not.toBeInTheDocument();
   });
 
   it('exibe a opção de sair da conta', async () => {

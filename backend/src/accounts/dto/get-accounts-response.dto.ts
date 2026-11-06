@@ -7,6 +7,8 @@ import { PaginationResponseDto } from '../../common/pagination/pagination-respon
 export class AccountSummaryResponseDto {
   id: string;
   name: string;
+  /** @example maria@exemplo.com */
+  email: string;
 }
 
 /** Resposta paginada da listagem de contas. */

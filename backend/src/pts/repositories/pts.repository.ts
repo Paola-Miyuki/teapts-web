@@ -2,6 +2,8 @@ import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 export interface ProfessionalRecord {
   id: string;
@@ -19,6 +21,7 @@ export interface FindPtsProposalsInput {
   accountId: string;
   patientId: string;
   isPatient: boolean;
+  isAdmin: boolean;
   professionalProfileIds: string[];
   page: number;
   limit: number;
@@ -40,6 +43,12 @@ export interface SocialSituationTarget {
   status: string;
   responsibleProfessionalId: string;
   teamProfessionalIds: string[];
+}
+
+export interface ProposalDecisionTarget {
+  id: string;
+  status: PtsStateEnum;
+  patientId: string;
 }
 
 /** Contrato de persistência dos PTS. */
@@ -85,4 +94,15 @@ export abstract class PtsRepository {
     patientId: string,
     profileIds: string[],
   ): Promise<boolean>;
+
+  abstract findProposalForDecision(
+    id: string,
+  ): Promise<ProposalDecisionTarget | null>;
+
+  abstract approveProposal(
+    id: string,
+    patientId: string,
+  ): Promise<PtsDecisionResponseDto>;
+
+  abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;
 }

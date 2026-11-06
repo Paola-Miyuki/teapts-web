@@ -1,11 +1,13 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   CreateDraftInput,
   ProfessionalRecord,
+  ProposalDecisionTarget,
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
@@ -51,7 +53,14 @@ export class InMemoryPtsRepository extends PtsRepository {
   async findDraftProposals(
     input: FindPtsProposalsInput,
   ): Promise<FindPtsProposalsResult> {
-    const { patientId, isPatient, professionalProfileIds, page, limit } = input;
+    const {
+      patientId,
+      isPatient,
+      isAdmin,
+      professionalProfileIds,
+      page,
+      limit,
+    } = input;
 
     const draftProposals = this.created.filter(
       (proposal) =>
@@ -59,11 +68,12 @@ export class InMemoryPtsRepository extends PtsRepository {
         proposal.status === PtsStateEnum.DRAFT,
     );
 
-    const proposals = isPatient
-      ? draftProposals
-      : draftProposals.filter((proposal) =>
-          this.isProfessionalOnProposal(proposal, professionalProfileIds),
-        );
+    const proposals =
+      isPatient || isAdmin
+        ? draftProposals
+        : draftProposals.filter((proposal) =>
+            this.isProfessionalOnProposal(proposal, professionalProfileIds),
+          );
 
     const ordered = [...proposals].sort(
       (a, b) =>
@@ -152,6 +162,69 @@ export class InMemoryPtsRepository extends PtsRepository {
     socialSituation: string,
   ): Promise<UpdateSocialSituationResponseDto> {
     return { id, socialSituation };
+  }
+
+  async findProposalForDecision(
+    id: string,
+  ): Promise<ProposalDecisionTarget | null> {
+    const proposal = this.created.find((item) => item.id === id);
+
+    return proposal
+      ? {
+          id: proposal.id,
+          status: proposal.status,
+          patientId: proposal.patient.id,
+        }
+      : null;
+  }
+
+  async approveProposal(
+    id: string,
+    patientId: string,
+  ): Promise<PtsDecisionResponseDto> {
+    const proposal = this.created.find((item) => item.id === id);
+
+    if (!proposal) {
+      throw new Error('Proposta não encontrada.');
+    }
+
+    const now = new Date().toISOString();
+    proposal.status = PtsStateEnum.PLANNING;
+
+    for (const otherProposal of this.created) {
+      if (
+        otherProposal.patient.id === patientId &&
+        otherProposal.id !== id &&
+        otherProposal.status === PtsStateEnum.DRAFT
+      ) {
+        otherProposal.status = PtsStateEnum.REJECTED;
+      }
+    }
+
+    return {
+      id,
+      status: PtsStateEnum.PLANNING,
+      acceptedAt: now,
+      rejectedAt: null,
+    };
+  }
+
+  async rejectProposal(id: string): Promise<PtsDecisionResponseDto> {
+    const proposal = this.created.find((item) => item.id === id);
+
+    if (!proposal) {
+      throw new Error('Proposta não encontrada.');
+    }
+
+    const rejectedAt = new Date().toISOString();
+    proposal.status = PtsStateEnum.REJECTED;
+
+    return {
+      id,
+      status: PtsStateEnum.REJECTED,
+      acceptedAt: null,
+      rejectedAt,
+    };
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {

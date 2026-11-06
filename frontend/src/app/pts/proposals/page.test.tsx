@@ -1,12 +1,22 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import PtsProposalList from './_components/PtsProposalList';
+import PtsProposalsPage from './page';
 import type { Account } from '@/lib/account';
-import { listEligiblePatients } from '../novo/api/ptsApi';
+import { listAuthorizedPatients } from '../novo/api/ptsApi';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 
 const mockRouter = {
   replace: mockReplace,
+  push: mockPush,
 };
 
 let mockSearchParams = new URLSearchParams();
@@ -19,6 +29,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('../novo/api/ptsApi', () => ({
   listProfessionals: jest.fn(() => Promise.resolve([])),
   listEligiblePatients: jest.fn(() => Promise.resolve([])),
+  listAuthorizedPatients: jest.fn(() => Promise.resolve([])),
 }));
 
 const PATIENT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
@@ -52,6 +63,17 @@ function professionalAccount(): Account {
     role: 'user',
     patientProfileId: null,
     professionalProfileIds: [PROFESSIONAL_ID],
+  } as unknown as Account;
+}
+
+function adminAccount(): Account {
+  return {
+    accountId: '44444444-4444-4444-8444-444444444444',
+    name: 'Admin Teste',
+    email: 'admin@example.com',
+    role: 'admin',
+    patientProfileId: null,
+    professionalProfileIds: [],
   } as unknown as Account;
 }
 
@@ -113,7 +135,9 @@ describe('PtsProposalList', () => {
 
     expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
     expect(screen.getByText('Paciente Teste')).toBeInTheDocument();
-    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Situação social de teste.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Integrante Teste')).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -132,6 +156,7 @@ describe('PtsProposalList', () => {
     render(<PtsProposalList account={professionalAccount()} />);
 
     expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=1&limit=20`,
       { credentials: 'include' },
@@ -219,7 +244,7 @@ describe('PtsProposalList', () => {
     mockSearchParams = new URLSearchParams('search=Paciente%20Teste');
 
     jest
-      .mocked(listEligiblePatients)
+      .mocked(listAuthorizedPatients)
       .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
 
     (global.fetch as jest.Mock).mockImplementationOnce(() =>
@@ -240,7 +265,7 @@ describe('PtsProposalList', () => {
     mockSearchParams = new URLSearchParams('search=Paciente%20Inexistente');
 
     jest
-      .mocked(listEligiblePatients)
+      .mocked(listAuthorizedPatients)
       .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
 
     render(<PtsProposalList account={professionalAccount()} />);
@@ -257,7 +282,7 @@ describe('PtsProposalList', () => {
 
     mockSearchParams = new URLSearchParams('search=Maria');
 
-    jest.mocked(listEligiblePatients).mockResolvedValueOnce([
+    jest.mocked(listAuthorizedPatients).mockResolvedValueOnce([
       { id: PATIENT_ID, name: 'Maria Silva' },
       { id: secondPatientId, name: 'Maria Souza' },
     ]);
@@ -273,5 +298,224 @@ describe('PtsProposalList', () => {
     ).toBeInTheDocument();
 
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('PtsProposalList com administrador (RN022)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams(`patientId=${PATIENT_ID}`);
+    global.fetch = jest.fn();
+  });
+
+  it('mostra a situação social e as ações de decisão da proposta em draft', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse(proposalResponse()),
+    );
+
+    render(<PtsProposalList account={adminAccount()} />);
+
+    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Escolher esta equipe' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Rejeitar' }),
+    ).toBeInTheDocument();
+  });
+
+  it('carrega os pacientes para o admin escolher quando não há patientId', async () => {
+    mockSearchParams = new URLSearchParams();
+
+    render(<PtsProposalList account={adminAccount()} />);
+
+    expect(
+      await screen.findByText('Nenhum paciente selecionado'),
+    ).toBeInTheDocument();
+    expect(listAuthorizedPatients).toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('PtsProposalsPage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    global.fetch = jest.fn((url: string) =>
+      url.endsWith('/me')
+        ? jsonResponse(patientAccount())
+        : jsonResponse(proposalResponse()),
+    ) as jest.Mock;
+  });
+
+  it('explica a escolha da proposta numa ajuda ao lado do título', async () => {
+    const user = userEvent.setup();
+
+    render(<PtsProposalsPage />);
+
+    const help = await screen.findByRole('button', {
+      name: 'Ajuda: Como funciona a escolha da proposta',
+    });
+
+    expect(help).toHaveAccessibleDescription(
+      'Só uma proposta pode ser aceita por vez. Quando uma é aceita, as outras propostas pendentes são rejeitadas automaticamente.',
+    );
+    expect(screen.queryByText(/Uma equipe por vez/)).not.toBeInTheDocument();
+
+    await user.click(help);
+
+    expect(help).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('PtsProposalList decisão do paciente', () => {
+  const PROPOSAL_ID = '3f2e1d0c-9b8a-4765-a432-10fedcba9876';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    global.fetch = jest.fn();
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse(proposalResponse()),
+    );
+  });
+
+  async function openDecision(action: string) {
+    render(<PtsProposalList account={patientAccount()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: action }));
+
+    return screen.getByRole('dialog');
+  }
+
+  it('não mostra as ações para o profissional', async () => {
+    mockSearchParams = new URLSearchParams(`patientId=${PATIENT_ID}`);
+
+    render(<PtsProposalList account={professionalAccount()} />);
+
+    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Escolher esta equipe' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Rejeitar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('aprova a proposta e leva para o PTS', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse({ id: PROPOSAL_ID, status: 'planning' }),
+    );
+
+    const dialog = await openDecision('Escolher esta equipe');
+
+    expect(
+      within(dialog).getByRole('heading', { name: 'Aceitar proposta?' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Escolher esta equipe' }),
+    );
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/pts'));
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      `http://localhost:3000/pts/proposals/${PROPOSAL_ID}/approve`,
+      { method: 'POST', credentials: 'include' },
+    );
+  });
+
+  it('rejeita a proposta e tira o card da lista', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse({ id: PROPOSAL_ID, status: 'rejected' }),
+    );
+
+    const dialog = await openDecision('Rejeitar');
+
+    expect(
+      within(dialog).getByRole('heading', { name: 'Rejeitar proposta?' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rejeitar' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Proposta rejeitada.',
+    );
+    expect(screen.queryByText('Responsável Teste')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      `http://localhost:3000/pts/proposals/${PROPOSAL_ID}/reject`,
+      { method: 'POST', credentials: 'include' },
+    );
+  });
+
+  it('desabilita a confirmação durante o envio', async () => {
+    let resolveDecision: (response: Response) => void = () => undefined;
+    (global.fetch as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveDecision = resolve;
+        }),
+    );
+
+    const dialog = await openDecision('Rejeitar');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rejeitar' }));
+
+    expect(
+      await within(dialog).findByRole('button', { name: 'Enviando...' }),
+    ).toBeDisabled();
+    expect(
+      within(dialog).getByRole('button', { name: 'Cancelar' }),
+    ).toBeDisabled();
+
+    resolveDecision({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: PROPOSAL_ID, status: 'rejected' }),
+    } as Response);
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Proposta rejeitada.',
+    );
+  });
+
+  it('mostra a mensagem da API e permite tentar de novo', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse(
+        {
+          status: 'PTS_NOT_DRAFT',
+          message: 'A proposta não está mais aguardando decisão.',
+        },
+        409,
+      ),
+    );
+
+    const dialog = await openDecision('Escolher esta equipe');
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Escolher esta equipe' }),
+    );
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'A proposta não está mais aguardando decisão.',
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Escolher esta equipe' }),
+    ).toBeEnabled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('redireciona para login quando a sessão expira na decisão', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse({}, 401),
+    );
+
+    const dialog = await openDecision('Rejeitar');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rejeitar' }));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'));
   });
 });

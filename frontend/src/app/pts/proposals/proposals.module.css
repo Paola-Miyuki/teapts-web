@@ -3,19 +3,11 @@
 }
 
 /* Aviso da página */
-.notice {
-  margin-bottom: 24px;
-  padding: 15px 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.notice strong {
-  color: var(--fg);
+/* Título com a ajuda (?) sobre a escolha da proposta. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Lista de propostas */
@@ -35,7 +27,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .listHeader p {
@@ -326,7 +318,7 @@
   margin: 12px 0 6px;
   font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .stateCard p {
@@ -511,39 +503,28 @@
 
 .headerAction {
   flex: none;
-}
-
-/* Estilização idêntica aos filtros de profissionais */
-.filters {
-  margin-bottom: 24px;
-  padding: 24px;
-}
-
-.filterMain {
-  display: flex;
-  gap: 16px;
-  width: 100%;
-  align-items: flex-end;
-}
-
-.inputWithIcon {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 14px;
-  color: var(--muted);
-  width: 16px;
-  height: 16px;
-  pointer-events: none;
-}
-
-.filterActions {
-  display: flex;
   gap: 8px;
-  flex-shrink: 0;
+}
+
+/* Decisão do paciente: ações do card e do diálogo */
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.decisionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .cardActions > *,
+  .decisionActions > * {
+    flex: 1;
+  }
 }
