@@ -115,3 +115,37 @@ describe('can', () => {
     }
   });
 });
+
+describe('editPtsProposal', () => {
+  const draft = (responsibleProfessionalId: string) => ({
+    pts: { status: 'draft', responsibleProfessionalId },
+  });
+  const prof = {
+    accountId: 'a',
+    role: 'user' as const,
+    patientProfileId: null,
+    professionalProfileIds: ['p1'],
+  };
+
+  it('libera ao responsável só em draft', () => {
+    expect(can(prof, 'editPtsProposal', draft('p1'))).toBe(true);
+    expect(can(prof, 'editPtsProposal', draft('p2'))).toBe(false);
+    expect(
+      can(prof, 'editPtsProposal', {
+        pts: { status: 'planning', responsibleProfessionalId: 'p1' },
+      }),
+    ).toBe(false);
+  });
+
+  it('libera ao admin em draft, mesmo sem ser o responsável', () => {
+    const admin = {
+      ...prof,
+      role: 'admin' as const,
+      professionalProfileIds: [],
+    };
+    expect(can(admin, 'editPtsProposal', draft('p2'))).toBe(true);
+    expect(can(admin, 'editPtsProposal', { pts: { status: 'running' } })).toBe(
+      false,
+    );
+  });
+});

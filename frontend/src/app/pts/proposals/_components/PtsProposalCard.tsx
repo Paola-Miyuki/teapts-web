@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import ui from '@/components/ui.module.css';
+import type { ProposalDecision } from '../api';
 import styles from '../proposals.module.css';
 
 export type PtsProposal = {
@@ -40,15 +41,15 @@ type PtsProposalCardProps = {
   showSocialSituation?: boolean;
   // Só o paciente decide: sem o callback, o card não mostra as ações.
   onDecide?: (proposalId: string, decision: ProposalDecision) => void;
+  canEdit?: boolean;
 };
 
 export default function PtsProposalCard({
   proposal,
+  showSocialSituation = true,
+  onDecide,
   canEdit = false,
-}: {
-  proposal: PtsProposal;
-  canEdit?: boolean;
-}) {
+}: PtsProposalCardProps) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
   const profSpecialism =
@@ -78,13 +79,7 @@ export default function PtsProposalCard({
             <p>{profSpecialism} &middot; profissional responsável</p>
           </div>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-          }}
-        >
+        <div className={styles.cardActions}>
           <div className={styles.statusBadge}>{displayStatus}</div>
 
           {canEdit && (

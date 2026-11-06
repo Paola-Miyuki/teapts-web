@@ -13,7 +13,7 @@ export default function EditPtsProposalClient({
 }: EditPtsProposalClientProps) {
   return (
     <AuthenticatedPage
-      currentHref="/pts/novo"
+      currentHref="/pts/proposals"
       breadcrumb="Editar proposta de PTS"
     >
       {(account) => (

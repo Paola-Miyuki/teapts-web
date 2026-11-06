@@ -17,12 +17,10 @@ jest.mock('@/lib/supertokens', () => ({
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-const mockRefresh = jest.fn();
 
 const mockRouter = {
   push: mockPush,
   replace: mockReplace,
-  refresh: mockRefresh,
 };
 
 jest.mock('next/navigation', () => ({
@@ -218,8 +216,6 @@ describe('EditPtsProposalForm', () => {
         `/pts/proposals?patientId=${PATIENT_ID}&updated=1`,
       );
     });
-
-    expect(mockRefresh).toHaveBeenCalled();
   });
 
   it('valida situação social vazia', async () => {

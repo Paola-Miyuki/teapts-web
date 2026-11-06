@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import ui from '@/components/ui.module.css';
 
 import type { Account } from '@/lib/account';
+import { can } from '@/lib/permissions';
 
 import { initSuperTokens } from '@/lib/supertokens';
 
@@ -88,11 +89,14 @@ export default function EditPtsProposalForm({
           return;
         }
 
-        const isResponsible = account.professionalProfileIds.includes(
-          loadedProposal.responsible.id,
-        );
+        const canEdit = can(account, 'editPtsProposal', {
+          pts: {
+            status: 'draft',
+            responsibleProfessionalId: loadedProposal.responsible.id,
+          },
+        });
 
-        if (!isResponsible) {
+        if (!canEdit) {
           setLoadError(
             'Somente o profissional responsável pode editar esta proposta.',
           );
@@ -147,7 +151,7 @@ export default function EditPtsProposalForm({
     return () => {
       controller.abort();
     };
-  }, [account.professionalProfileIds, proposalId, reloadKey, router]);
+  }, [account, proposalId, reloadKey, router]);
 
   useEffect(() => {
     if (submitError) {
@@ -216,8 +220,6 @@ export default function EditPtsProposalForm({
       });
 
       router.push(`/pts/proposals?${params.toString()}`);
-
-      router.refresh();
     } catch (error: unknown) {
       if (error instanceof PtsProposalApiError && error.statusCode === 401) {
         router.replace('/login');

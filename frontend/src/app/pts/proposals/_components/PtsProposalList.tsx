@@ -535,22 +535,26 @@ export default function PtsProposalList({ account }: { account: Account }) {
         </div>
       ) : (
         <div className={styles.proposalList}>
-          {enrichedProposals.map((proposal) => {
-            const canEdit =
-              proposal.status?.toUpperCase() === 'DRAFT' &&
-              Boolean(proposal.responsible?.id) &&
-              account.professionalProfileIds.includes(
-                proposal.responsible?.id ?? '',
-              );
-
-            return (
-              <PtsProposalCard
-                key={proposal.id}
-                proposal={proposal}
-                canEdit={canEdit}
-              />
-            );
-          })}
+          {enrichedProposals.map((proposal) => (
+            <PtsProposalCard
+              key={proposal.id}
+              proposal={proposal}
+              showSocialSituation={can(account, 'viewPtsSocialSituation')}
+              onDecide={
+                can(account, 'approvePtsProposal', {
+                  pts: { status: proposal.status },
+                })
+                  ? handleDecide
+                  : undefined
+              }
+              canEdit={can(account, 'editPtsProposal', {
+                pts: {
+                  status: proposal.status?.toLowerCase(),
+                  responsibleProfessionalId: proposal.responsible?.id,
+                },
+              })}
+            />
+          ))}
         </div>
       )}
 
