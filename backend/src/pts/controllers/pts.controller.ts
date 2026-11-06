@@ -71,7 +71,7 @@ export class PtsController {
     @Body() dto: CreatePtsRequestDto,
     @CurrentAccount() account: AccountContext,
   ) {
-    return this.ptsService.createPts(dto, account.accountId);
+    return this.ptsService.createPts(dto, account);
   }
 
   @Get('proposals')

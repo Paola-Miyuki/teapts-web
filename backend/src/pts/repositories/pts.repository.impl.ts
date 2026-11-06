@@ -184,7 +184,14 @@ export class PtsRepositoryImpl extends PtsRepository {
   async findDraftProposals(
     input: FindPtsProposalsInput,
   ): Promise<FindPtsProposalsResult> {
-    const { patientId, isPatient, professionalProfileIds, page, limit } = input;
+    const {
+      patientId,
+      isPatient,
+      isAdmin,
+      professionalProfileIds,
+      page,
+      limit,
+    } = input;
 
     const query = this.ptsRepository
       .createQueryBuilder('proposal')
@@ -199,7 +206,7 @@ export class PtsRepositoryImpl extends PtsRepository {
         status: PtsStateEnum.DRAFT,
       });
 
-    if (!isPatient) {
+    if (!isPatient && !isAdmin) {
       this.restrictToProfessionals(query, 'proposal', professionalProfileIds);
     }
 

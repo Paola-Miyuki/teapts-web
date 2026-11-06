@@ -47,11 +47,12 @@ describe('can', () => {
     }
   });
 
-  it('libera pacientes autorizados e criação de PTS só ao profissional', () => {
+  it('libera pacientes autorizados e criação de PTS ao profissional e ao admin', () => {
     for (const action of ['viewAuthorizedPatients', 'createPts'] as const) {
       expect(can(professional, action)).toBe(true);
-      expect(can(admin, action)).toBe(false);
+      expect(can(admin, action)).toBe(true);
       expect(can(patient, action)).toBe(false);
+      expect(can(waiting, action)).toBe(false);
     }
   });
 
@@ -70,22 +71,47 @@ describe('can', () => {
         pts: { ...draft, teamProfessionalIds: [] },
       }),
     ).toBe(false);
-    expect(can(admin, 'viewPtsProposals')).toBe(false);
+    expect(can(admin, 'viewPtsProposals')).toBe(true);
+    expect(can(admin, 'viewPtsProposals', { pts: draft })).toBe(true);
+    expect(can(waiting, 'viewPtsProposals')).toBe(false);
   });
 
   it('mantém a situação social oculta para o paciente (DP003)', () => {
     expect(can(professional, 'viewPtsSocialSituation')).toBe(true);
+    expect(can(admin, 'viewPtsSocialSituation')).toBe(true);
     expect(can(patient, 'viewPtsSocialSituation')).toBe(false);
   });
 
-  it('deixa só o paciente decidir, e só proposta em draft', () => {
+  it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
       expect(can(patient, action, { pts: draft })).toBe(true);
       expect(
         can(patient, action, { pts: { ...draft, status: 'planning' } }),
       ).toBe(false);
       expect(can(professional, action, { pts: draft })).toBe(false);
-      expect(can(admin, action, { pts: draft })).toBe(false);
+      expect(can(admin, action, { pts: draft })).toBe(true);
+      expect(
+        can(admin, action, { pts: { ...draft, status: 'planning' } }),
+      ).toBe(false);
+      expect(can(admin, action)).toBe(false);
+      expect(can(waiting, action, { pts: draft })).toBe(false);
+    }
+  });
+
+  it('libera ao admin toda ação, menos as que só escolhem o início', () => {
+    expect(can(admin, 'viewOwnCare')).toBe(false);
+    expect(can(admin, 'viewWaitingHome')).toBe(false);
+
+    for (const action of [
+      'createPatientProfile',
+      'viewAuthorizedPatients',
+      'viewPatientRegistry',
+      'viewProfessionalDirectory',
+      'viewPtsProposals',
+      'viewPtsSocialSituation',
+      'createPts',
+    ] as const) {
+      expect(can(admin, action)).toBe(true);
     }
   });
 });

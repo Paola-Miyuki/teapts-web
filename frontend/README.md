@@ -68,10 +68,11 @@ src/
                            especialidade e paginação
     pts/
       novo/                criar proposta de PTS: paciente (GET /patients/available-for-pts),
-                           equipe (GET /professionals) e POST /pts
+                           equipe (GET /professionals) e POST /pts; o admin escolhe o profissional
+                           responsável
       proposals/           propostas de PTS do paciente (GET /pts/proposals?patientId=); o
-                           profissional escolhe o paciente (GET /patients/authorized) e o paciente
-                           aprova ou rejeita (POST /pts/proposals/:id/approve e /reject)
+                           profissional e o admin escolhem o paciente (GET /patients/authorized) e o
+                           paciente (ou o admin, em nome dele) aprova ou rejeita (POST /pts/proposals/:id/approve e /reject)
     patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) com busca por nome ou
                            e-mail (termo em /patients?q=) e modal "Adicionar paciente"
       _components/         PatientSearch e PatientList (busca `q`, página 1 ao mudar o termo, resultados
@@ -108,7 +109,9 @@ usuário, com um texto padrão quando ela não vier.
 
 Toda tela autenticada usa `AuthenticatedPage`: sem sessão, vai para `/login`;
 sem a permissão de `requiredAction` (`src/lib/permissions.ts`), mostra
-"Acesso restrito". O menu lateral sai de `getNavigation` (`src/lib/account.ts`).
+"Acesso restrito". O admin tem todas as permissões (RN022), menos
+`viewOwnCare` e `viewWaitingHome`, que só escolhem o início, e aprovar ou
+rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation` (`src/lib/account.ts`).
 
 | Rota | Tela | Acesso (`requiredAction`) | Layout |
 | --- | --- | --- | --- |
@@ -119,8 +122,8 @@ sem a permissão de `requiredAction` (`src/lib/permissions.ts`), mostra
 | `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
 | `/patients` | Pacientes cadastrados e "Adicionar paciente" | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
 | `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | — |
-| `/pts/proposals` | Propostas de PTS | paciente e profissional da proposta (`viewPtsProposals`) | `propostas-pts.html` |
-| `/pts/novo` | Criar proposta de PTS | profissional (`createPts`) | `criar-pts.html` |
+| `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
+| `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 
 ## Layouts (`design/`)
 

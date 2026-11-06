@@ -34,6 +34,12 @@ function createService() {
           filters: GetAuthorizedPatientsRequestDto,
         ) => Promise<AuthorizedPatientsPage>
       >(),
+    findAllPaginated:
+      jest.fn<
+        (
+          filters: GetAuthorizedPatientsRequestDto,
+        ) => Promise<AuthorizedPatientsPage>
+      >(),
     findAvailableForPtsPaginated:
       jest.fn<
         (
@@ -52,6 +58,20 @@ function createService() {
   return { repository, accountRepository, service };
 }
 
+const professionalAccount: AccountContext = {
+  accountId: 'account-1',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['professional-1'],
+};
+
+const adminAccount: AccountContext = {
+  accountId: 'admin-1',
+  role: AccountRole.Admin,
+  patientProfileId: null,
+  professionalProfileIds: [],
+};
+
 describe('PatientsService.findAuthorized', () => {
   it('passes the account and filters and returns only the public summary', async () => {
     const { repository, service } = createService();
@@ -62,16 +82,50 @@ describe('PatientsService.findAuthorized', () => {
     });
 
     await expect(
-      service.findAuthorized('professional-account', request),
+      service.findAuthorized(professionalAccount, request),
     ).resolves.toEqual({
       data: [{ id: 'patient-1', name: 'Maria Silva' }],
       pagination: { page: 2, limit: 10, total: 11, totalPages: 2 },
     });
 
     expect(repository.findAuthorizedPaginated).toHaveBeenCalledWith(
-      'professional-account',
+      'account-1',
       request,
     );
+    expect(repository.findAllPaginated).not.toHaveBeenCalled();
+  });
+
+  it('returns every patient to the admin without the PTS filter', async () => {
+    const { repository, service } = createService();
+    const request = { page: 1, limit: 10 };
+    repository.findAllPaginated.mockResolvedValue({
+      rows: [{ patient_id: 'patient-2', account_name: 'Ana Souza' }],
+      total: 1,
+    });
+
+    await expect(
+      service.findAuthorized(adminAccount, request),
+    ).resolves.toEqual({
+      data: [{ id: 'patient-2', name: 'Ana Souza' }],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+
+    expect(repository.findAllPaginated).toHaveBeenCalledWith(request);
+    expect(repository.findAuthorizedPaginated).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe internal error when the admin query fails', async () => {
+    const { repository, service } = createService();
+    repository.findAllPaginated.mockRejectedValue(new Error('details'));
+
+    await expect(
+      service.findAuthorized(adminAccount, { page: 1, limit: 10 }),
+    ).rejects.toMatchObject({
+      response: {
+        status: 'ERROR',
+        message: 'Não foi possível consultar os pacientes autorizados.',
+      },
+    });
   });
 
   it('returns an empty page with zero total pages', async () => {
@@ -82,7 +136,7 @@ describe('PatientsService.findAuthorized', () => {
     });
 
     await expect(
-      service.findAuthorized('account', { page: 1, limit: 10 }),
+      service.findAuthorized(professionalAccount, { page: 1, limit: 10 }),
     ).resolves.toMatchObject({
       data: [],
       pagination: { total: 0, totalPages: 0 },
@@ -90,12 +144,17 @@ describe('PatientsService.findAuthorized', () => {
   });
 
   describe('PatientsService.findAvailableForPts', () => {
-    const professionalAccount: AccountContext = {
-      accountId: 'account-1',
-      role: AccountRole.User,
-      patientProfileId: null,
-      professionalProfileIds: ['professional-1'],
-    };
+    it('allows the admin without a professional profile', async () => {
+      const { repository, service } = createService();
+      repository.findAvailableForPtsPaginated.mockResolvedValue({
+        rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+        total: 1,
+      });
+
+      await expect(
+        service.findAvailableForPts(adminAccount, { page: 1, limit: 10 }),
+      ).resolves.toMatchObject({ data: [{ id: 'patient-1' }] });
+    });
 
     it('blocks accounts without a professional profile', async () => {
       const { repository, service } = createService();
@@ -157,7 +216,7 @@ describe('PatientsService.findAuthorized', () => {
     );
 
     await expect(
-      service.findAuthorized('account', { page: 1, limit: 10 }),
+      service.findAuthorized(professionalAccount, { page: 1, limit: 10 }),
     ).rejects.toMatchObject({
       response: {
         status: 'ERROR',

@@ -38,22 +38,25 @@ describe('getNavigation', () => {
     expect(labels(account({ role: 'admin' }))).toEqual([
       'Início',
       'Profissionais',
+      'PTS',
       'Pacientes',
     ]);
   });
 
-  it('mostra PTS para paciente e profissional, mas não para admin', () => {
+  it('mostra PTS para paciente, profissional e admin, mas não para conta sem perfil', () => {
     expect(labels(account({ patientProfileId: 'patient' }))).toContain('PTS');
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
     ).toContain('PTS');
-    expect(labels(account({ role: 'admin' }))).not.toContain('PTS');
+    expect(labels(account({ role: 'admin' }))).toContain('PTS');
+    expect(labels(account({}))).not.toContain('PTS');
   });
 
   it('mantém o menu alinhado aos acessos de cada perfil', () => {
     expect(labels(account({ role: 'admin' }))).toEqual([
       'Início',
       'Profissionais',
+      'PTS',
       'Pacientes',
     ]);
     expect(

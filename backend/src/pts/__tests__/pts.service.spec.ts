@@ -70,6 +70,13 @@ const adminAccount: AccountContext = {
   professionalProfileIds: [],
 };
 
+const accountOf = (accountId: string): AccountContext => ({
+  accountId,
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: [],
+});
+
 describe('PtsService.createPts', () => {
   let repo: InMemoryPtsRepository;
   let service: PtsService;
@@ -80,7 +87,7 @@ describe('PtsService.createPts', () => {
   });
 
   it('cria uma proposta com responsável, paciente e equipe', async () => {
-    const result = await service.createPts(body, 'acc-1');
+    const result = await service.createPts(body, accountOf('acc-1'));
 
     expect(result).toMatchObject({
       id: '100',
@@ -93,7 +100,7 @@ describe('PtsService.createPts', () => {
 
   it('rejeita quando a sessão não pertence ao profissional responsável', async () => {
     await expectApiError(
-      () => service.createPts(body, 'acc-9'),
+      () => service.createPts(body, accountOf('acc-9')),
       403,
       'PROFESSIONAL_NOT_AUTHORIZED',
     );
@@ -103,7 +110,11 @@ describe('PtsService.createPts', () => {
 
   it('rejeita quando o paciente não existe', async () => {
     await expectApiError(
-      () => service.createPts({ ...body, patientId: 'patient-404' }, 'acc-1'),
+      () =>
+        service.createPts(
+          { ...body, patientId: 'patient-404' },
+          accountOf('acc-1'),
+        ),
       404,
       'PATIENT_NOT_FOUND',
     );
@@ -113,7 +124,7 @@ describe('PtsService.createPts', () => {
     repo.patientsWithApprovedActivePts.add('patient-25');
 
     await expectApiError(
-      () => service.createPts(body, 'acc-1'),
+      () => service.createPts(body, accountOf('acc-1')),
       409,
       'PTS_ACTIVE_EXISTS',
     );
@@ -126,7 +137,7 @@ describe('PtsService.createPts', () => {
       socialSituation: body.socialSituation,
     };
 
-    const result = await service.createPts(withoutTeam, 'acc-1');
+    const result = await service.createPts(withoutTeam, accountOf('acc-1'));
 
     expect(result.team).toEqual([]);
   });
@@ -137,7 +148,7 @@ describe('PtsService.createPts', () => {
         ...body,
         teamProfessionalIds: ['prof-11', 'prof-11', 'prof-10'],
       },
-      'acc-1',
+      accountOf('acc-1'),
     );
 
     expect(result.team.map((professional) => professional.id)).toEqual([
@@ -149,14 +160,20 @@ describe('PtsService.createPts', () => {
     repo.patients.add('patient-26');
     repo.patientsWithApprovedActivePts.add('patient-26');
 
-    await expect(service.createPts(body, 'acc-1')).resolves.toMatchObject({
+    await expect(
+      service.createPts(body, accountOf('acc-1')),
+    ).resolves.toMatchObject({
       patient: { id: 'patient-25' },
     });
   });
 
   it('trata profissional inexistente como não autorizado', async () => {
     await expectApiError(
-      () => service.createPts({ ...body, professionalId: 'prof-999' }, 'acc-1'),
+      () =>
+        service.createPts(
+          { ...body, professionalId: 'prof-999' },
+          accountOf('acc-1'),
+        ),
       403,
       'PROFESSIONAL_NOT_AUTHORIZED',
     );
@@ -171,7 +188,7 @@ describe('PtsService.createPts', () => {
             professionalId: 'prof-20',
             patientId: 'patient-inexistente',
           },
-          'acc-1',
+          accountOf('acc-1'),
         ),
       403,
       'PROFESSIONAL_NOT_AUTHORIZED',
@@ -180,7 +197,7 @@ describe('PtsService.createPts', () => {
 
   it('rejeita o profissional quando a sessão pertence a outra conta', async () => {
     await expectApiError(
-      () => service.createPts(body, 'acc-2'),
+      () => service.createPts(body, accountOf('acc-2')),
       403,
       'PROFESSIONAL_NOT_AUTHORIZED',
     );
@@ -194,7 +211,7 @@ describe('PtsService.createPts', () => {
             ...body,
             teamProfessionalIds: ['prof-11', 'prof-777', 'prof-888'],
           },
-          'acc-1',
+          accountOf('acc-1'),
         ),
       400,
       'TEAM_PROFESSIONAL_NOT_FOUND',
@@ -215,7 +232,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('retorna propostas e dados de paginação para o paciente', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     const result = await service.findDraftProposals(
@@ -233,7 +250,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('permite que o profissional responsável consulte as propostas', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     const result = await service.findDraftProposals(
@@ -245,7 +262,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('permite que um integrante da equipe consulte as propostas', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     const result = await service.findDraftProposals(
@@ -257,7 +274,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('rejeita profissional sem vínculo com o paciente', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -289,7 +306,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('retorna somente propostas vinculadas ao profissional', async () => {
-    const primeiraProposta = await service.createPts(body, 'acc-1');
+    const primeiraProposta = await service.createPts(body, accountOf('acc-1'));
     primeiraProposta.patient.id = 'acc-patient-25';
 
     const segundaProposta = await service.createPts(
@@ -298,7 +315,7 @@ describe('PtsService.findDraftProposals', () => {
         professionalId: 'prof-11',
         teamProfessionalIds: ['prof-15'],
       },
-      'acc-2',
+      accountOf('acc-2'),
     );
     segundaProposta.patient.id = 'acc-patient-25';
 
@@ -313,7 +330,7 @@ describe('PtsService.findDraftProposals', () => {
   });
 
   it('retorna lista vazia quando o profissional tem vínculo, mas não há propostas DRAFT disponíveis', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
     proposal.status = PtsStateEnum.CONCLUDED;
 
@@ -335,7 +352,7 @@ describe('PtsService.findDraftProposals', () => {
 
   // NOVO
   it('rejeita conta sem perfil de paciente nem profissional', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -351,7 +368,7 @@ describe('PtsService.findDraftProposals', () => {
 
   // NOVO
   it('rejeita paciente que consulta propostas de outro paciente', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -367,7 +384,7 @@ describe('PtsService.findDraftProposals', () => {
 
   // NOVO
   it('permite que conta com perfis de paciente e profissional consulte como profissional', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     const result = await service.findDraftProposals(
@@ -381,9 +398,9 @@ describe('PtsService.findDraftProposals', () => {
 
   // NOVO
   it('pagina os resultados e calcula o total de páginas', async () => {
-    const first = await service.createPts(body, 'acc-1');
+    const first = await service.createPts(body, accountOf('acc-1'));
     first.patient.id = 'acc-patient-25';
-    const second = await service.createPts(body, 'acc-1');
+    const second = await service.createPts(body, accountOf('acc-1'));
     second.patient.id = 'acc-patient-25';
 
     const page1 = await service.findDraftProposals(
@@ -496,15 +513,6 @@ describe('PtsService.findActivePts', () => {
     );
   });
 
-  it('rejeita administrador sem perfil de paciente ou profissional', async () => {
-    await expectApiError(
-      () =>
-        service.findActivePts({ patientId: 'acc-patient-25' }, adminAccount),
-      403,
-      'FORBIDDEN',
-    );
-  });
-
   it('rejeita paciente que consulta outro paciente', async () => {
     await expectApiError(
       () =>
@@ -539,7 +547,7 @@ describe('PtsService.updatePtsProposal', () => {
   });
 
   const createDraft = async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
     return proposal;
   };
@@ -769,7 +777,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('permite que o paciente consulte sua própria proposta', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expect(
@@ -781,7 +789,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('permite que o profissional responsável consulte a proposta', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expect(
@@ -790,7 +798,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('permite que um integrante da equipe consulte a proposta', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expect(
@@ -799,7 +807,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('rejeita profissional sem vínculo com a proposta', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -819,7 +827,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('permite que conta com perfis de paciente e profissional consulte como integrante da equipe', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expect(
@@ -828,7 +836,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('rejeita paciente que consulta proposta de outro paciente', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -839,7 +847,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('rejeita conta sem perfil de paciente nem profissional', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
 
     await expectApiError(
@@ -850,7 +858,7 @@ describe('PtsService.findDraftProposalById', () => {
   });
 
   it('retorna 404 quando a proposta não está mais em DRAFT', async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
     proposal.status = PtsStateEnum.CONCLUDED;
 
@@ -872,7 +880,7 @@ describe('PtsService.approveProposal', () => {
   });
 
   const createDraft = async (patientId = 'acc-patient-25') => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = patientId;
     return proposal;
   };
@@ -961,7 +969,7 @@ describe('PtsService.rejectProposal', () => {
   });
 
   const createDraft = async () => {
-    const proposal = await service.createPts(body, 'acc-1');
+    const proposal = await service.createPts(body, accountOf('acc-1'));
     proposal.patient.id = 'acc-patient-25';
     return proposal;
   };
@@ -1003,5 +1011,214 @@ describe('PtsService.rejectProposal', () => {
       'PTS_NOT_DRAFT',
     );
     expect(proposal.status).toBe(PtsStateEnum.PLANNING);
+  });
+});
+
+describe('PtsService com administrador (RN022)', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const activePts: ActivePtsResponseDto = {
+    id: 'active-100',
+    status: PtsStateEnum.PLANNING,
+    socialSituation: 'Situação social confidencial.',
+    createdAt: '2026-10-15T12:00:00.000Z',
+    acceptedAt: '2026-10-15T12:30:00.000Z',
+    beganAt: null,
+    patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+    responsible: {
+      id: 'prof-10',
+      name: 'Profissional responsável',
+      specialism: { id: 'psychologist', name: 'Psicologia' },
+    },
+    team: [],
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+    repo.socialSituationTargets.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.PLANNING,
+      responsibleProfessionalId: 'prof-10',
+      teamProfessionalIds: ['prof-11'],
+    });
+  });
+
+  const createDraft = async () => {
+    const proposal = await service.createPts(body, adminAccount);
+    proposal.patient.id = 'acc-patient-25';
+    return proposal;
+  };
+
+  it('cria a proposta com o profissional escolhido como responsável', async () => {
+    const result = await service.createPts(body, adminAccount);
+
+    expect(result).toMatchObject({
+      status: PtsStateEnum.DRAFT,
+      responsible: { id: 'prof-10' },
+    });
+  });
+
+  it('mantém 403 para profissional inexistente na criação', async () => {
+    await expectApiError(
+      () =>
+        service.createPts(
+          { ...body, professionalId: 'prof-999' },
+          adminAccount,
+        ),
+      403,
+      'PROFESSIONAL_NOT_AUTHORIZED',
+    );
+  });
+
+  it('mantém as regras de criação para o admin', async () => {
+    repo.patientsWithApprovedActivePts.add('patient-25');
+
+    await expectApiError(
+      () => service.createPts(body, adminAccount),
+      409,
+      'PTS_ACTIVE_EXISTS',
+    );
+  });
+
+  it('lista as propostas de qualquer paciente, sem relação com a equipe', async () => {
+    await createDraft();
+
+    const result = await service.findDraftProposals(
+      { patientId: 'acc-patient-25', page: 1, limit: 20 },
+      adminAccount,
+    );
+
+    expect(result.data).toHaveLength(1);
+    expect(result.pagination.total).toBe(1);
+  });
+
+  it('lista vazio, sem 403, quando o paciente não tem proposta', async () => {
+    const result = await service.findDraftProposals(
+      { patientId: 'acc-patient-25', page: 1, limit: 20 },
+      adminAccount,
+    );
+
+    expect(result.data).toEqual([]);
+  });
+
+  it('detalha a proposta', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.findDraftProposalById(proposal.id, adminAccount),
+    ).resolves.toMatchObject({ id: proposal.id });
+  });
+
+  it('retorna o PTS ativo com a situação social', async () => {
+    repo.activePts.push(activePts);
+
+    await expect(
+      service.findActivePts({ patientId: 'acc-patient-25' }, adminAccount),
+    ).resolves.toMatchObject({
+      id: 'active-100',
+      socialSituation: activePts.socialSituation,
+    });
+  });
+
+  it('retorna 404 quando não há PTS ativo', async () => {
+    await expectApiError(
+      () =>
+        service.findActivePts({ patientId: 'acc-patient-25' }, adminAccount),
+      404,
+      'ACTIVE_PTS_NOT_FOUND',
+    );
+  });
+
+  it('edita a proposta em DRAFT', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.updatePtsProposal(
+        proposal.id,
+        { socialSituation: 'Situação social atualizada.' },
+        adminAccount,
+      ),
+    ).resolves.toMatchObject({
+      socialSituation: 'Situação social atualizada.',
+    });
+  });
+
+  it('não edita proposta fora de DRAFT', async () => {
+    const proposal = await createDraft();
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          proposal.id,
+          { socialSituation: 'Nova.' },
+          adminAccount,
+        ),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+  });
+
+  it('atualiza a situação social do PTS ativo', async () => {
+    await expect(
+      service.updateSocialSituation(
+        'pts-100',
+        { socialSituation: 'Situação social atualizada.' },
+        adminAccount,
+      ),
+    ).resolves.toEqual({
+      id: 'pts-100',
+      socialSituation: 'Situação social atualizada.',
+    });
+  });
+
+  it('não atualiza a situação social de PTS fora de PLANNING e RUNNING', async () => {
+    repo.socialSituationTargets.get('pts-100')!.status = PtsStateEnum.DRAFT;
+
+    await expectApiError(
+      () =>
+        service.updateSocialSituation(
+          'pts-100',
+          { socialSituation: 'Nova.' },
+          adminAccount,
+        ),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+  });
+
+  it('aprova a proposta em nome do paciente', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.approveProposal(proposal.id, adminAccount),
+    ).resolves.toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.PLANNING,
+    });
+  });
+
+  it('rejeita a proposta em nome do paciente', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.rejectProposal(proposal.id, adminAccount),
+    ).resolves.toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.REJECTED,
+    });
+  });
+
+  it('não decide proposta fora de DRAFT', async () => {
+    const proposal = await createDraft();
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () => service.approveProposal(proposal.id, adminAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
   });
 });

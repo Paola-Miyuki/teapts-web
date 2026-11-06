@@ -74,6 +74,22 @@ export function can(
   const patient = kind === 'patient';
   const { pts } = context;
 
+  // RN022 – o administrador acessa todo o sistema. Ficam de fora o que só
+  // escolhe o início (paciente e conta sem perfil) e a regra de estado:
+  // aprovar e rejeitar seguem valendo só em DRAFT.
+  if (admin) {
+    switch (action) {
+      case 'viewOwnCare':
+      case 'viewWaitingHome':
+        return false;
+      case 'approvePtsProposal':
+      case 'rejectPtsProposal':
+        return pts?.status === 'draft';
+      default:
+        return true;
+    }
+  }
+
   switch (action) {
     case 'viewWaitingHome':
       // RFAUT002 – conta sem perfil aguarda a associação pelo administrador.
