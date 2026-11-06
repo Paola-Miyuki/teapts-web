@@ -105,8 +105,11 @@ export function CreatePts({ account }: CreatePtsProps) {
         setPatients(loadedPatients);
         setProfessionals(loadedProfessionals);
 
+        // O admin (RN022/DP017) não tem perfil: escolhe o responsável.
         setResponsibleId(
-          ownProfessionals.length === 1 ? ownProfessionals[0].id : '',
+          account?.role !== 'admin' && ownProfessionals.length === 1
+            ? ownProfessionals[0].id
+            : '',
         );
 
         setLoadStatus('ready');
@@ -119,7 +122,7 @@ export function CreatePts({ account }: CreatePtsProps) {
       });
 
     return () => controller.abort();
-  }, [account?.professionalProfileIds, reloadKey]);
+  }, [account?.professionalProfileIds, account?.role, reloadKey]);
 
   useEffect(() => {
     if (submitError) {
@@ -129,19 +132,27 @@ export function CreatePts({ account }: CreatePtsProps) {
 
   const accountProfileIds = account?.professionalProfileIds ?? [];
 
-  const accountProfessionals = professionals.filter((professional) =>
-    accountProfileIds.includes(professional.id),
-  );
+  const isAdmin = account?.role === 'admin';
+
+  // Profissional: só os próprios perfis. Admin: todos os profissionais.
+  const accountProfessionals = isAdmin
+    ? professionals
+    : professionals.filter((professional) =>
+        accountProfileIds.includes(professional.id),
+      );
 
   const me =
-    accountProfessionals.length === 1
+    !isAdmin && accountProfessionals.length === 1
       ? accountProfessionals[0]
       : (accountProfessionals.find(
           (professional) => professional.id === responsibleId,
         ) ?? null);
 
   const hasNoProfessionalProfile =
-    loadStatus === 'ready' && !!account && accountProfessionals.length === 0;
+    loadStatus === 'ready' &&
+    !!account &&
+    !isAdmin &&
+    accountProfessionals.length === 0;
 
   const teamOptions = professionals.filter(
     (professional) => professional.id !== me?.id,
@@ -161,7 +172,9 @@ export function CreatePts({ account }: CreatePtsProps) {
     setFieldErrors({});
     setSubmitError(null);
     setResponsibleId(
-      accountProfessionals.length === 1 ? accountProfessionals[0].id : '',
+      !isAdmin && accountProfessionals.length === 1
+        ? accountProfessionals[0].id
+        : '',
     );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
@@ -298,10 +311,12 @@ export function CreatePts({ account }: CreatePtsProps) {
 
             <div className={fieldCls}>
               <label htmlFor="professional" className={labelCls}>
-                Seu perfil profissional
+                {isAdmin
+                  ? 'Profissional responsável'
+                  : 'Seu perfil profissional'}
               </label>
 
-              {accountProfessionals.length === 1 ? (
+              {!isAdmin && accountProfessionals.length === 1 ? (
                 <input
                   id="professional"
                   type="text"
@@ -325,7 +340,11 @@ export function CreatePts({ account }: CreatePtsProps) {
                     aria-describedby="professional-help"
                     className={`${inputCls(false)} ${styles.select}`}
                   >
-                    <option value="">Selecione seu perfil profissional</option>
+                    <option value="">
+                      {isAdmin
+                        ? 'Selecione o profissional responsável'
+                        : 'Selecione seu perfil profissional'}
+                    </option>
 
                     {accountProfessionals.map((professional) => (
                       <option key={professional.id} value={professional.id}>
@@ -342,7 +361,9 @@ export function CreatePts({ account }: CreatePtsProps) {
               )}
 
               <p id="professional-help" className={helpCls}>
-                Você será o profissional responsável por esta proposta.
+                {isAdmin
+                  ? 'O profissional escolhido será o responsável pelo PTS.'
+                  : 'Você será o profissional responsável por esta proposta.'}
               </p>
             </div>
 

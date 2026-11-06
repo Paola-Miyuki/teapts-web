@@ -66,6 +66,17 @@ function professionalAccount(): Account {
   } as unknown as Account;
 }
 
+function adminAccount(): Account {
+  return {
+    accountId: '44444444-4444-4444-8444-444444444444',
+    name: 'Admin Teste',
+    email: 'admin@example.com',
+    role: 'admin',
+    patientProfileId: null,
+    professionalProfileIds: [],
+  } as unknown as Account;
+}
+
 function proposalResponse(page = 1, totalPages = 1) {
   return {
     data: [
@@ -286,6 +297,43 @@ describe('PtsProposalList', () => {
       screen.getByText(/Digite um nome mais completo/i),
     ).toBeInTheDocument();
 
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('PtsProposalList com administrador (RN022)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams(`patientId=${PATIENT_ID}`);
+    global.fetch = jest.fn();
+  });
+
+  it('mostra a situação social e as ações de decisão da proposta em draft', async () => {
+    (global.fetch as jest.Mock).mockImplementationOnce(() =>
+      jsonResponse(proposalResponse()),
+    );
+
+    render(<PtsProposalList account={adminAccount()} />);
+
+    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Escolher esta equipe' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Rejeitar' }),
+    ).toBeInTheDocument();
+  });
+
+  it('carrega os pacientes para o admin escolher quando não há patientId', async () => {
+    mockSearchParams = new URLSearchParams();
+
+    render(<PtsProposalList account={adminAccount()} />);
+
+    expect(
+      await screen.findByText('Nenhum paciente selecionado'),
+    ).toBeInTheDocument();
+    expect(listAuthorizedPatients).toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 });
