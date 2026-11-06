@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import HelpTooltip from '@/components/HelpTooltip';
@@ -9,28 +9,15 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import {
   createPatient,
-  getAccountsWithoutPatientProfile,
   type AccountOption,
   type SupportContact,
 } from '@/lib/patients';
 import styles from '../patients.module.css';
+import AccountCombobox from './AccountCombobox';
 import SupportContactFields from './SupportContactFields';
 import SupportContactList from './SupportContactList';
 
-const LOAD_ERROR = 'Não foi possível carregar as contas.';
 const SUBMIT_ERROR = 'Não foi possível adicionar o paciente.';
-
-function getAccountPlaceholder(accounts: AccountOption[] | null) {
-  if (accounts === null) {
-    return 'Carregando contas...';
-  }
-
-  if (accounts.length === 0) {
-    return 'Nenhuma conta disponível.';
-  }
-
-  return 'Selecione a conta';
-}
 
 type AddPatientFormProps = {
   onCancel: () => void;
@@ -43,52 +30,13 @@ export default function AddPatientForm({
 }: AddPatientFormProps) {
   const router = useRouter();
 
-  // null = carregando; o select só tem a 1ª página (20 contas).
-  const [accounts, setAccounts] = useState<AccountOption[] | null>(null);
-  const [loadError, setLoadError] = useState('');
-  const [retryKey, setRetryKey] = useState(0);
-
-  const [accountId, setAccountId] = useState('');
+  const [account, setAccount] = useState<AccountOption | null>(null);
   const [accountError, setAccountError] = useState('');
   const [contacts, setContacts] = useState<SupportContact[]>([]);
   const [isContactOpen, setIsContactOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getAccountsWithoutPatientProfile()
-      .then((result) => {
-        if (!cancelled) {
-          setAccounts(result.data);
-        }
-      })
-      .catch((error: unknown) => {
-        if (cancelled) {
-          return;
-        }
-
-        if (error instanceof ApiError && error.status === 401) {
-          router.replace('/login');
-          return;
-        }
-
-        setAccounts([]);
-        setLoadError(LOAD_ERROR);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [retryKey, router]);
-
-  function handleRetry() {
-    setAccounts(null);
-    setLoadError('');
-    setRetryKey((current) => current + 1);
-  }
 
   function handleSaveContact(contact: SupportContact) {
     setContacts((current) => [...current, contact]);
@@ -104,7 +52,7 @@ export default function AddPatientForm({
 
     setSubmitError('');
 
-    if (!accountId) {
+    if (!account) {
       setAccountError('Selecione a conta.');
       document.getElementById('account')?.focus();
       return;
@@ -113,7 +61,7 @@ export default function AddPatientForm({
     setSubmitting(true);
 
     try {
-      await createPatient({ accountId, supportContacts: contacts });
+      await createPatient({ accountId: account.id, supportContacts: contacts });
     } catch (error) {
       setSubmitting(false);
 
@@ -130,13 +78,8 @@ export default function AddPatientForm({
       return;
     }
 
-    const name = accounts?.find((account) => account.id === accountId)?.name;
-
-    onAdded(name ?? 'da conta selecionada');
+    onAdded(account.name);
   }
-
-  const isAccountDisabled =
-    accounts === null || accounts.length === 0 || submitting;
 
   return (
     <form onSubmit={handleSubmit} noValidate>
@@ -157,62 +100,29 @@ export default function AddPatientForm({
           </label>
 
           <HelpTooltip id="account-help" label="Conta">
-            Conta já cadastrada que passa a ser paciente. Contas que já são
-            pacientes não aparecem.
+            Conta já cadastrada que passa a ser paciente. Busque por nome ou
+            e-mail. Contas que já são pacientes ou profissionais não aparecem.
           </HelpTooltip>
         </div>
 
-        <select
+        <AccountCombobox
           id="account"
-          name="account"
-          className={ui.input}
-          value={accountId}
-          disabled={isAccountDisabled}
-          aria-invalid={accountError ? true : undefined}
-          aria-describedby={
+          value={account}
+          disabled={submitting}
+          invalid={Boolean(accountError)}
+          describedBy={
             accountError ? 'account-help account-error' : 'account-help'
           }
-          onChange={(event) => {
-            setAccountId(event.target.value);
+          onChange={(next) => {
+            setAccount(next);
             setAccountError('');
           }}
-        >
-          <option value="">{getAccountPlaceholder(accounts)}</option>
-
-          {accounts?.map((account) => (
-            <option key={account.id} value={account.id}>
-              {account.name}
-            </option>
-          ))}
-        </select>
+        />
 
         {accountError && (
           <p id="account-error" className={ui.fieldError}>
             {accountError}
           </p>
-        )}
-
-        {loadError && (
-          <div
-            className={`${ui.alert} ${ui.alertError} ${styles.loadError}`}
-            role="alert"
-          >
-            <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
-              <Icon name="alertCircle" />
-            </div>
-
-            <div>
-              <span>{loadError}</span>
-
-              <button
-                type="button"
-                className={`${ui.btn} ${ui.btnSecondary} ${styles.retry}`}
-                onClick={handleRetry}
-              >
-                Tentar novamente
-              </button>
-            </div>
-          </div>
         )}
       </div>
 

@@ -4,6 +4,13 @@ import type { PaginationData } from '@/lib/professionals';
 export type AccountOption = {
   id: string;
   name: string;
+  email: string;
+};
+
+// Busca `q` por nome ou e-mail (NFUS003) e `signal` para cancelar a consulta.
+export type AccountsSearch = {
+  q?: string;
+  signal?: AbortSignal;
 };
 
 export type AccountsResponse = {
@@ -38,17 +45,50 @@ export type CreatePatientBody = {
 
 export type PatientProfile = CreatePatientBody;
 
-// GET /accounts: contas sem perfil de paciente e sem perfil profissional.
-export function getAccountsWithoutPatientProfile() {
-  return request<AccountsResponse>(
-    '/accounts?isPatient=false&isProfessional=false&page=1&limit=20',
-  );
+// Monta a query do GET /accounts: filtros de perfil, `q` (só se houver texto),
+// página e limite, nessa ordem.
+function buildAccountsQuery(
+  filters: Record<string, string>,
+  q: string | undefined,
+  page: number,
+  limit: number,
+) {
+  const params = new URLSearchParams(filters);
+  const term = q?.trim();
+
+  if (term) {
+    params.set('q', term);
+  }
+
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  return params.toString();
 }
 
 // GET /accounts: contas com perfil de paciente, paginadas (só admin).
-export function getPatientAccounts(page: number, limit: number) {
+export function getPatientAccounts(
+  page: number,
+  limit: number,
+  { q, signal }: AccountsSearch = {},
+) {
   return request<AccountsResponse>(
-    `/accounts?isPatient=true&page=${page}&limit=${limit}`,
+    `/accounts?${buildAccountsQuery({ isPatient: 'true' }, q, page, limit)}`,
+    { signal },
+  );
+}
+
+// GET /accounts: 1ª página das contas sem perfil de paciente nem profissional
+// (só admin). Paciente e profissional usam contas separadas (RN002).
+export function getAccountsWithoutProfile({ q, signal }: AccountsSearch = {}) {
+  return request<AccountsResponse>(
+    `/accounts?${buildAccountsQuery(
+      { isPatient: 'false', isProfessional: 'false' },
+      q,
+      1,
+      20,
+    )}`,
+    { signal },
   );
 }
 

@@ -20,8 +20,8 @@
 .page h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 

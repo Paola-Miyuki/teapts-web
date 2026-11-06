@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 import { Repository } from 'typeorm';
 import { Account } from '../entities/account.entity';
+import { AccountRole } from '../enums/account-role.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import {
   type AccountRow,
@@ -13,6 +14,7 @@ import {
 
 type QueryBuilderMock = {
   select: jest.Mock;
+  where: jest.Mock;
   leftJoin: jest.Mock;
   andWhere: jest.Mock;
   orderBy: jest.Mock;
@@ -27,6 +29,7 @@ type QueryBuilderMock = {
 function createRepository() {
   const query: QueryBuilderMock = {
     select: jest.fn(),
+    where: jest.fn(),
     leftJoin: jest.fn(),
     andWhere: jest.fn(),
     orderBy: jest.fn(),
@@ -40,6 +43,7 @@ function createRepository() {
 
   for (const method of [
     query.select,
+    query.where,
     query.leftJoin,
     query.andWhere,
     query.orderBy,
@@ -68,7 +72,11 @@ const firstPage: AccountsQuery = { page: 1, limit: 20 };
 describe('AccountsRepository.findPaginated', () => {
   it('returns the projected rows and the total, ordered and paginated', async () => {
     const { query, typeormRepository, repository } = createRepository();
-    const row = { account_id: 'account-1', account_name: 'Maria Silva' };
+    const row = {
+      account_id: 'account-1',
+      account_name: 'Maria Silva',
+      account_email: 'maria@exemplo.com',
+    };
     query.getCount.mockResolvedValue(21);
     query.getRawMany.mockResolvedValue([row]);
 
@@ -82,6 +90,7 @@ describe('AccountsRepository.findPaginated', () => {
     expect(query.select).toHaveBeenCalledWith([
       'account.id AS account_id',
       'account.name AS account_name',
+      'account.email AS account_email',
     ]);
     expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
     expect(query.addOrderBy).toHaveBeenCalledWith('account.id', 'ASC');
@@ -90,13 +99,35 @@ describe('AccountsRepository.findPaginated', () => {
     expect(query.limit).toHaveBeenCalledWith(20);
   });
 
-  it('does not filter when no filter is informed', async () => {
+  it('lists only user accounts before counting and paginating', async () => {
     const { query, repository } = createRepository();
 
     await repository.findPaginated(firstPage);
 
+    expect(query.where).toHaveBeenCalledWith('account.role = :role', {
+      role: AccountRole.User,
+    });
+    expect(query.where.mock.invocationCallOrder[0]).toBeLessThan(
+      query.clone.mock.invocationCallOrder[0],
+    );
     expect(query.leftJoin).not.toHaveBeenCalled();
     expect(query.andWhere).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ q: 'ana' }],
+    [{ isPatient: true }],
+    [{ isProfessional: false }],
+    [{ q: 'ana', isPatient: false, isProfessional: true }],
+  ])('keeps admins out with the filters %j', async (filters) => {
+    const { query, repository } = createRepository();
+
+    await repository.findPaginated({ ...firstPage, ...filters });
+
+    expect(query.where).toHaveBeenCalledTimes(1);
+    expect(query.where).toHaveBeenCalledWith('account.role = :role', {
+      role: AccountRole.User,
+    });
   });
 
   it.each([
@@ -125,6 +156,53 @@ describe('AccountsRepository.findPaginated', () => {
 
     expect(query.andWhere).toHaveBeenCalledWith(
       `${operator} (SELECT 1 FROM professional WHERE professional."accountId" = account.id)`,
+    );
+  });
+
+  it('searches by name or email before counting and paginating', async () => {
+    const { query, repository } = createRepository();
+
+    await repository.findPaginated({ ...firstPage, q: 'Mari' });
+
+    expect(query.andWhere).toHaveBeenCalledWith(
+      `(account.name ILIKE :q ESCAPE '\\' OR account.email ILIKE :q ESCAPE '\\')`,
+      { q: '%Mari%' },
+    );
+    expect(query.andWhere.mock.invocationCallOrder[0]).toBeLessThan(
+      query.clone.mock.invocationCallOrder[0],
+    );
+    expect(query.andWhere.mock.invocationCallOrder[0]).toBeLessThan(
+      query.offset.mock.invocationCallOrder[0],
+    );
+  });
+
+  it.each([
+    ['100%', '%100\\%%'],
+    ['maria_silva', '%maria\\_silva%'],
+    ['a\\b', '%a\\\\b%'],
+  ])('treats the wildcards in %s as text', async (q, pattern) => {
+    const { query, repository } = createRepository();
+
+    await repository.findPaginated({ ...firstPage, q });
+
+    expect(query.andWhere).toHaveBeenCalledWith(expect.any(String), {
+      q: pattern,
+    });
+  });
+
+  it('combines the search with the patient filter', async () => {
+    const { query, repository } = createRepository();
+
+    await repository.findPaginated({ ...firstPage, isPatient: true, q: 'ana' });
+
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'patient."accountId" IS NOT NULL',
+    );
+    expect(query.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('ILIKE'),
+      {
+        q: '%ana%',
+      },
     );
   });
 

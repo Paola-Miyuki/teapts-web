@@ -224,8 +224,6 @@ export function CreatePts({ account }: CreatePtsProps) {
   return (
     <>
       <div className={ui.heading}>
-        <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
-
         <h1>{created ? 'Proposta criada' : 'Criar proposta de PTS'}</h1>
 
         {!created && (
@@ -423,22 +421,6 @@ export function CreatePts({ account }: CreatePtsProps) {
               </Link>
             </div>
           </form>
-        )}
-
-        {!created && (
-          <aside className={styles.aside}>
-            <h2>O primeiro passo é conjunto.</h2>
-
-            <p>
-              A proposta será apresentada ao paciente. Após a aprovação, o PTS
-              entra em planejamento.
-            </p>
-
-            <p>
-              Cada paciente pode ter apenas um PTS aprovado ativo. Outras
-              propostas pendentes serão rejeitadas ao escolher uma equipe.
-            </p>
-          </aside>
         )}
       </div>
     </>

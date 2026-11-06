@@ -285,3 +285,112 @@
     flex: 1;
   }
 }
+
+/* Busca por nome ou e-mail (campo de pacientes.html) e combobox da conta */
+
+.searchBlock {
+  margin-bottom: 18px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Seletores com mais especificidade que .input (ui.module.css), senão o
+   padding do campo ignora o espaço do ícone e do ✕. */
+.search .searchInput,
+.search .comboboxInput {
+  padding-right: 48px;
+}
+
+.search .searchInput {
+  padding-left: 40px;
+}
+
+/* O ✕ próprio substitui o do navegador. */
+.searchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.searchClear {
+  position: absolute;
+  right: 2px;
+}
+
+.combobox {
+  position: relative;
+}
+
+.listbox {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  margin: 6px 0 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.option {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.option:hover,
+.option[data-active] {
+  background: var(--bg);
+}
+
+.option[data-active] {
+  outline: 2px solid var(--fg);
+  outline-offset: -2px;
+}
+
+.option[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.comboboxStatus {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.comboboxStatus p {
+  margin: 0;
+}
+
+.comboboxStatus button {
+  margin-top: 10px;
+}
+
+/* Resultados anteriores ficam na tela, mais claros, durante a nova busca. */
+.refreshing {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}

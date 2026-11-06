@@ -1,7 +1,7 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import type { Account } from '@/lib/account';
 
@@ -9,9 +9,11 @@ import PatientsPage from './page';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  useSearchParams: jest.fn(),
 }));
 
 const mockedUseRouter = useRouter as jest.Mock;
+const mockedUseSearchParams = useSearchParams as jest.Mock;
 
 const API = 'http://localhost:3000';
 const PATIENTS_URL = `${API}/accounts?isPatient=true&page=1&limit=10`;
@@ -37,15 +39,19 @@ const PROFESSIONAL: Account = {
 
 const ACCOUNTS = {
   data: [
-    { id: ACCOUNT_ID, name: 'João Martins' },
-    { id: 'other-uuid', name: 'Kaio Felipe' },
+    { id: ACCOUNT_ID, name: 'João Martins', email: 'joao@exemplo.com' },
+    { id: 'other-uuid', name: 'Kaio Felipe', email: 'kaio@exemplo.com' },
   ],
   pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
 };
 
 function page(names: string[], current = 1, totalPages = 1) {
   return {
-    data: names.map((name, index) => ({ id: `${current}-${index}`, name })),
+    data: names.map((name, index) => ({
+      id: `${current}-${index}`,
+      name,
+      email: `${name.split(' ')[0].toLowerCase()}@exemplo.com`,
+    })),
     pagination: {
       page: current,
       limit: 10,
@@ -117,11 +123,21 @@ async function openAddPatient(user: ReturnType<typeof userEvent.setup>) {
   );
 
   const dialog = within(screen.getByRole('dialog'));
-  const select = dialog.getByLabelText('Conta');
-
-  await waitFor(() => expect(select).toBeEnabled());
+  const select = dialog.getByRole('combobox', { name: 'Conta' });
 
   return { dialog, select };
+}
+
+const JOAO = 'João Martins · joao@exemplo.com';
+
+// Abre a lista do combobox e escolhe a conta pelo texto da opção.
+async function chooseAccount(
+  user: ReturnType<typeof userEvent.setup>,
+  select: HTMLElement,
+  option = JOAO,
+) {
+  await user.click(select);
+  await user.click(await screen.findByRole('option', { name: option }));
 }
 
 async function addContact(
@@ -167,6 +183,7 @@ describe('PatientsPage', () => {
     jest.clearAllMocks();
 
     mockedUseRouter.mockReturnValue({ replace });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
 
     global.fetch = jest.fn();
   });
@@ -197,10 +214,12 @@ describe('PatientsPage', () => {
       );
 
       expect(items.getByText('Maria Sílvia')).toBeInTheDocument();
+      expect(items.getByText('maria@exemplo.com')).toBeInTheDocument();
       expect(items.getByText('Diego Alves')).toBeInTheDocument();
-      expect(list).toHaveBeenCalledWith(PATIENTS_URL, {
-        credentials: 'include',
-      });
+      expect(list).toHaveBeenCalledWith(
+        PATIENTS_URL,
+        expect.objectContaining({ credentials: 'include' }),
+      );
       // As contas do select só carregam quando o modal abre.
       expect(accounts).not.toHaveBeenCalled();
 
@@ -301,13 +320,13 @@ describe('PatientsPage', () => {
       expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
       expect(list).toHaveBeenLastCalledWith(
         `${API}/accounts?isPatient=true&page=2&limit=10`,
-        { credentials: 'include' },
+        expect.objectContaining({ credentials: 'include' }),
       );
     });
   });
 
   describe('modal "Adicionar paciente"', () => {
-    it('carrega as contas que ainda não são pacientes', async () => {
+    it('carrega as contas sem perfil de paciente nem profissional', async () => {
       const user = userEvent.setup();
       const { accounts } = mockApi();
 
@@ -315,32 +334,31 @@ describe('PatientsPage', () => {
 
       const { select } = await openAddPatient(user);
 
-      expect(
-        within(select)
-          .getAllByRole('option')
-          .map((option) => option.textContent),
-      ).toEqual(['Selecione a conta', 'João Martins', 'Kaio Felipe']);
-      expect(accounts).toHaveBeenCalledWith(ACCOUNTS_URL, {
-        credentials: 'include',
-      });
+      await user.click(select);
+
+      const options = await screen.findAllByRole('option');
+
+      expect(options.map((option) => option.textContent)).toEqual([
+        JOAO,
+        'Kaio Felipe · kaio@exemplo.com',
+      ]);
+      expect(accounts).toHaveBeenCalledWith(
+        ACCOUNTS_URL,
+        expect.objectContaining({ credentials: 'include' }),
+      );
     });
 
-    it('mostra o loading do select enquanto as contas carregam', async () => {
+    it('mostra o loading das contas enquanto carregam', async () => {
       const user = userEvent.setup();
       mockApi({ accounts: jest.fn(() => new Promise<Response>(() => {})) });
 
       render(<PatientsPage />);
 
-      await user.click(
-        await screen.findByRole('button', { name: 'Adicionar paciente' }),
-      );
+      const { select } = await openAddPatient(user);
 
-      const select = within(screen.getByRole('dialog')).getByLabelText('Conta');
+      await user.click(select);
 
-      expect(select).toBeDisabled();
-      expect(
-        within(select).getByRole('option', { name: 'Carregando contas...' }),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('Carregando contas...')).toBeVisible();
     });
 
     it('avisa quando não há contas disponíveis', async () => {
@@ -358,15 +376,13 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
-      await user.click(
-        await screen.findByRole('button', { name: 'Adicionar paciente' }),
-      );
+      const { select } = await openAddPatient(user);
+
+      await user.click(select);
 
       expect(
-        await screen.findByRole('option', {
-          name: 'Nenhuma conta disponível.',
-        }),
-      ).toBeInTheDocument();
+        await screen.findByText('Nenhuma conta disponível.'),
+      ).toBeVisible();
     });
 
     it('mostra o erro ao carregar as contas e tenta de novo', async () => {
@@ -380,11 +396,7 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
-      await user.click(
-        await screen.findByRole('button', { name: 'Adicionar paciente' }),
-      );
-
-      const dialog = within(screen.getByRole('dialog'));
+      const { dialog, select } = await openAddPatient(user);
 
       expect(
         await dialog.findByText('Não foi possível carregar as contas.'),
@@ -393,11 +405,51 @@ describe('PatientsPage', () => {
       await user.click(
         dialog.getByRole('button', { name: 'Tentar novamente' }),
       );
+      await user.click(select);
 
       expect(
-        await dialog.findByRole('option', { name: 'João Martins' }),
+        await screen.findByRole('option', { name: JOAO }),
       ).toBeInTheDocument();
       expect(accounts).toHaveBeenCalledTimes(2);
+    });
+
+    it('mostra a message da API ao falhar a busca das contas', async () => {
+      const user = userEvent.setup();
+      mockApi({
+        accounts: jest.fn().mockResolvedValue(
+          mockResponse({
+            status: 403,
+            ok: false,
+            data: {
+              status: 'FORBIDDEN',
+              message: 'Acesso restrito ao administrador.',
+            },
+          }),
+        ),
+      });
+
+      render(<PatientsPage />);
+
+      const { dialog } = await openAddPatient(user);
+
+      expect(
+        await dialog.findByText('Acesso restrito ao administrador.'),
+      ).toBeInTheDocument();
+    });
+
+    it('redireciona para o login quando as contas respondem 401', async () => {
+      const user = userEvent.setup();
+      mockApi({
+        accounts: jest
+          .fn()
+          .mockResolvedValue(mockResponse({ status: 401, ok: false })),
+      });
+
+      render(<PatientsPage />);
+
+      await openAddPatient(user);
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
     });
 
     it('explica a conta e os contatos em tooltips de ajuda', async () => {
@@ -409,7 +461,7 @@ describe('PatientsPage', () => {
       const { dialog, select } = await openAddPatient(user);
 
       expect(select).toHaveAccessibleDescription(
-        'Conta já cadastrada que passa a ser paciente. Contas que já são pacientes não aparecem.',
+        'Conta já cadastrada que passa a ser paciente. Busque por nome ou e-mail. Contas que já são pacientes ou profissionais não aparecem.',
       );
       expect(
         dialog.getByRole('group', { name: /Contatos de suporte/ }),
@@ -436,7 +488,7 @@ describe('PatientsPage', () => {
 
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await user.click(dialog.getByRole('button', { name: 'Cancelar' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -444,6 +496,548 @@ describe('PatientsPage', () => {
       const reopened = await openAddPatient(user);
 
       expect(reopened.select).toHaveValue('');
+      expect(reopened.select).toHaveAttribute('aria-expanded', 'false');
+    });
+  });
+
+  describe('busca por nome ou e-mail em /patients', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    // Resposta da lista com o total igual ao número de nomes.
+    function results(names: string[], current = 1, totalPages = 1) {
+      return {
+        data: names.map((name, index) => ({
+          id: `${current}-${index}`,
+          name,
+          email: `${name.split(' ')[0].toLowerCase()}@exemplo.com`,
+        })),
+        pagination: {
+          page: current,
+          limit: 10,
+          total: names.length,
+          totalPages: names.length === 0 ? 0 : totalPages,
+        },
+      };
+    }
+
+    // A lista responde conforme o `q` da URL; sem `q`, usa a chave ''.
+    function listByTerm(byTerm: Record<string, string[]>) {
+      return jest.fn((url: string) => {
+        const q = new URL(url).searchParams.get('q') ?? '';
+
+        return Promise.resolve(
+          mockResponse({ data: results(byTerm[q] ?? []) }),
+        );
+      });
+    }
+
+    const SEARCH = { name: 'Buscar por nome ou e-mail' };
+
+    it('lê o termo da URL e busca com ele', async () => {
+      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=maria'));
+      const { list } = mockApi({
+        list: listByTerm({ maria: ['Maria Sílvia'] }),
+      });
+
+      render(<PatientsPage />);
+
+      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
+      expect(screen.getByRole('searchbox', SEARCH)).toHaveValue('maria');
+      expect(screen.getByText('1 paciente encontrado')).toBeInTheDocument();
+      expect(list).toHaveBeenCalledWith(
+        `${API}/accounts?isPatient=true&q=maria&page=1&limit=10`,
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+
+    it('busca 300 ms depois da última tecla e grava o termo na URL', async () => {
+      jest.useFakeTimers();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const { list } = mockApi({
+        list: listByTerm({
+          '': ['Maria Sílvia', 'Diego Alves'],
+          mar: ['Maria Sílvia'],
+        }),
+      });
+
+      render(<PatientsPage />);
+
+      await user.type(await screen.findByRole('searchbox', SEARCH), 'mar');
+
+      expect(list).toHaveBeenCalledTimes(1);
+
+      act(() => jest.advanceTimersByTime(299));
+
+      expect(list).toHaveBeenCalledTimes(1);
+
+      act(() => jest.advanceTimersByTime(1));
+
+      await waitFor(() =>
+        expect(list).toHaveBeenLastCalledWith(
+          `${API}/accounts?isPatient=true&q=mar&page=1&limit=10`,
+          expect.anything(),
+        ),
+      );
+      expect(replace).toHaveBeenCalledWith('/patients?q=mar', {
+        scroll: false,
+      });
+      await waitFor(() =>
+        expect(screen.queryByText('Diego Alves')).not.toBeInTheDocument(),
+      );
+    });
+
+    it('não busca com menos de 2 caracteres e avisa', async () => {
+      jest.useFakeTimers();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const { list } = mockApi();
+
+      render(<PatientsPage />);
+
+      await user.type(await screen.findByRole('searchbox', SEARCH), 'm');
+      act(() => jest.advanceTimersByTime(300));
+
+      expect(list).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByText('Digite ao menos 2 caracteres para buscar.'),
+      ).toBeInTheDocument();
+    });
+
+    it('busca na hora ao pressionar Enter, sem esperar o debounce', async () => {
+      jest.useFakeTimers();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      const { list } = mockApi({
+        list: listByTerm({ '': ['Diego Alves'], ana: ['Ana Lima'] }),
+      });
+
+      render(<PatientsPage />);
+
+      await user.type(
+        await screen.findByRole('searchbox', SEARCH),
+        'ana{Enter}',
+      );
+
+      expect(await screen.findByText('Ana Lima')).toBeInTheDocument();
+      expect(list).toHaveBeenLastCalledWith(
+        `${API}/accounts?isPatient=true&q=ana&page=1&limit=10`,
+        expect.anything(),
+      );
+    });
+
+    it('limpa a busca com o Esc e com o ✕', async () => {
+      const user = userEvent.setup();
+      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=maria'));
+      const { list } = mockApi({
+        list: listByTerm({
+          maria: ['Maria Sílvia'],
+          '': ['Maria Sílvia', 'Diego Alves'],
+        }),
+      });
+
+      render(<PatientsPage />);
+
+      const box = await screen.findByRole('searchbox', SEARCH);
+
+      await screen.findByText('Maria Sílvia');
+      await user.type(box, '{Escape}');
+
+      expect(box).toHaveValue('');
+      expect(await screen.findByText('Diego Alves')).toBeInTheDocument();
+      expect(replace).toHaveBeenLastCalledWith('/patients', { scroll: false });
+      expect(list).toHaveBeenLastCalledWith(PATIENTS_URL, expect.anything());
+
+      await user.type(box, 'diego{Enter}');
+      await user.click(
+        screen.getByRole('button', { name: 'Limpar campo de busca' }),
+      );
+
+      expect(box).toHaveValue('');
+      expect(
+        screen.queryByRole('button', { name: 'Limpar campo de busca' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('mostra a mensagem própria sem resultados e limpa pelo botão', async () => {
+      const user = userEvent.setup();
+      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=zzz'));
+      mockApi({ list: listByTerm({ '': ['Maria Sílvia'] }) });
+
+      render(<PatientsPage />);
+
+      expect(
+        await screen.findByText('Nenhum paciente encontrado'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Nenhum resultado para “zzz”/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Nenhum paciente cadastrado'),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+
+      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
+      expect(screen.getByRole('searchbox', SEARCH)).toHaveValue('');
+    });
+
+    it('mantém os resultados anteriores enquanto a busca carrega', async () => {
+      const user = userEvent.setup();
+      const list = jest
+        .fn()
+        .mockResolvedValueOnce(
+          mockResponse({ data: results(['Maria Sílvia']) }),
+        )
+        .mockImplementationOnce(() => new Promise<Response>(() => {}));
+
+      mockApi({ list });
+      render(<PatientsPage />);
+
+      await screen.findByText('Maria Sílvia');
+      await user.type(screen.getByRole('searchbox', SEARCH), 'ana{Enter}');
+
+      expect(await screen.findByText('Buscando...')).toBeInTheDocument();
+      expect(screen.getByText('Maria Sílvia')).toBeInTheDocument();
+      expect(
+        screen.getByRole('list', { name: 'Pacientes' }).parentElement,
+      ).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('descarta a resposta de uma busca superada', async () => {
+      const user = userEvent.setup();
+      let resolveOld: (response: Response) => void = () => {};
+      const list = jest.fn((url: string) => {
+        const q = new URL(url).searchParams.get('q');
+
+        if (q === 'ma') {
+          return new Promise<Response>((resolve) => {
+            resolveOld = resolve;
+          });
+        }
+
+        return Promise.resolve(
+          mockResponse({
+            data: results(q === 'maria' ? ['Maria Sílvia'] : ['Diego Alves']),
+          }),
+        );
+      });
+
+      mockApi({ list });
+      render(<PatientsPage />);
+
+      const box = await screen.findByRole('searchbox', SEARCH);
+
+      await screen.findByText('Diego Alves');
+      await user.type(box, 'ma{Enter}');
+      await user.type(box, 'ria{Enter}');
+
+      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
+
+      await act(async () => {
+        resolveOld(mockResponse({ data: results(['Resposta velha']) }));
+      });
+
+      expect(screen.getByText('Maria Sílvia')).toBeInTheDocument();
+      expect(screen.queryByText('Resposta velha')).not.toBeInTheDocument();
+    });
+
+    it('volta à página 1 quando o termo muda', async () => {
+      const user = userEvent.setup();
+      const list = jest.fn((url: string) => {
+        const params = new URL(url).searchParams;
+        const current = Number(params.get('page'));
+
+        return Promise.resolve(
+          mockResponse({
+            data: results(
+              [params.get('q') ? 'Ana Lima' : `Paciente ${current}`],
+              current,
+              2,
+            ),
+          }),
+        );
+      });
+
+      mockApi({ list });
+      render(<PatientsPage />);
+
+      await screen.findByText('Página 1 de 2');
+      await user.click(screen.getByRole('button', { name: 'Próxima' }));
+      await screen.findByText('Página 2 de 2');
+      await user.type(screen.getByRole('searchbox', SEARCH), 'ana{Enter}');
+
+      expect(await screen.findByText('Ana Lima')).toBeInTheDocument();
+      expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+      expect(list).toHaveBeenLastCalledWith(
+        `${API}/accounts?isPatient=true&q=ana&page=1&limit=10`,
+        expect.anything(),
+      );
+    });
+
+    it('mostra a message da API quando a lista falha', async () => {
+      mockApi({
+        list: jest.fn().mockResolvedValue(
+          mockResponse({
+            status: 500,
+            ok: false,
+            data: {
+              status: 'ERROR',
+              message: 'Não foi possível consultar as contas.',
+            },
+          }),
+        ),
+      });
+
+      render(<PatientsPage />);
+
+      expect(
+        await screen.findByText('Não foi possível consultar as contas.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('combobox "Conta" do modal', () => {
+    // O `q` do modal escolhe a resposta; sem `q`, as contas da 1ª página.
+    function accountsByTerm(byTerm: Record<string, AccountSeed[]>) {
+      return jest.fn((url: string) => {
+        const q = new URL(url).searchParams.get('q') ?? '';
+        const data = q ? (byTerm[q] ?? []) : ACCOUNTS.data;
+
+        return Promise.resolve(
+          mockResponse({
+            data: {
+              data,
+              pagination: {
+                page: 1,
+                limit: 20,
+                total: data.length,
+                totalPages: data.length === 0 ? 0 : 1,
+              },
+            },
+          }),
+        );
+      });
+    }
+
+    type AccountSeed = { id: string; name: string; email: string };
+
+    const ANA: AccountSeed = {
+      id: 'ana-uuid',
+      name: 'Ana Souza',
+      email: 'ana@exemplo.com',
+    };
+
+    it('encontra por e-mail uma conta fora da 1ª página e a seleciona', async () => {
+      const user = userEvent.setup();
+      const { accounts, patients } = mockApi({
+        accounts: accountsByTerm({ 'ana@': [ANA] }),
+        patients: jest
+          .fn()
+          .mockResolvedValue(mockResponse({ status: 201, data: {} })),
+      });
+
+      render(<PatientsPage />);
+
+      const { dialog, select } = await openAddPatient(user);
+
+      await user.type(select, 'ana@');
+
+      await chooseAccount(user, select, 'Ana Souza · ana@exemplo.com');
+
+      expect(accounts).toHaveBeenCalledWith(
+        `${API}/accounts?isPatient=false&isProfessional=false&q=ana%40&page=1&limit=20`,
+        expect.anything(),
+      );
+      expect(select).toHaveValue('Ana Souza · ana@exemplo.com');
+      expect(select).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar paciente' }),
+      );
+
+      expect(patients).toHaveBeenCalledWith(
+        `${API}/patients`,
+        expect.objectContaining({
+          body: JSON.stringify({ accountId: 'ana-uuid', supportContacts: [] }),
+        }),
+      );
+      expect(
+        await screen.findByText('Paciente Ana Souza adicionado.'),
+      ).toBeInTheDocument();
+    });
+
+    it('expõe os papéis ARIA do combobox e da lista', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+
+      const { select } = await openAddPatient(user);
+
+      expect(select).toHaveAttribute('aria-autocomplete', 'list');
+      expect(select).toHaveAttribute('aria-expanded', 'false');
+
+      await user.click(select);
+
+      const listbox = await screen.findByRole('listbox', {
+        name: 'Contas disponíveis',
+      });
+
+      expect(select).toHaveAttribute('aria-expanded', 'true');
+      expect(select).toHaveAttribute('aria-controls', listbox.id);
+    });
+
+    it('navega por setas, escolhe com Enter e fecha com Esc', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+
+      const { select } = await openAddPatient(user);
+
+      await user.click(select);
+      await screen.findByRole('listbox');
+      await user.keyboard('{ArrowDown}');
+
+      const options = screen.getAllByRole('option');
+
+      expect(select).toHaveAttribute('aria-activedescendant', options[0].id);
+
+      await user.keyboard('{ArrowDown}');
+
+      expect(select).toHaveAttribute('aria-activedescendant', options[1].id);
+
+      await user.keyboard('{ArrowUp}{ArrowUp}');
+
+      expect(select).toHaveAttribute('aria-activedescendant', options[1].id);
+
+      await user.keyboard('{Enter}');
+
+      expect(select).toHaveValue('Kaio Felipe · kaio@exemplo.com');
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+      await user.clear(select);
+      await user.click(select);
+      await screen.findByRole('listbox');
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      // O Esc fecha só a lista, não o modal.
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('mostra a mensagem própria sem resultados e limpa pelo ✕', async () => {
+      const user = userEvent.setup();
+      mockApi({ accounts: accountsByTerm({ zzz: [] }) });
+
+      render(<PatientsPage />);
+
+      const { dialog, select } = await openAddPatient(user);
+
+      await user.type(select, 'zzz');
+
+      expect(
+        await screen.findByText('Nenhuma conta encontrada para “zzz”.'),
+      ).toBeInTheDocument();
+
+      await user.click(
+        dialog.getByRole('button', { name: 'Limpar campo da conta' }),
+      );
+
+      expect(select).toHaveValue('');
+      expect(
+        await screen.findByRole('option', { name: JOAO }),
+      ).toBeInTheDocument();
+    });
+
+    it('limpa a conta escolhida pelo ✕', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+
+      const { dialog, select } = await openAddPatient(user);
+
+      await chooseAccount(user, select);
+      await user.click(
+        dialog.getByRole('button', { name: 'Limpar campo da conta' }),
+      );
+
+      expect(select).toHaveValue('');
+    });
+
+    it('avisa e não busca com menos de 2 caracteres', async () => {
+      const user = userEvent.setup();
+      const { accounts } = mockApi();
+
+      render(<PatientsPage />);
+
+      const { select } = await openAddPatient(user);
+
+      await user.type(select, 'a');
+
+      expect(
+        await screen.findByText('Digite ao menos 2 caracteres para buscar.'),
+      ).toBeInTheDocument();
+
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      expect(accounts).toHaveBeenCalledTimes(1);
+    });
+
+    it('descarta a resposta de uma busca superada', async () => {
+      const user = userEvent.setup();
+      let resolveOld: (response: Response) => void = () => {};
+      const accounts = jest.fn((url: string) => {
+        const q = new URL(url).searchParams.get('q');
+
+        if (q === 'an') {
+          return new Promise<Response>((resolve) => {
+            resolveOld = resolve;
+          });
+        }
+
+        return Promise.resolve(
+          mockResponse({
+            data: {
+              data: q === 'ana' ? [ANA] : ACCOUNTS.data,
+              pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+            },
+          }),
+        );
+      });
+
+      mockApi({ accounts });
+      render(<PatientsPage />);
+
+      const { select } = await openAddPatient(user);
+
+      await user.type(select, 'an{Enter}');
+      await user.type(select, 'a{Enter}');
+
+      expect(
+        await screen.findByRole('option', {
+          name: 'Ana Souza · ana@exemplo.com',
+        }),
+      ).toBeInTheDocument();
+
+      await act(async () => {
+        resolveOld(
+          mockResponse({
+            data: {
+              data: [{ id: 'old', name: 'Velha', email: 'velha@exemplo.com' }],
+              pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+            },
+          }),
+        );
+      });
+
+      expect(
+        screen.getByRole('option', { name: 'Ana Souza · ana@exemplo.com' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('option', { name: /Velha/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -572,7 +1166,7 @@ describe('PatientsPage', () => {
       expect(list.getAllByText('Não informado')).toHaveLength(3);
     });
 
-    it('descarta o contato sem fechar o modal', async () => {
+    it('exclui o contato sem fechar o modal', async () => {
       const user = userEvent.setup();
       mockApi();
 
@@ -583,9 +1177,7 @@ describe('PatientsPage', () => {
         dialog.getByRole('button', { name: 'Adicionar contato' }),
       );
       await user.type(dialog.getByLabelText('Nome do contato'), 'Maria');
-      await user.click(
-        dialog.getByRole('button', { name: 'Descartar contato' }),
-      );
+      await user.click(dialog.getByRole('button', { name: 'Excluir contato' }));
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(
@@ -646,7 +1238,7 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await addContact(user, {
         name: '  Maria Martins ',
         description: 'Mãe',
@@ -695,7 +1287,7 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await user.click(
         dialog.getByRole('button', { name: 'Adicionar paciente' }),
       );
@@ -729,7 +1321,7 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await user.click(
         dialog.getByRole('button', { name: 'Adicionar paciente' }),
       );
@@ -751,7 +1343,7 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await user.click(
         dialog.getByRole('button', { name: 'Adicionar paciente' }),
       );
@@ -772,7 +1364,7 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       const { dialog, select } = await openAddPatient(user);
 
-      await user.selectOptions(select, ACCOUNT_ID);
+      await chooseAccount(user, select);
       await user.click(
         dialog.getByRole('button', { name: 'Adicionar paciente' }),
       );

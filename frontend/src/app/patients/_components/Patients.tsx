@@ -1,18 +1,37 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { can } from '@/lib/permissions';
 import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
 import PatientList from './PatientList';
+import PatientSearch from './PatientSearch';
 
 // Só o admin consulta e adiciona pacientes; os demais veem o bloqueio, sem
 // chamar a API.
 export default function Patients() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // O termo fica na URL (/patients?q=) para manter a busca ao recarregar,
+  // voltar ou compartilhar o link.
+  const search = useDebouncedSearch({
+    initialTerm: searchParams.get('q') ?? '',
+    onTermChange: (term) =>
+      router.replace(
+        term ? `/patients?q=${encodeURIComponent(term)}` : '/patients',
+        {
+          scroll: false,
+        },
+      ),
+  });
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [success, setSuccess] = useState('');
   // Muda a cada paciente adicionado, para a lista recarregar.
@@ -73,9 +92,19 @@ export default function Patients() {
               </div>
             )}
 
+            <PatientSearch
+              value={search.input}
+              isTooShort={search.isTooShort}
+              onChange={search.setInput}
+              onCommit={search.commit}
+              onClear={search.clear}
+            />
+
             <PatientList
               key={listKey}
+              term={search.term}
               onAdd={openAdd}
+              onClearSearch={search.clear}
               canAdd={can(account, 'createPatientProfile')}
             />
 
