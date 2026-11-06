@@ -53,7 +53,14 @@ export class InMemoryPtsRepository extends PtsRepository {
   async findDraftProposals(
     input: FindPtsProposalsInput,
   ): Promise<FindPtsProposalsResult> {
-    const { patientId, isPatient, professionalProfileIds, page, limit } = input;
+    const {
+      patientId,
+      isPatient,
+      isAdmin,
+      professionalProfileIds,
+      page,
+      limit,
+    } = input;
 
     const draftProposals = this.created.filter(
       (proposal) =>
@@ -61,11 +68,12 @@ export class InMemoryPtsRepository extends PtsRepository {
         proposal.status === PtsStateEnum.DRAFT,
     );
 
-    const proposals = isPatient
-      ? draftProposals
-      : draftProposals.filter((proposal) =>
-          this.isProfessionalOnProposal(proposal, professionalProfileIds),
-        );
+    const proposals =
+      isPatient || isAdmin
+        ? draftProposals
+        : draftProposals.filter((proposal) =>
+            this.isProfessionalOnProposal(proposal, professionalProfileIds),
+          );
 
     const ordered = [...proposals].sort(
       (a, b) =>

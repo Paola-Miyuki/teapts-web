@@ -21,6 +21,7 @@ export interface FindPtsProposalsInput {
   accountId: string;
   patientId: string;
   isPatient: boolean;
+  isAdmin: boolean;
   professionalProfileIds: string[];
   page: number;
   limit: number;

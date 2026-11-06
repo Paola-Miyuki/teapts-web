@@ -98,7 +98,7 @@ src/
                                                sessão e POST /patients, só admin
     services/patients.service.ts               consulta (erro seguro, contrato e paginação)
                                                e cadastro do perfil de paciente
-    repositories/patients.repository.ts        query de autorização e paginação; gravação do
+    repositories/patients.repository.ts        query de autorização e paginação (admin: todos); gravação do
                                                perfil (supportContacts como jsonb[])
     dto/                                       contratos e validação da consulta e do cadastro
     entities/patient.entity.ts
@@ -107,8 +107,8 @@ src/
                                                GET /pts/active, PATCH /pts/proposals/:id,
                                                PATCH /pts/:id/social-situation e POST
                                                /pts/proposals/:id/approve e /reject, todos com sessão
-    services/pts.service.ts                    regras de acesso (paciente titular, responsável e
-                                               equipe), estados do PTS e decisão das propostas
+    services/pts.service.ts                    regras de acesso (paciente titular, responsável,
+                                               equipe e admin), estados do PTS e decisão das propostas
     repositories/pts.repository.ts             contrato do repositório (implementação em
                                                pts.repository.impl.ts)
     dto/                                       contratos e validação de criação, consulta,
@@ -160,25 +160,26 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | POST | `/me/password` | conta da sessão | [POST /me/password](#post-mepassword) |
 | POST | `/auth/logout` | conta da sessão | README da raiz, 6.3 |
 | GET | `/accounts` | admin | [GET /accounts](#get-accounts) |
-| GET | `/patients/authorized` | profissional | [GET /patients/authorized](#get-patientsauthorized) |
-| GET | `/patients/available-for-pts` | profissional | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
+| GET | `/patients/authorized` | profissional (admin vê todos os pacientes) | [GET /patients/authorized](#get-patientsauthorized) |
+| GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
 | POST | `/patients` | admin | [POST /patients](#post-patients) |
 | GET | `/professionals` | conta da sessão | Swagger |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
-| POST | `/pts` | profissional (o perfil informado vira o responsável) | Swagger |
-| GET | `/pts/proposals?patientId=` | paciente titular ou profissional da proposta | Swagger |
-| GET | `/pts/proposals/:id` | paciente titular ou profissional da proposta | Swagger |
-| GET | `/pts/active?patientId=` | paciente titular ou membro da equipe | [GET /pts/active](#get-ptsactive) |
-| PATCH | `/pts/proposals/:id` | responsável, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
-| PATCH | `/pts/:id/social-situation` | membro da equipe, PTS em `planning` ou `running` | Swagger |
-| POST | `/pts/proposals/:id/approve` | paciente titular, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
-| POST | `/pts/proposals/:id/reject` | paciente titular, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
+| POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
+| GET | `/pts/proposals?patientId=` | paciente titular, profissional da proposta ou admin | Swagger |
+| GET | `/pts/proposals/:id` | paciente titular, profissional da proposta ou admin | Swagger |
+| GET | `/pts/active?patientId=` | paciente titular, membro da equipe ou admin | [GET /pts/active](#get-ptsactive) |
+| PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
+| PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
+| POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
+| POST | `/pts/proposals/:id/reject` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 
 ## GET /patients/authorized
 
 Exige sessão autenticada e lista pacientes vinculados a PTS em estado
 `planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe.
+responsável ou participa da equipe. O admin recebe todos os pacientes
+cadastrados, com ou sem PTS (RN022).
 
 Parâmetros de query:
 
@@ -195,7 +196,7 @@ totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
 
 ## GET /patients/available-for-pts
 
-Exige sessão autenticada de uma conta com perfil profissional e lista os
+Exige sessão autenticada de uma conta com perfil profissional ou de admin e lista os
 pacientes que podem receber uma nova proposta: os que não têm PTS em
 `planning` ou `running`. Proposta em `draft` não impede uma nova. Não exige
 vínculo prévio com o paciente; é a lista que o `pts/novo` usa para escolher o
@@ -203,14 +204,14 @@ paciente.
 
 Usa os mesmos parâmetros e a mesma resposta de `GET /patients/authorized`.
 Os erros possíveis são `400` (`Parâmetro inválido: X`), `401` (sem sessão),
-`403` (`FORBIDDEN`, conta sem perfil profissional) e `500`
+`403` (`FORBIDDEN`, conta sem perfil profissional e que não é admin) e `500`
 (`Não foi possível consultar os pacientes disponíveis.`).
 
 ## GET /pts/active
 
 Exige sessão autenticada e consulta o PTS ativo do paciente informado. O
 paciente titular recebe os dados sem `socialSituation`; o profissional
-responsável ou integrante da equipe recebe o PTS completo.
+responsável, integrante da equipe ou admin recebe o PTS completo.
 
 Parâmetros de query:
 
@@ -219,8 +220,8 @@ Parâmetros de query:
 A resposta contém `{ id, status, socialSituation?, createdAt, acceptedAt,
 beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
 `null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
-(sem sessão), `403` (`FORBIDDEN`) e, somente para o próprio paciente, `404`
-(`ACTIVE_PTS_NOT_FOUND`).
+(sem sessão), `403` (`FORBIDDEN`) e, para o próprio paciente e para o admin,
+`404` (`ACTIVE_PTS_NOT_FOUND`).
 
 ## GET /accounts
 
@@ -360,8 +361,8 @@ que recebeu o perfil só aparece como profissional depois de um novo login.
 
 ## PATCH /pts/proposals/:id
 
-Exige sessão autenticada e permite que somente o profissional responsável
-edite uma proposta em estado `draft`.
+Exige sessão autenticada e permite que somente o profissional responsável ou
+o admin editem uma proposta em estado `draft`.
 
 Corpo (ao menos um campo):
 
@@ -381,8 +382,8 @@ possíveis são `400` (`VALIDATION_ERROR` ou
 
 ## POST /pts/proposals/:id/approve e /reject
 
-Exige sessão autenticada; só o paciente dono decide uma proposta em
-`draft`. Não há corpo.
+Exige sessão autenticada; só o paciente dono ou o admin (em nome do paciente,
+RN022) decidem uma proposta em `draft`. Não há corpo.
 
 - **approve**: a proposta vai para `planning` com `acceptedAt`, e as demais
   `draft` do paciente vão para `rejected` com `rejectedAt`, na mesma

@@ -102,6 +102,36 @@ export class PatientsRepository {
   }
 
   /**
+   * Busca todos os pacientes cadastrados, na mesma projeção e ordenação da
+   * consulta de autorizados. Usada pelo administrador (RN022).
+   *
+   * @param filters paginação já validada
+   * @returns linhas da página pedida e total de pacientes
+   * @throws erro do banco, sem tratamento
+   */
+  async findAllPaginated(
+    filters: AuthorizedPatientsQuery,
+  ): Promise<AuthorizedPatientsPage> {
+    const query = this.patientRepository
+      .createQueryBuilder('patient')
+      .innerJoin(Account, 'account', 'account.id = patient."accountId"')
+      .select([
+        'patient."accountId" AS patient_id',
+        'account.name AS account_name',
+      ])
+      .orderBy('account.name', 'ASC')
+      .addOrderBy('patient."accountId"', 'ASC');
+
+    const total = await query.clone().getCount();
+    const rows = await query
+      .offset((filters.page - 1) * filters.limit)
+      .limit(filters.limit)
+      .getRawMany<AuthorizedPatientRow>();
+
+    return { rows, total };
+  }
+
+  /**
    * Busca pacientes que podem receber uma nova proposta de PTS.
    *
    * Propostas em DRAFT não impedem uma nova proposta; somente PTS em

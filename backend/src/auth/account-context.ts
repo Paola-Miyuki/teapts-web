@@ -60,3 +60,13 @@ export function parseAccountContext(payload: unknown): AccountContext {
     professionalProfileIds,
   };
 }
+
+/**
+ * Indica se a conta é de administrador, que acessa todo o sistema (RN022).
+ *
+ * @param account contexto da conta autenticada
+ * @returns true quando o papel da conta é admin
+ */
+export function isAdmin(account: AccountContext): boolean {
+  return account.role === AccountRole.Admin;
+}

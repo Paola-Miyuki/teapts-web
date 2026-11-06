@@ -79,7 +79,7 @@ describe('GET /patients/authorized', () => {
       pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
     });
     expect(patientsService.findAuthorized).toHaveBeenCalledWith(
-      'account-1',
+      accountContext,
       expect.objectContaining({ page: 1, limit: 10 }),
     );
   });
@@ -90,7 +90,7 @@ describe('GET /patients/authorized', () => {
       .query({ page: '2', limit: '25' });
 
     expect(patientsService.findAuthorized).toHaveBeenCalledWith(
-      'account-1',
+      accountContext,
       expect.objectContaining({ page: 2, limit: 25 }),
     );
   });
