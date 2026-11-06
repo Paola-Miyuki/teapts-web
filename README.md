@@ -324,6 +324,8 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
 | POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
+| PATCH | `/me` | access token; `{ name?, email? }` | dados da conta atualizados |
+| POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |
 

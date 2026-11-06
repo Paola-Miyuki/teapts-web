@@ -93,19 +93,33 @@ src/
     entities/professional.entity.ts            unique (accountId, specialism)
     enums/specialism.enum.ts                   specialism_e
   patients/
-    controllers/patients.controller.ts         GET /patients/authorized protegido por sessão
-                                               e POST /patients, só admin
+    controllers/patients.controller.ts         GET /patients/authorized e
+                                               GET /patients/available-for-pts protegidos por
+                                               sessão e POST /patients, só admin
     services/patients.service.ts               consulta (erro seguro, contrato e paginação)
                                                e cadastro do perfil de paciente
     repositories/patients.repository.ts        query de autorização e paginação; gravação do
                                                perfil (supportContacts como jsonb[])
     dto/                                       contratos e validação da consulta e do cadastro
     entities/patient.entity.ts
+  pts/
+    controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
+                                               GET /pts/active, PATCH /pts/proposals/:id,
+                                               PATCH /pts/:id/social-situation e POST
+                                               /pts/proposals/:id/approve e /reject, todos com sessão
+    services/pts.service.ts                    regras de acesso (paciente titular, responsável e
+                                               equipe), estados do PTS e decisão das propostas
+    repositories/pts.repository.ts             contrato do repositório (implementação em
+                                               pts.repository.impl.ts)
+    dto/                                       contratos e validação de criação, consulta,
+                                               edição, situação social e decisão
+    entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e)
+    pts.errors.ts                              erros { status, message } do módulo
   auth/
     services/supertokens.service.ts        receitas EmailPassword e Session; campo name no
                                            signup; overrides de signUpPOST, signUp,
                                            signInPOST e createNewSession; signOutPOST desligado
-    controllers/auth.controller.ts         GET /me e POST /auth/logout
+    controllers/auth.controller.ts         GET /me, PATCH /me, POST /me/password e POST /auth/logout
     dto/logout-request.dto.ts              corpo do logout (allSessions)
     dto/me-response.dto.ts, logout-response.dto.ts   respostas do /me e do logout
     account-context.ts                     valida o payload da sessão
@@ -131,6 +145,34 @@ service usa o `Repository<T>` do TypeORM), com os specs ao lado do arquivo.
 
 Entidade ou migration nova precisa entrar nos arrays `entities`/`migrations`
 de `src/database/database.config.ts`; senão o TypeORM a ignora.
+
+## Rotas
+
+Todas exigem sessão, exceto `GET /health` e as rotas do SuperTokens (seção 6
+do [README da raiz](../README.md)). O contrato completo de cada rota está no
+Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
+
+| Método | Rota | Acesso | Detalhe |
+| --- | --- | --- | --- |
+| GET | `/health` | público | README da raiz, 5.3 |
+| GET | `/me` | conta da sessão | README da raiz, 6.3 |
+| PATCH | `/me` | conta da sessão | [PATCH /me](#patch-me) |
+| POST | `/me/password` | conta da sessão | [POST /me/password](#post-mepassword) |
+| POST | `/auth/logout` | conta da sessão | README da raiz, 6.3 |
+| GET | `/accounts` | admin | [GET /accounts](#get-accounts) |
+| GET | `/patients/authorized` | profissional | [GET /patients/authorized](#get-patientsauthorized) |
+| GET | `/patients/available-for-pts` | profissional | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
+| POST | `/patients` | admin | [POST /patients](#post-patients) |
+| GET | `/professionals` | conta da sessão | Swagger |
+| POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
+| POST | `/pts` | profissional (o perfil informado vira o responsável) | Swagger |
+| GET | `/pts/proposals?patientId=` | paciente titular ou profissional da proposta | Swagger |
+| GET | `/pts/proposals/:id` | paciente titular ou profissional da proposta | Swagger |
+| GET | `/pts/active?patientId=` | paciente titular ou membro da equipe | [GET /pts/active](#get-ptsactive) |
+| PATCH | `/pts/proposals/:id` | responsável, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
+| PATCH | `/pts/:id/social-situation` | membro da equipe, PTS em `planning` ou `running` | Swagger |
+| POST | `/pts/proposals/:id/approve` | paciente titular, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
+| POST | `/pts/proposals/:id/reject` | paciente titular, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 
 ## GET /patients/authorized
 
