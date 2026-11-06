@@ -15,7 +15,8 @@ export type PermissionAction =
   | 'viewPtsSocialSituation'
   | 'createPts'
   | 'approvePtsProposal'
-  | 'rejectPtsProposal';
+  | 'rejectPtsProposal'
+  | 'editPtsProposal';
 
 // Mesmos valores do PtsStateEnum da API.
 export type PtsStatus =
@@ -76,7 +77,7 @@ export function can(
 
   // RN022 – o administrador acessa todo o sistema. Ficam de fora o que só
   // escolhe o início (paciente e conta sem perfil) e a regra de estado:
-  // aprovar e rejeitar seguem valendo só em DRAFT.
+  // aprovar, rejeitar e editar seguem valendo só em DRAFT.
   if (admin) {
     switch (action) {
       case 'viewOwnCare':
@@ -84,6 +85,7 @@ export function can(
         return false;
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
+      case 'editPtsProposal':
         return pts?.status === 'draft';
       default:
         return true;
@@ -123,5 +125,14 @@ export function can(
       // RFPTS003 – paciente titular, só em DRAFT.
       // TODO(DP002): liberar o responsável tutelar depois de modelar o vínculo.
       return patient && pts?.status === 'draft';
+    case 'editPtsProposal':
+      // RFPTS005 – profissional responsável, só em DRAFT.
+      return (
+        professional &&
+        pts?.status === 'draft' &&
+        user.professionalProfileIds.includes(
+          pts.responsibleProfessionalId ?? '',
+        )
+      );
   }
 }

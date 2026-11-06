@@ -74,6 +74,7 @@ export default function PtsProposalList({ account }: { account: Account }) {
 
   const patientIdFromUrl = searchParams.get('patientId')?.trim() ?? '';
   const searchFromUrl = searchParams.get('search')?.trim() ?? '';
+  const wasUpdated = searchParams.get('updated') === '1';
 
   const [proposals, setProposals] = useState<PtsProposal[] | null>(null);
   const [proposalError, setProposalError] = useState('');
@@ -473,6 +474,7 @@ export default function PtsProposalList({ account }: { account: Account }) {
     return {
       ...prop,
       responsible: {
+        id: profId ?? '',
         name: resolvedProfName,
         specialism: {
           name: resolvedSpecialism,
@@ -491,6 +493,12 @@ export default function PtsProposalList({ account }: { account: Account }) {
 
   return (
     <div className={styles.proposalsArea}>
+      {wasUpdated && (
+        <div className={styles.notice} role="status">
+          <strong>Proposta atualizada.</strong>
+        </div>
+      )}
+
       <div className={styles.listHeader}>
         <div>
           <h2>Propostas disponíveis</h2>
@@ -539,6 +547,12 @@ export default function PtsProposalList({ account }: { account: Account }) {
                   ? handleDecide
                   : undefined
               }
+              canEdit={can(account, 'editPtsProposal', {
+                pts: {
+                  status: proposal.status?.toLowerCase(),
+                  responsibleProfessionalId: proposal.responsible?.id,
+                },
+              })}
             />
           ))}
         </div>
