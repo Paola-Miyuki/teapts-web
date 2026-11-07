@@ -12,6 +12,8 @@ type PatientSearchProps = {
   onChange: (value: string) => void;
   onCommit: () => void;
   onClear: () => void;
+  // Rótulo e texto de apoio do campo (padrão: nome ou e-mail, do admin).
+  label?: string;
 };
 
 export default function PatientSearch({
@@ -20,6 +22,7 @@ export default function PatientSearch({
   onChange,
   onCommit,
   onClear,
+  label = 'Buscar por nome ou e-mail',
 }: PatientSearchProps) {
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Enter') {
@@ -40,8 +43,8 @@ export default function PatientSearch({
           id="patient-search"
           type="search"
           className={`${ui.input} ${styles.searchInput}`}
-          placeholder="Buscar por nome ou e-mail"
-          aria-label="Buscar por nome ou e-mail"
+          placeholder={label}
+          aria-label={label}
           aria-describedby={isTooShort ? 'patient-search-hint' : undefined}
           autoComplete="off"
           value={value}

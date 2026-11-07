@@ -30,13 +30,6 @@ const ADMIN: Account = {
   professionalProfileIds: [],
 };
 
-const PROFESSIONAL: Account = {
-  ...ADMIN,
-  name: 'Priscila Martins',
-  role: 'user',
-  professionalProfileIds: ['professional-profile-uuid'],
-};
-
 const ACCOUNTS = {
   data: [
     { id: ACCOUNT_ID, name: 'João Martins', email: 'joao@exemplo.com' },
@@ -189,8 +182,8 @@ describe('PatientsPage', () => {
   });
 
   describe('acesso e lista', () => {
-    it('bloqueia quem não é admin sem chamar /accounts', async () => {
-      mockApi({ account: PROFESSIONAL });
+    it('bloqueia quem não é admin nem profissional sem chamar a lista', async () => {
+      mockApi({ account: { ...ADMIN, role: 'user' } });
 
       render(<PatientsPage />);
 

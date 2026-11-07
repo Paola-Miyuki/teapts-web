@@ -1,5 +1,6 @@
 import {
   getAccountsWithoutProfile,
+  getAuthorizedPatients,
   getPatientAccounts,
   isValidPhone,
 } from './patients';
@@ -87,6 +88,36 @@ describe('consultas de contas', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       `${API}/accounts?isPatient=false&isProfessional=false&q=mari&page=1&limit=20`,
       expect.objectContaining({ signal }),
+    );
+  });
+});
+
+describe('getAuthorizedPatients', () => {
+  const API = 'http://localhost:3000';
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ data: [], pagination: {} }),
+    });
+  });
+
+  it('não envia o name quando não há busca', async () => {
+    await getAuthorizedPatients(1, 10, { name: '   ' });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/authorized?page=1&limit=10`,
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('envia o name sem espaços externos, a página e o limite', async () => {
+    await getAuthorizedPatients(2, 10, { name: ' mari ' });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/authorized?name=mari&page=2&limit=10`,
+      expect.objectContaining({ credentials: 'include' }),
     );
   });
 });

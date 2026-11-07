@@ -92,7 +92,7 @@ export function getNavigation(account: Account, currentHref: string) {
     items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }
 
-  if (can(account, 'viewPatientRegistry')) {
+  if (can(account, 'viewAuthorizedPatients')) {
     items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
   }
 

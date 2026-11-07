@@ -17,7 +17,15 @@ function labels(current: Account) {
 }
 
 describe('getNavigation', () => {
-  it('mostra o item "Pacientes" só para o admin', () => {
+  it('mostra o item "Pacientes" para o admin e o profissional', () => {
+    expect(
+      labels(account({ professionalProfileIds: ['professional'] })),
+    ).toContain('Pacientes');
+    expect(labels(account({ patientProfileId: 'patient' }))).not.toContain(
+      'Pacientes',
+    );
+    expect(labels(account())).not.toContain('Pacientes');
+
     expect(
       getNavigation(account({ role: 'admin' }), '/patients'),
     ).toContainEqual({
@@ -31,7 +39,7 @@ describe('getNavigation', () => {
   it('mostra profissionais e PTS no menu do profissional', () => {
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
   });
 
   it('mantém os itens compartilhados no menu do admin', () => {
@@ -61,7 +69,7 @@ describe('getNavigation', () => {
     ]);
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Meu cuidado',
       'PTS',

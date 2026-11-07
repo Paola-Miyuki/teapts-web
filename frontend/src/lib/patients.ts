@@ -92,6 +92,39 @@ export function getAccountsWithoutProfile({ q, signal }: AccountsSearch = {}) {
   );
 }
 
+export type AuthorizedPatient = {
+  id: string;
+  name: string;
+};
+
+export type AuthorizedPatientsResponse = {
+  data: AuthorizedPatient[];
+  pagination: PaginationData;
+};
+
+// GET /patients/authorized: pacientes de PTS ativos do profissional, com busca
+// parcial por `name` (só entra na query se houver texto).
+export function getAuthorizedPatients(
+  page: number,
+  limit: number,
+  { name, signal }: { name?: string; signal?: AbortSignal } = {},
+) {
+  const params = new URLSearchParams();
+  const term = name?.trim();
+
+  if (term) {
+    params.set('name', term);
+  }
+
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  return request<AuthorizedPatientsResponse>(
+    `/patients/authorized?${params.toString()}`,
+    { signal },
+  );
+}
+
 // POST /patients: cria o perfil de paciente da conta (só admin).
 export function createPatient(body: CreatePatientBody) {
   return request<PatientProfile>('/patients', {

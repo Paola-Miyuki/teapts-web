@@ -7,15 +7,35 @@ import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import type { Account } from '@/lib/account';
 import { can } from '@/lib/permissions';
 import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
+import AuthorizedPatients from './AuthorizedPatients';
 import PatientList from './PatientList';
 import PatientSearch from './PatientSearch';
 
-// Só o admin consulta e adiciona pacientes; os demais veem o bloqueio, sem
-// chamar a API.
+// O admin consulta e adiciona pacientes cadastrados; o profissional vê os
+// pacientes autorizados a ele. Os demais veem o bloqueio, sem chamar a API.
 export default function Patients() {
+  return (
+    <AuthenticatedPage
+      currentHref="/patients"
+      breadcrumb="Pacientes"
+      requiredAction="viewAuthorizedPatients"
+    >
+      {(account) =>
+        can(account, 'viewPatientRegistry') ? (
+          <PatientRegistry account={account} />
+        ) : (
+          <AuthorizedPatients />
+        )
+      }
+    </AuthenticatedPage>
+  );
+}
+
+function PatientRegistry({ account }: { account: Account }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -49,74 +69,66 @@ export default function Patients() {
   }
 
   return (
-    <AuthenticatedPage
-      currentHref="/patients"
-      breadcrumb="Pacientes"
-      requiredAction="viewPatientRegistry"
-    >
-      {(account) => (
-        <>
-          <div className={`${ui.heading} ${styles.heading}`}>
-            <div>
-              <h1>Pacientes</h1>
+    <>
+      <div className={`${ui.heading} ${styles.heading}`}>
+        <div>
+          <h1>Pacientes</h1>
 
-              <p>
-                Consulte os pacientes cadastrados e adicione contas existentes
-                como pacientes.
-              </p>
+          <p>
+            Consulte os pacientes cadastrados e adicione contas existentes como
+            pacientes.
+          </p>
+        </div>
+
+        {can(account, 'createPatientProfile') && (
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
+            onClick={openAdd}
+          >
+            <Icon name="plus" className={ui.icon} />
+            Adicionar paciente
+          </button>
+        )}
+      </div>
+
+      <>
+        {success && (
+          <div
+            className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
+            role="status"
+          >
+            <div className={ui.alertIcon}>
+              <Icon name="checkCircle" />
             </div>
 
-            {can(account, 'createPatientProfile') && (
-              <button
-                type="button"
-                className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
-                onClick={openAdd}
-              >
-                <Icon name="plus" className={ui.icon} />
-                Adicionar paciente
-              </button>
-            )}
+            <span>{success}</span>
           </div>
+        )}
 
-          <>
-            {success && (
-              <div
-                className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
-                role="status"
-              >
-                <div className={ui.alertIcon}>
-                  <Icon name="checkCircle" />
-                </div>
+        <PatientSearch
+          value={search.input}
+          isTooShort={search.isTooShort}
+          onChange={search.setInput}
+          onCommit={search.commit}
+          onClear={search.clear}
+        />
 
-                <span>{success}</span>
-              </div>
-            )}
+        <PatientList
+          key={listKey}
+          term={search.term}
+          onAdd={openAdd}
+          onClearSearch={search.clear}
+          canAdd={can(account, 'createPatientProfile')}
+        />
 
-            <PatientSearch
-              value={search.input}
-              isTooShort={search.isTooShort}
-              onChange={search.setInput}
-              onCommit={search.commit}
-              onClear={search.clear}
-            />
-
-            <PatientList
-              key={listKey}
-              term={search.term}
-              onAdd={openAdd}
-              onClearSearch={search.clear}
-              canAdd={can(account, 'createPatientProfile')}
-            />
-
-            <AddPatientModal
-              open={isAddOpen}
-              onClose={() => setIsAddOpen(false)}
-              onAdded={handleAdded}
-              canCreate={can(account, 'createPatientProfile')}
-            />
-          </>
-        </>
-      )}
-    </AuthenticatedPage>
+        <AddPatientModal
+          open={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          onAdded={handleAdded}
+          canCreate={can(account, 'createPatientProfile')}
+        />
+      </>
+    </>
   );
 }
