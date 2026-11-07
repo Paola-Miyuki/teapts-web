@@ -75,7 +75,7 @@ const adminAccount: AccountContext = {
 describe('PatientsService.findAuthorized', () => {
   it('passes the account and filters and returns only the public summary', async () => {
     const { repository, service } = createService();
-    const request = { page: 2, limit: 10 };
+    const request = { page: 2, limit: 10, name: 'mari' };
     repository.findAuthorizedPaginated.mockResolvedValue({
       rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
       total: 11,
@@ -97,7 +97,7 @@ describe('PatientsService.findAuthorized', () => {
 
   it('returns every patient to the admin without the PTS filter', async () => {
     const { repository, service } = createService();
-    const request = { page: 1, limit: 10 };
+    const request = { page: 1, limit: 10, name: 'ana' };
     repository.findAllPaginated.mockResolvedValue({
       rows: [{ patient_id: 'patient-2', account_name: 'Ana Souza' }],
       total: 1,

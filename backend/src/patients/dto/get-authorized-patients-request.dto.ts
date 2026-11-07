@@ -2,14 +2,23 @@
 
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsInt, Max, Min, type ValidationOptions } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  type ValidationOptions,
+} from 'class-validator';
 
 export const DEFAULT_AUTHORIZED_PATIENTS_PAGE = 1;
 export const DEFAULT_AUTHORIZED_PATIENTS_LIMIT = 10;
 export const MAX_AUTHORIZED_PATIENTS_LIMIT = 100;
 
 /** Mensagem e status do erro de um parâmetro de consulta inválido. */
-function invalidParameter(parameter: 'page' | 'limit'): ValidationOptions {
+function invalidParameter(
+  parameter: 'page' | 'limit' | 'name',
+): ValidationOptions {
   return {
     message: `Parâmetro inválido: ${parameter}`,
     context: { status: 'ERROR' },
@@ -20,6 +29,15 @@ function invalidParameter(parameter: 'page' | 'limit'): ValidationOptions {
 function toPageNumber(defaultValue: number) {
   return ({ value }: { value: unknown }): unknown =>
     value === undefined || value === '' ? defaultValue : Number(value);
+}
+
+/** Aplica o trim ao nome buscado; vazio ou só com espaços vira não informado. */
+function toSearchName({ value }: { value: unknown }): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  return value.trim() || undefined;
 }
 
 /**
@@ -52,4 +70,13 @@ export class GetAuthorizedPatientsRequestDto {
   @Min(1, invalidParameter('limit'))
   @Max(MAX_AUTHORIZED_PATIENTS_LIMIT, invalidParameter('limit'))
   limit: number = DEFAULT_AUTHORIZED_PATIENTS_LIMIT;
+
+  @ApiPropertyOptional({
+    description:
+      'Parte do nome do paciente (sem diferenciar maiúsculas); vazio equivale a sem busca.',
+  })
+  @Transform(toSearchName)
+  @IsOptional()
+  @IsString(invalidParameter('name'))
+  name?: string;
 }

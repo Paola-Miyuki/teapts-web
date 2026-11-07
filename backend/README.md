@@ -184,7 +184,10 @@ cadastrados, com ou sem PTS (RN022).
 Parâmetros de query:
 
 - `page`: página, padrão `1`, mínimo `1`;
-- `limit`: quantidade por página, padrão `10`, mínimo `1` e máximo `100`.
+- `limit`: quantidade por página, padrão `10`, mínimo `1` e máximo `100`;
+- `name`: opcional, busca parcial no nome do paciente, sem diferenciar
+  maiúsculas de minúsculas; aplica `trim`, trata `%`, `_` e `\` como texto e,
+  vazio ou só com espaços, equivale a sem busca. Vale também para o admin.
 
 Não usa a paginação de `common/pagination` (máximo `50`) porque o `pts/novo`
 pede `limit=100`.
@@ -202,7 +205,8 @@ pacientes que podem receber uma nova proposta: os que não têm PTS em
 vínculo prévio com o paciente; é a lista que o `pts/novo` usa para escolher o
 paciente.
 
-Usa os mesmos parâmetros e a mesma resposta de `GET /patients/authorized`.
+Usa os mesmos parâmetros e a mesma resposta de `GET /patients/authorized`, mas
+ignora o `name`.
 Os erros possíveis são `400` (`Parâmetro inválido: X`), `401` (sem sessão),
 `403` (`FORBIDDEN`, conta sem perfil profissional e que não é admin) e `500`
 (`Não foi possível consultar os pacientes disponíveis.`).

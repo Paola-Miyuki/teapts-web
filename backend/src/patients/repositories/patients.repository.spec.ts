@@ -15,6 +15,7 @@ type QueryBuilderMock = {
   innerJoin: jest.Mock;
   select: jest.Mock;
   where: jest.Mock;
+  andWhere: jest.Mock;
   orderBy: jest.Mock;
   addOrderBy: jest.Mock;
   clone: jest.Mock;
@@ -29,6 +30,7 @@ function createRepository() {
     innerJoin: jest.fn(),
     select: jest.fn(),
     where: jest.fn(),
+    andWhere: jest.fn(),
     orderBy: jest.fn(),
     addOrderBy: jest.fn(),
     clone: jest.fn(),
@@ -42,6 +44,7 @@ function createRepository() {
     query.innerJoin,
     query.select,
     query.where,
+    query.andWhere,
     query.orderBy,
     query.addOrderBy,
     query.offset,
@@ -113,6 +116,33 @@ describe('PatientsRepository.findAuthorizedPaginated', () => {
     expect(query.limit).toHaveBeenCalledWith(10);
   });
 
+  it('filters by name inside the authorized patients, escaping wildcards', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findAuthorizedPaginated('account', {
+      page: 1,
+      limit: 10,
+      name: '50%_a\\',
+    });
+
+    expect(query.andWhere).toHaveBeenCalledWith(
+      `account.name ILIKE :name ESCAPE '\\'`,
+      { name: '%50\\%\\_a\\\\%' },
+    );
+  });
+
+  it('does not filter by name when it is not informed', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findAuthorizedPaginated('account', { page: 1, limit: 10 });
+
+    expect(query.andWhere).not.toHaveBeenCalled();
+  });
+
   it('propagates database errors to the caller', async () => {
     const { query, repository } = createRepository();
     const failure = new Error('database connection details');
@@ -143,6 +173,21 @@ describe('PatientsRepository.findAllPaginated', () => {
     expect(query.addOrderBy).toHaveBeenCalledWith('patient."accountId"', 'ASC');
     expect(query.offset).toHaveBeenCalledWith(10);
     expect(query.limit).toHaveBeenCalledWith(10);
+  });
+});
+
+describe('PatientsRepository.findAllPaginated by name', () => {
+  it('filters every patient by name', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findAllPaginated({ page: 1, limit: 10, name: 'mari' });
+
+    expect(query.andWhere).toHaveBeenCalledWith(
+      `account.name ILIKE :name ESCAPE '\\'`,
+      { name: '%mari%' },
+    );
   });
 });
 

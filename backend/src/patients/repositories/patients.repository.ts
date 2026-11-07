@@ -3,8 +3,9 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type SelectQueryBuilder } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { escapeLike } from '../../common/search/escape-like';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import type { SupportContactDto } from '../dto/support-contact.dto';
 import { Patient } from '../entities/patient.entity';
@@ -16,6 +17,7 @@ export const ACTIVE_PTS_STATES = [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING];
 export type AuthorizedPatientsQuery = {
   page: number;
   limit: number;
+  name?: string;
 };
 
 /** Linha projetada pela consulta, só com os campos públicos. */
@@ -35,6 +37,18 @@ export type NewPatient = {
   accountId: string;
   supportContacts: SupportContactDto[];
 };
+
+/** Acrescenta a busca parcial por nome, tratando `%`, `_` e `\` como texto. */
+function applyNameFilter(
+  query: SelectQueryBuilder<Patient>,
+  name: string | undefined,
+): void {
+  if (name !== undefined) {
+    query.andWhere(`account.name ILIKE :name ESCAPE '\\'`, {
+      name: `%${escapeLike(name)}%`,
+    });
+  }
+}
 
 /**
  * Acesso aos dados de pacientes.
@@ -91,6 +105,7 @@ export class PatientsRepository {
       )
       .orderBy('account.name', 'ASC')
       .addOrderBy('patient."accountId"', 'ASC');
+    applyNameFilter(query, filters.name);
 
     const total = await query.clone().getCount();
     const rows = await query
@@ -121,6 +136,7 @@ export class PatientsRepository {
       ])
       .orderBy('account.name', 'ASC')
       .addOrderBy('patient."accountId"', 'ASC');
+    applyNameFilter(query, filters.name);
 
     const total = await query.clone().getCount();
     const rows = await query

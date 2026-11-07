@@ -32,6 +32,30 @@ describe('GetAuthorizedPatientsRequestDto', () => {
     });
   });
 
+  it('trims the name', async () => {
+    await expect(normalize({ name: '  Maria  ' })).resolves.toMatchObject({
+      name: 'Maria',
+    });
+  });
+
+  it.each(['', '   '])('treats name %j as not informed', async (name) => {
+    const result = await normalize({ name });
+
+    expect(result.name).toBeUndefined();
+  });
+
+  it('rejects a repeated name parameter', async () => {
+    const error: unknown = await normalize({ name: ['a', 'b'] }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect((error as BadRequestException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: 'Parâmetro inválido: name',
+    });
+  });
+
   it('accepts the maximum limit', async () => {
     await expect(
       normalize({ limit: String(MAX_AUTHORIZED_PATIENTS_LIMIT) }),

@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
+import { escapeLike } from '../../common/search/escape-like';
 import { Patient } from '../../patients/entities/patient.entity';
 
 /** Filtros e paginação já validados da listagem de contas. */
@@ -18,11 +19,6 @@ export type AccountsQuery = {
   isPatient?: boolean;
   isProfessional?: boolean;
 };
-
-/** Escapa `\`, `%` e `_` para a busca tratá-los como texto no `ILIKE`. */
-function escapeLike(term: string): string {
-  return term.replace(/[\\%_]/g, '\\$&');
-}
 
 /** Linha projetada pela consulta, só com os campos públicos. */
 export type AccountRow = {

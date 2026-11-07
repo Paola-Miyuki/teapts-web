@@ -84,6 +84,17 @@ describe('GET /patients/authorized', () => {
     );
   });
 
+  it('passes the trimmed name to the service', async () => {
+    await request(app.getHttpServer())
+      .get('/patients/authorized')
+      .query({ name: '  mari  ' });
+
+    expect(patientsService.findAuthorized).toHaveBeenCalledWith(
+      accountContext,
+      expect.objectContaining({ name: 'mari' }),
+    );
+  });
+
   it('passes the normalized query to the service', async () => {
     await request(app.getHttpServer())
       .get('/patients/authorized')
