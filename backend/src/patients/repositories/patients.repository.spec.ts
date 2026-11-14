@@ -252,3 +252,130 @@ describe('PatientsRepository.insert', () => {
     ).rejects.toBe(failure);
   });
 });
+
+describe('PatientsRepository.findSupportContacts', () => {
+  function createFindRepository() {
+    const typeormRepository = {
+      findOne:
+        jest.fn<(options: unknown) => Promise<Partial<Patient> | null>>(),
+    };
+    const repository = new PatientsRepository(
+      typeormRepository as unknown as Repository<Patient>,
+    );
+
+    return { typeormRepository, repository };
+  }
+
+  it('returns the contacts saved on the patient', async () => {
+    const { typeormRepository, repository } = createFindRepository();
+    const contacts = [{ name: 'Joana Silva', phone: '(11) 98765-4321' }];
+    typeormRepository.findOne.mockResolvedValue({
+      accountId: 'patient-1',
+      supportContacts: contacts,
+    });
+
+    await expect(repository.findSupportContacts('patient-1')).resolves.toBe(
+      contacts,
+    );
+    expect(typeormRepository.findOne).toHaveBeenCalledWith({
+      select: { accountId: true, supportContacts: true },
+      where: { accountId: 'patient-1' },
+    });
+  });
+
+  it('returns null when the patient does not exist', async () => {
+    const { typeormRepository, repository } = createFindRepository();
+    typeormRepository.findOne.mockResolvedValue(null);
+
+    await expect(
+      repository.findSupportContacts('patient-1'),
+    ).resolves.toBeNull();
+  });
+});
+
+describe('PatientsRepository.updateSupportContacts', () => {
+  function createUpdateRepository() {
+    const updateQuery = {
+      update: jest.fn(),
+      set: jest.fn(),
+      where: jest.fn(),
+      setParameter: jest.fn(),
+      execute: jest.fn<() => Promise<{ affected?: number }>>(),
+    };
+
+    for (const method of [
+      updateQuery.update,
+      updateQuery.set,
+      updateQuery.where,
+      updateQuery.setParameter,
+    ]) {
+      method.mockReturnValue(updateQuery);
+    }
+
+    updateQuery.execute.mockResolvedValue({ affected: 1 });
+    const typeormRepository = {
+      createQueryBuilder: jest.fn(() => updateQuery),
+    };
+    const repository = new PatientsRepository(
+      typeormRepository as unknown as Repository<Patient>,
+    );
+
+    return { updateQuery, repository };
+  }
+
+  it('replaces the list with each contact as JSON text cast to jsonb[]', async () => {
+    const { updateQuery, repository } = createUpdateRepository();
+    const contacts = [
+      { name: 'Joana Silva', email: 'joana@example.com' },
+      { name: 'Pedro' },
+    ];
+
+    await expect(
+      repository.updateSupportContacts('patient-1', contacts),
+    ).resolves.toBe(true);
+
+    expect(updateQuery.update).toHaveBeenCalledWith(Patient);
+    const [values] = updateQuery.set.mock.calls[0] as [
+      { supportContacts: () => string },
+    ];
+    expect(Object.keys(values)).toEqual(['supportContacts']);
+    expect(values.supportContacts()).toBe('CAST(:supportContacts AS jsonb[])');
+    expect(updateQuery.where).toHaveBeenCalledWith('"accountId" = :patientId', {
+      patientId: 'patient-1',
+    });
+    expect(updateQuery.setParameter).toHaveBeenCalledWith('supportContacts', [
+      JSON.stringify(contacts[0]),
+      JSON.stringify(contacts[1]),
+    ]);
+  });
+
+  it('sends an empty list to remove every contact', async () => {
+    const { updateQuery, repository } = createUpdateRepository();
+
+    await repository.updateSupportContacts('patient-1', []);
+
+    expect(updateQuery.setParameter).toHaveBeenCalledWith(
+      'supportContacts',
+      [],
+    );
+  });
+
+  it('returns false when no patient was updated', async () => {
+    const { updateQuery, repository } = createUpdateRepository();
+    updateQuery.execute.mockResolvedValue({ affected: 0 });
+
+    await expect(
+      repository.updateSupportContacts('patient-1', []),
+    ).resolves.toBe(false);
+  });
+
+  it('propagates database errors to the caller', async () => {
+    const { updateQuery, repository } = createUpdateRepository();
+    const failure = new Error('connection lost');
+    updateQuery.execute.mockRejectedValue(failure);
+
+    await expect(
+      repository.updateSupportContacts('patient-1', []),
+    ).rejects.toBe(failure);
+  });
+});
