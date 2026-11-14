@@ -5,7 +5,10 @@ import { jest } from '@jest/globals';
 import {
   ConflictException,
   ExecutionContext,
+  ForbiddenException,
   INestApplication,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -291,6 +294,262 @@ describe('POST /patients', () => {
     expect(response.body).toEqual({
       status: 'PATIENT_PROFILE_ALREADY_EXISTS',
       message: 'A conta já possui perfil de paciente.',
+    });
+  });
+});
+
+describe('/patients/:patientId/support-contacts', () => {
+  const patientId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+  const route = `/patients/${patientId}/support-contacts`;
+  const contact = {
+    name: 'Joana Silva',
+    description: 'Mãe',
+    email: 'joana@example.com',
+    phone: '(11) 98765-4321',
+  };
+  const profile = { accountId: patientId, supportContacts: [contact] };
+  let app: INestApplication;
+  let currentAccount: AccountContext;
+  let authenticated: boolean;
+  let patientsService: {
+    findSupportContacts: jest.Mock<
+      (account: unknown, patientId: unknown) => Promise<unknown>
+    >;
+    updateSupportContacts: jest.Mock<
+      (account: unknown, patientId: unknown, body: unknown) => Promise<unknown>
+    >;
+  };
+
+  beforeEach(async () => {
+    currentAccount = { ...accountContext, patientProfileId: patientId };
+    authenticated = true;
+    patientsService = {
+      findSupportContacts: jest.fn(async () => profile),
+      updateSupportContacts: jest.fn(
+        async (_account: unknown, id: unknown, body: unknown) => ({
+          accountId: id,
+          ...(body as object),
+        }),
+      ),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PatientsController],
+      providers: [
+        { provide: PatientsService, useValue: patientsService },
+        AuthGuard,
+        AdminGuard,
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          if (!authenticated) {
+            throw new UnauthorizedException();
+          }
+
+          context
+            .switchToHttp()
+            .getRequest<{ accountContext?: AccountContext }>().accountContext =
+            currentAccount;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  describe('GET', () => {
+    it('returns the profile with the current contacts', async () => {
+      const response = await request(app.getHttpServer()).get(route);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(profile);
+      expect(patientsService.findSupportContacts).toHaveBeenCalledWith(
+        currentAccount,
+        patientId,
+      );
+    });
+
+    it('returns 400 VALIDATION_ERROR for a patientId that is not a UUID', async () => {
+      const response = await request(app.getHttpServer()).get(
+        '/patients/123/support-contacts',
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: patientId',
+      });
+      expect(patientsService.findSupportContacts).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without a session', async () => {
+      authenticated = false;
+
+      const response = await request(app.getHttpServer()).get(route);
+
+      expect(response.status).toBe(401);
+      expect(patientsService.findSupportContacts).not.toHaveBeenCalled();
+    });
+
+    it('relays 404 PATIENT_NOT_FOUND from the service', async () => {
+      patientsService.findSupportContacts.mockRejectedValue(
+        new NotFoundException({
+          status: 'PATIENT_NOT_FOUND',
+          message: 'Paciente não encontrado.',
+        }),
+      );
+
+      const response = await request(app.getHttpServer()).get(route);
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        status: 'PATIENT_NOT_FOUND',
+        message: 'Paciente não encontrado.',
+      });
+    });
+  });
+
+  describe('PUT', () => {
+    it('replaces the list and returns the profile with the new contacts', async () => {
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(profile);
+      expect(patientsService.updateSupportContacts).toHaveBeenCalledWith(
+        currentAccount,
+        patientId,
+        { supportContacts: [contact] },
+      );
+    });
+
+    it('accepts an empty list', async () => {
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [] });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        accountId: patientId,
+        supportContacts: [],
+      });
+    });
+
+    it('lets the admin reach the service, which checks the access', async () => {
+      currentAccount = { ...accountContext, role: AccountRole.Admin };
+
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(200);
+      expect(patientsService.updateSupportContacts).toHaveBeenCalledWith(
+        currentAccount,
+        patientId,
+        { supportContacts: [contact] },
+      );
+    });
+
+    it.each([
+      [
+        'a contact without name',
+        { supportContacts: [{ email: 'joana@example.com' }] },
+        'Informe o nome do contato.',
+      ],
+      [
+        'an invalid contact email',
+        { supportContacts: [{ name: 'Joana', email: 'joana' }] },
+        'Informe um e-mail válido para o contato.',
+      ],
+      [
+        'an invalid contact phone',
+        { supportContacts: [contact, { name: 'Pedro', phone: 1234 }] },
+        'Informe um telefone válido para o contato.',
+      ],
+    ])(
+      'returns 400 VALIDATION_ERROR for %s and saves nothing',
+      async (_case, body, message) => {
+        const response = await request(app.getHttpServer())
+          .put(route)
+          .send(body);
+
+        expect(response.status).toBe(400);
+        expect(response.body).toEqual({ status: 'VALIDATION_ERROR', message });
+        expect(patientsService.updateSupportContacts).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns 400 VALIDATION_ERROR for a patientId that is not a UUID', async () => {
+      const response = await request(app.getHttpServer())
+        .put('/patients/123/support-contacts')
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: patientId',
+      });
+      expect(patientsService.updateSupportContacts).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without a session', async () => {
+      authenticated = false;
+
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(401);
+      expect(patientsService.updateSupportContacts).not.toHaveBeenCalled();
+    });
+
+    it('relays 403 FORBIDDEN from the service', async () => {
+      patientsService.updateSupportContacts.mockRejectedValue(
+        new ForbiddenException({
+          status: 'FORBIDDEN',
+          message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+        }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+      });
+    });
+
+    it('relays 404 PATIENT_NOT_FOUND from the service', async () => {
+      patientsService.updateSupportContacts.mockRejectedValue(
+        new NotFoundException({
+          status: 'PATIENT_NOT_FOUND',
+          message: 'Paciente não encontrado.',
+        }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .put(route)
+        .send({ supportContacts: [contact] });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        status: 'PATIENT_NOT_FOUND',
+        message: 'Paciente não encontrado.',
+      });
     });
   });
 });
