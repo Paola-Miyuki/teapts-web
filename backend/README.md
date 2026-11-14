@@ -95,12 +95,13 @@ src/
   patients/
     controllers/patients.controller.ts         GET /patients/authorized e
                                                GET /patients/available-for-pts protegidos por
-                                               sessão e POST /patients, só admin
-    services/patients.service.ts               consulta (erro seguro, contrato e paginação)
-                                               e cadastro do perfil de paciente
+                                               sessão, POST /patients, só admin, e GET e PUT
+                                               /patients/:patientId/support-contacts
+    services/patients.service.ts               consulta (erro seguro, contrato e paginação),
+                                               cadastro do perfil de paciente e contatos de suporte
     repositories/patients.repository.ts        query de autorização e paginação (admin: todos); gravação do
-                                               perfil (supportContacts como jsonb[])
-    dto/                                       contratos e validação da consulta e do cadastro
+                                               perfil e troca dos contatos (supportContacts como jsonb[])
+    dto/                                       contratos e validação da consulta, do cadastro e dos contatos
     entities/patient.entity.ts
   pts/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
@@ -163,6 +164,8 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/patients/authorized` | profissional (admin vê todos os pacientes) | [GET /patients/authorized](#get-patientsauthorized) |
 | GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
 | POST | `/patients` | admin | [POST /patients](#post-patients) |
+| GET | `/patients/:patientId/support-contacts` | próprio paciente ou admin | [GET e PUT /patients/:patientId/support-contacts](#get-e-put-patientspatientidsupport-contacts) |
+| PUT | `/patients/:patientId/support-contacts` | próprio paciente ou admin | [GET e PUT /patients/:patientId/support-contacts](#get-e-put-patientspatientidsupport-contacts) |
 | GET | `/professionals` | conta da sessão | Swagger |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
@@ -324,6 +327,37 @@ de checagem, com:
 
 O `patientProfileId` da sessão vem do access token: a conta que recebeu o
 perfil só aparece como paciente depois de um novo login.
+
+## GET e PUT /patients/:patientId/support-contacts
+
+Exigem sessão autenticada e consultam ou atualizam os contatos de suporte do
+perfil de paciente (RFPAC003). Só o admin ou o próprio paciente
+(`patientProfileId` da sessão igual a `patientId`) têm acesso; o responsável
+tutelar entra quando a RFACL001 existir. Contato de suporte não concede tutela
+nem acesso clínico (RN017): a atualização não muda nenhuma permissão.
+
+O `PUT` substitui a lista inteira (DP012), e lista vazia remove todos os
+contatos. Corpo:
+
+```json
+{
+  "supportContacts": [
+    { "name": "Joana Silva", "description": "Mãe", "email": "joana@example.com", "phone": "(11) 98765-4321" }
+  ]
+}
+```
+
+`supportContacts` é obrigatório, e cada contato segue a validação do
+[POST /patients](#post-patients). Se um contato for inválido, nada é gravado.
+
+Os dois respondem `200` com `{ accountId, supportContacts }`, com os contatos
+atuais. Os erros possíveis são `400` (`VALIDATION_ERROR`, com a mensagem do
+campo, ou `Parâmetro inválido: patientId` quando não é UUID), `401` (sem
+sessão), `403` (`FORBIDDEN`), `404` (`PATIENT_NOT_FOUND`) e `500`
+(`Não foi possível consultar os contatos de suporte.` ou `Não foi possível
+atualizar os contatos de suporte.`). O acesso é checado antes da existência
+do paciente, então uma conta sem acesso recebe `403` mesmo para um
+`patientId` inexistente.
 
 ## POST /professionals
 
