@@ -62,8 +62,9 @@ src/
     signup/                cadastro de conta (EmailPassword.signUp); volta para /login?registered=true
     home/                  início por perfil: área de trabalho, "Meu cuidado" do paciente ou
                            "Aguardando perfil" para a conta sem perfil
-    profile/               meu perfil: dados da conta (GET/PATCH /me) e troca de senha
-                           (POST /me/password)
+    profile/               meu perfil: dados da conta (GET/PATCH /me), troca de senha
+                           (POST /me/password) e, para o paciente, a seção "Contatos de suporte"
+                           (SupportContactsCard)
     professionals/         consulta de profissionais (GET /professionals) com filtros de nome e
                            especialidade e paginação
     pts/
@@ -74,11 +75,14 @@ src/
                            profissional e o admin escolhem o paciente (GET /patients/authorized) e o
                            paciente (ou o admin, em nome dele) aprova ou rejeita (POST /pts/proposals/:id/approve e /reject)
     patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) com busca por nome ou
-                           e-mail (termo em /patients?q=) e modal "Adicionar paciente"
+                           e-mail (termo em /patients?q=), modal "Adicionar paciente" e ação
+                           "Contatos" em cada paciente
       _components/         PatientSearch e PatientList (busca `q`, página 1 ao mudar o termo, resultados
                            anteriores mantidos no carregamento), AddPatientModal/AddPatientForm,
                            AccountCombobox (combobox ARIA da conta: GET /accounts?isPatient=false&
-                           isProfessional=false&q=; POST /patients) e SupportContactFields/SupportContactList
+                           isProfessional=false&q=; POST /patients), SupportContactFields/SupportContactList
+                           (incluir, editar e remover contato) e SupportContactsModal (GET e PUT
+                           /patients/:patientId/support-contacts; a lista é salva inteira)
   components/              AppShell (sidebar e cabeçalho), AuthenticatedPage (sessão, perfil e
                            "Acesso restrito"), LogoutButton, HelpTooltip, Icon e Logo
   hooks/
@@ -92,7 +96,8 @@ src/
     permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
     professionals.ts       GET /professionals
     patients.ts            contas com perfil de paciente e sem perfil de paciente nem profissional (com `q` e
-                           `signal` para cancelar), cadastro do perfil e isValidPhone
+                           `signal` para cancelar), cadastro do perfil, contatos de suporte
+                           (getSupportContacts/updateSupportContacts) e isValidPhone
 design/                    layouts de referência (HTML estático)
 public/                    arquivos servidos na raiz do site
 ```
@@ -119,8 +124,8 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/login` | Entrar | pública | `teapts-login.html` |
 | `/signup` | Criar conta | pública | `cadastro.html` |
 | `/home` | Início, Meu cuidado ou Aguardando perfil | conta da sessão | `inicio-paciente.html`, `aguardando-perfil.html` |
-| `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
-| `/patients` | Pacientes cadastrados e "Adicionar paciente" | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
+| `/profile` | Meu perfil; "Contatos de suporte" para o paciente (`manageSupportContacts`) | conta da sessão | `meu-perfil.html`, `criar-paciente.html` (contatos) |
+| `/patients` | Pacientes cadastrados, "Adicionar paciente" e "Contatos" (`manageSupportContacts`) | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
 | `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | — |
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |

@@ -1,5 +1,6 @@
 // Este arquivo concentra o acesso a dados de pacientes: a consulta de
-// pacientes autorizados (projeção pública da resposta) e a gravação do perfil.
+// pacientes autorizados (projeção pública da resposta), a gravação do perfil
+// e a leitura e substituição dos contatos de suporte.
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -35,6 +36,20 @@ export type NewPatient = {
   accountId: string;
   supportContacts: SupportContactDto[];
 };
+
+/** Expressão SQL que converte a lista de textos JSON em `jsonb[]`. */
+const SUPPORT_CONTACTS_AS_JSONB_ARRAY = 'CAST(:supportContacts AS jsonb[])';
+
+/**
+ * Converte os contatos no parâmetro de `SUPPORT_CONTACTS_AS_JSONB_ARRAY`.
+ *
+ * O TypeORM grava coluna jsonb com JSON.stringify do valor inteiro, o que
+ * gera um literal inválido para `jsonb[]` ("malformed array literal"). Por
+ * isso cada contato vai como texto JSON, e o banco converte a lista.
+ */
+function toSupportContactsParameter(contacts: SupportContactDto[]): string[] {
+  return contacts.map((contact) => JSON.stringify(contact));
+}
 
 /**
  * Acesso aos dados de pacientes.
@@ -169,11 +184,8 @@ export class PatientsRepository {
   }
 
   /**
-   * Grava o perfil de paciente.
-   *
-   * O TypeORM grava coluna jsonb com JSON.stringify do valor inteiro, o que
-   * gera um literal inválido para `jsonb[]` ("malformed array literal"). Por
-   * isso cada contato vai como texto JSON, e o banco converte a lista.
+   * Grava o perfil de paciente. Os contatos vão como `jsonb[]`
+   * (`toSupportContactsParameter`).
    *
    * @param patient conta e contatos já normalizados
    * @throws erro do banco, sem tratamento (ex.: `23505` na PK duplicada)
@@ -185,12 +197,57 @@ export class PatientsRepository {
       .into(Patient)
       .values({
         accountId: patient.accountId,
-        supportContacts: () => 'CAST(:supportContacts AS jsonb[])',
+        supportContacts: () => SUPPORT_CONTACTS_AS_JSONB_ARRAY,
       })
       .setParameter(
         'supportContacts',
-        patient.supportContacts.map((contact) => JSON.stringify(contact)),
+        toSupportContactsParameter(patient.supportContacts),
       )
       .execute();
+  }
+
+  /**
+   * Busca os contatos de suporte do paciente (RFPAC003).
+   *
+   * @param patientId accountId do perfil de paciente
+   * @returns contatos gravados, ou `null` quando o paciente não existe
+   * @throws erro do banco, sem tratamento
+   */
+  async findSupportContacts(
+    patientId: string,
+  ): Promise<SupportContactDto[] | null> {
+    const patient = await this.patientRepository.findOne({
+      select: { accountId: true, supportContacts: true },
+      where: { accountId: patientId },
+    });
+
+    return patient ? patient.supportContacts : null;
+  }
+
+  /**
+   * Substitui a lista inteira de contatos de suporte do paciente (RFPAC003,
+   * DP012). É um único UPDATE: a lista nova entra inteira ou nada muda.
+   *
+   * @param patientId accountId do perfil de paciente
+   * @param supportContacts lista nova, já normalizada (pode ser vazia)
+   * @returns `false` quando o paciente não existe
+   * @throws erro do banco, sem tratamento
+   */
+  async updateSupportContacts(
+    patientId: string,
+    supportContacts: SupportContactDto[],
+  ): Promise<boolean> {
+    const result = await this.patientRepository
+      .createQueryBuilder()
+      .update(Patient)
+      .set({ supportContacts: () => SUPPORT_CONTACTS_AS_JSONB_ARRAY })
+      .where('"accountId" = :patientId', { patientId })
+      .setParameter(
+        'supportContacts',
+        toSupportContactsParameter(supportContacts),
+      )
+      .execute();
+
+    return (result.affected ?? 0) > 0;
   }
 }

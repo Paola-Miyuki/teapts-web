@@ -35,6 +35,19 @@ const draft = {
 };
 
 describe('can', () => {
+  it('libera os contatos de suporte ao admin e ao próprio paciente (RFPAC003)', () => {
+    const own = { patientId: 'patient-id' };
+    const other = { patientId: 'other-patient-id' };
+
+    expect(can(admin, 'manageSupportContacts', own)).toBe(true);
+    expect(can(admin, 'manageSupportContacts', other)).toBe(true);
+    expect(can(patient, 'manageSupportContacts', own)).toBe(true);
+    expect(can(patient, 'manageSupportContacts', other)).toBe(false);
+    expect(can(patient, 'manageSupportContacts')).toBe(false);
+    expect(can(professional, 'manageSupportContacts', own)).toBe(false);
+    expect(can(waiting, 'manageSupportContacts', own)).toBe(false);
+  });
+
   it('restringe o cadastro e a lista de pacientes ao admin', () => {
     for (const action of [
       'viewPatientRegistry',

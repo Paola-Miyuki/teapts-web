@@ -6,8 +6,10 @@ import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import type { Account, ProfileKind } from '@/lib/account';
+import { can } from '@/lib/permissions';
 import AccountDetailsCard from './AccountDetailsCard';
 import ChangePasswordForm from './ChangePasswordForm';
+import SupportContactsCard from './SupportContactsCard';
 import styles from '../profile.module.css';
 
 function renderProfile(
@@ -70,6 +72,17 @@ function ProfileContent({
             setPasswordOpen(true);
           }}
         />
+
+        {account.patientProfileId &&
+          can(account, 'manageSupportContacts', {
+            patientId: account.patientProfileId,
+          }) && (
+            <SupportContactsCard
+              patientId={account.patientProfileId}
+              patientName={account.name}
+              onFeedback={setFeedback}
+            />
+          )}
 
         {passwordOpen && (
           <ChangePasswordForm

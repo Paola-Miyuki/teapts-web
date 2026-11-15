@@ -12,6 +12,9 @@ import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
 import PatientList from './PatientList';
 import PatientSearch from './PatientSearch';
+import SupportContactsModal, {
+  type SupportContactsPatient,
+} from './SupportContactsModal';
 
 // Só o admin consulta e adiciona pacientes; os demais veem o bloqueio, sem
 // chamar a API.
@@ -33,6 +36,8 @@ export default function Patients() {
   });
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [contactsPatient, setContactsPatient] =
+    useState<SupportContactsPatient | null>(null);
   const [success, setSuccess] = useState('');
   // Muda a cada paciente adicionado, para a lista recarregar.
   const [listKey, setListKey] = useState(0);
@@ -40,6 +45,18 @@ export default function Patients() {
   function openAdd() {
     setSuccess('');
     setIsAddOpen(true);
+  }
+
+  function openContacts(patient: SupportContactsPatient) {
+    setSuccess('');
+    setContactsPatient(patient);
+  }
+
+  function handleContactsSaved() {
+    setSuccess(
+      `Contatos de suporte de ${contactsPatient?.name ?? 'paciente'} atualizados.`,
+    );
+    setContactsPatient(null);
   }
 
   function handleAdded(name: string) {
@@ -106,6 +123,11 @@ export default function Patients() {
               onAdd={openAdd}
               onClearSearch={search.clear}
               canAdd={can(account, 'createPatientProfile')}
+              // A lista só aparece para o admin, que gerencia os contatos de
+              // qualquer paciente (RFPAC003).
+              onEditContacts={
+                can(account, 'manageSupportContacts') ? openContacts : undefined
+              }
             />
 
             <AddPatientModal
@@ -113,6 +135,12 @@ export default function Patients() {
               onClose={() => setIsAddOpen(false)}
               onAdded={handleAdded}
               canCreate={can(account, 'createPatientProfile')}
+            />
+
+            <SupportContactsModal
+              patient={contactsPatient}
+              onClose={() => setContactsPatient(null)}
+              onSaved={handleContactsSaved}
             />
           </>
         </>

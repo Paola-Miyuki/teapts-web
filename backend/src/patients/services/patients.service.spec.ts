@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 import {
   ConflictException,
+  ForbiddenException,
   InternalServerErrorException,
   Logger,
   NotFoundException,
@@ -16,6 +17,8 @@ import type { Professional } from '../../professionals/entities/professional.ent
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
+import type { SupportContactDto } from '../dto/support-contact.dto';
+import type { UpdateSupportContactsRequestDto } from '../dto/update-support-contacts-request.dto';
 import type { Patient } from '../entities/patient.entity';
 import type { NewPatient } from '../repositories/patients.repository';
 import type {
@@ -27,6 +30,15 @@ import { PatientsService } from './patients.service';
 function createService() {
   const repository = {
     insert: jest.fn<(patient: NewPatient) => Promise<void>>(),
+    findSupportContacts:
+      jest.fn<(patientId: string) => Promise<SupportContactDto[] | null>>(),
+    updateSupportContacts:
+      jest.fn<
+        (
+          patientId: string,
+          supportContacts: SupportContactDto[],
+        ) => Promise<boolean>
+      >(),
     findAuthorizedPaginated:
       jest.fn<
         (
@@ -419,6 +431,224 @@ describe('PatientsService.create', () => {
     expect((error as InternalServerErrorException).getResponse()).toEqual({
       status: 'ERROR',
       message: 'Não foi possível cadastrar o perfil de paciente.',
+    });
+  });
+});
+
+describe('PatientsService support contacts', () => {
+  const patientId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+  const contact = {
+    name: 'Joana Silva',
+    description: 'Mãe',
+    email: 'joana@example.com',
+    phone: '(11) 98765-4321',
+  };
+  const patientAccount: AccountContext = {
+    accountId: patientId,
+    role: AccountRole.User,
+    patientProfileId: patientId,
+    professionalProfileIds: [],
+  };
+  const otherPatientAccount: AccountContext = {
+    ...patientAccount,
+    accountId: 'other-account',
+    patientProfileId: 'other-patient',
+  };
+
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('findSupportContacts', () => {
+    it.each([
+      ['the admin', adminAccount],
+      ['the patient', patientAccount],
+    ])('returns the current contacts to %s', async (_who, account) => {
+      const { repository, service } = createService();
+      repository.findSupportContacts.mockResolvedValue([contact]);
+
+      await expect(
+        service.findSupportContacts(account, patientId),
+      ).resolves.toEqual({ accountId: patientId, supportContacts: [contact] });
+      expect(repository.findSupportContacts).toHaveBeenCalledWith(patientId);
+    });
+
+    it.each([
+      ['another patient', otherPatientAccount],
+      ['a professional', professionalAccount],
+    ])(
+      'returns 403 FORBIDDEN to %s without reading the patient',
+      async (_who, account) => {
+        const { repository, service } = createService();
+
+        const error = await service
+          .findSupportContacts(account, patientId)
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toEqual({
+          status: 'FORBIDDEN',
+          message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+        });
+        expect(repository.findSupportContacts).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns 404 PATIENT_NOT_FOUND when the patient does not exist', async () => {
+      const { repository, service } = createService();
+      repository.findSupportContacts.mockResolvedValue(null);
+
+      const error = await service
+        .findSupportContacts(adminAccount, patientId)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).getResponse()).toEqual({
+        status: 'PATIENT_NOT_FOUND',
+        message: 'Paciente não encontrado.',
+      });
+    });
+
+    it('returns a safe internal error when the query fails', async () => {
+      const { repository, service } = createService();
+      repository.findSupportContacts.mockRejectedValue(
+        new Error('database connection details'),
+      );
+
+      const error = await service
+        .findSupportContacts(adminAccount, patientId)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(InternalServerErrorException);
+      expect((error as InternalServerErrorException).getResponse()).toEqual({
+        status: 'ERROR',
+        message: 'Não foi possível consultar os contatos de suporte.',
+      });
+    });
+  });
+
+  describe('updateSupportContacts', () => {
+    it.each([
+      ['the admin', adminAccount],
+      ['the patient', patientAccount],
+    ])('replaces the whole list for %s', async (_who, account) => {
+      const { repository, service } = createService();
+      repository.updateSupportContacts.mockResolvedValue(true);
+
+      await expect(
+        service.updateSupportContacts(account, patientId, {
+          supportContacts: [contact],
+        }),
+      ).resolves.toEqual({ accountId: patientId, supportContacts: [contact] });
+      expect(repository.updateSupportContacts).toHaveBeenCalledWith(patientId, [
+        contact,
+      ]);
+    });
+
+    it('removes every contact when the list is empty', async () => {
+      const { repository, service } = createService();
+      repository.updateSupportContacts.mockResolvedValue(true);
+
+      await expect(
+        service.updateSupportContacts(patientAccount, patientId, {
+          supportContacts: [],
+        }),
+      ).resolves.toEqual({ accountId: patientId, supportContacts: [] });
+      expect(repository.updateSupportContacts).toHaveBeenCalledWith(
+        patientId,
+        [],
+      );
+    });
+
+    it('normalizes the contacts before saving', async () => {
+      const { repository, service } = createService();
+      repository.updateSupportContacts.mockResolvedValue(true);
+
+      await service.updateSupportContacts(adminAccount, patientId, {
+        supportContacts: [
+          { name: ' Joana ', description: ' ', phone: ' (11) 98765-4321 ' },
+        ],
+      } as UpdateSupportContactsRequestDto);
+
+      expect(repository.updateSupportContacts).toHaveBeenCalledWith(patientId, [
+        { name: 'Joana', phone: '(11) 98765-4321' },
+      ]);
+    });
+
+    it('only touches the support contacts, granting no access (RN017)', async () => {
+      const { accountRepository, repository, service } = createService();
+      repository.updateSupportContacts.mockResolvedValue(true);
+
+      await service.updateSupportContacts(adminAccount, patientId, {
+        supportContacts: [contact],
+      });
+
+      expect(repository.updateSupportContacts).toHaveBeenCalledTimes(1);
+      expect(repository.insert).not.toHaveBeenCalled();
+      expect(accountRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['another patient', otherPatientAccount],
+      ['a professional', professionalAccount],
+    ])(
+      'returns 403 FORBIDDEN to %s and keeps the list',
+      async (_who, account) => {
+        const { repository, service } = createService();
+
+        const error = await service
+          .updateSupportContacts(account, patientId, {
+            supportContacts: [contact],
+          })
+          .catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(ForbiddenException);
+        expect((error as ForbiddenException).getResponse()).toEqual({
+          status: 'FORBIDDEN',
+          message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+        });
+        expect(repository.updateSupportContacts).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns 404 PATIENT_NOT_FOUND when the patient does not exist', async () => {
+      const { repository, service } = createService();
+      repository.updateSupportContacts.mockResolvedValue(false);
+
+      const error = await service
+        .updateSupportContacts(adminAccount, patientId, {
+          supportContacts: [contact],
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).getResponse()).toEqual({
+        status: 'PATIENT_NOT_FOUND',
+        message: 'Paciente não encontrado.',
+      });
+    });
+
+    it('returns a safe internal error when the update fails', async () => {
+      const { repository, service } = createService();
+      repository.updateSupportContacts.mockRejectedValue(
+        new Error('database connection details'),
+      );
+
+      const error = await service
+        .updateSupportContacts(adminAccount, patientId, {
+          supportContacts: [contact],
+        })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(InternalServerErrorException);
+      expect((error as InternalServerErrorException).getResponse()).toEqual({
+        status: 'ERROR',
+        message: 'Não foi possível atualizar os contatos de suporte.',
+      });
     });
   });
 });

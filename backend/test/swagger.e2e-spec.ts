@@ -75,6 +75,8 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
   ['/patients', 'post'],
+  ['/patients/{patientId}/support-contacts', 'get'],
+  ['/patients/{patientId}/support-contacts', 'put'],
   ['/professionals', 'post'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
@@ -146,6 +148,19 @@ describe('Swagger (e2e)', () => {
     expect(paths['/accounts']).toHaveProperty('get');
     expect(paths['/patients']).toHaveProperty('post');
     expect(paths['/professionals']).toHaveProperty('post');
+  });
+
+  it('documents the PUT support-contacts body from the DTO', async () => {
+    const document = await getDocument();
+    const operation =
+      document.paths['/patients/{patientId}/support-contacts'].put;
+
+    expect(
+      operation.requestBody?.content['application/json']?.schema?.$ref,
+    ).toBe('#/components/schemas/UpdateSupportContactsRequestDto');
+    expect(
+      document.components.schemas.UpdateSupportContactsRequestDto,
+    ).toMatchObject({ required: ['supportContacts'] });
   });
 
   it('declares the cookie and bearer session schemes', async () => {
@@ -258,6 +273,14 @@ describe('Swagger (e2e)', () => {
     ['/patients', 'post', '404'],
     ['/patients', 'post', '409'],
     ['/patients', 'post', '500'],
+    ['/patients/{patientId}/support-contacts', 'get', '400'],
+    ['/patients/{patientId}/support-contacts', 'get', '403'],
+    ['/patients/{patientId}/support-contacts', 'get', '404'],
+    ['/patients/{patientId}/support-contacts', 'get', '500'],
+    ['/patients/{patientId}/support-contacts', 'put', '400'],
+    ['/patients/{patientId}/support-contacts', 'put', '403'],
+    ['/patients/{patientId}/support-contacts', 'put', '404'],
+    ['/patients/{patientId}/support-contacts', 'put', '500'],
     ['/professionals', 'post', '400'],
     ['/professionals', 'post', '403'],
     ['/professionals', 'post', '404'],

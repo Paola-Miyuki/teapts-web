@@ -8,6 +8,7 @@ export type PermissionAction =
   | 'viewWaitingHome'
   | 'viewOwnCare'
   | 'createPatientProfile'
+  | 'manageSupportContacts'
   | 'viewAuthorizedPatients'
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
@@ -30,6 +31,8 @@ export type PtsPermissionData = {
 
 export type PermissionContext = {
   pts?: PtsPermissionData;
+  // Paciente alvo da ação (accountId do perfil de paciente).
+  patientId?: string;
 };
 
 export type PermissionUser = {
@@ -102,6 +105,15 @@ export function can(
     case 'createPatientProfile':
       // RFPAC001 – administrador.
       return admin;
+    case 'manageSupportContacts':
+      // RFPAC003 – administrador ou o próprio paciente. Contato de suporte não
+      // concede acesso (RN017).
+      // TODO(RFACL001): liberar o responsável tutelar depois do vínculo.
+      return (
+        patient &&
+        context.patientId !== undefined &&
+        context.patientId === user.patientProfileId
+      );
     case 'viewAuthorizedPatients':
       // RFPAC002 – profissional (a API filtra os vinculados).
       return professional;
