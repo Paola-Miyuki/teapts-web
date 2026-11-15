@@ -100,3 +100,29 @@ export function createPatient(body: CreatePatientBody) {
     body: JSON.stringify(body),
   });
 }
+
+function supportContactsPath(patientId: string) {
+  return `/patients/${encodeURIComponent(patientId)}/support-contacts`;
+}
+
+// GET /patients/:patientId/support-contacts: contatos atuais do paciente
+// (admin ou o próprio paciente, RFPAC003).
+export function getSupportContacts(
+  patientId: string,
+  { signal }: { signal?: AbortSignal } = {},
+) {
+  return request<PatientProfile>(supportContactsPath(patientId), { signal });
+}
+
+// PUT /patients/:patientId/support-contacts: substitui a lista inteira; lista
+// vazia remove todos os contatos (RFPAC003, DP012).
+export function updateSupportContacts(
+  patientId: string,
+  supportContacts: SupportContact[],
+) {
+  return request<PatientProfile>(supportContactsPath(patientId), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ supportContacts }),
+  });
+}
