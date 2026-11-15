@@ -9,6 +9,7 @@ import { CreatePatientAndProfessional1791148860000 } from './migrations/17911488
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
+import { AddDeletedAtToPts1791148900000 } from './migrations/1791148900000-AddDeletedAtToPts';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -76,6 +77,7 @@ describe('getDatabaseOptions', () => {
         CreatePatientAndProfessional1791148860000,
         CreatePtsTables1791148870000,
         AddProfessionalAccountSpecialismUnique1791148880000,
+        AddDeletedAtToPts1791148900000,
       ],
     });
   });
