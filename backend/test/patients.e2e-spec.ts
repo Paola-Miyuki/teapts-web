@@ -329,3 +329,165 @@ describe('patient profile (e2e)', () => {
     expect(response.body.status).toBe('PATIENT_PROFILE_ALREADY_EXISTS');
   });
 });
+
+/*
+ * GET e PUT /patients/:patientId/support-contacts com o AuthGuard,
+ * o ValidationPipe e o PatientsService reais
+ */
+describe('patient support contacts (e2e)', () => {
+  const patientId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+  const route = `/patients/${patientId}/support-contacts`;
+  const contact = {
+    name: 'Joana Silva',
+    description: 'Mãe',
+    email: 'joana@example.com',
+    phone: '(11) 98765-4321',
+  };
+
+  let app: INestApplication;
+  let patientsRepository: {
+    findSupportContacts: jest.Mock<(patientId: string) => Promise<unknown>>;
+    updateSupportContacts: jest.Mock<
+      (patientId: string, contacts: unknown) => Promise<boolean>
+    >;
+  };
+
+  function signIn(role: 'admin' | 'user', patientProfileId: string | null) {
+    currentSession = {
+      getAccessTokenPayload: () => ({
+        accountId: patientProfileId ?? 'admin-account',
+        role,
+        patientProfileId,
+        professionalProfileIds: [],
+      }),
+    };
+  }
+
+  beforeEach(async () => {
+    patientsRepository = {
+      findSupportContacts: jest.fn(),
+      updateSupportContacts: jest.fn(),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [PatientsController],
+      providers: [
+        PatientsService,
+        AuthGuard,
+        AdminGuard,
+        { provide: PatientsRepository, useValue: patientsRepository },
+        { provide: getRepositoryToken(Account), useValue: {} },
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    currentSession = undefined;
+    await app.close();
+  });
+
+  it('lets the patient read their own contacts', async () => {
+    signIn('user', patientId);
+    patientsRepository.findSupportContacts.mockResolvedValue([contact]);
+
+    const response = await request(app.getHttpServer()).get(route);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      accountId: patientId,
+      supportContacts: [contact],
+    });
+  });
+
+  it('lets the admin replace the whole list', async () => {
+    signIn('admin', null);
+    patientsRepository.updateSupportContacts.mockResolvedValue(true);
+
+    const response = await request(app.getHttpServer())
+      .put(route)
+      .send({ supportContacts: [contact] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      accountId: patientId,
+      supportContacts: [contact],
+    });
+    expect(patientsRepository.updateSupportContacts).toHaveBeenCalledWith(
+      patientId,
+      [contact],
+    );
+  });
+
+  it('removes every contact with an empty list', async () => {
+    signIn('user', patientId);
+    patientsRepository.updateSupportContacts.mockResolvedValue(true);
+
+    const response = await request(app.getHttpServer())
+      .put(route)
+      .send({ supportContacts: [] });
+
+    expect(response.status).toBe(200);
+    expect(response.body.supportContacts).toEqual([]);
+    expect(patientsRepository.updateSupportContacts).toHaveBeenCalledWith(
+      patientId,
+      [],
+    );
+  });
+
+  it('answers 401 without a session', async () => {
+    const response = await request(app.getHttpServer())
+      .put(route)
+      .send({ supportContacts: [contact] });
+
+    expect(response.status).toBe(401);
+    expect(patientsRepository.updateSupportContacts).not.toHaveBeenCalled();
+  });
+
+  it('answers 403 to another patient and keeps the list', async () => {
+    signIn('user', 'other-patient');
+
+    const response = await request(app.getHttpServer())
+      .put(route)
+      .send({ supportContacts: [contact] });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+    });
+    expect(patientsRepository.updateSupportContacts).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for an invalid contact without saving anything', async () => {
+    signIn('admin', null);
+
+    const response = await request(app.getHttpServer())
+      .put(route)
+      .send({ supportContacts: [contact, { name: 'Pedro', email: 'pedro' }] });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um e-mail válido para o contato.',
+    });
+    expect(patientsRepository.updateSupportContacts).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 PATIENT_NOT_FOUND for a missing patient', async () => {
+    signIn('admin', null);
+    patientsRepository.findSupportContacts.mockResolvedValue(null);
+
+    const response = await request(app.getHttpServer()).get(route);
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    });
+  });
+});
