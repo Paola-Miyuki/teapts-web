@@ -72,6 +72,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'get'],
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
+  ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
   ['/patients', 'post'],
@@ -263,6 +264,10 @@ describe('Swagger (e2e)', () => {
     ['/professionals', 'post', '404'],
     ['/professionals', 'post', '409'],
     ['/professionals', 'post', '500'],
+    ['/pts/proposals/{id}', 'delete', '400'],
+    ['/pts/proposals/{id}', 'delete', '403'],
+    ['/pts/proposals/{id}', 'delete', '404'],
+    ['/pts/proposals/{id}', 'delete', '409'],
   ])('%s %s answers %s with the error body', async (path, method, status) => {
     const operation = (await getDocument()).paths[path][method];
 
@@ -363,6 +368,25 @@ describe('Swagger (e2e)', () => {
       'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
       'PATIENT_PROFILE_ALREADY_EXISTS',
     ]);
+  });
+
+  it('documents DELETE /pts/proposals/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/proposals/{id}'].delete;
+
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/DeletePtsProposalResponseDto',
+    );
+    expect(components.schemas.DeletePtsProposalResponseDto.required).toEqual([
+      'status',
+    ]);
+    expect(
+      Object.keys(
+        operation.responses['409']?.content?.['application/json']?.examples ??
+          {},
+      ),
+    ).toEqual(['PTS_NOT_DRAFT']);
   });
 
   it('reads the POST /patients body from the DTO', async () => {
