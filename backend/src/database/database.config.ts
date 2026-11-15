@@ -9,6 +9,7 @@ import { LinkAccountToSupertokens1791148800000 } from './migrations/179114880000
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
+import { AddDeletedAtToPts1791148900000 } from './migrations/1791148900000-AddDeletedAtToPts';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
@@ -20,6 +21,7 @@ const migrations = [
   CreatePatientAndProfessional1791148860000,
   CreatePtsTables1791148870000,
   AddProfessionalAccountSpecialismUnique1791148880000,
+  AddDeletedAtToPts1791148900000,
 ];
 
 export function getDatabaseOptions(

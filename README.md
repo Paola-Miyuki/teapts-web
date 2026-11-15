@@ -18,7 +18,7 @@ Escolha livre, e dá para alternar: os dois usam o mesmo `.env` e o mesmo banco.
 
 1. [Pré-requisitos](#1-pré-requisitos) e [Setup](#2-setup) (`make env`, `make install`, preencher `DATABASE_PASSWORD`).
 2. Suba a stack: [local](#3-rodar-local) **ou** [Docker](#4-rodar-no-docker).
-3. Crie a conta de teste: [5.2](#52-conta-de-teste).
+3. Crie as contas de teste: [5.2](#52-contas-de-teste).
 4. Teste o login com os curls de [6.4](#64-testar-com-curl).
 
 Este README cobre a stack inteira. Scripts, variáveis e estrutura de cada projeto ficam em [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
@@ -91,7 +91,7 @@ cd backend  && pnpm start:dev     # http://localhost:3000
 cd frontend && pnpm dev -p 3001   # http://localhost:3001
 ```
 
-**3.5 Crie a conta de teste** ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)). A tela de login fica em <http://localhost:3001/login>.
+**3.5 Crie as contas de teste** ([5.2](#52-contas-de-teste)) e teste o login ([6.4](#64-testar-com-curl)). A tela de login fica em <http://localhost:3001/login>.
 
 **Mudou `frontend/.env`?** Pare o `pnpm dev` e suba de novo: as `NEXT_PUBLIC_*` entram no bundle no build, e o servidor em execução não relê o arquivo. No Docker, o equivalente é `make rebuild-frontend-no-cache`.
 
@@ -111,7 +111,7 @@ make up-d      # builda (na 1ª vez), sobe postgres → supertokens → backend 
 make ps        # todos "running"/"healthy"
 ```
 
-Frontend em <http://localhost:3001> (login em `/login`), backend em <http://localhost:3000>. Em seguida, crie a conta de teste com `make seed` ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)).
+Frontend em <http://localhost:3001> (login em `/login`), backend em <http://localhost:3000>. Em seguida, crie as contas de teste com `make seed` ([5.2](#52-contas-de-teste)) e teste o login ([6.4](#64-testar-com-curl)).
 
 Todo alvo que sobe o backend (`up`, `up-d`, `rebuild`, `rebuild-no-cache`, `rebuild-backend`) espera o container ficar em execução e então roda `make migrate`. Se a migration falhar, o comando termina com erro **e os containers continuam no ar** — investigue com `make logs-backend` e rode `make migrate` de novo. `make up` sobe em segundo plano e segue os logs, então `Ctrl+C` só fecha os logs: para parar de verdade, use `make down`.
 
@@ -216,7 +216,9 @@ O seed precisa do PostgreSQL e do SuperTokens em execução.
 - Papel: `user`
 - Perfil: paciente
 
-O seed cria ou reutiliza as contas e garante que exista um perfil de psicólogo para a conta profissional. Ele não redefine a senha de usuários já existentes no SuperTokens.
+O seed cria ou reutiliza as contas e garante que existam o perfil de psicólogo da conta profissional e o perfil de paciente da conta paciente. Ele não redefine a senha de usuários já existentes no SuperTokens.
+
+Para testar fluxos com mais de um profissional (equipe, responsável e outro profissional), cadastre outras contas em `/auth/signup` e crie os perfis com o admin (`POST /professionals` e `POST /patients`).
 
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
 
@@ -259,7 +261,7 @@ make up-d      # já aplica as migrations
 make seed
 ```
 
-Como o SuperTokens usa o mesmo volume, o `make clean` também apaga os usuários e as sessões dele. Depois do reset, só existe a conta criada pelo `make seed`.
+Como o SuperTokens usa o mesmo volume, o `make clean` também apaga os usuários e as sessões dele. Depois do reset, só existem as contas criadas pelo `make seed`.
 
 Trocar `DATABASE_PASSWORD` **não** muda a senha de um banco já criado no volume: altere no PostgreSQL ou recrie o volume (com backup antes).
 
@@ -346,7 +348,7 @@ As rotas do SDK (`/auth/signup`, `/auth/signin` e `/auth/session/refresh`) são 
 
 ### 6.4 Testar com curl
 
-Com a stack no ar e a conta de teste criada ([5.2](#52-conta-de-teste)):
+Com a stack no ar e as contas de teste criadas ([5.2](#52-contas-de-teste)):
 
 ```bash
 API=http://localhost:3000
@@ -508,7 +510,7 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make migrate-show` | Lista as migrations, `[X]` = aplicada |
 | `make migrate-revert` | Desfaz a última |
 | `make migrate-generate NAME=AddFoo` | Gera migration a partir das entidades, **no host** (precisa de `make up-d-db`) |
-| `make seed` | Cria a conta de teste no SuperTokens e em `account` |
+| `make seed` | Cria as contas de teste (admin, profissional e paciente) no SuperTokens e em `account`, com os perfis ([5.2](#52-contas-de-teste)) |
 | `make db-tables` | Lista as tabelas |
 | `make db-account` | Mostra as contas |
 | `make db-query SQL="..."` | Roda um SQL qualquer |

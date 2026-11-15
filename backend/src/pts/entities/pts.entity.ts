@@ -7,6 +7,7 @@ import {
   JoinTable,
   JoinColumn,
   CreateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -38,6 +39,11 @@ export class PtsEntity {
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   beganAt: Date | null;
+
+  // Exclusão lógica (RN021): as consultas do TypeORM ignoram linhas com
+  // deletedAt preenchido, a menos que usem withDeleted.
+  @DeleteDateColumn({ type: 'timestamp', precision: 3, nullable: true })
+  deletedAt: Date | null;
 
   @Column({ name: 'patient_id' })
   patientId: string;

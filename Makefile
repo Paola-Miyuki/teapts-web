@@ -185,7 +185,7 @@ migrate-generate: ## Gera migration a partir das entidades, no host (uso: make m
 	@test -n "$(NAME)" || { echo "ERRO: informe NAME, ex.: make migrate-generate NAME=AddFoo"; exit 1; }
 	$(BE) migration:generate src/database/migrations/$(NAME)
 
-seed: ## Cria a conta de teste (teste@teapts.local / teapts123)
+seed: ## Cria as contas de teste: admin, profissional (psicólogo) e paciente (README 5.2)
 	$(BE_DB) node dist/database/seeds/create-test-user.js
 
 db-tables: ## Lista as tabelas do banco
