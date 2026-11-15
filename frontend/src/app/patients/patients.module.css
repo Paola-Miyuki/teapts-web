@@ -173,6 +173,10 @@
   gap: 8px;
 }
 
+.addContactSpaced {
+  margin-top: 16px;
+}
+
 .contactList {
   margin: 0;
   padding: 0;
@@ -220,6 +224,34 @@
 .contactData .missing {
   color: var(--muted);
   font-style: italic;
+}
+
+.contactRowActions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* Ação "Contatos" no fim da linha do paciente (RFPAC003). */
+.rowAction {
+  margin-left: auto;
+  gap: 8px;
+}
+
+/* Texto da lista vazia e do carregamento no modal de contatos. */
+.contactsStatus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.contactsStatus .loader {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
 .contactFields {

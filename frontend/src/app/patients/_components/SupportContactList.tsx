@@ -5,7 +5,9 @@ import styles from '../patients.module.css';
 
 type SupportContactListProps = {
   contacts: SupportContact[];
-  onRemove: (index: number) => void;
+  // Sem os callbacks, a lista fica só para leitura.
+  onEdit?: (index: number) => void;
+  onRemove?: (index: number) => void;
 };
 
 // Mesma ordem do formulário: nome e descrição ocupam a linha inteira.
@@ -18,6 +20,7 @@ const FIELDS = [
 
 export default function SupportContactList({
   contacts,
+  onEdit,
   onRemove,
 }: SupportContactListProps) {
   if (contacts.length === 0) {
@@ -40,14 +43,31 @@ export default function SupportContactList({
             ))}
           </dl>
 
-          <button
-            type="button"
-            className={ui.iconButton}
-            aria-label={`Remover contato ${contact.name}`}
-            onClick={() => onRemove(index)}
-          >
-            <Icon name="trash" className={ui.icon} />
-          </button>
+          {(onEdit || onRemove) && (
+            <div className={styles.contactRowActions}>
+              {onEdit && (
+                <button
+                  type="button"
+                  className={ui.iconButton}
+                  aria-label={`Editar contato ${contact.name}`}
+                  onClick={() => onEdit(index)}
+                >
+                  <Icon name="edit" className={ui.icon} />
+                </button>
+              )}
+
+              {onRemove && (
+                <button
+                  type="button"
+                  className={ui.iconButton}
+                  aria-label={`Remover contato ${contact.name}`}
+                  onClick={() => onRemove(index)}
+                >
+                  <Icon name="trash" className={ui.icon} />
+                </button>
+              )}
+            </div>
+          )}
         </li>
       ))}
     </ul>
