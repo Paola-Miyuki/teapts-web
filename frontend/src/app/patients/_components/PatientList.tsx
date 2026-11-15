@@ -8,6 +8,7 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { getPatientAccounts, type AccountsResponse } from '@/lib/patients';
 import styles from '../patients.module.css';
+import type { SupportContactsPatient } from './SupportContactsModal';
 
 const PAGE_LIMIT = 10;
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
@@ -22,6 +23,8 @@ type PatientListProps = {
   onAdd: () => void;
   onClearSearch: () => void;
   canAdd: boolean;
+  // Abre os contatos de suporte do paciente; sem ele, a ação não aparece.
+  onEditContacts?: (patient: SupportContactsPatient) => void;
 };
 
 export default function PatientList({
@@ -29,6 +32,7 @@ export default function PatientList({
   onAdd,
   onClearSearch,
   canAdd,
+  onEditContacts,
 }: PatientListProps) {
   const router = useRouter();
 
@@ -190,6 +194,20 @@ export default function PatientList({
                 <strong>{patient.name}</strong>
                 <small>{patient.email}</small>
               </div>
+
+              {onEditContacts && (
+                <button
+                  type="button"
+                  className={`${ui.btn} ${ui.btnSecondary} ${styles.rowAction}`}
+                  aria-label={`Contatos de suporte de ${patient.name}`}
+                  onClick={() =>
+                    onEditContacts({ id: patient.id, name: patient.name })
+                  }
+                >
+                  <Icon name="people" className={ui.icon} />
+                  Contatos
+                </button>
+              )}
             </li>
           ))}
         </ul>

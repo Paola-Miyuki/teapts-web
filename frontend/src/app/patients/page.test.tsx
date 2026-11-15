@@ -1372,4 +1372,511 @@ describe('PatientsPage', () => {
       await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
     });
   });
+
+  describe('contatos de suporte do paciente (RFPAC003)', () => {
+    // Maria Sílvia é o 1º paciente da página 1 do mock da lista.
+    const PATIENT_ID = '1-0';
+    const CONTACTS_URL = `${API}/patients/${PATIENT_ID}/support-contacts`;
+    const JOANA = {
+      name: 'Joana Silva',
+      description: 'Mãe',
+      email: 'joana@example.com',
+      phone: '(11) 98765-4321',
+    };
+
+    function profile(supportContacts: unknown[]) {
+      return mockResponse({
+        data: { accountId: PATIENT_ID, supportContacts },
+      });
+    }
+
+    // GET responde com a Joana; o PUT devolve a lista que recebeu.
+    function mockContacts({
+      get = jest.fn().mockResolvedValue(profile([JOANA])),
+      put = jest.fn((_url: string, init?: RequestInit) =>
+        Promise.resolve(
+          profile(
+            (JSON.parse(String(init?.body)) as { supportContacts: unknown[] })
+              .supportContacts,
+          ),
+        ),
+      ),
+    }: { get?: jest.Mock; put?: jest.Mock } = {}) {
+      mockApi({
+        patients: jest.fn((url: string, init?: RequestInit) =>
+          init?.method === 'PUT' ? put(url, init) : get(url, init),
+        ),
+      });
+
+      return { get, put };
+    }
+
+    async function openContacts(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(
+        await screen.findByRole('button', {
+          name: 'Contatos de suporte de Maria Sílvia',
+        }),
+      );
+
+      return within(
+        screen.getByRole('dialog', { name: 'Contatos de suporte' }),
+      );
+    }
+
+    function sentContacts(put: jest.Mock) {
+      const [url, init] = put.mock.calls[0] as [string, RequestInit];
+
+      expect(url).toBe(CONTACTS_URL);
+      expect(init.method).toBe('PUT');
+
+      return (JSON.parse(String(init.body)) as { supportContacts: unknown })
+        .supportContacts;
+    }
+
+    it('mostra a ação "Contatos" em cada paciente e carrega os contatos atuais', async () => {
+      const user = userEvent.setup();
+      const { get } = mockContacts();
+
+      render(<PatientsPage />);
+
+      expect(
+        await screen.findByRole('button', {
+          name: 'Contatos de suporte de Diego Alves',
+        }),
+      ).toBeInTheDocument();
+
+      const dialog = await openContacts(user);
+
+      expect(
+        await dialog.findByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Joana Silva');
+      expect(get).toHaveBeenCalledWith(
+        CONTACTS_URL,
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+
+    it('mostra o loading enquanto os contatos carregam', async () => {
+      const user = userEvent.setup();
+      mockContacts({ get: jest.fn(() => new Promise<Response>(() => {})) });
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      expect(dialog.getByRole('status')).toHaveTextContent(
+        'Carregando contatos...',
+      );
+      expect(
+        dialog.queryByRole('button', { name: 'Salvar contatos' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('inclui, edita e remove contatos e salva a lista inteira', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts({
+        get: jest
+          .fn()
+          .mockResolvedValue(profile([JOANA, { name: 'Pedro Souza' }])),
+      });
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      // Edita a Joana.
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Editar contato Joana Silva',
+        }),
+      );
+
+      const editing = within(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      );
+
+      expect(editing.getByLabelText('Nome do contato')).toHaveValue(
+        'Joana Silva',
+      );
+
+      await user.clear(editing.getByLabelText(/Telefone/));
+      await user.type(editing.getByLabelText(/Telefone/), '(21) 3456-7890');
+
+      // O modal não tem "Salvar contato": remover o Pedro guarda a Joana.
+      expect(
+        editing.queryByRole('button', { name: 'Salvar contato' }),
+      ).not.toBeInTheDocument();
+
+      // Remove o Pedro e inclui a Ana.
+      await user.click(
+        dialog.getByRole('button', { name: 'Remover contato Pedro Souza' }),
+      );
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar contato' }),
+      );
+
+      const adding = within(
+        dialog.getByRole('group', { name: 'Novo contato de suporte' }),
+      );
+
+      await user.type(adding.getByLabelText('Nome do contato'), 'Ana Lima');
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Contatos de suporte de Maria Sílvia atualizados.',
+      );
+      expect(
+        screen.queryByRole('dialog', { name: 'Contatos de suporte' }),
+      ).not.toBeInTheDocument();
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(sentContacts(put)).toEqual([
+        { ...JOANA, phone: '(21) 3456-7890' },
+        { name: 'Ana Lima' },
+      ]);
+    });
+
+    it('cancela a edição sem mudar o contato', async () => {
+      const user = userEvent.setup();
+      mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Editar contato Joana Silva',
+        }),
+      );
+
+      const editing = within(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      );
+
+      await user.clear(editing.getByLabelText('Nome do contato'));
+      await user.type(editing.getByLabelText('Nome do contato'), 'Outra');
+      await user.click(
+        editing.getByRole('button', { name: 'Cancelar edição' }),
+      );
+
+      expect(
+        dialog.getByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Joana Silva');
+    });
+
+    it('envia a lista vazia ao remover todos os contatos', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Remover contato Joana Silva',
+        }),
+      );
+
+      expect(
+        dialog.getByText('Nenhum contato de suporte cadastrado.'),
+      ).toBeInTheDocument();
+
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+      expect(sentContacts(put)).toEqual([]);
+    });
+
+    it('aponta o contato inválido no campo sem chamar a API', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Editar contato Joana Silva',
+        }),
+      );
+
+      const editing = within(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      );
+
+      await user.clear(editing.getByLabelText(/Telefone/));
+      await user.type(editing.getByLabelText(/Telefone/), '98765-4321');
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      expect(editing.getByRole('alert')).toHaveTextContent(
+        'Informe um telefone válido para o contato.',
+      );
+      expect(editing.getByLabelText(/Telefone/)).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+      expect(put).not.toHaveBeenCalled();
+
+      // Adicionar outro contato também fica bloqueado até corrigir.
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar contato' }),
+      );
+
+      expect(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      ).toBeInTheDocument();
+      expect(
+        dialog.queryByRole('group', { name: 'Novo contato de suporte' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('guarda o contato aberto e abre outro em branco ao adicionar contato', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', { name: 'Adicionar contato' }),
+      );
+      await user.type(dialog.getByLabelText('Nome do contato'), 'Ana Lima');
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar contato' }),
+      );
+
+      expect(
+        dialog.getByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Ana Lima');
+      expect(dialog.getByLabelText('Nome do contato')).toHaveValue('');
+
+      await user.type(dialog.getByLabelText('Nome do contato'), 'Pedro Souza');
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+      expect(sentContacts(put)).toEqual([
+        JOANA,
+        { name: 'Ana Lima' },
+        { name: 'Pedro Souza' },
+      ]);
+    });
+
+    it('salva o contato novo aberto junto com a lista, num clique só', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', { name: 'Adicionar contato' }),
+      );
+
+      const adding = within(
+        dialog.getByRole('group', { name: 'Novo contato de suporte' }),
+      );
+
+      await user.type(adding.getByLabelText('Nome do contato'), 'Ana Lima');
+      await user.type(adding.getByLabelText(/Telefone/), '(21) 3456-7890');
+
+      // Sem clicar em "Salvar contato".
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Contatos de suporte de Maria Sílvia atualizados.',
+      );
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(sentContacts(put)).toEqual([
+        JOANA,
+        { name: 'Ana Lima', phone: '(21) 3456-7890' },
+      ]);
+    });
+
+    it('salva o contato em edição junto com a lista, num clique só', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Editar contato Joana Silva',
+        }),
+      );
+
+      const editing = within(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      );
+
+      await user.clear(editing.getByLabelText('Nome do contato'));
+      await user.type(editing.getByLabelText('Nome do contato'), 'Joana S.');
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+      expect(sentContacts(put)).toEqual([{ ...JOANA, name: 'Joana S.' }]);
+    });
+
+    it('descarta o contato novo em branco ao salvar a lista', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', { name: 'Adicionar contato' }),
+      );
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+      expect(sentContacts(put)).toEqual([JOANA]);
+    });
+
+    it('não salva a lista com o contato em edição sem nome', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts();
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Editar contato Joana Silva',
+        }),
+      );
+
+      const editing = within(
+        dialog.getByRole('group', { name: 'Editar contato de suporte' }),
+      );
+
+      await user.clear(editing.getByLabelText('Nome do contato'));
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      expect(editing.getByRole('alert')).toHaveTextContent(
+        'Informe o nome do contato.',
+      );
+      expect(editing.getByLabelText('Nome do contato')).toHaveFocus();
+      expect(put).not.toHaveBeenCalled();
+    });
+
+    it('mostra "Salvando..." e não envia duas vezes', async () => {
+      const user = userEvent.setup();
+      const { put } = mockContacts({
+        put: jest.fn(() => new Promise<Response>(() => {})),
+      });
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      await dialog.findByRole('list', { name: 'Contatos de suporte' });
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      const saving = dialog.getByRole('button', { name: 'Salvando...' });
+
+      expect(saving).toBeDisabled();
+      expect(dialog.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
+      expect(
+        dialog.getByRole('button', { name: 'Fechar janela' }),
+      ).toBeDisabled();
+
+      await user.click(saving);
+
+      expect(put).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [400, 'VALIDATION_ERROR', 'Informe um telefone válido para o contato.'],
+      [
+        403,
+        'FORBIDDEN',
+        'Acesso restrito ao administrador ou ao próprio paciente.',
+      ],
+      [404, 'PATIENT_NOT_FOUND', 'Paciente não encontrado.'],
+    ])(
+      'mostra no modal a message da API quando o PUT responde %s',
+      async (status, code, message) => {
+        const user = userEvent.setup();
+        mockContacts({
+          put: jest.fn().mockResolvedValue(
+            mockResponse({
+              status,
+              ok: false,
+              data: { status: code, message },
+            }),
+          ),
+        });
+
+        render(<PatientsPage />);
+        const dialog = await openContacts(user);
+
+        await dialog.findByRole('list', { name: 'Contatos de suporte' });
+        await user.click(
+          dialog.getByRole('button', { name: 'Salvar contatos' }),
+        );
+
+        expect(await dialog.findByRole('alert')).toHaveTextContent(message);
+        expect(
+          dialog.getByRole('button', { name: 'Salvar contatos' }),
+        ).toBeEnabled();
+      },
+    );
+
+    it('mostra a message da API quando o GET falha e tenta de novo', async () => {
+      const user = userEvent.setup();
+      const get = jest
+        .fn()
+        .mockResolvedValueOnce(
+          mockResponse({
+            status: 404,
+            ok: false,
+            data: {
+              status: 'PATIENT_NOT_FOUND',
+              message: 'Paciente não encontrado.',
+            },
+          }),
+        )
+        .mockResolvedValueOnce(profile([JOANA]));
+      mockContacts({ get });
+
+      render(<PatientsPage />);
+      const dialog = await openContacts(user);
+
+      expect(await dialog.findByRole('alert')).toHaveTextContent(
+        'Paciente não encontrado.',
+      );
+
+      await user.click(
+        dialog.getByRole('button', { name: 'Tentar novamente' }),
+      );
+
+      expect(
+        await dialog.findByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Joana Silva');
+      expect(get).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['GET', 'get'],
+      ['PUT', 'put'],
+    ] as const)(
+      'redireciona para o login quando o %s responde 401',
+      async (_method, handler) => {
+        const user = userEvent.setup();
+        const unauthorized = jest
+          .fn()
+          .mockResolvedValue(mockResponse({ status: 401, ok: false }));
+        mockContacts({ [handler]: unauthorized });
+
+        render(<PatientsPage />);
+        const dialog = await openContacts(user);
+
+        if (handler === 'put') {
+          await dialog.findByRole('list', { name: 'Contatos de suporte' });
+          await user.click(
+            dialog.getByRole('button', { name: 'Salvar contatos' }),
+          );
+        }
+
+        await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+      },
+    );
+  });
 });

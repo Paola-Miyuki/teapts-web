@@ -41,15 +41,21 @@ function mockApi({
   account = ACCOUNT,
   patch = jest.fn().mockResolvedValue(response(account)),
   password = jest.fn().mockResolvedValue(response({ status: 'OK' })),
+  contacts = jest.fn(),
 }: {
   account?: Account;
   patch?: jest.Mock;
   password?: jest.Mock;
+  contacts?: jest.Mock;
 } = {}) {
   (global.fetch as jest.Mock).mockImplementation(
     (url: string, init?: RequestInit) => {
       if (url === `${API}/me` && !init?.method) {
         return Promise.resolve(response(account));
+      }
+
+      if (url.endsWith('/support-contacts')) {
+        return contacts(url, init);
       }
 
       if (url === `${API}/me/password`) {
@@ -64,7 +70,7 @@ function mockApi({
     },
   );
 
-  return { patch, password };
+  return { patch, password, contacts };
 }
 
 async function renderProfile() {
@@ -356,5 +362,143 @@ describe('ProfilePage', () => {
         screen.getByRole('heading', { name: 'Maria Souza' }),
       ).toBeInTheDocument(),
     );
+  });
+
+  describe('contatos de suporte do paciente (RFPAC003)', () => {
+    const PATIENT: Account = {
+      ...ACCOUNT,
+      accountId: 'patient-uuid',
+      patientProfileId: 'patient-uuid',
+      professionalProfileIds: [],
+    };
+    const CONTACTS_URL = `${API}/patients/patient-uuid/support-contacts`;
+    const JOANA = { name: 'Joana Silva', phone: '(11) 98765-4321' };
+
+    function profile(supportContacts: unknown[]) {
+      return response({ accountId: 'patient-uuid', supportContacts });
+    }
+
+    it('não mostra a seção para quem não é paciente', async () => {
+      const { contacts } = mockApi();
+
+      await renderProfile();
+
+      expect(
+        screen.queryByRole('heading', { name: 'Contatos de suporte' }),
+      ).not.toBeInTheDocument();
+      expect(contacts).not.toHaveBeenCalled();
+    });
+
+    it('mostra os contatos do paciente e edita pelo modal', async () => {
+      const user = userEvent.setup();
+      const contacts = jest.fn((_url: string, init?: RequestInit) =>
+        Promise.resolve(
+          init?.method === 'PUT'
+            ? profile(
+                (
+                  JSON.parse(String(init.body)) as {
+                    supportContacts: unknown[];
+                  }
+                ).supportContacts,
+              )
+            : profile([JOANA]),
+        ),
+      );
+      mockApi({ account: PATIENT, contacts });
+
+      await renderProfile();
+
+      const section = within(
+        screen.getByRole('region', { name: 'Contatos de suporte' }),
+      );
+
+      expect(
+        await section.findByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Joana Silva');
+      // Na página, a lista é só para leitura.
+      expect(
+        section.queryByRole('button', { name: /Remover contato/ }),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        section.getByRole('button', { name: 'Editar contatos' }),
+      );
+
+      const dialog = within(
+        screen.getByRole('dialog', { name: 'Contatos de suporte' }),
+      );
+
+      await user.click(
+        await dialog.findByRole('button', {
+          name: 'Remover contato Joana Silva',
+        }),
+      );
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar contato' }),
+      );
+      await user.type(dialog.getByLabelText('Nome do contato'), 'Ana Lima');
+      await user.click(dialog.getByRole('button', { name: 'Salvar contatos' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        'Seus contatos de suporte foram atualizados.',
+      );
+      expect(
+        screen.queryByRole('dialog', { name: 'Contatos de suporte' }),
+      ).not.toBeInTheDocument();
+      expect(
+        section.getByRole('list', { name: 'Contatos de suporte' }),
+      ).toHaveTextContent('Ana Lima');
+      expect(section.queryByText('Joana Silva')).not.toBeInTheDocument();
+
+      const put = contacts.mock.calls.find(
+        ([, init]) => init?.method === 'PUT',
+      );
+
+      expect(put?.[0]).toBe(CONTACTS_URL);
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+        supportContacts: [{ name: 'Ana Lima' }],
+      });
+    });
+
+    it('avisa quando o paciente não tem contatos', async () => {
+      mockApi({
+        account: PATIENT,
+        contacts: jest.fn().mockResolvedValue(profile([])),
+      });
+
+      await renderProfile();
+
+      expect(
+        await screen.findByText('Nenhum contato de suporte cadastrado.'),
+      ).toBeInTheDocument();
+    });
+
+    it('mostra a message da API quando os contatos não carregam', async () => {
+      mockApi({
+        account: PATIENT,
+        contacts: jest
+          .fn()
+          .mockResolvedValue(
+            response({ status: 'FORBIDDEN', message: 'Acesso restrito.' }, 403),
+          ),
+      });
+
+      await renderProfile();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Acesso restrito.',
+      );
+    });
+
+    it('redireciona para o login quando os contatos respondem 401', async () => {
+      mockApi({
+        account: PATIENT,
+        contacts: jest.fn().mockResolvedValue(response(null, 401)),
+      });
+
+      await renderProfile();
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
   });
 });
