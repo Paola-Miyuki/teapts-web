@@ -1,9 +1,21 @@
 // Este arquivo expõe as rotas autenticadas de pacientes: a consulta de
-// pacientes autorizados e o cadastro do perfil de paciente (só admin).
-// O ValidationPipe global valida a query e o corpo, e o controller delega ao
-// PatientsService.
+// pacientes autorizados, o cadastro do perfil de paciente (só admin) e a
+// consulta e atualização dos contatos de suporte (admin ou o próprio
+// paciente). O ValidationPipe global valida a query e o corpo, e o controller
+// delega ao PatientsService.
 
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -29,11 +41,30 @@ import { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
 import { PatientResponseDto } from '../dto/patient-response.dto';
+import { UpdateSupportContactsRequestDto } from '../dto/update-support-contacts-request.dto';
 import { PatientsService } from '../services/patients.service';
 
+const parsePatientId = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: patientId',
+    }),
+});
+
+const SUPPORT_CONTACTS_FORBIDDEN_EXAMPLE = {
+  status: 'FORBIDDEN',
+  message: 'Acesso restrito ao administrador ou ao próprio paciente.',
+};
+
+const PATIENT_NOT_FOUND_EXAMPLE = {
+  status: 'PATIENT_NOT_FOUND',
+  message: 'Paciente não encontrado.',
+};
+
 /**
- * Expõe a consulta de pacientes autorizados e o cadastro de perfil de
- * paciente.
+ * Expõe a consulta de pacientes autorizados, o cadastro de perfil de
+ * paciente e os contatos de suporte.
  */
 @ApiTags('patients')
 @ApiCookieAuth()
@@ -170,5 +201,100 @@ export class PatientsController {
     @Body() body: CreatePatientRequestDto,
   ): Promise<PatientResponseDto> {
     return this.patientsService.create(body);
+  }
+
+  /**
+   * Consulta os contatos de suporte do paciente (RFPAC003). Só o admin ou o
+   * próprio paciente.
+   *
+   * @param account contexto da conta autenticada
+   * @param patientId accountId do perfil de paciente
+   * @returns perfil com os contatos atuais
+   */
+  @Get('patients/:patientId/support-contacts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: PatientResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: patientId',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: SUPPORT_CONTACTS_FORBIDDEN_EXAMPLE,
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: PATIENT_NOT_FOUND_EXAMPLE,
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar os contatos de suporte.',
+    },
+  })
+  async findSupportContacts(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+  ): Promise<PatientResponseDto> {
+    return this.patientsService.findSupportContacts(account, patientId);
+  }
+
+  /**
+   * Substitui a lista inteira de contatos de suporte do paciente (RFPAC003,
+   * DP012); lista vazia remove todos. Só o admin ou o próprio paciente.
+   * Contato de suporte não concede tutela nem acesso clínico (RN017).
+   *
+   * @param account contexto da conta autenticada
+   * @param patientId accountId do perfil de paciente
+   * @param body lista nova de contatos, já validada
+   * @returns perfil com os contatos gravados
+   */
+  @Put('patients/:patientId/support-contacts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: PatientResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      INVALID_PATIENT_ID: {
+        summary: 'patientId que não é UUID',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Parâmetro inválido: patientId',
+        },
+      },
+      INVALID_PHONE: {
+        summary: 'Contato com telefone inválido',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Informe um telefone válido para o contato.',
+        },
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: SUPPORT_CONTACTS_FORBIDDEN_EXAMPLE,
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: PATIENT_NOT_FOUND_EXAMPLE,
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível atualizar os contatos de suporte.',
+    },
+  })
+  async updateSupportContacts(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Body() body: UpdateSupportContactsRequestDto,
+  ): Promise<PatientResponseDto> {
+    return this.patientsService.updateSupportContacts(account, patientId, body);
   }
 }

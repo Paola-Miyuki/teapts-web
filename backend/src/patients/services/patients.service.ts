@@ -1,5 +1,6 @@
 // Este arquivo concentra as regras de pacientes: a consulta de pacientes
-// autorizados e o cadastro do perfil de paciente.
+// autorizados, o cadastro do perfil de paciente e a consulta e atualização
+// dos contatos de suporte.
 // A query da consulta fica no PatientsRepository; aqui ficam o erro seguro, a
 // conversão para o contrato público e os metadados da paginação.
 import {
@@ -22,6 +23,7 @@ import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-pati
 import type { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
 import type { SupportContactDto } from '../dto/support-contact.dto';
+import type { UpdateSupportContactsRequestDto } from '../dto/update-support-contacts-request.dto';
 import {
   type AuthorizedPatientsPage,
   PatientsRepository,
@@ -37,6 +39,38 @@ function patientProfileAlreadyExists(): ConflictException {
   return new ConflictException({
     status: 'PATIENT_PROFILE_ALREADY_EXISTS',
     message: 'A conta já possui perfil de paciente.',
+  });
+}
+
+/** Erro `404` de paciente inexistente. */
+function patientNotFound(): NotFoundException {
+  return new NotFoundException({
+    status: 'PATIENT_NOT_FOUND',
+    message: 'Paciente não encontrado.',
+  });
+}
+
+/**
+ * Garante que a conta é admin (RN022, mesma checagem do AdminGuard) ou o
+ * próprio paciente. Contato de suporte não entra aqui (RN017); o responsável
+ * tutelar entra quando a RFACL001 existir.
+ *
+ * Roda antes da busca do paciente para não revelar a quem não tem acesso se
+ * o paciente existe.
+ *
+ * @throws ForbiddenException `FORBIDDEN` para qualquer outra conta
+ */
+function assertCanManageSupportContacts(
+  account: AccountContext,
+  patientId: string,
+): void {
+  if (isAdmin(account) || account.patientProfileId === patientId) {
+    return;
+  }
+
+  throw new ForbiddenException({
+    status: 'FORBIDDEN',
+    message: 'Acesso restrito ao administrador ou ao próprio paciente.',
   });
 }
 
@@ -233,5 +267,88 @@ export class PatientsService {
     }
 
     return patient;
+  }
+
+  /**
+   * Consulta os contatos de suporte do paciente (RFPAC003).
+   *
+   * @param account contexto da conta autenticada
+   * @param patientId accountId do perfil de paciente, já validado como UUID
+   * @returns perfil com os contatos atuais
+   * @throws ForbiddenException `FORBIDDEN` quando a conta não é admin nem o
+   *   próprio paciente
+   * @throws NotFoundException `PATIENT_NOT_FOUND` quando o paciente não existe
+   * @throws InternalServerErrorException quando a consulta falha, sem expor o
+   *   erro original
+   */
+  async findSupportContacts(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<PatientResponseDto> {
+    assertCanManageSupportContacts(account, patientId);
+
+    let supportContacts: SupportContactDto[] | null;
+
+    try {
+      supportContacts =
+        await this.patientsRepository.findSupportContacts(patientId);
+    } catch (error) {
+      this.logger.error('Support contacts query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar os contatos de suporte.',
+      });
+    }
+
+    if (!supportContacts) {
+      throw patientNotFound();
+    }
+
+    return { accountId: patientId, supportContacts };
+  }
+
+  /**
+   * Substitui a lista inteira de contatos de suporte do paciente (RFPAC003,
+   * DP012); lista vazia remove todos. Não muda nenhuma permissão: contato de
+   * suporte não concede tutela nem acesso clínico (RN017).
+   *
+   * @param account contexto da conta autenticada
+   * @param patientId accountId do perfil de paciente, já validado como UUID
+   * @param request corpo já validado pelo ValidationPipe global
+   * @returns perfil com os contatos gravados
+   * @throws ForbiddenException `FORBIDDEN` quando a conta não é admin nem o
+   *   próprio paciente
+   * @throws NotFoundException `PATIENT_NOT_FOUND` quando o paciente não existe
+   * @throws InternalServerErrorException quando a gravação falha, sem expor o
+   *   erro original
+   */
+  async updateSupportContacts(
+    account: AccountContext,
+    patientId: string,
+    request: UpdateSupportContactsRequestDto,
+  ): Promise<PatientResponseDto> {
+    assertCanManageSupportContacts(account, patientId);
+
+    const supportContacts = request.supportContacts.map(toSupportContact);
+    let updated: boolean;
+
+    try {
+      updated = await this.patientsRepository.updateSupportContacts(
+        patientId,
+        supportContacts,
+      );
+    } catch (error) {
+      this.logger.error('Support contacts update failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível atualizar os contatos de suporte.',
+      });
+    }
+
+    if (!updated) {
+      throw patientNotFound();
+    }
+
+    return { accountId: patientId, supportContacts };
   }
 }
