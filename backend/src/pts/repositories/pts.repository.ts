@@ -3,6 +3,7 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 export interface ProfessionalRecord {
@@ -49,6 +50,15 @@ export interface ProposalDecisionTarget {
   id: string;
   status: PtsStateEnum;
   patientId: string;
+}
+
+export interface RemoveTeamMemberInput {
+  ptsId: string;
+  professionalId: string;
+  /** Autor do evento na timeline; nulo quando a ação vem do admin. */
+  authorProfessionalId: string | null;
+  /** Texto do evento na timeline. */
+  description: string;
 }
 
 /** Contrato de persistência dos PTS. */
@@ -105,4 +115,15 @@ export abstract class PtsRepository {
   ): Promise<PtsDecisionResponseDto>;
 
   abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;
+
+  /** PTS com responsável e equipe, em qualquer estado. */
+  abstract findPtsTeam(id: string): Promise<PtsTeamResponseDto | null>;
+
+  /**
+   * Remove o vínculo do profissional com o PTS e grava o evento na timeline,
+   * na mesma transação.
+   */
+  abstract removeTeamMember(
+    input: RemoveTeamMemberInput,
+  ): Promise<PtsTeamResponseDto>;
 }
