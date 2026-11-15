@@ -18,7 +18,9 @@ import {
   type UpdatePtsProposalInput,
   type SocialSituationTarget,
   type ProposalDecisionTarget,
+  type RemoveTeamMemberInput,
 } from './pts.repository';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
@@ -28,10 +30,18 @@ import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
+import { TimelineRecordEntity } from '../../timeline/entities/timeline-record.entity';
+import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
+import { TimelineRecordType } from '../../timeline/enums/timeline-record-type.enum';
 import {
   activePtsAlreadyExists,
+  cannotRemoveResponsible,
+  ptsNotActive,
+  ptsNotFound,
   ptsProposalNotDraft,
   ptsProposalNotPending,
+  teamEditForbidden,
+  teamMemberNotFound,
 } from '../pts.errors';
 
 @Injectable()
@@ -556,6 +566,118 @@ export class PtsRepositoryImpl extends PtsRepository {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  async findPtsTeam(id: string): Promise<PtsTeamResponseDto | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: {
+        responsible: { account: true },
+        team: { account: true },
+      },
+    });
+
+    return pts ? this.toTeamResponse(pts) : null;
+  }
+
+  async removeTeamMember(
+    input: RemoveTeamMemberInput,
+  ): Promise<PtsTeamResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava o PTS e refaz as checagens: uma transferência de
+      // responsabilidade ou um encerramento simultâneo não passam despercebidos.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        input.authorProfessionalId !== null &&
+        locked.responsibleProfessionalId !== input.authorProfessionalId
+      ) {
+        throw teamEditForbidden();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsNotActive();
+      }
+
+      if (locked.responsibleProfessionalId === input.professionalId) {
+        throw cannotRemoveResponsible();
+      }
+
+      const removed = await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from('professional_participating_on_therapeutic_journey')
+        .where('therapeutic_journey_id = :ptsId', { ptsId: input.ptsId })
+        .andWhere('professional_id = :professionalId', {
+          professionalId: input.professionalId,
+        })
+        .execute();
+
+      if (!removed.affected) {
+        throw teamMemberNotFound();
+      }
+
+      // Só o vínculo sai: registros feitos pelo profissional mantêm a autoria.
+      await queryRunner.manager.insert(TimelineRecordEntity, {
+        type: TimelineRecordType.Removed,
+        description: input.description,
+        targetId: input.ptsId,
+        targetType: TimelineRecordTarget.Pts,
+        projetoTerapeuticoSingularId: input.ptsId,
+        authorProfessionalId: input.authorProfessionalId,
+      });
+
+      const pts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: input.ptsId },
+        relations: {
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!pts) {
+        throw new Error('Erro ao recuperar o PTS atualizado.');
+      }
+
+      await queryRunner.commitTransaction();
+
+      return this.toTeamResponse(pts);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  private toTeamResponse(pts: PtsEntity): PtsTeamResponseDto {
+    return {
+      id: pts.id,
+      status: pts.status,
+      responsible: this.mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {

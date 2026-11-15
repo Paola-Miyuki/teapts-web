@@ -9,6 +9,8 @@ import { CreatePatientAndProfessional1791148860000 } from './migrations/17911488
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
+import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
+import { CreateTimelineRecord1791148890000 } from './migrations/1791148890000-CreateTimelineRecord';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -69,13 +71,14 @@ describe('getDatabaseOptions', () => {
 
   it('registers the entities and migrations explicitly', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
-      entities: [Account, Patient, Professional, Pts],
+      entities: [Account, Patient, Professional, Pts, TimelineRecord],
       migrations: [
         CreateAccount1791072000000,
         LinkAccountToSupertokens1791148800000,
         CreatePatientAndProfessional1791148860000,
         CreatePtsTables1791148870000,
         AddProfessionalAccountSpecialismUnique1791148880000,
+        CreateTimelineRecord1791148890000,
       ],
     });
   });
