@@ -4,22 +4,25 @@ import { Account } from '../accounts/entities/account.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
+import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
+import { CreateTimelineRecord1791148890000 } from './migrations/1791148890000-CreateTimelineRecord';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
 // precisa ser registrada aqui.
-const entities = [Account, Patient, Professional, Pts];
+const entities = [Account, Patient, Professional, Pts, TimelineRecord];
 const migrations = [
   CreateAccount1791072000000,
   LinkAccountToSupertokens1791148800000,
   CreatePatientAndProfessional1791148860000,
   CreatePtsTables1791148870000,
   AddProfessionalAccountSpecialismUnique1791148880000,
+  CreateTimelineRecord1791148890000,
 ];
 
 export function getDatabaseOptions(
