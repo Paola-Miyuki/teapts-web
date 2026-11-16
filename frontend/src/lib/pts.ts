@@ -50,3 +50,21 @@ export function getActivePts(patientId: string) {
 
   return request<ActivePts>(`/pts/active?${params.toString()}`);
 }
+
+
+export type UpdateSocialSituationResponse = {
+  id: string;
+  socialSituation: string;
+};
+
+// PATCH /pts/:id/social-situation (RFPTS005).
+export function updateSocialSituation(id: string, socialSituation: string) {
+  return request<UpdateSocialSituationResponse>(
+    `/pts/${encodeURIComponent(id)}/social-situation`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ socialSituation }),
+    },
+  );
+}

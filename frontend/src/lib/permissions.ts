@@ -14,6 +14,7 @@ export type PermissionAction =
   | 'viewPtsProposals'
   | 'viewActivePts'
   | 'viewPtsSocialSituation'
+  | 'editPtsSocialSituation'
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
@@ -121,6 +122,9 @@ export function can(
     case 'viewPtsSocialSituation':
       // DP003 – oculta para o paciente até a decisão.
       return professional;
+    case 'editPtsSocialSituation':
+      // RFPTS005 – profissional da equipe (responsável ou membro).
+      return professional && pts !== undefined && isProposalMember(user, pts);
     case 'createPts':
       // RFPTS001 – profissional.
       return professional;

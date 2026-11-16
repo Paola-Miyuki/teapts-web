@@ -19,6 +19,7 @@ import {
 
 import styles from '../pts.module.css';
 import PtsTeamList from './PtsTeamList';
+import SocialSituationDialog from './SocialSituationDialog';
 
 type PtsOverviewProps = {
   account: Account;
@@ -81,6 +82,8 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryKey, setRetryKey] = useState(0);
+  const [editingSocial, setEditingSocial] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const validPatientId = Boolean(patientId && UUID_PATTERN.test(patientId));
   const isOwnPts =
@@ -131,6 +134,17 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   function handleRetry() {
     setState({ kind: 'loading' });
     setRetryKey((current) => current + 1);
+  }
+
+  // RFPTS005 – fecha o diálogo, troca o texto na página e avisa.
+  function handleSocialSaved(socialSituation: string) {
+    setState((current) =>
+      current.kind === 'loaded'
+        ? { kind: 'loaded', pts: { ...current.pts, socialSituation } }
+        : current,
+    );
+    setEditingSocial(false);
+    setFeedback('Situação social atualizada.');
   }
 
   if (!patientId) {
@@ -205,11 +219,33 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
     !isOwnPts &&
     can(account, 'viewPtsSocialSituation') &&
     pts.socialSituation !== undefined;
+  const canEditSocialSituation =
+    showSocialSituation &&
+    can(account, 'editPtsSocialSituation', {
+      pts: {
+        status: pts.status,
+        responsibleProfessionalId: pts.responsible.id,
+        teamProfessionalIds: (pts.team ?? []).map((member) => member.id),
+      },
+    });
   const acceptedAt = formatDate(pts.acceptedAt);
   const beganAt = formatDate(pts.beganAt);
 
   return (
     <>
+      {feedback && (
+        <div
+          className={`${ui.alert} ${ui.alertSuccess} ${styles.feedback}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
+          </div>
+          <span>{feedback}</span>
+        </div>
+      )}
+
       <div className={styles.personBanner}>
         <span className={styles.patientAvatar}>
           <Image
@@ -282,6 +318,19 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
                 {pts.socialSituation?.trim() ||
                   'Nenhuma informação registrada.'}
               </p>
+
+              {canEditSocialSituation && (
+                <button
+                  type="button"
+                  className={`${ui.btn} ${ui.btnSecondary} ${styles.asideAction}`}
+                  onClick={() => {
+                    setFeedback('');
+                    setEditingSocial(true);
+                  }}
+                >
+                  Editar situação social
+                </button>
+              )}
             </>
           )}
 
@@ -293,6 +342,17 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
           </p>
         </aside>
       </div>
+
+      {canEditSocialSituation && (
+        <SocialSituationDialog
+          key={editingSocial ? 'open' : 'closed'}
+          open={editingSocial}
+          ptsId={pts.id}
+          currentValue={pts.socialSituation ?? ''}
+          onClose={() => setEditingSocial(false)}
+          onSaved={handleSocialSaved}
+        />
+      )}
     </>
   );
 }
