@@ -88,6 +88,26 @@ describe('can', () => {
     expect(can(admin, 'viewPtsSocialSituation')).toBe(true);
     expect(can(patient, 'viewPtsSocialSituation')).toBe(false);
   });
+  it('deixa só a equipe e o admin editarem a situação social (RFPTS005)', () => {
+    const active = {
+      status: 'planning',
+      responsibleProfessionalId: 'responsible-id',
+      teamProfessionalIds: ['professional-id'],
+    };
+
+    expect(can(professional, 'editPtsSocialSituation', { pts: active })).toBe(
+      true,
+    );
+    expect(
+      can(professional, 'editPtsSocialSituation', {
+        pts: { ...active, teamProfessionalIds: [] },
+      }),
+    ).toBe(false);
+    expect(can(professional, 'editPtsSocialSituation')).toBe(false);
+    expect(can(admin, 'editPtsSocialSituation', { pts: active })).toBe(true);
+    expect(can(patient, 'editPtsSocialSituation', { pts: active })).toBe(false);
+    expect(can(waiting, 'editPtsSocialSituation', { pts: active })).toBe(false);
+  });
 
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {

@@ -51,7 +51,6 @@ export function getActivePts(patientId: string) {
   return request<ActivePts>(`/pts/active?${params.toString()}`);
 }
 
-
 export type UpdateSocialSituationResponse = {
   id: string;
   socialSituation: string;

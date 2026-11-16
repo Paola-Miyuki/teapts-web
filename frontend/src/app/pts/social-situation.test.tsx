@@ -253,7 +253,7 @@ describe('Situação social (RFPTS005)', () => {
         'Somente profissionais da equipe podem alterar a situação social.',
       ),
     ).toBeInTheDocument();
-        expect(
+    expect(
       screen.getByRole('dialog', { name: 'Situação social' }),
     ).toBeInTheDocument();
     // O texto da página continua o antigo (o diálogo também mostra o texto).
