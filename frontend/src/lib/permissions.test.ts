@@ -76,6 +76,13 @@ describe('can', () => {
     expect(can(waiting, 'viewPtsProposals')).toBe(false);
   });
 
+  it('libera o PTS ativo ao paciente, ao profissional e ao admin (RFPTS004)', () => {
+    expect(can(patient, 'viewActivePts')).toBe(true);
+    expect(can(professional, 'viewActivePts')).toBe(true);
+    expect(can(admin, 'viewActivePts')).toBe(true);
+    expect(can(waiting, 'viewActivePts')).toBe(false);
+  });
+
   it('mantém a situação social oculta para o paciente (DP003)', () => {
     expect(can(professional, 'viewPtsSocialSituation')).toBe(true);
     expect(can(admin, 'viewPtsSocialSituation')).toBe(true);

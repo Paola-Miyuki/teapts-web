@@ -52,6 +52,21 @@ describe('getNavigation', () => {
     expect(labels(account({}))).not.toContain('PTS');
   });
 
+  it('mostra "Meu PTS" só para o paciente (RFPTS004)', () => {
+    expect(
+      getNavigation(account({ patientProfileId: 'patient' }), '/pts'),
+    ).toContainEqual({
+      href: '/pts',
+      icon: 'check',
+      label: 'Meu PTS',
+      current: true,
+    });
+    expect(
+      labels(account({ professionalProfileIds: ['professional'] })),
+    ).not.toContain('Meu PTS');
+    expect(labels(account({ role: 'admin' }))).not.toContain('Meu PTS');
+  });
+
   it('mantém o menu alinhado aos acessos de cada perfil', () => {
     expect(labels(account({ role: 'admin' }))).toEqual([
       'Início',
@@ -64,6 +79,7 @@ describe('getNavigation', () => {
     ).toEqual(['Início', 'Profissionais', 'PTS']);
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Meu cuidado',
+      'Meu PTS',
       'PTS',
     ]);
     expect(labels(account())).toEqual(['Início']);
