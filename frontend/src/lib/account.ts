@@ -88,6 +88,12 @@ export function getNavigation(account: Account, currentHref: string) {
     });
   }
 
+  // RFPTS004 – o paciente vê o próprio PTS ativo; o profissional chega a
+  // ele pela rota do paciente (/patients/[patientId]/pts).
+  if (can(account, 'viewOwnCare') && can(account, 'viewActivePts')) {
+    items.push({ href: '/pts', icon: 'check', label: 'Meu PTS' });
+  }
+
   if (can(account, 'viewPtsProposals')) {
     items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }
