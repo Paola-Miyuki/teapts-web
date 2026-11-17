@@ -42,6 +42,7 @@ type PtsProposalCardProps = {
   // Só o paciente decide: sem o callback, o card não mostra as ações.
   onDecide?: (proposalId: string, decision: ProposalDecision) => void;
   canEdit?: boolean;
+  onDelete?: (proposalId: string) => void;
 };
 
 export default function PtsProposalCard({
@@ -49,6 +50,7 @@ export default function PtsProposalCard({
   showSocialSituation = true,
   onDecide,
   canEdit = false,
+  onDelete,
 }: PtsProposalCardProps) {
   const profName =
     proposal.responsible?.name || 'Profissional não identificado';
@@ -89,6 +91,15 @@ export default function PtsProposalCard({
             >
               Editar proposta
             </Link>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className={`${ui.btn} ${ui.btnSecondary}`}
+              onClick={() => onDelete(proposal.id)}
+            >
+              Excluir proposta
+            </button>
           )}
         </div>
       </div>

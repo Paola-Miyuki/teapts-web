@@ -13,6 +13,7 @@ import Pagination from './Pagination';
 import PtsProposalCard from './PtsProposalCard';
 import EmptyState from './EmptyState';
 import ProposalDecisionDialog from './ProposalDecisionDialog';
+import DeletePtsProposalDialog from './DeletePtsProposalDialog';
 
 import type { PtsProposal } from './PtsProposalCard';
 import type { Patient, Professional } from '../../novo/types';
@@ -20,7 +21,7 @@ import {
   listAuthorizedPatients,
   listProfessionals,
 } from '../../novo/api/ptsApi';
-import { decideProposal, type ProposalDecision } from '../api';
+import { decideProposal, deleteProposal, type ProposalDecision } from '../api';
 import { ApiError } from '@/lib/api';
 
 // 1. Importamos a interface Account do sistema
@@ -96,6 +97,11 @@ export default function PtsProposalList({ account }: { account: Account }) {
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionError, setDecisionError] = useState('');
   const [decisionFeedback, setDecisionFeedback] = useState('');
+
+  // RFPTS008 – exclusão da proposta pelo responsável.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationData>({
@@ -331,6 +337,58 @@ export default function PtsProposalList({ account }: { account: Account }) {
     }
   }
 
+  function handleDelete(proposalId: string) {
+    setDeleteError('');
+    setDecisionFeedback('');
+    setPendingDeleteId(proposalId);
+  }
+
+  function handleDeleteClose() {
+    setPendingDeleteId(null);
+    setDeleteError('');
+  }
+
+  async function handleDeleteConfirm() {
+    // Sem clique duplo: um envio por vez.
+    if (!pendingDeleteId || deleteSubmitting) return;
+
+    let leaving = false;
+
+    setDeleteSubmitting(true);
+    setDeleteError('');
+
+    try {
+      await deleteProposal(pendingDeleteId);
+
+      setPendingDeleteId(null);
+      setDecisionFeedback('Proposta excluída.');
+      setProposals(null);
+
+      // Se era o último card de uma página que não é a primeira, volta uma.
+      if ((proposals?.length ?? 0) <= 1 && page > 1) {
+        setPage((current) => current - 1);
+      } else {
+        setProposalRetryKey((current) => current + 1);
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        leaving = true;
+        router.replace('/login');
+        return;
+      }
+
+      setDeleteError(
+        error instanceof ApiError && error.apiMessage
+          ? error.apiMessage
+          : 'Não foi possível excluir a proposta. Tente de novo.',
+      );
+    } finally {
+      if (!leaving) {
+        setDeleteSubmitting(false);
+      }
+    }
+  }
+
   function handlePageChange(newPage: number) {
     setProposals(null);
     setProposalError('');
@@ -553,6 +611,16 @@ export default function PtsProposalList({ account }: { account: Account }) {
                   responsibleProfessionalId: proposal.responsible?.id,
                 },
               })}
+              onDelete={
+                can(account, 'deletePtsProposal', {
+                  pts: {
+                    status: proposal.status?.toLowerCase(),
+                    responsibleProfessionalId: proposal.responsible?.id,
+                  },
+                })
+                  ? handleDelete
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -572,6 +640,14 @@ export default function PtsProposalList({ account }: { account: Account }) {
         error={decisionError}
         onConfirm={handleDecisionConfirm}
         onClose={handleDecisionClose}
+      />
+
+      <DeletePtsProposalDialog
+        open={pendingDeleteId !== null}
+        submitting={deleteSubmitting}
+        error={deleteError}
+        onConfirm={handleDeleteConfirm}
+        onClose={handleDeleteClose}
       />
     </div>
   );
