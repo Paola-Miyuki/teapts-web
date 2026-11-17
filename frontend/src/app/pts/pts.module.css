@@ -335,3 +335,11 @@
     flex: 1;
   }
 }
+
+/* Remover profissional da equipe (RFEM003) */
+.memberAction {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: 12px;
+}
