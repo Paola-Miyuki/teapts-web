@@ -15,10 +15,13 @@ import {
   getPtsStatusLabel,
   UUID_PATTERN,
   type ActivePts,
+  type PtsProfessional,
+  type PtsTeamResponse,
 } from '@/lib/pts';
 
 import styles from '../pts.module.css';
 import PtsTeamList from './PtsTeamList';
+import RemoveTeamMemberDialog from './RemoveTeamMemberDialog';
 import SocialSituationDialog from './SocialSituationDialog';
 
 type PtsOverviewProps = {
@@ -84,6 +87,9 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   const [retryKey, setRetryKey] = useState(0);
   const [editingSocial, setEditingSocial] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [removingMember, setRemovingMember] = useState<PtsProfessional | null>(
+    null,
+  );
 
   const validPatientId = Boolean(patientId && UUID_PATTERN.test(patientId));
   const isOwnPts =
@@ -145,6 +151,24 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
     );
     setEditingSocial(false);
     setFeedback('Situação social atualizada.');
+  }
+
+  // RFEM003 – mostra a equipe da resposta e avisa.
+  function handleMemberRemoved(team: PtsTeamResponse) {
+    setState((current) =>
+      current.kind === 'loaded'
+        ? {
+            kind: 'loaded',
+            pts: {
+              ...current.pts,
+              responsible: team.responsible,
+              team: team.team,
+            },
+          }
+        : current,
+    );
+    setRemovingMember(null);
+    setFeedback('Profissional removido da equipe.');
   }
 
   if (!patientId) {
@@ -228,6 +252,12 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
         teamProfessionalIds: (pts.team ?? []).map((member) => member.id),
       },
     });
+  const canRemoveTeamMember = can(account, 'removePtsTeamMember', {
+    pts: {
+      status: pts.status,
+      responsibleProfessionalId: pts.responsible.id,
+    },
+  });
   const acceptedAt = formatDate(pts.acceptedAt);
   const beganAt = formatDate(pts.beganAt);
 
@@ -268,7 +298,18 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
 
       <div className={styles.grid}>
         <div className={styles.main}>
-          <PtsTeamList responsible={pts.responsible} team={pts.team ?? []} />
+          <PtsTeamList
+            responsible={pts.responsible}
+            team={pts.team ?? []}
+            onRemove={
+              canRemoveTeamMember
+                ? (member) => {
+                    setFeedback('');
+                    setRemovingMember(member);
+                  }
+                : undefined
+            }
+          />
         </div>
 
         <aside className={styles.aside} aria-labelledby="pts-about-title">
@@ -351,6 +392,16 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
           currentValue={pts.socialSituation ?? ''}
           onClose={() => setEditingSocial(false)}
           onSaved={handleSocialSaved}
+        />
+      )}
+
+      {canRemoveTeamMember && (
+        <RemoveTeamMemberDialog
+          key={removingMember?.id ?? 'closed'}
+          ptsId={pts.id}
+          member={removingMember}
+          onClose={() => setRemovingMember(null)}
+          onRemoved={handleMemberRemoved}
         />
       )}
     </>
