@@ -1,14 +1,14 @@
-// Este arquivo testa a validação e a normalização da paginação de pacientes
+// Este arquivo testa a validação e a normalização da consulta de pacientes
 // autorizados antes que os parâmetros sejam enviados ao service.
 
 import { BadRequestException } from '@nestjs/common';
-import { createValidationPipe } from '../../common/validation/create-validation-pipe';
 import {
-  DEFAULT_AUTHORIZED_PATIENTS_LIMIT,
-  DEFAULT_AUTHORIZED_PATIENTS_PAGE,
-  GetAuthorizedPatientsRequestDto,
-  MAX_AUTHORIZED_PATIENTS_LIMIT,
-} from './get-authorized-patients-request.dto';
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+} from '../../common/pagination/pagination-query.dto';
+import { createValidationPipe } from '../../common/validation/create-validation-pipe';
+import { GetAuthorizedPatientsRequestDto } from './get-authorized-patients-request.dto';
 
 function normalize(query: Record<string, unknown>) {
   return createValidationPipe().transform(query, {
@@ -17,11 +17,18 @@ function normalize(query: Record<string, unknown>) {
   }) as Promise<GetAuthorizedPatientsRequestDto>;
 }
 
+async function rejection(query: Record<string, unknown>) {
+  const error: unknown = await normalize(query).catch((e: unknown) => e);
+
+  expect(error).toBeInstanceOf(BadRequestException);
+  return (error as BadRequestException).getResponse();
+}
+
 describe('GetAuthorizedPatientsRequestDto', () => {
-  it('applies the default pagination', async () => {
+  it('applies the shared default pagination', async () => {
     await expect(normalize({})).resolves.toEqual({
-      page: DEFAULT_AUTHORIZED_PATIENTS_PAGE,
-      limit: DEFAULT_AUTHORIZED_PATIENTS_LIMIT,
+      page: DEFAULT_PAGE,
+      limit: DEFAULT_PAGE_LIMIT,
     });
   });
 
@@ -32,49 +39,72 @@ describe('GetAuthorizedPatientsRequestDto', () => {
     });
   });
 
-  it('trims the name', async () => {
-    await expect(normalize({ name: '  Maria  ' })).resolves.toMatchObject({
-      name: 'Maria',
+  it('trims the search term', async () => {
+    await expect(normalize({ q: '  Maria  ' })).resolves.toMatchObject({
+      q: 'Maria',
     });
   });
 
-  it.each(['', '   '])('treats name %j as not informed', async (name) => {
-    const result = await normalize({ name });
+  it.each(['', '   '])('treats q %j as not informed', async (q) => {
+    const result = await normalize({ q });
 
-    expect(result.name).toBeUndefined();
+    expect(result.q).toBeUndefined();
   });
 
-  it('rejects a repeated name parameter', async () => {
-    const error: unknown = await normalize({ name: ['a', 'b'] }).catch(
-      (e: unknown) => e,
-    );
-
-    expect(error).toBeInstanceOf(BadRequestException);
-    expect((error as BadRequestException).getResponse()).toEqual({
+  it('rejects a repeated q parameter', async () => {
+    await expect(rejection({ q: ['a', 'b'] })).resolves.toEqual({
       status: 'ERROR',
-      message: 'Parâmetro inválido: name',
+      message: 'Parâmetro inválido: q',
+    });
+  });
+
+  it('accepts the status as a comma list or a repeated parameter', async () => {
+    await expect(normalize({ status: 'running,none' })).resolves.toMatchObject({
+      status: ['running', 'none'],
+    });
+    await expect(
+      normalize({ status: ['concluded', 'cancelled', 'concluded'] }),
+    ).resolves.toMatchObject({ status: ['concluded', 'cancelled'] });
+  });
+
+  it('accepts the filters and the ordering', async () => {
+    await expect(
+      normalize({
+        responsibleProfessionalId: '7d0e8f2a-1c3b-4d5e-8f90-a1b2c3d4e5f6',
+        registeredFrom: '2026-10-01',
+        registeredTo: '2026-11-23',
+        sort: 'registeredAt',
+        order: 'desc',
+      }),
+    ).resolves.toMatchObject({
+      responsibleProfessionalId: '7d0e8f2a-1c3b-4d5e-8f90-a1b2c3d4e5f6',
+      registeredFrom: '2026-10-01',
+      registeredTo: '2026-11-23',
+      sort: 'registeredAt',
+      order: 'desc',
     });
   });
 
   it('accepts the maximum limit', async () => {
     await expect(
-      normalize({ limit: String(MAX_AUTHORIZED_PATIENTS_LIMIT) }),
-    ).resolves.toMatchObject({ limit: 100 });
+      normalize({ limit: String(MAX_PAGE_LIMIT) }),
+    ).resolves.toMatchObject({ limit: 50 });
   });
 
   it.each([
     ['page', { page: '0' }],
-    ['page', { page: '-1' }],
     ['page', { page: 'abc' }],
     ['page', { page: '1.5' }],
     ['limit', { limit: '0' }],
-    ['limit', { limit: 'invalid' }],
-    ['limit', { limit: '101' }],
+    ['limit', { limit: '51' }],
+    ['status', { status: 'active' }],
+    ['responsibleProfessionalId', { responsibleProfessionalId: 'abc' }],
+    ['registeredFrom', { registeredFrom: '01/10/2026' }],
+    ['registeredTo', { registeredTo: '2026-11' }],
+    ['sort', { sort: 'email' }],
+    ['order', { order: 'up' }],
   ])('rejects an invalid %s parameter', async (parameter, query) => {
-    const error: unknown = await normalize(query).catch((e: unknown) => e);
-
-    expect(error).toBeInstanceOf(BadRequestException);
-    expect((error as BadRequestException).getResponse()).toEqual({
+    await expect(rejection(query)).resolves.toEqual({
       status: 'ERROR',
       message: `Parâmetro inválido: ${parameter}`,
     });

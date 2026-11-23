@@ -30,6 +30,7 @@ import {
   secondaryBtnCls,
 } from './styles';
 import type { Patient, Professional, Pts } from './types';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
@@ -123,6 +124,31 @@ export function CreatePts({ account }: CreatePtsProps) {
 
     return () => controller.abort();
   }, [account?.professionalProfileIds, account?.role, reloadKey]);
+
+  // Busca de pacientes pelo nome, com debounce (NFUS003): a lista traz só a
+  // primeira página, então o nome refina quem aparece no select.
+  const patientSearch = useDebouncedSearch();
+  const patientTerm = patientSearch.term;
+  const [searchedTerm, setSearchedTerm] = useState('');
+
+  useEffect(() => {
+    if (loadStatus !== 'ready' || patientTerm === searchedTerm) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    listEligiblePatients(controller.signal, patientTerm)
+      .then((loaded) => {
+        if (!controller.signal.aborted) {
+          setPatients(loaded);
+          setSearchedTerm(patientTerm);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [loadStatus, patientTerm, searchedTerm]);
 
   useEffect(() => {
     if (submitError) {
@@ -393,6 +419,8 @@ export function CreatePts({ account }: CreatePtsProps) {
               <>
                 <PatientSelect
                   patients={patients}
+                  search={patientSearch.input}
+                  onSearch={patientSearch.setInput}
                   value={patientId}
                   disabled={isLoading}
                   error={fieldErrors.patient}

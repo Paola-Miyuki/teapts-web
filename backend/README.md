@@ -90,21 +90,24 @@ src/
     repositories/professionals.repository.ts   query com filtros e paginação; gravação
                                                do perfil
     dto/                                       contratos e validação da consulta e do cadastro
-    entities/professional.entity.ts            unique (accountId, specialism)
+    entities/professional.entity.ts            unique (account_id): um perfil por conta
     enums/specialism.enum.ts                   specialism_e
   patients/
-    controllers/patients.controller.ts         GET /patients/authorized e
-                                               GET /patients/available-for-pts protegidos por
+    controllers/patients.controller.ts         GET /patients/authorized,
+                                               GET /patients/available-for-pts e
+                                               GET /patients/:id protegidos por
                                                sessão e POST /patients, só admin
-    services/patients.service.ts               consulta (erro seguro, contrato e paginação)
-                                               e cadastro do perfil de paciente
-    repositories/patients.repository.ts        query de autorização e paginação (admin: todos); gravação do
-                                               perfil (supportContacts como jsonb[])
+    services/patients.service.ts               escopo por papel (RN016, RN022), contrato,
+                                               erro seguro e cadastro do perfil de paciente
+    repositories/patients.repository.ts        lista com status do PTS, busca, filtros,
+                                               ordenação e paginação; detalhe; gravação do
+                                               perfil e dos contatos numa transação
     dto/                                       contratos e validação da consulta e do cadastro
-    entities/patient.entity.ts
+    entities/patient.entity.ts                 FK para account com ON DELETE RESTRICT
+    entities/support-contact.entity.ts         contatos de suporte (tabela support_contact)
   pts/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
-                                               GET /pts/active, PATCH /pts/proposals/:id,
+                                               GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
                                                PATCH /pts/:id/social-situation e POST
                                                /pts/proposals/:id/approve e /reject, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
@@ -162,13 +165,15 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/accounts` | admin | [GET /accounts](#get-accounts) |
 | GET | `/patients/authorized` | profissional (admin vê todos os pacientes) | [GET /patients/authorized](#get-patientsauthorized) |
 | GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
+| GET | `/patients/:id` | admin ou profissional com acesso (RN016) | [GET /patients/:id](#get-patientsid) |
 | POST | `/patients` | admin | [POST /patients](#post-patients) |
-| GET | `/professionals` | conta da sessão | Swagger |
+| GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
 | GET | `/pts/proposals?patientId=` | paciente titular, profissional da proposta ou admin | Swagger |
 | GET | `/pts/proposals/:id` | paciente titular, profissional da proposta ou admin | Swagger |
 | GET | `/pts/active?patientId=` | paciente titular, membro da equipe ou admin | [GET /pts/active](#get-ptsactive) |
+| GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
@@ -176,26 +181,48 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 
 ## GET /patients/authorized
 
-Exige sessão autenticada e lista pacientes vinculados a PTS em estado
-`planning` ou `running` (`PtsStateEnum`), nos quais o profissional logado é
-responsável ou participa da equipe. O admin recebe todos os pacientes
-cadastrados, com ou sem PTS (RN022).
+Exige sessão autenticada. O admin recebe todos os pacientes cadastrados, com ou
+sem PTS (RN022). O profissional recebe os pacientes dos PTS em `planning`,
+`running`, `concluded` ou `cancelled` de que é ou foi responsável ou membro da
+equipe (RN016); `draft` e `rejected` não dão acesso. Conta sem perfil
+profissional, que não é admin, recebe `403` (`FORBIDDEN`).
 
-Parâmetros de query:
+Parâmetros de query (paginação de `common/pagination`):
 
-- `page`: página, padrão `1`, mínimo `1`;
-- `limit`: quantidade por página, padrão `10`, mínimo `1` e máximo `100`;
-- `name`: opcional, busca parcial no nome do paciente, sem diferenciar
-  maiúsculas de minúsculas; aplica `trim`, trata `%`, `_` e `\` como texto e,
-  vazio ou só com espaços, equivale a sem busca. Vale também para o admin.
+- `page`: padrão `1`, mínimo `1`;
+- `limit`: padrão `20`, mínimo `1` e máximo `50`;
+- `q`: opcional, busca parcial por nome, nome social, e-mail, CNS ou CPF, sem
+  diferenciar maiúsculas; com só dígitos e pontuação, compara também os
+  dígitos do CPF e do CNS. Trata `%`, `_` e `\` como texto; vazio equivale a
+  sem busca;
+- `status`: opcional, lista separada por vírgula de `draft`, `planning`,
+  `running`, `concluded`, `cancelled`, `rejected` e `none` (sem PTS). O
+  profissional só filtra entre `planning`, `running`, `concluded` e
+  `cancelled`; os outros valores são ignorados para ele;
+- `responsibleProfessionalId`: opcional, perfil profissional responsável por
+  um PTS do paciente (menos os rejeitados);
+- `registeredFrom` e `registeredTo`: opcionais, `AAAA-MM-DD`, inclusive;
+- `sort`: `name` (padrão) ou `registeredAt`; `order`: `asc` (padrão) ou `desc`.
 
-Não usa a paginação de `common/pagination` (máximo `50`) porque o `pts/novo`
-pede `limit=100`.
+O status do PTS de cada paciente é o do PTS ativo; sem ele, o do mais recente
+sem contar os rejeitados; só com rejeitados, `rejected`; sem PTS, `null`.
 
-A resposta contém `{ data: [{ id, name }], pagination: { page, limit, total,
-totalPages } }`; `id` é um UUID (`string`). Os erros possíveis são `400`
-(`Parâmetro inválido: X`), `401` (sem sessão) e `500`
-(`Não foi possível consultar os pacientes autorizados.`).
+A resposta contém `{ data: [{ id, name, socialName, email, cns, guardianName,
+registeredAt, ptsStatus, activePtsId, readOnly }], pagination: { page, limit,
+total, totalPages } }`. `readOnly` é `true` para o profissional quando o
+acesso vem só de PTS concluído ou cancelado (RN024); campo ainda vazio vem
+como `null`. Os erros possíveis são `400` (`Parâmetro inválido: X`), `401`
+(sem sessão), `403` e `500` (`Não foi possível consultar os pacientes
+autorizados.`).
+
+## GET /patients/:id
+
+Detalhe do paciente, com o escopo da lista acima: o admin abre qualquer
+paciente; o profissional, só os do seu acesso. A resposta tem os campos da
+lista e mais `cpf` e `supportContacts` (`[{ name, description?, email?,
+phone? }]`). Os erros possíveis são `400` (`Parâmetro inválido: id`, id que
+não é UUID), `401`, `403` (`FORBIDDEN`, fora do acesso ou conta sem perfil
+profissional), `404` (`PATIENT_NOT_FOUND`) e `500`.
 
 ## GET /patients/available-for-pts
 
@@ -205,8 +232,9 @@ pacientes que podem receber uma nova proposta: os que não têm PTS em
 vínculo prévio com o paciente; é a lista que o `pts/novo` usa para escolher o
 paciente.
 
-Usa os mesmos parâmetros e a mesma resposta de `GET /patients/authorized`, mas
-ignora o `name`.
+Usa a paginação de `common/pagination` (padrão `20`, máximo `50`) e o `name`
+opcional (busca parcial pelo nome). A resposta contém `{ data: [{ id, name }],
+pagination }`.
 Os erros possíveis são `400` (`Parâmetro inválido: X`), `401` (sem sessão),
 `403` (`FORBIDDEN`, conta sem perfil profissional e que não é admin) e `500`
 (`Não foi possível consultar os pacientes disponíveis.`).
@@ -226,6 +254,15 @@ beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
 `null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
 (sem sessão), `403` (`FORBIDDEN`) e, para o próprio paciente e para o admin,
 `404` (`ACTIVE_PTS_NOT_FOUND`).
+
+## GET /pts/:id
+
+Exige sessão autenticada e devolve o PTS em qualquer estado (RFPTS009), com
+`rejectedAt`, `concludedAt` e `cancelledAt` além dos campos de `GET
+/pts/active`. O admin abre qualquer PTS; o profissional responsável ou membro
+da equipe, menos o PTS rejeitado (RN016); o paciente titular, os próprios PTS,
+sem `socialSituation` (RN028). Os erros possíveis são `400` (`Parâmetro
+inválido: id`), `401`, `403` (`FORBIDDEN`) e `404` (`PTS_NOT_FOUND`).
 
 ## GET /accounts
 
@@ -332,8 +369,8 @@ perfil só aparece como paciente depois de um novo login.
 ## POST /professionals
 
 Exige sessão autenticada com papel `admin` e cria um perfil profissional para
-uma conta de usuário comum (RFPRO002). Uma conta pode ter vários perfis
-profissionais, um por especialidade (RN002).
+uma conta de usuário comum (RFPRO002). Uma conta tem no máximo um perfil
+profissional (RN002).
 
 Corpo:
 
@@ -354,9 +391,9 @@ ordem de checagem, com:
 
 - `ADMIN_ACCOUNT_NOT_ALLOWED`: conta de administrador;
 - `ACCOUNT_HAS_PATIENT_PROFILE`: conta que já tem perfil de paciente;
-- `PROFESSIONAL_PROFILE_ALREADY_EXISTS`: conta que já tem perfil com a mesma
-  especialidade. A restrição única `UQ_professional_account_specialism`
-  (`accountId`, `specialism`) garante a regra também em pedidos simultâneos.
+- `PROFESSIONAL_PROFILE_ALREADY_EXISTS`: conta que já tem perfil
+  profissional. A restrição única `UQ_professional_account` (`account_id`)
+  garante a regra também em pedidos simultâneos.
 
 A regra entre paciente e profissional fica só na aplicação: um `POST
 /patients` e um `POST /professionals` simultâneos na mesma conta podem passar

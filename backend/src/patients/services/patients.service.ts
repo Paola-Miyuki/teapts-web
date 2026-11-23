@@ -19,11 +19,21 @@ import { isAdmin } from '../../auth/account-context';
 import { toPagination } from '../../common/pagination/pagination';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
-import type { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
+import type {
+  AuthorizedPatientResponseDto,
+  GetAuthorizedPatientsResponseDto,
+} from '../dto/get-authorized-patients-response.dto';
+import type { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-request.dto';
+import type { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
+import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
+import type { SupportContact } from '../entities/support-contact.entity';
 import type { SupportContactDto } from '../dto/support-contact.dto';
 import {
   type AuthorizedPatientsPage,
+  type PatientRow,
+  type PatientScope,
+  type PatientsPage,
   PatientsRepository,
 } from '../repositories/patients.repository';
 
@@ -70,6 +80,60 @@ function toSupportContact(contact: SupportContactDto): SupportContactDto {
 /**
  * Consulta pacientes autorizados e cadastra perfis de paciente.
  */
+function forbiddenPatient(): ForbiddenException {
+  return new ForbiddenException({
+    status: 'FORBIDDEN',
+    message: 'Acesso restrito ao profissional.',
+  });
+}
+
+/**
+ * Escopo de quem consulta: o administrador vê todos (RN022); o profissional,
+ * os pacientes dos PTS de que faz ou fez parte (RN016). Conta sem perfil
+ * profissional, que não seja de administrador, recebe 403 (RFPAC002.E04).
+ */
+function patientScope(account: AccountContext): PatientScope {
+  if (isAdmin(account)) {
+    return { kind: 'all' };
+  }
+
+  if (account.professionalProfileIds.length === 0) {
+    throw forbiddenPatient();
+  }
+
+  return { kind: 'professional', accountId: account.accountId };
+}
+
+function toSupportContactResponse(contact: SupportContact): SupportContactDto {
+  return {
+    name: contact.name,
+    ...(contact.description !== null && { description: contact.description }),
+    ...(contact.email !== null && { email: contact.email }),
+    ...(contact.phone !== null && { phone: contact.phone }),
+  };
+}
+
+function toIsoDate(value: Date | string): string {
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
+}
+
+function toAuthorizedPatient(row: PatientRow): AuthorizedPatientResponseDto {
+  return {
+    id: row.patient_id,
+    name: row.account_name,
+    socialName: row.social_name,
+    email: row.email,
+    cns: row.cns,
+    guardianName: row.guardian_name,
+    registeredAt: toIsoDate(row.registered_at),
+    ptsStatus: row.pts_status,
+    activePtsId: row.active_pts_id,
+    readOnly: row.read_only === true,
+  };
+}
+
 @Injectable()
 export class PatientsService {
   private readonly logger = new Logger(PatientsService.name);
@@ -95,15 +159,14 @@ export class PatientsService {
     account: AccountContext,
     request: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
-    let page: AuthorizedPatientsPage;
+    const scope = patientScope(account);
+    let page: PatientsPage;
 
     try {
-      page = isAdmin(account)
-        ? await this.patientsRepository.findAllPaginated(request)
-        : await this.patientsRepository.findAuthorizedPaginated(
-            account.accountId,
-            request,
-          );
+      page = await this.patientsRepository.findPatientsPaginated(
+        scope,
+        request,
+      );
     } catch (error) {
       this.logger.error('Authorized patients query failed', error);
       throw new InternalServerErrorException({
@@ -112,26 +175,67 @@ export class PatientsService {
       });
     }
 
-    const { rows, total } = page;
-
     return {
-      data: rows.map((row) => ({
-        id: row.patient_id,
-        name: row.account_name,
-      })),
-      pagination: toPagination(request, total),
+      data: page.rows.map(toAuthorizedPatient),
+      pagination: toPagination(request, page.total),
     };
   }
 
-  /**
-   * Busca pacientes disponíveis para criação de uma nova proposta de PTS.
-   * Só a conta com perfil profissional ou o administrador consulta (RFPTS001,
-   * RN022).
-   */
+  async findOne(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<PatientDetailResponseDto> {
+    const scope = patientScope(account);
+    let row: PatientRow | null;
+    let exists: boolean;
+
+    try {
+      exists = await this.patientsRepository.patientExists(patientId);
+      row = exists
+        ? await this.patientsRepository.findPatient(scope, patientId)
+        : null;
+    } catch (error) {
+      this.logger.error('Patient detail query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar o paciente.',
+      });
+    }
+
+    if (!exists) {
+      throw new NotFoundException({
+        status: 'PATIENT_NOT_FOUND',
+        message: 'Paciente não encontrado.',
+      });
+    }
+
+    if (!row) {
+      throw forbiddenPatient();
+    }
+
+    let contacts: SupportContact[];
+
+    try {
+      contacts = await this.patientsRepository.findSupportContacts(patientId);
+    } catch (error) {
+      this.logger.error('Patient support contacts query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar o paciente.',
+      });
+    }
+
+    return {
+      ...toAuthorizedPatient(row),
+      cpf: row.cpf,
+      supportContacts: contacts.map(toSupportContactResponse),
+    };
+  }
+
   async findAvailableForPts(
     account: AccountContext,
-    request: GetAuthorizedPatientsRequestDto,
-  ): Promise<GetAuthorizedPatientsResponseDto> {
+    request: GetAvailablePatientsRequestDto,
+  ): Promise<GetAvailablePatientsResponseDto> {
     if (!isAdmin(account) && account.professionalProfileIds.length === 0) {
       throw new ForbiddenException({
         status: 'FORBIDDEN',

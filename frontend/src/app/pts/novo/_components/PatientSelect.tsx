@@ -11,6 +11,8 @@ import {
 
 interface Props {
   patients: Patient[];
+  search: string;
+  onSearch: (value: string) => void;
   value: string;
   onChange: (value: string) => void;
   error?: string;
@@ -19,6 +21,8 @@ interface Props {
 
 export function PatientSelect({
   patients,
+  search,
+  onSearch,
   value,
   onChange,
   error,
@@ -26,6 +30,18 @@ export function PatientSelect({
 }: Props) {
   return (
     <div className={fieldCls}>
+      <label htmlFor="patient-search" className={labelCls}>
+        Buscar paciente
+      </label>
+      <input
+        id="patient-search"
+        type="search"
+        value={search}
+        disabled={disabled}
+        placeholder="Nome do paciente"
+        onChange={(e) => onSearch(e.target.value)}
+        className={inputCls(false)}
+      />
       <label htmlFor="patient" className={labelCls}>
         Paciente
       </label>

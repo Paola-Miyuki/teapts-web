@@ -5,11 +5,11 @@ import { BadRequestException } from '@nestjs/common';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
 import { Specialism } from '../enums/specialism.enum';
 import {
-  DEFAULT_PROFESSIONALS_LIMIT,
-  DEFAULT_PROFESSIONALS_PAGE,
-  GetProfessionalsRequestDto,
-  MAX_PROFESSIONALS_LIMIT,
-} from './get-professionals-request.dto';
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_LIMIT,
+  MAX_PAGE_LIMIT,
+} from '../../common/pagination/pagination-query.dto';
+import { GetProfessionalsRequestDto } from './get-professionals-request.dto';
 
 // A query passa pelo mesmo pipe global usado pela aplicação.
 function normalize(query: Record<string, unknown>) {
@@ -24,8 +24,8 @@ describe('GetProfessionalsRequestDto', () => {
   // Garante que a consulta use os valores padrão quando a paginação não é informada.
   it('applies the default pagination', async () => {
     await expect(normalize({})).resolves.toEqual({
-      page: DEFAULT_PROFESSIONALS_PAGE,
-      limit: DEFAULT_PROFESSIONALS_LIMIT,
+      page: DEFAULT_PAGE,
+      limit: DEFAULT_PAGE_LIMIT,
       name: undefined,
       specialism: undefined,
       ids: undefined,
@@ -37,8 +37,8 @@ describe('GetProfessionalsRequestDto', () => {
     const result = await normalize({ page: '', limit: '', specialism: '' });
 
     expect(result).toMatchObject({
-      page: DEFAULT_PROFESSIONALS_PAGE,
-      limit: DEFAULT_PROFESSIONALS_LIMIT,
+      page: DEFAULT_PAGE,
+      limit: DEFAULT_PAGE_LIMIT,
     });
     expect(result.specialism).toBeUndefined();
   });
@@ -86,7 +86,7 @@ describe('GetProfessionalsRequestDto', () => {
     ['page', { page: '0' }],
     ['page', { page: '1.5' }],
     ['limit', { limit: '0' }],
-    ['limit', { limit: String(MAX_PROFESSIONALS_LIMIT + 1) }],
+    ['limit', { limit: String(MAX_PAGE_LIMIT + 1) }],
     ['limit', { limit: 'invalid' }],
     ['name', { name: '   ' }],
     ['specialism', { specialism: 'invalid' }],
@@ -101,15 +101,16 @@ describe('GetProfessionalsRequestDto', () => {
     });
   });
 
-  // Mantém a ordem da validação: o primeiro parâmetro inválido é o reportado.
-  it('reports the first invalid parameter in declaration order', async () => {
+  // Com a paginação herdada do PaginationQueryDto, os filtros da rota são
+  // validados antes de page e limit; o primeiro inválido é o reportado.
+  it('reports the first invalid parameter in validation order', async () => {
     const error: unknown = await normalize({
       ids: 'not-a-uuid',
       limit: '0',
     }).catch((e: unknown) => e);
 
     expect((error as BadRequestException).getResponse()).toMatchObject({
-      message: 'Parâmetro inválido: limit',
+      message: 'Parâmetro inválido: ids',
     });
   });
 });

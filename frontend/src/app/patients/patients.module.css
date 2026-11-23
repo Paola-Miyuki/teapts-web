@@ -1,93 +1,5 @@
-/* Tela "Pacientes": cabeçalho com ação, como em frontend/design/pacientes.html,
-   lista no padrão da tela de profissionais e modal "Adicionar paciente" com
-   os campos e o contato de frontend/design/criar-paciente.html. */
-
-.heading {
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.create {
-  flex: none;
-  gap: 8px;
-}
-
 .success {
   margin-bottom: 18px;
-}
-
-.tableCard {
-  overflow: hidden;
-}
-
-.tableHeader {
-  padding: 20px 22px;
-  border-bottom: 1px solid var(--border);
-}
-
-.tableHeader h2 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.tableHeader p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.patientCell {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 14px 22px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.patientCell:last-child {
-  border-bottom: 0;
-}
-
-.patientCell:hover {
-  background: var(--bg);
-}
-
-.patientCell strong {
-  display: block;
-  font-weight: 600;
-}
-
-.patientCell small {
-  display: block;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.avatar {
-  width: 38px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  flex: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  font-family: var(--font-mono);
-  font-size: 12px;
 }
 
 .loader {
@@ -110,19 +22,6 @@
   .loader {
     animation-duration: 2.4s;
   }
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 18px;
-}
-
-.pagination span {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .field {
@@ -266,30 +165,16 @@
 }
 
 @media (max-width: 640px) {
-  .heading {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .pagination {
-    justify-content: center;
-  }
 
   .contactGrid,
-  .contactData {
+.contactData {
     grid-template-columns: 1fr;
   }
 
   .formActions > *,
-  .contactActions > * {
+.contactActions > * {
     flex: 1;
   }
-}
-
-/* Busca por nome ou e-mail (campo de pacientes.html) e combobox da conta */
-
-.searchBlock {
-  margin-bottom: 18px;
 }
 
 .search {
@@ -298,31 +183,10 @@
   align-items: center;
 }
 
-.searchIcon {
-  position: absolute;
-  top: 50%;
-  left: 14px;
-  width: 16px;
-  height: 16px;
-  color: var(--muted);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 /* Seletores com mais especificidade que .input (ui.module.css), senão o
    padding do campo ignora o espaço do ícone e do ✕. */
-.search .searchInput,
 .search .comboboxInput {
   padding-right: 48px;
-}
-
-.search .searchInput {
-  padding-left: 40px;
-}
-
-/* O ✕ próprio substitui o do navegador. */
-.searchInput::-webkit-search-cancel-button {
-  display: none;
 }
 
 .searchClear {
@@ -393,12 +257,4 @@
 .refreshing {
   opacity: 0.6;
   transition: opacity 0.15s ease;
-}
-
-.footNote {
-  margin: 0;
-  padding: 14px 22px;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 13px;
 }

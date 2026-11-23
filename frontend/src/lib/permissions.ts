@@ -122,8 +122,8 @@ export function can(
       return professional;
     case 'approvePtsProposal':
     case 'rejectPtsProposal':
-      // RFPTS003 – paciente titular, só em DRAFT.
-      // TODO(DP002): liberar o responsável tutelar depois de modelar o vínculo.
+      // RFPTS003 – paciente titular, só em DRAFT. O responsável tutelar não
+      // é ator do sistema (RN025).
       return patient && pts?.status === 'draft';
     case 'editPtsProposal':
       // RFPTS005 – profissional responsável, só em DRAFT.

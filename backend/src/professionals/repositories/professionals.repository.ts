@@ -57,7 +57,7 @@ export class ProfessionalsRepository {
   ): Promise<ProfessionalsPage> {
     const query = this.professionalRepository
       .createQueryBuilder('professional')
-      .innerJoin(Account, 'account', 'account.id = professional."accountId"')
+      .innerJoin(Account, 'account', 'account.id = professional.accountId')
       .select([
         'professional.id AS professional_id',
         'professional.specialism AS professional_specialism',
@@ -98,7 +98,7 @@ export class ProfessionalsRepository {
    * @param professional conta e especialidade já validadas pelo service
    * @returns id gerado para o perfil
    * @throws erro do banco, sem tratamento (ex.: `23505` na restrição única
-   *   `(accountId, specialism)`)
+   *   `UQ_professional_account`)
    */
   async insert(
     professional: Pick<Professional, 'accountId' | 'specialism'>,

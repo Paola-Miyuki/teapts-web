@@ -2,12 +2,12 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 .PHONY: help env install \
-	up up-d up-d-db wait-backend rebuild rebuild-no-cache rebuild-backend rebuild-frontend rebuild-frontend-no-cache \
+	up up-d up-d-db stop start wait-backend rebuild rebuild-no-cache rebuild-backend rebuild-frontend rebuild-frontend-no-cache \
 	restart restart-backend restart-frontend down clean ps health \
 	logs logs-backend logs-frontend logs-db \
 	shell-backend shell-frontend psql \
 	migrate migrate-revert migrate-show migrate-generate seed \
-	db-tables db-account db-query \
+	db-tables db-account db-patients db-professionals db-query \
 	test test-e2e typecheck lint format format-check check
 
 # Variáveis
@@ -192,7 +192,13 @@ db-tables: ## Lista as tabelas do banco
 	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\dt"'
 
 db-account: ## Mostra as contas da tabela account
-	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT id, name, email, role, \"createdAt\" FROM account;"'
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT id, name, email, cpf, role, created_at FROM account;"'
+
+db-patients: ## Mostra os pacientes com CNS, responsável tutelar e nº de contatos de suporte
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT p.account_id, a.name, p.cns, p.guardian_name, p.registered_at, (SELECT count(*) FROM support_contact c WHERE c.patient_id = p.account_id) AS contacts FROM patient p JOIN account a ON a.id = p.account_id ORDER BY a.name;"'
+
+db-professionals: ## Mostra os perfis profissionais (um por conta) com nome e especialidade
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT pr.id, pr.account_id, a.name, pr.specialism FROM professional pr JOIN account a ON a.id = pr.account_id ORDER BY a.name;"'
 
 db-query: ## Roda um SQL no banco (uso: make db-query SQL="select * from account")
 	@test -n "$(SQL)" || { echo 'ERRO: informe SQL, ex.: make db-query SQL="\dt"'; exit 1; }

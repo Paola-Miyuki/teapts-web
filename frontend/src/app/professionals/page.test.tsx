@@ -167,7 +167,7 @@ describe('ProfessionalsPage', () => {
     render(<ProfessionalsPage />);
 
     expect(
-      await screen.findByText('Nenhum profissional encontrado'),
+      await screen.findByText('Nenhum profissional cadastrado'),
     ).toBeInTheDocument();
   });
 
@@ -226,7 +226,7 @@ describe('ProfessionalsPage', () => {
             },
           }),
         )
-        .mockResolvedValueOnce(
+        .mockResolvedValue(
           mockResponse({
             data: {
               data: [
@@ -253,26 +253,16 @@ describe('ProfessionalsPage', () => {
 
     render(<ProfessionalsPage />);
 
-    await screen.findByText('Nenhum profissional encontrado');
+    await screen.findByText('Nenhum profissional cadastrado');
 
-    fireEvent.change(screen.getByPlaceholderText('Buscar por nome'), {
+    fireEvent.change(screen.getByPlaceholderText('Nome do profissional'), {
       target: { value: 'Maria' },
     });
-
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Especialidade',
-      }),
-      {
-        target: { value: 'psychologist' },
-      },
-    );
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Aplicar filtros',
-      }),
-    );
+    fireEvent.keyDown(screen.getByPlaceholderText('Nome do profissional'), {
+      key: 'Enter',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Psicologia' }));
 
     expect(await screen.findByText('Maria Silva')).toBeInTheDocument();
 
@@ -342,7 +332,7 @@ describe('ProfessionalsPage', () => {
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: 'Próxima',
+        name: 'Próxima página',
       }),
     );
 

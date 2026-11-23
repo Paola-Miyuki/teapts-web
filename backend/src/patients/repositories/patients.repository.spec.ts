@@ -2,13 +2,18 @@
 // depender de uma conexão externa durante a execução unitária.
 
 import { jest } from '@jest/globals';
-import { Repository } from 'typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
+import { Account } from '../../accounts/entities/account.entity';
+import { Professional } from '../../professionals/entities/professional.entity';
+import { PtsEntity } from '../../pts/entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Patient } from '../entities/patient.entity';
+import { SupportContact } from '../entities/support-contact.entity';
 import {
   ACTIVE_PTS_STATES,
   type AuthorizedPatientRow,
   PatientsRepository,
+  PROFESSIONAL_ACCESS_PTS_STATES,
 } from './patients.repository';
 
 type QueryBuilderMock = {
@@ -73,121 +78,220 @@ describe('ACTIVE_PTS_STATES', () => {
   });
 });
 
-describe('PatientsRepository.findAuthorizedPaginated', () => {
-  it('returns rows and total with authorization and pagination', async () => {
-    const { query, typeormRepository, repository } = createRepository();
-    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
-    query.getCount.mockResolvedValue(11);
-    query.getRawMany.mockResolvedValue([row]);
-
-    await expect(
-      repository.findAuthorizedPaginated('professional-account', {
-        page: 2,
-        limit: 10,
-      }),
-    ).resolves.toEqual({ rows: [row], total: 11 });
-
-    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
-      'patient',
-    );
-    expect(query.where).toHaveBeenCalledWith(
-      `patient."accountId" IN (
-    SELECT pts.patient_id
-    FROM projeto_terapeutico_singular pts
-    WHERE pts.status IN (:...states)
-      AND (
-        pts.responsible_professional_id IN (
-          SELECT id FROM professional WHERE "accountId" = :accountId
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM professional_participating_on_therapeutic_journey participation
-          INNER JOIN professional ON professional.id = participation.professional_id
-          WHERE participation.therapeutic_journey_id = pts.id
-            AND professional."accountId" = :accountId
-        )
-      )
-  )`,
-      { accountId: 'professional-account', states: ACTIVE_PTS_STATES },
-    );
-    expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
-    expect(query.addOrderBy).toHaveBeenCalledWith('patient."accountId"', 'ASC');
-    expect(query.offset).toHaveBeenCalledWith(10);
-    expect(query.limit).toHaveBeenCalledWith(10);
+describe('PROFESSIONAL_ACCESS_PTS_STATES', () => {
+  it('adds the closed states to the active ones (RN016)', () => {
+    expect(PROFESSIONAL_ACCESS_PTS_STATES).toEqual([
+      PtsStateEnum.PLANNING,
+      PtsStateEnum.RUNNING,
+      PtsStateEnum.CONCLUDED,
+      PtsStateEnum.CANCELLED,
+    ]);
   });
+});
 
-  it('filters by name inside the authorized patients, escaping wildcards', async () => {
-    const { query, repository } = createRepository();
-    query.getCount.mockResolvedValue(0);
-    query.getRawMany.mockResolvedValue([]);
+// A lista usa subconsultas e a subconsulta `listed`; os testes montam o SQL com
+// os metadados reais das entidades, sem conectar no banco, e conferem o SQL e
+// os parâmetros que iriam para o Postgres.
+describe('PatientsRepository list and detail', () => {
+  let dataSource: DataSource;
+  let repository: PatientsRepository;
+  let captured: { sql: string; parameters: Record<string, unknown> }[];
 
-    await repository.findAuthorizedPaginated('account', {
-      page: 1,
-      limit: 10,
-      name: '50%_a\\',
+  beforeAll(async () => {
+    dataSource = new DataSource({
+      type: 'postgres',
+      entities: [Account, Patient, SupportContact, Professional, PtsEntity],
     });
-
-    expect(query.andWhere).toHaveBeenCalledWith(
-      `account.name ILIKE :name ESCAPE '\\'`,
-      { name: '%50\\%\\_a\\\\%' },
-    );
+    await (
+      dataSource as unknown as { buildMetadatas(): Promise<void> }
+    ).buildMetadatas();
   });
 
-  it('does not filter by name when it is not informed', async () => {
-    const { query, repository } = createRepository();
-    query.getCount.mockResolvedValue(0);
-    query.getRawMany.mockResolvedValue([]);
-
-    await repository.findAuthorizedPaginated('account', { page: 1, limit: 10 });
-
-    expect(query.andWhere).not.toHaveBeenCalled();
+  beforeEach(() => {
+    captured = [];
+    repository = new PatientsRepository(dataSource.getRepository(Patient));
   });
 
-  it('propagates database errors to the caller', async () => {
-    const { query, repository } = createRepository();
-    const failure = new Error('database connection details');
-    query.getCount.mockRejectedValue(failure);
+  function answer(rawOne: unknown, rawMany: unknown[] = []) {
+    const capture = function (this: SelectQueryBuilder<Patient>) {
+      captured.push({ sql: this.getQuery(), parameters: this.getParameters() });
+    };
+    jest
+      .spyOn(SelectQueryBuilder.prototype, 'getRawOne')
+      .mockImplementation(function (this: SelectQueryBuilder<Patient>) {
+        capture.call(this);
+        return Promise.resolve(rawOne);
+      });
+    jest
+      .spyOn(SelectQueryBuilder.prototype, 'getRawMany')
+      .mockImplementation(function (this: SelectQueryBuilder<Patient>) {
+        capture.call(this);
+        return Promise.resolve(rawMany);
+      });
+  }
+
+  const row = {
+    patient_id: 'patient-1',
+    account_name: 'Maria Silva',
+    pts_status: PtsStateEnum.RUNNING,
+  };
+
+  it('lists every patient to the admin, with the PTS status and no read-only mark', async () => {
+    answer({ total: '12' }, [row]);
 
     await expect(
-      repository.findAuthorizedPaginated('account', { page: 1, limit: 10 }),
-    ).rejects.toBe(failure);
-  });
-});
+      repository.findPatientsPaginated({ kind: 'all' }, { page: 2, limit: 10 }),
+    ).resolves.toEqual({ rows: [row], total: 12 });
 
-describe('PatientsRepository.findAllPaginated', () => {
-  it('returns every patient with the same projection and order', async () => {
-    const { query, typeormRepository, repository } = createRepository();
-    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
-    query.getCount.mockResolvedValue(11);
-    query.getRawMany.mockResolvedValue([row]);
+    const [count, page] = captured;
+    expect(count.sql).toContain('SELECT COUNT(*) AS "total" FROM (SELECT');
+    expect(page.sql).toContain('false AS "read_only"');
+    expect(page.sql).toContain('COALESCE(');
+    expect(page.sql).not.toContain('EXISTS');
+    expect(page.sql).toContain(
+      'ORDER BY listed.account_name ASC, listed.patient_id ASC',
+    );
+    expect(page.sql).toContain('LIMIT 10 OFFSET 10');
+    expect(page.parameters).toMatchObject({
+      activeStates: ACTIVE_PTS_STATES,
+      rejectedState: PtsStateEnum.REJECTED,
+    });
+  });
+
+  it('limits the professional to the PTS of their account in the access states', async () => {
+    answer({ total: '1' }, [row]);
+
+    await repository.findPatientsPaginated(
+      { kind: 'professional', accountId: 'account-1' },
+      { page: 1, limit: 10 },
+    );
+
+    const page = captured[1];
+    expect(page.sql).toContain('NOT EXISTS');
+    expect(page.sql).toContain(
+      'professional_participating_on_therapeutic_journey',
+    );
+    expect(page.sql).toContain('"read_only"');
+    expect(page.parameters).toMatchObject({
+      accountId: 'account-1',
+      accessStates: PROFESSIONAL_ACCESS_PTS_STATES,
+      statusFilter: PROFESSIONAL_ACCESS_PTS_STATES,
+    });
+  });
+
+  it('searches name, social name, e-mail, CNS and CPF, and the digits when the term is a number', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      { page: 1, limit: 10, q: '111.444' },
+    );
+
+    const page = captured[1];
+    for (const column of ['name', 'social_name', 'email', 'cns', 'cpf']) {
+      expect(page.sql).toContain(`."${column}" ILIKE :term`);
+    }
+    expect(page.sql).toContain(
+      `regexp_replace("account"."cpf", '\\D', '', 'g') LIKE :digits`,
+    );
+    expect(page.parameters).toMatchObject({
+      term: '%111.444%',
+      digits: '%111444%',
+    });
+  });
+
+  it('escapes % and _ in the search term and skips the digit search for text', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      { page: 1, limit: 10, q: '50%_a' },
+    );
+
+    const page = captured[1];
+    expect(page.parameters.term).toBe('%50\\%\\_a%');
+    expect(page.sql).not.toContain('regexp_replace');
+  });
+
+  it('filters by PTS status, with none as the patient without PTS', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      { page: 1, limit: 10, status: [PtsStateEnum.DRAFT, 'none'] },
+    );
+
+    const page = captured[1];
+    expect(page.sql).toContain('listed.pts_status IN (');
+    expect(page.sql).toContain('listed.pts_status IS NULL');
+    expect(page.parameters.statusFilter).toEqual([PtsStateEnum.DRAFT]);
+  });
+
+  it('ignores the statuses the professional has no access to', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'professional', accountId: 'account-1' },
+      {
+        page: 1,
+        limit: 10,
+        status: [PtsStateEnum.DRAFT, PtsStateEnum.REJECTED, 'none'],
+      },
+    );
+
+    const page = captured[1];
+    expect(page.sql).toContain('1 = 0');
+    expect(page.sql).not.toContain('IS NULL');
+    expect(page.parameters.statusFilter).toBeUndefined();
+  });
+
+  it('filters by responsible professional and registration dates, and sorts by date', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      {
+        page: 1,
+        limit: 10,
+        responsibleProfessionalId: 'professional-1',
+        registeredFrom: '2026-10-01',
+        registeredTo: '2026-11-23',
+        sort: 'registeredAt',
+        order: 'desc',
+      },
+    );
+
+    const page = captured[1];
+    expect(page.sql).toContain(
+      '"responsible_professional_id" = :responsibleProfessionalId',
+    );
+    expect(page.sql).toContain(
+      '"registered_at" >= CAST(:registeredFrom AS date)',
+    );
+    expect(page.sql).toContain('AS date) + 1');
+    expect(page.sql).toContain('ORDER BY listed.registered_at DESC');
+    expect(page.parameters).toMatchObject({
+      responsibleProfessionalId: 'professional-1',
+      registeredFrom: '2026-10-01',
+      registeredTo: '2026-11-23',
+    });
+  });
+
+  it('finds one patient inside the scope, or null outside it', async () => {
+    answer(undefined);
 
     await expect(
-      repository.findAllPaginated({ page: 2, limit: 10 }),
-    ).resolves.toEqual({ rows: [row], total: 11 });
+      repository.findPatient(
+        { kind: 'professional', accountId: 'account-1' },
+        'patient-1',
+      ),
+    ).resolves.toBeNull();
 
-    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
-      'patient',
-    );
-    expect(query.where).not.toHaveBeenCalled();
-    expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
-    expect(query.addOrderBy).toHaveBeenCalledWith('patient."accountId"', 'ASC');
-    expect(query.offset).toHaveBeenCalledWith(10);
-    expect(query.limit).toHaveBeenCalledWith(10);
-  });
-});
-
-describe('PatientsRepository.findAllPaginated by name', () => {
-  it('filters every patient by name', async () => {
-    const { query, repository } = createRepository();
-    query.getCount.mockResolvedValue(0);
-    query.getRawMany.mockResolvedValue([]);
-
-    await repository.findAllPaginated({ page: 1, limit: 10, name: 'mari' });
-
-    expect(query.andWhere).toHaveBeenCalledWith(
-      `account.name ILIKE :name ESCAPE '\\'`,
-      { name: '%mari%' },
-    );
+    expect(captured[0].sql).toContain('"patient"."account_id" = :patientId');
+    expect(captured[0].parameters).toMatchObject({
+      patientId: 'patient-1',
+      accountId: 'account-1',
+    });
   });
 });
 
@@ -209,7 +313,7 @@ describe('PatientsRepository.findAvailableForPtsPaginated', () => {
       `NOT EXISTS (
     SELECT 1
     FROM projeto_terapeutico_singular pts
-    WHERE pts.patient_id = patient."accountId"
+    WHERE pts.patient_id = patient.account_id
       AND pts.status IN (:...states)
   )`,
       { states: ACTIVE_PTS_STATES },
@@ -221,76 +325,70 @@ describe('PatientsRepository.findAvailableForPtsPaginated', () => {
 
 describe('PatientsRepository.insert', () => {
   function createInsertRepository() {
-    const insertQuery = {
-      insert: jest.fn(),
-      into: jest.fn(),
-      values: jest.fn(),
-      setParameter: jest.fn(),
-      execute: jest.fn<() => Promise<unknown>>(),
+    const manager = {
+      insert: jest.fn<(target: unknown, values: unknown) => Promise<unknown>>(),
     };
-
-    for (const method of [
-      insertQuery.insert,
-      insertQuery.into,
-      insertQuery.values,
-      insertQuery.setParameter,
-    ]) {
-      method.mockReturnValue(insertQuery);
-    }
-
-    insertQuery.execute.mockResolvedValue({});
+    manager.insert.mockResolvedValue({});
     const typeormRepository = {
-      createQueryBuilder: jest.fn(() => insertQuery),
+      manager: {
+        transaction: jest.fn(
+          (run: (transactionManager: typeof manager) => Promise<void>) =>
+            run(manager),
+        ),
+      },
     };
     const repository = new PatientsRepository(
       typeormRepository as unknown as Repository<Patient>,
     );
 
-    return { insertQuery, repository };
+    return { manager, typeormRepository, repository };
   }
 
-  // O TypeORM grava coluna jsonb com JSON.stringify do valor inteiro, o que
-  // gera um literal inválido para jsonb[] ("malformed array literal").
-  it('sends each support contact as JSON text cast to jsonb[]', async () => {
-    const { insertQuery, repository } = createInsertRepository();
-    const contacts = [
-      { name: 'Maria Martins', email: 'maria@exemplo.com' },
-      { name: 'João' },
-    ];
+  it('saves the patient and each support contact in one transaction', async () => {
+    const { manager, typeormRepository, repository } = createInsertRepository();
 
     await repository.insert({
       accountId: 'account-1',
-      supportContacts: contacts,
+      supportContacts: [
+        { name: 'Maria Martins', email: 'maria@exemplo.com' },
+        { name: 'João', description: 'Avô', phone: '41999999999' },
+      ],
     });
 
-    expect(insertQuery.into).toHaveBeenCalledWith(Patient);
-    const [values] = insertQuery.values.mock.calls[0] as [
-      { accountId: string; supportContacts: () => string },
-    ];
-    expect(values.accountId).toBe('account-1');
-    expect(values.supportContacts()).toBe('CAST(:supportContacts AS jsonb[])');
-    expect(insertQuery.setParameter).toHaveBeenCalledWith('supportContacts', [
-      JSON.stringify(contacts[0]),
-      JSON.stringify(contacts[1]),
+    expect(typeormRepository.manager.transaction).toHaveBeenCalledTimes(1);
+    expect(manager.insert).toHaveBeenNthCalledWith(1, Patient, {
+      accountId: 'account-1',
+    });
+    expect(manager.insert).toHaveBeenNthCalledWith(2, SupportContact, [
+      {
+        patientId: 'account-1',
+        name: 'Maria Martins',
+        description: null,
+        email: 'maria@exemplo.com',
+        phone: null,
+      },
+      {
+        patientId: 'account-1',
+        name: 'João',
+        description: 'Avô',
+        email: null,
+        phone: '41999999999',
+      },
     ]);
-    expect(insertQuery.execute).toHaveBeenCalled();
   });
 
-  it('sends an empty list when there are no support contacts', async () => {
-    const { insertQuery, repository } = createInsertRepository();
+  it('skips the contacts insert when there are no support contacts', async () => {
+    const { manager, repository } = createInsertRepository();
 
     await repository.insert({ accountId: 'account-1', supportContacts: [] });
 
-    expect(insertQuery.setParameter).toHaveBeenCalledWith(
-      'supportContacts',
-      [],
-    );
+    expect(manager.insert).toHaveBeenCalledTimes(1);
   });
 
   it('propagates database errors to the caller', async () => {
-    const { insertQuery, repository } = createInsertRepository();
+    const { manager, repository } = createInsertRepository();
     const failure = new Error('duplicate key value');
-    insertQuery.execute.mockRejectedValue(failure);
+    manager.insert.mockRejectedValue(failure);
 
     await expect(
       repository.insert({ accountId: 'account-1', supportContacts: [] }),

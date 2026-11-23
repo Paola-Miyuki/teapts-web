@@ -97,7 +97,7 @@ describe('ProfessionalsRepository.findPaginated', () => {
     expect(query.innerJoin).toHaveBeenCalledWith(
       Account,
       'account',
-      'account.id = professional."accountId"',
+      'account.id = professional.accountId',
     );
     expect(query.select).toHaveBeenCalledWith([
       'professional.id AS professional_id',

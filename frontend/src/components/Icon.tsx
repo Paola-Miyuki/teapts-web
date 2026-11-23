@@ -90,6 +90,28 @@ const glyphs = {
   ),
   plus: <path d="M12 4v16M4 12h16" />,
   trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
+  edit: (
+    <>
+      <path d="M4 20h4L19 9l-4-4L4 16Z" />
+      <path d="m13 7 4 4" />
+    </>
+  ),
+  filter: <path d="M4 5h16l-6 8v6l-4-2v-4Z" />,
+  more: (
+    <>
+      <circle cx="12" cy="5" r="1.3" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="12" cy="19" r="1.3" />
+    </>
+  ),
+  sortUp: <path d="M12 20V4m-6 6 6-6 6 6" />,
+  sortDown: <path d="M12 4v16m-6-6 6 6 6-6" />,
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof glyphs;

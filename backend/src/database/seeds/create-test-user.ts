@@ -155,7 +155,7 @@ async function ensurePatientProfile(account: Account): Promise<void> {
     return;
   }
 
-  await dataSource.query('INSERT INTO "patient" ("accountId") VALUES ($1)', [
+  await dataSource.query('INSERT INTO "patient" ("account_id") VALUES ($1)', [
     account.id,
   ]);
 

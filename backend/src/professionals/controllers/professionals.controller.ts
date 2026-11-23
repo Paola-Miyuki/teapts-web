@@ -17,6 +17,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
@@ -45,6 +47,7 @@ export class ProfessionalsController {
    * de chegar aqui, garantindo que somente parâmetros válidos sejam usados na
    * consulta ao banco.
    *
+   * @param account contexto da conta autenticada, que define os campos
    * @param query parâmetros já normalizados
    * @returns profissionais compatíveis e dados de paginação
    */
@@ -66,9 +69,10 @@ export class ProfessionalsController {
     },
   })
   async findAll(
+    @CurrentAccount() account: AccountContext,
     @Query() query: GetProfessionalsRequestDto,
   ): Promise<GetProfessionalsResponseDto> {
-    return this.professionalsService.findAll(query);
+    return this.professionalsService.findAll(account, query);
   }
 
   /**

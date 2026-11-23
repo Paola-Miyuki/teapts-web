@@ -52,7 +52,7 @@ As `NEXT_PUBLIC_*` entram no bundle no build: mudou o `.env`, pare o
 ```
 src/
   app/
-    layout.tsx             layout raiz e fontes
+    layout.tsx             layout raiz, fontes e as folhas globais de styles/
     globals.css            @import 'tailwindcss' e estilos globais
     page.tsx               redireciona para /home
     login/
@@ -64,23 +64,31 @@ src/
                            "Aguardando perfil" para a conta sem perfil
     profile/               meu perfil: dados da conta (GET/PATCH /me) e troca de senha
                            (POST /me/password)
-    professionals/         consulta de profissionais (GET /professionals) com filtros de nome e
-                           especialidade e paginação
+    professionals/         profissionais (GET /professionals) na tabela de `profissionais.html`:
+                           busca por nome, filtro de especialidade e paginação
     pts/
-      novo/                criar proposta de PTS: paciente (GET /patients/available-for-pts),
+      novo/                criar proposta de PTS: paciente buscado pelo nome
+                           (GET /patients/available-for-pts?name=, paginação padrão),
                            equipe (GET /professionals) e POST /pts; o admin escolhe o profissional
                            responsável
       proposals/           propostas de PTS do paciente (GET /pts/proposals?patientId=); o
                            profissional e o admin escolhem o paciente (GET /patients/authorized) e o
                            paciente (ou o admin, em nome dele) aprova ou rejeita (POST /pts/proposals/:id/approve e /reject)
-    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) com busca por nome ou
-                           e-mail (termo em /patients?q=) e modal "Adicionar paciente"
-      _components/         PatientSearch e PatientList (busca `q`, página 1 ao mudar o termo, resultados
-                           anteriores mantidos no carregamento), AddPatientModal/AddPatientForm,
-                           AccountCombobox (combobox ARIA da conta: GET /accounts?isPatient=false&
-                           isProfessional=false&q=; POST /patients) e SupportContactFields/SupportContactList
+    patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
+                           `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
+                           status do PTS, responsável e data de cadastro, ordenação e paginação,
+                           todos na URL; modal "Adicionar paciente" (só admin)
+      [id]/                detalhe do paciente (GET /patients/:id), aba Dados do paciente
+      _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar"),
+                           AddPatientModal/AddPatientForm, AccountCombobox (combobox ARIA da conta:
+                           GET /accounts?isPatient=false&isProfessional=false&q=; POST /patients) e
+                           SupportContactFields/SupportContactList
   components/              AppShell (sidebar e cabeçalho), AuthenticatedPage (sessão, perfil e
                            "Acesso restrito"), LogoutButton, HelpTooltip, Icon e Logo
+    table/                 peças das tabelas dos mockups: KebabMenu (menu ⋮), MultiSelect,
+                           Pagination (faixa, páginas e itens por página) e PtsStatusBadge
+  styles/                  teapts-mockups.css e teapts-ui.css: classes globais dos mockups
+                           (cópia de design/assets, sem as regras só do mockup)
   hooks/
     useAccount.ts          GET /me da sessão
     useDebouncedSearch.ts  busca da NFUS003: debounce de 300 ms, trim, mínimo de 2 caracteres, Enter
@@ -90,9 +98,10 @@ src/
     api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
     account.ts             GET /me, PATCH /me, POST /me/password e menu por perfil
     permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
-    professionals.ts       GET /professionals
-    patients.ts            contas com perfil de paciente e sem perfil de paciente nem profissional (com `q` e
-                           `signal` para cancelar), cadastro do perfil e isValidPhone
+    professionals.ts       GET /professionals (o e-mail vem `null` para quem não é admin nem profissional)
+    patients.ts            lista (getPatients) e detalhe (getPatient) dos pacientes, contas sem perfil
+                           (com `q` e `signal`), cadastro do perfil e isValidPhone
+    pts-status.ts          status do PTS e rótulos das telas
 design/                    layouts de referência (HTML estático)
 public/                    arquivos servidos na raiz do site
 ```
@@ -120,8 +129,9 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/signup` | Criar conta | pública | `cadastro.html` |
 | `/home` | Início, Meu cuidado ou Aguardando perfil | conta da sessão | `inicio.html`, `inicio-paciente.html`, `aguardando-perfil.html` |
 | `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
-| `/patients` | Pacientes cadastrados e "Adicionar paciente" | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
-| `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | — |
+| `/patients` | Pacientes cadastrados (admin) ou vinculados (profissional) e "Adicionar paciente" | admin e profissional (`viewAuthorizedPatients`) | `pacientes.html`, `criar-paciente.html` |
+| `/patients/:id` | Detalhe do paciente (Dados do paciente) | admin e profissional com acesso (RN016) | `paciente.html` |
+| `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | `profissionais.html` |
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 
@@ -166,6 +176,12 @@ ou com PTS ativo) e as opções das decisões pendentes (DPs) da tela.
 - **Tailwind CSS v4**: ligado pelo `postcss.config.mjs` (plugin
   `@tailwindcss/postcss`) e pelo `@import 'tailwindcss'` em `globals.css`.
   Não há `tailwind.config.js`; personalizações vão no CSS, com `@theme`.
+- **Classes dos mockups**: `src/styles/teapts-mockups.css` e
+  `src/styles/teapts-ui.css` são cópias de `design/assets/` (sem as regras
+  só do mockup, como a `mockbar`), importadas no `layout.tsx`. As telas novas
+  usam as mesmas classes globais do HTML de `design/` (`ux-tcard`,
+  `ux-toolbar`, `table`, `badge <status>`, `kebab-menu` etc.). Ao mudar o
+  CSS de `design/assets/`, copie de novo.
 - **CSS Modules** (`*.module.css`) para estilos de uma tela, como no login.
   O que mais de uma tela usa (modal, botão de ícone, campo de senha com
   requisitos) fica em `components/ui.module.css`; uma tela não importa o CSS

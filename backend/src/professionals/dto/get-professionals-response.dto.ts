@@ -17,7 +17,8 @@ export class ProfessionalSpecialismResponseDto {
 export class ProfessionalSummaryResponseDto {
   id: string;
   name: string;
-  email: string;
+  /** Só para o admin e o profissional; `null` para as outras contas (DP011). */
+  email: string | null;
   specialism: ProfessionalSpecialismResponseDto;
 }
 

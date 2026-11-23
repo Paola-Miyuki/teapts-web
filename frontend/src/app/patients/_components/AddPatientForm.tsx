@@ -134,8 +134,8 @@ export default function AddPatientForm({
           </span>
 
           <HelpTooltip id="contacts-help" label="Contatos de suporte">
-            Pessoas que ajudam no cuidado. Um contato de suporte não é
-            responsável tutelar e não acessa informações clínicas.
+            Pessoas que ajudam no cuidado. Não acessam o sistema nem os
+            dados clínicos.
           </HelpTooltip>
         </legend>
 

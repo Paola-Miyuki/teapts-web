@@ -3,7 +3,17 @@
 // O ValidationPipe global valida a query e o corpo, e o controller delega ao
 // PatientsService.
 
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -28,6 +38,9 @@ import {
 import { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
+import { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-request.dto';
+import { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
+import { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import { PatientResponseDto } from '../dto/patient-response.dto';
 import { PatientsService } from '../services/patients.service';
 
@@ -84,7 +97,7 @@ export class PatientsController {
    */
   @Get('patients/available-for-pts')
   @UseGuards(AuthGuard)
-  @ApiOkResponse({ type: GetAuthorizedPatientsResponseDto })
+  @ApiOkResponse({ type: GetAvailablePatientsResponseDto })
   @ApiForbiddenResponse({
     type: ErrorResponseDto,
     example: {
@@ -101,9 +114,63 @@ export class PatientsController {
   })
   async findAvailableForPts(
     @CurrentAccount() account: AccountContext,
-    @Query() query: GetAuthorizedPatientsRequestDto,
-  ): Promise<GetAuthorizedPatientsResponseDto> {
+    @Query() query: GetAvailablePatientsRequestDto,
+  ): Promise<GetAvailablePatientsResponseDto> {
     return this.patientsService.findAvailableForPts(account, query);
+  }
+
+  /**
+   * Retorna o detalhe de um paciente: o administrador vê qualquer paciente
+   * (RN022); o profissional, os pacientes dos PTS de que faz ou fez parte
+   * (RN016), só para leitura quando o PTS está encerrado (RN024).
+   *
+   * @param account contexto da conta autenticada
+   * @param id identificador do paciente (a conta)
+   * @returns dados do paciente permitidos ao papel
+   */
+  @Get('patients/:id')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: PatientDetailResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: { status: 'ERROR', message: 'Parâmetro inválido: id' },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao profissional.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar o paciente.',
+    },
+  })
+  async findOne(
+    @CurrentAccount() account: AccountContext,
+    @Param(
+      'id',
+      new ParseUUIDPipe({
+        exceptionFactory: () =>
+          new BadRequestException({
+            status: 'ERROR',
+            message: 'Parâmetro inválido: id',
+          }),
+      }),
+    )
+    id: string,
+  ): Promise<PatientDetailResponseDto> {
+    return this.patientsService.findOne(account, id);
   }
 
   /**

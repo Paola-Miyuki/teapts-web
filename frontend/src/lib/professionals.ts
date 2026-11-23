@@ -6,7 +6,8 @@ export type ProfessionalSpecialism =
 export type Professional = {
   id: string;
   name: string;
-  email: string;
+  // Só vem para o admin e o profissional (DP011).
+  email: string | null;
   specialism: {
     id: ProfessionalSpecialism;
     name: string;

@@ -17,6 +17,7 @@ import { Professional } from '../../professionals/entities/professional.entity';
 @Entity('account')
 @Unique('UQ_account_email', ['email'])
 @Unique('UQ_account_supertokens_user_id', ['supertokensUserId'])
+@Unique('UQ_account_cpf', ['cpf'])
 export class Account {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_account' })
   id!: string;
@@ -30,15 +31,23 @@ export class Account {
   @Column('text', { name: 'supertokens_user_id' })
   supertokensUserId!: string;
 
+  @Column('text', { name: 'social_name', nullable: true })
+  socialName!: string | null;
+
+  // Unico entre contas; nulo so na conta de administrador e nas contas
+  // antigas, criadas antes do campo (RN001).
+  @Column('text', { nullable: true })
+  cpf!: string | null;
+
   @Column({
-    name: 'last_updated_at',
+    name: 'updated_at',
     type: 'timestamp',
     precision: 3,
     nullable: true,
   })
   lastUpdatedAt!: Date | null;
 
-  @CreateDateColumn({ type: 'timestamp', precision: 3 })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 3 })
   createdAt!: Date;
 
   @Column({

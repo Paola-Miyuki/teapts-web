@@ -282,7 +282,7 @@ describe('Swagger (e2e)', () => {
     });
     expect(byName.limit).toMatchObject({
       required: false,
-      schema: { type: 'integer', default: 10, minimum: 1, maximum: 100 },
+      schema: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
     });
     expect(byName.ids).toMatchObject({
       required: false,
@@ -294,7 +294,8 @@ describe('Swagger (e2e)', () => {
 
   it.each([
     ['/accounts', 20, 50],
-    ['/patients/authorized', 10, 100],
+    ['/patients/authorized', 20, 50],
+    ['/patients/available-for-pts', 20, 50],
   ])(
     'documents the GET %s pagination defaults and limits',
     async (path, defaultLimit, maxLimit) => {

@@ -1,3 +1,4 @@
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -319,6 +320,21 @@ export class PtsRepositoryImpl extends PtsRepository {
     return proposal ? this.toProposalResponse(proposal) : null;
   }
 
+  async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.id = :id', { id })
+      .getOne();
+
+    return pts ? this.toDetailResponse(pts) : null;
+  }
+
   async updateDraftProposal(
     input: UpdatePtsProposalInput,
   ): Promise<PtsProposalResponseDto> {
@@ -591,6 +607,16 @@ export class PtsRepositoryImpl extends PtsRepository {
       team: (pts.team ?? []).map((professional) =>
         this.mapProfessional(professional),
       ),
+    };
+  }
+
+  private toDetailResponse(pts: PtsEntity): PtsDetailResponseDto {
+    return {
+      ...this.toActiveResponse(pts),
+      status: pts.status,
+      rejectedAt: pts.rejectedAt?.toISOString() ?? null,
+      concludedAt: pts.concludedAt?.toISOString() ?? null,
+      cancelledAt: pts.cancelledAt?.toISOString() ?? null,
     };
   }
 

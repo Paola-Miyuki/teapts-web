@@ -11,9 +11,9 @@ import {
 import { Specialism } from '../enums/specialism.enum';
 import { Account } from '../../accounts/entities/account.entity';
 
-// Perfil profissional: uma conta pode ter varios, um por especialidade (RN002).
+// Perfil profissional: no maximo um por conta (RN002).
 @Entity('professional')
-@Unique('UQ_professional_account_specialism', ['accountId', 'specialism'])
+@Unique('UQ_professional_account', ['accountId'])
 export class Professional {
   @PrimaryGeneratedColumn('uuid', {
     primaryKeyConstraintName: 'PK_professional',
@@ -24,14 +24,14 @@ export class Professional {
   specialism!: Specialism;
 
   @Index('IDX_professional_account_id')
-  @Column('uuid', { name: 'accountId' })
+  @Column('uuid', { name: 'account_id' })
   accountId!: string;
 
   @ManyToOne(() => Account, (account) => account.professionalProfiles, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({
-    name: 'accountId',
+    name: 'account_id',
     foreignKeyConstraintName: 'FK_professional_account',
   })
   account?: Relation<Account>;

@@ -180,6 +180,10 @@ Editar a entidade não altera o banco. Sem o passo 3, a coluna não existe e a p
 
 `migrate-show` marca com `[X]` as aplicadas e com `[ ]` as pendentes. A migration inicial pressupõe banco vazio. Nunca edite migration já aplicada: crie outra.
 
+**Nomes no banco:** colunas em snake_case, enums com sufixo `_e` e restrições com os prefixos `PK_`, `FK_`, `UQ_`, `IDX_` e `CHK_`. Nas entidades, a propriedade continua em camelCase e aponta para a coluna com `name:` (ex.: `accountId` → `account_id`). A migration `StandardizeColumnNames` renomeou as colunas antigas em camelCase; branch aberta antes dela precisa usar os nomes novos.
+
+A migration `AlignPatientAndProfessionalConstraints` troca a restrição para um perfil profissional por conta (`UQ_professional_account`) e falha se alguma conta tiver mais de um perfil profissional: apague os perfis a mais antes de aplicar.
+
 Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `migrations` e só roda as pendentes. Por isso `make up`, `make up-d` e os `make rebuild*` já migram sozinhos, e você raramente digita `make migrate`.
 
 > ⚠️ **No Docker, os alvos de migration leem o código compilado** (`dist/database/data-source.js`), porque a imagem final não tem ts-node. Migration que você acabou de escrever só existe no host: rode `make rebuild-backend`, que recompila **e** aplica. `make migrate` sozinho não vê o arquivo novo.
@@ -224,8 +228,10 @@ Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as 
 ### 5.3 Testar se o banco está de pé
 
 ```bash
-make db-tables                              # tabelas do public: account, patient, professional, migrations
+make db-tables                              # tabelas do public: account, patient, support_contact, professional, PTS, migrations
 make db-account                             # mostra as contas
+make db-patients                            # pacientes com CNS, responsável tutelar e nº de contatos
+make db-professionals                       # perfis profissionais (um por conta)
 make db-query SQL="\dt supertokens.*"       # tabelas do SuperTokens
 make psql                                   # sessão psql interativa
 ```
@@ -511,6 +517,8 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make seed` | Cria a conta de teste no SuperTokens e em `account` |
 | `make db-tables` | Lista as tabelas |
 | `make db-account` | Mostra as contas |
+| `make db-patients` | Mostra os pacientes |
+| `make db-professionals` | Mostra os perfis profissionais |
 | `make db-query SQL="..."` | Roda um SQL qualquer |
 
 **Testes e qualidade** (rodam no host, sem container)

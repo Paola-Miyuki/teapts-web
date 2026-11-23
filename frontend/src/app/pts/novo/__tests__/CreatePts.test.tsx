@@ -111,6 +111,24 @@ describe('CreatePts', () => {
     );
   });
 
+  it('busca pacientes pelo nome com a paginação padrão', async () => {
+    const user = userEvent.setup();
+    await renderScreen();
+    (api.listEligiblePatients as jest.Mock).mockResolvedValueOnce([
+      { id: 'patient-x', name: 'Mariana Costa' },
+    ]);
+
+    await user.type(screen.getByLabelText('Buscar paciente'), 'mari{Enter}');
+
+    expect(
+      await screen.findByRole('option', { name: 'Mariana Costa' }),
+    ).toBeInTheDocument();
+    expect(api.listEligiblePatients).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'mari',
+    );
+  });
+
   it('valida campos obrigatórios e não chama a API', async () => {
     const user = userEvent.setup();
     await renderScreen();

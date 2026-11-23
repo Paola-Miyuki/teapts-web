@@ -9,6 +9,7 @@ import type {
 } from '../dto/pts-proposal-response.dto';
 import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
@@ -31,6 +32,7 @@ import {
   activePtsForbidden,
   activePtsNotFound,
   ptsNotActive,
+  ptsForbidden,
   ptsNotFound,
   socialSituationForbidden,
   teamProfessionalNotFound,
@@ -200,6 +202,44 @@ export class PtsService {
     }
 
     return activePts;
+  }
+
+  /**
+   * Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
+   * paciente, os próprios, sem a situação social (RN028); o profissional, os
+   * de cuja equipe faz parte, menos o rejeitado (RN016).
+   */
+  async findPtsById(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDetailResponseDto> {
+    const pts = await this.ptsRepository.findPtsById(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    if (isAdmin(account)) {
+      return pts;
+    }
+
+    const profileIds = account.professionalProfileIds;
+    const isProfessionalOnPts =
+      pts.status !== PtsStateEnum.REJECTED &&
+      (profileIds.includes(pts.responsible.id) ||
+        pts.team.some((member) => profileIds.includes(member.id)));
+
+    if (isProfessionalOnPts) {
+      return pts;
+    }
+
+    if (account.patientProfileId === pts.patient.id) {
+      const patientResponse = { ...pts };
+      delete patientResponse.socialSituation;
+      return patientResponse;
+    }
+
+    throw ptsForbidden();
   }
 
   async updatePtsProposal(

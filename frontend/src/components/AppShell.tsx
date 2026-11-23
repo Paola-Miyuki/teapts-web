@@ -127,7 +127,7 @@ export default function AppShell({
             <Link
               key={item.href}
               href={item.href}
-              className={styles.navLink}
+              className={`${styles.navLink} shell-navLink`}
               aria-current={item.current ? 'page' : undefined}
               title={item.label}
             >
@@ -179,12 +179,17 @@ export default function AppShell({
           </Link>
         </header>
 
-        <main className={styles.content}>
+        <main className={`${styles.content} shell-content`}>
           {breadcrumb && (
-            <nav className={styles.breadcrumb} aria-label="Caminho da página">
+            <nav
+              className={`${styles.breadcrumb} shell-breadcrumb`}
+              aria-label="Caminho da página"
+            >
               <Link href="/home">Início</Link>
-              <span aria-hidden="true">/</span>
-              <span>{breadcrumb}</span>
+              <span className="crumb">
+                <span aria-hidden="true">/</span>
+                <span>{breadcrumb}</span>
+              </span>
             </nav>
           )}
 
