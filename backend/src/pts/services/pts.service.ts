@@ -92,8 +92,14 @@ export class PtsService {
     account: AccountContext,
   ): Promise<GetPtsProposalsResponseDto> {
     const admin = isAdmin(account);
-    const isPatient = account.patientProfileId === query.patientId;
     const profileIds = account.professionalProfileIds;
+    // Sem paciente na consulta, o paciente vê só as próprias propostas.
+    const patientId =
+      query.patientId ??
+      (!admin && profileIds.length === 0 ? account.patientProfileId : null);
+    const isPatient =
+      account.patientProfileId !== null &&
+      account.patientProfileId === patientId;
 
     if (!admin && !isPatient && profileIds.length === 0) {
       throw ptsProposalForbidden();
@@ -101,7 +107,8 @@ export class PtsService {
 
     const result = await this.ptsRepository.findDraftProposals({
       accountId: account.accountId,
-      patientId: query.patientId,
+      patientId,
+      q: query.q ?? null,
       isPatient,
       isAdmin: admin,
       professionalProfileIds: profileIds,
@@ -110,19 +117,26 @@ export class PtsService {
     });
 
     if (
+      patientId &&
       !admin &&
       !isPatient &&
       result.total === 0 &&
-      !(await this.ptsRepository.hasProposalRelation(
-        query.patientId,
-        profileIds,
-      ))
+      !(await this.ptsRepository.hasProposalRelation(patientId, profileIds))
     ) {
       throw ptsProposalForbidden();
     }
 
+    // O paciente não vê a situação social (RN028).
+    const rows = isPatient
+      ? result.rows.map((row) => {
+          const patientRow: Partial<typeof row> = { ...row };
+          delete patientRow.socialSituation;
+          return patientRow as typeof row;
+        })
+      : result.rows;
+
     return {
-      data: result.rows,
+      data: rows,
       pagination: {
         page: query.page,
         limit: query.limit,

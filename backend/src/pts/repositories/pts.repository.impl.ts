@@ -1,3 +1,4 @@
+import { escapeLike } from '../../common/search/escape-like';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -187,6 +188,7 @@ export class PtsRepositoryImpl extends PtsRepository {
   ): Promise<FindPtsProposalsResult> {
     const {
       patientId,
+      q,
       isPatient,
       isAdmin,
       professionalProfileIds,
@@ -202,10 +204,23 @@ export class PtsRepositoryImpl extends PtsRepository {
       .leftJoinAndSelect('responsible.account', 'responsibleAccount')
       .leftJoinAndSelect('proposal.team', 'team')
       .leftJoinAndSelect('team.account', 'teamAccount')
-      .where('proposal.patientId = :patientId', { patientId })
-      .andWhere('proposal.status = :status', {
+      .where('proposal.status = :status', {
         status: PtsStateEnum.DRAFT,
       });
+
+    if (patientId) {
+      query.andWhere('proposal.patientId = :patientId', { patientId });
+    }
+
+    if (q) {
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where('patientAccount.name ILIKE :term', {
+            term: `%${escapeLike(q)}%`,
+          }).orWhere('patientAccount.socialName ILIKE :term');
+        }),
+      );
+    }
 
     if (!isPatient && !isAdmin) {
       this.restrictToProfessionals(query, 'proposal', professionalProfileIds);

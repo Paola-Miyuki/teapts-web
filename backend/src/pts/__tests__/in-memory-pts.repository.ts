@@ -57,16 +57,20 @@ export class InMemoryPtsRepository extends PtsRepository {
   ): Promise<FindPtsProposalsResult> {
     const {
       patientId,
+      q,
       isPatient,
       isAdmin,
       professionalProfileIds,
       page,
       limit,
     } = input;
+    const term = q?.toLocaleLowerCase('pt-BR');
 
     const draftProposals = this.created.filter(
       (proposal) =>
-        proposal.patient.id === patientId &&
+        (!patientId || proposal.patient.id === patientId) &&
+        (!term ||
+          proposal.patient.name.toLocaleLowerCase('pt-BR').includes(term)) &&
         proposal.status === PtsStateEnum.DRAFT,
     );
 

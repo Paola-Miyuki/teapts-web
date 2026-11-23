@@ -81,7 +81,7 @@ src/
     repositories/accounts.repository.ts    query da listagem (só contas user) com busca, filtros e paginação
     dto/                                   contratos e validação da listagem
     entities/account.entity.ts
-    enums/account-role.enum.ts             account_role_e
+    enums/                                 account_role_e, sex_e e gender_e
   professionals/
     controllers/professionals.controller.ts    GET /professionals protegido por sessão
                                                e POST /professionals, só admin
@@ -119,9 +119,11 @@ src/
     entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e)
     pts.errors.ts                              erros { status, message } do módulo
   auth/
-    services/supertokens.service.ts        receitas EmailPassword e Session; campo name no
+    services/supertokens.service.ts        receitas EmailPassword e Session; campos da conta no
                                            signup; overrides de signUpPOST, signUp,
                                            signInPOST e createNewSession; signOutPOST desligado
+    sign-up-fields.ts                      validação e leitura dos campos do signup (CPF com
+                                           dígito verificador, data, sexo, gênero, telefone)
     controllers/auth.controller.ts         GET /me, PATCH /me, POST /me/password e POST /auth/logout
     dto/logout-request.dto.ts              corpo do logout (allSessions)
     dto/me-response.dto.ts, logout-response.dto.ts   respostas do /me e do logout
@@ -170,7 +172,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
-| GET | `/pts/proposals?patientId=` | paciente titular, profissional da proposta ou admin | Swagger |
+| GET | `/pts/proposals` | paciente titular, profissional da proposta ou admin | [GET /pts/proposals](#get-ptsproposals) |
 | GET | `/pts/proposals/:id` | paciente titular, profissional da proposta ou admin | Swagger |
 | GET | `/pts/active?patientId=` | paciente titular, membro da equipe ou admin | [GET /pts/active](#get-ptsactive) |
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
@@ -293,21 +295,31 @@ sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 
 ## PATCH /me
 
-Exige sessão autenticada e atualiza o nome e/ou o e-mail da conta atual. O
-papel da conta não pode ser alterado.
+Exige sessão autenticada e atualiza os dados da conta atual (RFAUT004). O papel
+e o CPF não podem ser alterados.
 
 Corpo:
 
 ```json
 {
   "name": "Maria Silva",
-  "email": "maria@exemplo.com"
+  "email": "maria@exemplo.com",
+  "socialName": null,
+  "birthDate": "1990-05-20",
+  "sex": "female",
+  "gender": "cis_woman",
+  "phone": "(11) 98765-4321"
 }
 ```
 
-`name` e `email` são opcionais, mas pelo menos um deve ser informado. O nome é
+Todos os campos são opcionais, mas pelo menos um deve ser informado. O nome é
 removido de espaços externos e o e-mail é removido de espaços externos e
-convertido para minúsculas. Responde `200` com o mesmo corpo do `GET /me`.
+convertido para minúsculas. `birthDate` é `AAAA-MM-DD` e não pode estar no
+futuro; `sex` é `male` ou `female`; `gender` segue o enum `gender_e`. Em
+`socialName`, `gender` e `phone`, `null` (ou texto vazio) apaga o campo; o
+telefone, com DDD, é gravado só com dígitos. Responde `200` com o mesmo corpo do
+`GET /me`, que traz também `socialName`, `birthDate`, `sex`, `gender`, `cpf`,
+`phone`, `createdAt` e `updatedAt`.
 Os erros possíveis são `400` (`VALIDATION_ERROR`), `401` (sem sessão), `403`
 (`FORBIDDEN` quando o corpo tenta alterar `role`), `409`
 (`EMAIL_ALREADY_EXISTS`) e `500` (`Não foi possível atualizar o e-mail.`).
@@ -399,6 +411,21 @@ A regra entre paciente e profissional fica só na aplicação: um `POST
 /patients` e um `POST /professionals` simultâneos na mesma conta podem passar
 os dois. Os `professionalProfileIds` da sessão vêm do access token: a conta
 que recebeu o perfil só aparece como profissional depois de um novo login.
+
+## GET /pts/proposals
+
+Lista as propostas em rascunho (`draft`), da mais recente para a mais antiga,
+com a paginação compartilhada (`page`, `limit` padrão 20 e máximo 50). Query
+opcional:
+
+- `patientId`: só as propostas desse paciente. Sem ele, o admin vê todas, o
+  profissional as de que é responsável ou membro e o paciente as próprias.
+- `q`: parte do nome ou do nome social do paciente, sem diferenciar
+  maiúsculas.
+
+Para o paciente, a resposta não traz `socialSituation` (RN028). Com
+`patientId`, o profissional sem vínculo com o paciente recebe `403`
+(`FORBIDDEN`).
 
 ## PATCH /pts/proposals/:id
 

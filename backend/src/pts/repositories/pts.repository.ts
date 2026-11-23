@@ -20,7 +20,10 @@ export interface CreateDraftInput {
 
 export interface FindPtsProposalsInput {
   accountId: string;
-  patientId: string;
+  /** null: propostas de todos os pacientes que a conta pode ver. */
+  patientId: string | null;
+  /** Parte do nome ou do nome social do paciente. */
+  q: string | null;
   isPatient: boolean;
   isAdmin: boolean;
   professionalProfileIds: string[];

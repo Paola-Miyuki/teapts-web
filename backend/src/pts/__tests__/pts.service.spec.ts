@@ -242,6 +242,7 @@ describe('PtsService.findDraftProposals', () => {
     );
 
     expect(result.data).toHaveLength(1);
+    expect(result.data[0]).not.toHaveProperty('socialSituation');
     expect(result.pagination).toEqual({
       page: 1,
       limit: 20,
@@ -287,6 +288,56 @@ describe('PtsService.findDraftProposals', () => {
       403,
       'FORBIDDEN',
     );
+  });
+
+  it('sem paciente, lista as propostas de que o profissional faz parte', async () => {
+    const proposal = await service.createPts(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+
+    await expect(
+      service.findDraftProposals({ page: 1, limit: 20 }, responsibleAccount),
+    ).resolves.toMatchObject({ pagination: { total: 1 } });
+    await expect(
+      service.findDraftProposals(
+        { page: 1, limit: 20 },
+        otherProfessionalAccount,
+      ),
+    ).resolves.toMatchObject({ data: [], pagination: { total: 0 } });
+  });
+
+  it('sem paciente, o admin vê todas e o paciente só as próprias', async () => {
+    const proposal = await service.createPts(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+    const other = await service.createPts(body, accountOf('acc-1'));
+    other.patient.id = 'acc-patient-99';
+
+    await expect(
+      service.findDraftProposals({ page: 1, limit: 20 }, adminAccount),
+    ).resolves.toMatchObject({ pagination: { total: 2 } });
+    await expect(
+      service.findDraftProposals({ page: 1, limit: 20 }, patientAccount),
+    ).resolves.toMatchObject({
+      data: [{ patient: { id: 'acc-patient-25' } }],
+      pagination: { total: 1 },
+    });
+  });
+
+  it('filtra pelo nome do paciente', async () => {
+    const proposal = await service.createPts(body, accountOf('acc-1'));
+    proposal.patient.name = 'Luna Ferreira';
+
+    await expect(
+      service.findDraftProposals(
+        { q: 'luna', page: 1, limit: 20 },
+        adminAccount,
+      ),
+    ).resolves.toMatchObject({ pagination: { total: 1 } });
+    await expect(
+      service.findDraftProposals(
+        { q: 'pedro', page: 1, limit: 20 },
+        adminAccount,
+      ),
+    ).resolves.toMatchObject({ pagination: { total: 0 } });
   });
 
   it('retorna lista vazia quando o paciente não tem propostas', async () => {

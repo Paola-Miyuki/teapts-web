@@ -184,8 +184,12 @@ describe('Swagger (e2e)', () => {
     );
 
     expect(byName.patientId).toMatchObject({
-      required: true,
+      required: false,
       schema: { type: 'string', format: 'uuid' },
+    });
+    expect(byName.q).toMatchObject({
+      required: false,
+      schema: { type: 'string' },
     });
 
     expect(byName.page).toMatchObject({
