@@ -205,6 +205,7 @@ O seed precisa do PostgreSQL e do SuperTokens em execução.
 - E-mail: `teste@teapts.local`
 - Senha: `teapts123`
 - Papel: `admin`
+- Sem CPF nem dados pessoais (conta de admin, RN001)
 
 **Profissional**
 
@@ -212,15 +213,17 @@ O seed precisa do PostgreSQL e do SuperTokens em execução.
 - Senha: `profissional123`
 - Papel: `user`
 - Perfil: psicólogo
+- CPF `123.456.789-09`, nascimento 12/06/1988, sexo feminino, mulher cisgênero, telefone `(41) 99100-2030`
 
 **Paciente**
 
 - E-mail: `paciente@teapts.local`
 - Senha: `paciente123`
 - Papel: `user`
-- Perfil: paciente
+- Perfil: paciente, CNS `700 0012 3456 7894`
+- CPF `987.654.321-00`, nascimento 18/04/2000, sexo masculino, telefone `(41) 99812-3344`
 
-O seed cria ou reutiliza as contas e garante que exista um perfil de psicólogo para a conta profissional. Ele não redefine a senha de usuários já existentes no SuperTokens.
+O seed cria ou reutiliza as contas (e grava de novo os dados pessoais delas) e garante o perfil de psicólogo da conta profissional e o perfil de paciente. Ele não redefine a senha de usuários já existentes no SuperTokens.
 
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
 
@@ -229,9 +232,10 @@ Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as 
 
 ```bash
 make db-tables                              # tabelas do public: account, patient, support_contact, professional, PTS, migrations
-make db-account                             # mostra as contas
-make db-patients                            # pacientes com CNS, responsável tutelar e nº de contatos
-make db-professionals                       # perfis profissionais (um por conta)
+make db-account                             # todas as colunas de account
+make db-patients                            # todas as colunas de patient, com o nome da conta
+make db-support-contacts                    # todas as colunas de support_contact, com o nome do paciente
+make db-professionals                       # todas as colunas de professional, com o nome da conta
 make db-query SQL="\dt supertokens.*"       # tabelas do SuperTokens
 make psql                                   # sessão psql interativa
 ```
@@ -525,9 +529,10 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make migrate-generate NAME=AddFoo` | Gera migration a partir das entidades, **no host** (precisa de `make up-d-db`) |
 | `make seed` | Cria a conta de teste no SuperTokens e em `account` |
 | `make db-tables` | Lista as tabelas |
-| `make db-account` | Mostra as contas |
-| `make db-patients` | Mostra os pacientes |
-| `make db-professionals` | Mostra os perfis profissionais |
+| `make db-account` | Mostra todas as colunas de `account` |
+| `make db-patients` | Mostra todas as colunas de `patient`, com o nome da conta |
+| `make db-support-contacts` | Mostra todas as colunas de `support_contact`, com o nome do paciente |
+| `make db-professionals` | Mostra todas as colunas de `professional`, com o nome da conta |
 | `make db-query SQL="..."` | Roda um SQL qualquer |
 
 **Testes e qualidade** (rodam no host, sem container)

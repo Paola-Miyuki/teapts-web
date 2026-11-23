@@ -4,11 +4,25 @@ import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { Gender } from '../../accounts/enums/gender.enum';
+import { Sex } from '../../accounts/enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 
 const TENANT_ID = 'public';
+
+// Dados pessoais do cadastro (RFAUT001): a conta de admin não tem CPF nem os
+// dados obrigatórios da conta de usuário (RN001). CPF, CNS e telefone só com
+// dígitos, válidos pelos dígitos verificadores.
+const NO_PERSONAL_DATA = {
+  socialName: null,
+  birthDate: null,
+  sex: null,
+  gender: null,
+  cpf: null,
+  phone: null,
+};
 
 const TEST_USERS = [
   {
@@ -17,6 +31,7 @@ const TEST_USERS = [
     name: 'Usuario de Teste',
     role: AccountRole.Admin,
     profile: 'none',
+    personal: NO_PERSONAL_DATA,
   },
   {
     email: 'profissional@teapts.local',
@@ -24,6 +39,14 @@ const TEST_USERS = [
     name: 'Profissional de Teste',
     role: AccountRole.User,
     profile: 'professional',
+    personal: {
+      socialName: null,
+      birthDate: '1988-06-12',
+      sex: Sex.Female,
+      gender: Gender.CisWoman,
+      cpf: '12345678909',
+      phone: '41991002030',
+    },
   },
   {
     email: 'paciente@teapts.local',
@@ -31,8 +54,18 @@ const TEST_USERS = [
     name: 'Paciente de Teste',
     role: AccountRole.User,
     profile: 'patient',
+    personal: {
+      socialName: null,
+      birthDate: '2000-04-18',
+      sex: Sex.Male,
+      gender: null,
+      cpf: '98765432100',
+      phone: '41998123344',
+    },
   },
 ] as const;
+
+const TEST_PATIENT_CNS = '700001234567894';
 
 function initSupertokens(): void {
   const config = new ConfigService();
@@ -100,6 +133,7 @@ async function createOrReuseAccount(
 
     account.name = user.name;
     account.role = user.role;
+    Object.assign(account, user.personal);
 
     account = await accounts.save(account);
     console.log(`Conta reutilizada: ${account.email} (${account.role})`);
@@ -112,6 +146,7 @@ async function createOrReuseAccount(
       email: user.email,
       supertokensUserId,
       role: user.role,
+      ...user.personal,
       lastUpdatedAt: null,
     }),
   );
@@ -125,7 +160,6 @@ async function ensureProfessionalProfile(account: Account): Promise<void> {
 
   const existingProfile = await professionals.findOneBy({
     accountId: account.id,
-    specialism: Specialism.Psychologist,
   });
 
   if (existingProfile) {
@@ -155,9 +189,10 @@ async function ensurePatientProfile(account: Account): Promise<void> {
     return;
   }
 
-  await dataSource.query('INSERT INTO "patient" ("account_id") VALUES ($1)', [
-    account.id,
-  ]);
+  await dataSource.query(
+    'INSERT INTO "patient" ("account_id", "cns") VALUES ($1, $2)',
+    [account.id, TEST_PATIENT_CNS],
+  );
 
   console.log(`Perfil de paciente criado: ${account.id}`);
 }
