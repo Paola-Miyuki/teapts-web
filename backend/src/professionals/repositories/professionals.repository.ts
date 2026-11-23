@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
+import type { Uf } from '../enums/uf.enum';
 
 /** Filtros e paginação já validados da consulta de profissionais. */
 export type FindProfessionalsQuery = {
@@ -22,6 +23,10 @@ export type FindProfessionalsQuery = {
 export type ProfessionalRow = {
   professional_id: string;
   professional_specialism: Specialism;
+  professional_council_number: string | null;
+  professional_council_state: Uf | null;
+  professional_institution: string | null;
+  professional_cnes: string | null;
   account_name: string;
   account_email: string;
 };
@@ -61,6 +66,10 @@ export class ProfessionalsRepository {
       .select([
         'professional.id AS professional_id',
         'professional.specialism AS professional_specialism',
+        'professional.councilNumber AS professional_council_number',
+        'professional.councilState AS professional_council_state',
+        'professional.institution AS professional_institution',
+        'professional.cnes AS professional_cnes',
         'account.name AS account_name',
         'account.email AS account_email',
       ]);

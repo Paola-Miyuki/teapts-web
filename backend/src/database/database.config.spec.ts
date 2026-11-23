@@ -14,6 +14,7 @@ import { StandardizeColumnNames1791148920000 } from './migrations/1791148920000-
 import { CreateSupportContact1791148930000 } from './migrations/1791148930000-CreateSupportContact';
 import { AlignPatientAndProfessionalConstraints1791148940000 } from './migrations/1791148940000-AlignPatientAndProfessionalConstraints';
 import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
+import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -87,6 +88,7 @@ describe('getDatabaseOptions', () => {
         CreateSupportContact1791148930000,
         AlignPatientAndProfessionalConstraints1791148940000,
         AddAccountPersonalFields1791148950000,
+        AddProfessionalCouncilFields1791148960000,
       ],
     });
   });

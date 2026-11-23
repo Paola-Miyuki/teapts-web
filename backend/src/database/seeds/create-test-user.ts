@@ -67,6 +67,16 @@ const TEST_USERS = [
 
 const TEST_PATIENT_CNS = '700001234567894';
 
+// Registro no conselho (CRP, da especialidade), instituição e CNES do perfil
+// profissional de teste.
+const TEST_PROFESSIONAL_PROFILE = {
+  specialism: Specialism.Psychologist,
+  councilNumber: '12345',
+  councilState: 'PR',
+  institution: 'IMA',
+  cnes: '2771112',
+} as const;
+
 function initSupertokens(): void {
   const config = new ConfigService();
 
@@ -163,14 +173,17 @@ async function ensureProfessionalProfile(account: Account): Promise<void> {
   });
 
   if (existingProfile) {
-    console.log('Perfil profissional de teste ja existe.');
+    await professionals.save(
+      Object.assign(existingProfile, TEST_PROFESSIONAL_PROFILE),
+    );
+    console.log('Perfil profissional de teste ja existe (dados atualizados).');
     return;
   }
 
   const profile = await professionals.save(
     professionals.create({
       accountId: account.id,
-      specialism: Specialism.Psychologist,
+      ...TEST_PROFESSIONAL_PROFILE,
     }),
   );
 

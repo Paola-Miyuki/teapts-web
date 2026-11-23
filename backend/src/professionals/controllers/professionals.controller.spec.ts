@@ -57,6 +57,9 @@ describe('GET /professionals', () => {
               id: Specialism.Psychologist,
               name: 'Psicologia',
             },
+            registration: null,
+            institution: null,
+            cnes: null,
           },
         ],
         pagination: {
@@ -114,6 +117,9 @@ describe('GET /professionals', () => {
             id: Specialism.Psychologist,
             name: 'Psicologia',
           },
+          registration: null,
+          institution: null,
+          cnes: null,
         },
       ],
       pagination: {

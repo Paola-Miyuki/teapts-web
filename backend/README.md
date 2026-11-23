@@ -169,7 +169,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
 | GET | `/patients/:id` | admin ou profissional com acesso (RN016) | [GET /patients/:id](#get-patientsid) |
 | POST | `/patients` | admin | [POST /patients](#post-patients) |
-| GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger |
+| GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger; cada item traz `registration` (`{ council, number, state }`, com o conselho vindo da especialidade, ou `null`), `institution` e `cnes` |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
 | GET | `/pts/proposals` | paciente titular, profissional da proposta ou admin | [GET /pts/proposals](#get-ptsproposals) |

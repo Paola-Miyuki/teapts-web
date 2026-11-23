@@ -76,6 +76,10 @@ describe('ProfessionalsService.findAll', () => {
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
         },
@@ -95,6 +99,9 @@ describe('ProfessionalsService.findAll', () => {
             id: Specialism.Psychologist,
             name: 'Psicologia',
           },
+          registration: { council: 'CRP', number: '12345', state: 'PR' },
+          institution: 'IMA',
+          cnes: null,
         },
       ],
       pagination: {
@@ -116,6 +123,10 @@ describe('ProfessionalsService.findAll', () => {
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
         },
@@ -135,6 +146,10 @@ describe('ProfessionalsService.findAll', () => {
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
         },

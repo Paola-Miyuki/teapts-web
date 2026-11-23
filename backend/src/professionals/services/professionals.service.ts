@@ -37,6 +37,13 @@ const SPECIALISM_NAMES: Record<Specialism, string> = {
   [Specialism.Physiotherapist]: 'Fisioterapia',
 };
 
+/** Conselho regional de cada especialidade (tabela de profissões do Dicionário de dados do front). */
+const SPECIALISM_COUNCILS: Record<Specialism, string> = {
+  [Specialism.Psychologist]: 'CRP',
+  [Specialism.Doctor]: 'CRM',
+  [Specialism.Physiotherapist]: 'Crefito',
+};
+
 /** Código do Postgres para violação de chave única (`unique_violation`). */
 const UNIQUE_VIOLATION = '23505';
 
@@ -210,6 +217,16 @@ export class ProfessionalsService {
         id: row.professional_specialism,
         name: SPECIALISM_NAMES[row.professional_specialism],
       },
+      registration:
+        row.professional_council_number && row.professional_council_state
+          ? {
+              council: SPECIALISM_COUNCILS[row.professional_specialism],
+              number: row.professional_council_number,
+              state: row.professional_council_state,
+            }
+          : null,
+      institution: row.professional_institution,
+      cnes: row.professional_cnes,
     };
   }
 }

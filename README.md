@@ -212,7 +212,7 @@ O seed precisa do PostgreSQL e do SuperTokens em execução.
 - E-mail: `profissional@teapts.local`
 - Senha: `profissional123`
 - Papel: `user`
-- Perfil: psicólogo
+- Perfil: psicólogo, registro `CRP-PR 12345`, instituição IMA, CNES `2771112`
 - CPF `123.456.789-09`, nascimento 12/06/1988, sexo feminino, mulher cisgênero, telefone `(41) 99100-2030`
 
 **Paciente**

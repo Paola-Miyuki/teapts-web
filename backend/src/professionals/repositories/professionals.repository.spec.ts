@@ -76,6 +76,10 @@ const filters: FindProfessionalsQuery = {
 const row: ProfessionalRow = {
   professional_id: '550e8400-e29b-41d4-a716-446655440000',
   professional_specialism: Specialism.Psychologist,
+  professional_council_number: '12345',
+  professional_council_state: 'PR',
+  professional_institution: 'IMA',
+  professional_cnes: null,
   account_name: 'Maria Silva',
   account_email: 'maria@example.com',
 };
@@ -102,6 +106,10 @@ describe('ProfessionalsRepository.findPaginated', () => {
     expect(query.select).toHaveBeenCalledWith([
       'professional.id AS professional_id',
       'professional.specialism AS professional_specialism',
+      'professional.councilNumber AS professional_council_number',
+      'professional.councilState AS professional_council_state',
+      'professional.institution AS professional_institution',
+      'professional.cnes AS professional_cnes',
       'account.name AS account_name',
       'account.email AS account_email',
     ]);
