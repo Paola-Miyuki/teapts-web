@@ -149,7 +149,7 @@ separa dois grupos:
   PTS abre `editar-pts.html`; os atendimentos usam o formato SOAP.
 - **Fluxos** (`teapts-login.html`, `cadastro.html`, `aguardando-perfil.html`,
   `inicio.html`, `inicio-paciente.html`, `meu-perfil.html`, `criar-paciente.html`,
-  `criar-pts.html`, `propostas-pts.html`, `pts.html` (no modelo do detalhe do PTS, com a aba Timeline; `historico.html` só abre a aba),
+  `criar-pts.html`, `propostas-pts.html`, `pts.html` (no modelo do detalhe do PTS, com as abas Timeline e Histórico de PTS; os PTS antigos abrem em `pts-anterior.html`; `historico.html` só abre a aba Timeline),
   `enviar-documento.html`): seguem a marcação e os estilos das telas do front
   (`login.module.css`, `signup.module.css`, `ui.module.css` etc.).
   `criar-paciente.html` é a página "Adicionar paciente". Nos formulários, só
