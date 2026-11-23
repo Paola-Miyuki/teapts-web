@@ -9,6 +9,8 @@ import {
   Unique,
 } from 'typeorm';
 import { AccountRole } from '../enums/account-role.enum';
+import { Gender } from '../enums/gender.enum';
+import { Sex } from '../enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 
@@ -38,6 +40,26 @@ export class Account {
   // antigas, criadas antes do campo (RN001).
   @Column('text', { nullable: true })
   cpf!: string | null;
+
+  // Data de nascimento e sexo sao obrigatorios no cadastro (RFAUT001); nulos so
+  // na conta de administrador e nas contas criadas antes dos campos.
+  @Column('date', { name: 'birth_date', nullable: true })
+  birthDate!: string | null;
+
+  @Column({ type: 'enum', enum: Sex, enumName: 'sex_e', nullable: true })
+  sex!: Sex | null;
+
+  @Column({
+    type: 'enum',
+    enum: Gender,
+    enumName: 'gender_e',
+    nullable: true,
+  })
+  gender!: Gender | null;
+
+  // So digitos, com DDD.
+  @Column('text', { nullable: true })
+  phone!: string | null;
 
   @Column({
     name: 'updated_at',

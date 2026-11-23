@@ -13,6 +13,7 @@ import { AddPatientListFields1791148910000 } from './migrations/1791148910000-Ad
 import { StandardizeColumnNames1791148920000 } from './migrations/1791148920000-StandardizeColumnNames';
 import { CreateSupportContact1791148930000 } from './migrations/1791148930000-CreateSupportContact';
 import { AlignPatientAndProfessionalConstraints1791148940000 } from './migrations/1791148940000-AlignPatientAndProfessionalConstraints';
+import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -85,6 +86,7 @@ describe('getDatabaseOptions', () => {
         StandardizeColumnNames1791148920000,
         CreateSupportContact1791148930000,
         AlignPatientAndProfessionalConstraints1791148940000,
+        AddAccountPersonalFields1791148950000,
       ],
     });
   });

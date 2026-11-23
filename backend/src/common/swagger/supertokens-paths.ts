@@ -110,7 +110,7 @@ function emailPasswordResponse(
 const fieldErrorExample = {
   value: {
     status: 'FIELD_ERROR',
-    formFields: [{ id: 'name', error: 'Informe o nome' }],
+    formFields: [{ id: 'cpf', error: 'Este CPF já está cadastrado' }],
   },
 };
 
@@ -121,14 +121,27 @@ export const supertokensPaths: PathsObject = {
       tags: ['auth'],
       summary: 'Cadastra uma conta (SDK do SuperTokens)',
       description:
-        'Cria a identidade no SuperTokens e a linha em `account` (role `user`). A senha precisa de pelo menos 8 caracteres, com letra e número; o `name` não pode ser vazio.',
+        'Cria a identidade no SuperTokens e a linha em `account` (role `user`), com os dados pessoais (RFAUT001). A senha precisa de pelo menos 8 caracteres, com letra e número. Obrigatórios: `name` (não vazio), `birthDate` (`AAAA-MM-DD`, até hoje), `sex` (`male` ou `female`) e `cpf` (11 dígitos com dígito verificador, com ou sem máscara, único: senão `Este CPF já está cadastrado`). Opcionais (vazio ou ausente): `socialName`, `gender` (`cis_woman`, `trans_woman`, `cis_man`, `trans_man`, `non_binary`, `other`, `prefer_not_to_say`) e `phone` (com DDD, 10 ou 11 dígitos). CPF e telefone são gravados só com dígitos.',
       parameters: [ridHeader, authModeHeader],
       requestBody: formFieldsBody(
-        ['email', 'password', 'name'],
+        [
+          'email',
+          'password',
+          'name',
+          'socialName',
+          'birthDate',
+          'sex',
+          'gender',
+          'cpf',
+          'phone',
+        ],
         [
           { id: 'email', value: 'maria@teapts.local' },
           { id: 'password', value: 'Senha123' },
           { id: 'name', value: 'Maria' },
+          { id: 'birthDate', value: '1990-05-20' },
+          { id: 'sex', value: 'female' },
+          { id: 'cpf', value: '52998224725' },
         ],
       ),
       responses: emailPasswordResponse(

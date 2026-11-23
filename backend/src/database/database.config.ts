@@ -14,6 +14,7 @@ import { AddPatientListFields1791148910000 } from './migrations/1791148910000-Ad
 import { StandardizeColumnNames1791148920000 } from './migrations/1791148920000-StandardizeColumnNames';
 import { CreateSupportContact1791148930000 } from './migrations/1791148930000-CreateSupportContact';
 import { AlignPatientAndProfessionalConstraints1791148940000 } from './migrations/1791148940000-AlignPatientAndProfessionalConstraints';
+import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
@@ -29,6 +30,7 @@ const migrations = [
   StandardizeColumnNames1791148920000,
   CreateSupportContact1791148930000,
   AlignPatientAndProfessionalConstraints1791148940000,
+  AddAccountPersonalFields1791148950000,
 ];
 
 export function getDatabaseOptions(

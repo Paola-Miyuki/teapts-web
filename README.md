@@ -281,12 +281,13 @@ A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita
 | --- | --- | --- |
 | SuperTokens Core | container `supertokens`, porta 3567 | e-mail, senha (hash) e sessões, no schema `supertokens` do Postgres |
 | Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
-| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role` e o vínculo `supertokens_user_id` |
+| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) e o vínculo `supertokens_user_id` |
 
-A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` (no máximo um) e `professional` (vários, um por especialidade). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
+A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` e `professional`, no máximo um de cada (RN002). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
 
 ```text
-POST /auth/signup (email, password, name)
+POST /auth/signup (email, password, name, birthDate, sex, cpf; socialName, gender, phone opcionais)
+  -> backend valida os campos (CPF com dígito verificador e sem outra conta)
   -> SuperTokens cria a identidade
   -> backend cria a linha em account (role = user)
      (se o banco falhar, a identidade é apagada do SuperTokens)
@@ -325,12 +326,12 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 
 | Método | Rota | Corpo / headers | Resposta |
 | --- | --- | --- | --- |
-| POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name` | `200 {"status":"OK","user":{...}}` e sessão |
+| POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name`, `birthDate`, `sex`, `cpf` e, opcionais, `socialName`, `gender`, `phone` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/signin` | `rid: emailpassword`; `formFields`: `email`, `password` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
 | POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
-| PATCH | `/me` | access token; `{ name?, email? }` | dados da conta atualizados |
+| PATCH | `/me` | access token; `{ name?, email?, socialName?, birthDate?, sex?, gender?, phone? }` | dados da conta atualizados |
 | POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |
@@ -390,6 +391,14 @@ O `GET /me` deve responder:
   "name": "Usuario de Teste",
   "email": "teste@teapts.local",
   "role": "admin",
+  "socialName": null,
+  "birthDate": null,
+  "sex": null,
+  "gender": null,
+  "cpf": null,
+  "phone": null,
+  "createdAt": "<data do cadastro>",
+  "updatedAt": null,
   "patientProfileId": null,
   "professionalProfileIds": []
 }
@@ -400,7 +409,7 @@ O `GET /me` deve responder:
 ```bash
 curl -s -X POST "$API/auth/signup" \
   -H 'rid: emailpassword' -H 'st-auth-mode: header' -H 'Content-Type: application/json' \
-  -d '{"formFields":[{"id":"email","value":"maria@teapts.local"},{"id":"password","value":"Senha123"},{"id":"name","value":"Maria"}]}'
+  -d '{"formFields":[{"id":"email","value":"maria@teapts.local"},{"id":"password","value":"Senha123"},{"id":"name","value":"Maria"},{"id":"birthDate","value":"1990-05-20"},{"id":"sex","value":"female"},{"id":"cpf","value":"52998224725"}]}'
 ```
 
 **Mesmo fluxo com cookies** (como o navegador faz):
@@ -421,7 +430,7 @@ Respostas que indicam problema:
 | --- | --- |
 | login (`/auth/signin`) `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
 | login/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
-| signup `200 {"status":"FIELD_ERROR",...}` | `name` vazio ou senha fraca; a mensagem diz qual campo |
+| signup `200 {"status":"FIELD_ERROR",...}` | campo obrigatório faltando (`Field is not optional`), CPF inválido ou já cadastrado, data de nascimento, sexo, gênero ou telefone inválidos, ou senha fraca; a mensagem diz qual campo |
 | signup `200 {"status":"EMAIL_ALREADY_EXISTS_ERROR"}` | e-mail já cadastrado |
 | `/me` `401 {"message":"unauthorised"}` | nenhum token chegou: o login não deu `OK` ou faltou `Authorization`/cookie |
 | `/me` `401 {"message":"try refresh token"}` | access token expirado: chame `/auth/session/refresh` |
