@@ -1,3 +1,5 @@
+'use client';
+
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Professionals from './_components/Professionals';
 
@@ -8,13 +10,17 @@ export default function ProfessionalsPage() {
       breadcrumb="Profissionais"
       requiredAction="viewProfessionalDirectory"
     >
-      <div className="heading">
-        <div>
-          <h1>Profissionais</h1>
-        </div>
-      </div>
+      {(account) => (
+        <>
+          <div className="heading">
+            <div>
+              <h1>Profissionais</h1>
+            </div>
+          </div>
 
-      <Professionals />
+          <Professionals isAdmin={account.role === 'admin'} />
+        </>
+      )}
     </AuthenticatedPage>
   );
 }

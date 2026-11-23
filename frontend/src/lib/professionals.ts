@@ -3,6 +3,13 @@ import { request } from '@/lib/api';
 export type ProfessionalSpecialism =
   'psychologist' | 'doctor' | 'physiotherapist';
 
+// Registro no conselho regional; o conselho vem da especialidade.
+export type ProfessionalRegistration = {
+  council: string;
+  number: string;
+  state: string;
+};
+
 export type Professional = {
   id: string;
   name: string;
@@ -12,7 +19,16 @@ export type Professional = {
     id: ProfessionalSpecialism;
     name: string;
   };
+  // Nulos nos perfis cadastrados antes do registro no conselho.
+  registration: ProfessionalRegistration | null;
+  institution: string | null;
+  cnes: string | null;
 };
+
+/** Registro como nas telas, ex.: "CRP-PR 12345". */
+export function formatRegistration(registration: ProfessionalRegistration) {
+  return `${registration.council}-${registration.state} ${registration.number}`;
+}
 
 export type PaginationData = {
   page: number;

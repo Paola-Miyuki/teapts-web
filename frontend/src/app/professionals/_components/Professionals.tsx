@@ -1,16 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 import Icon from '@/components/Icon';
+import Modal from '@/components/Modal';
+import KebabMenu from '@/components/table/KebabMenu';
 import MultiSelect from '@/components/table/MultiSelect';
 import Pagination, { PER_PAGE_OPTIONS } from '@/components/table/Pagination';
 import ui from '@/components/ui.module.css';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { ApiError } from '@/lib/api';
 import {
+  formatRegistration,
   getProfessionals,
+  type Professional,
   type ProfessionalSpecialism,
   type ProfessionalsResponse,
 } from '@/lib/professionals';
@@ -26,10 +31,103 @@ function initial(name: string) {
   return name.trim().charAt(0).toUpperCase();
 }
 
-// Lista de `profissionais.html`, com as colunas que a API já devolve: nome,
-// profissão e e-mail (o e-mail só vem para admin e profissional, DP011).
-// A API filtra uma especialidade por vez.
-export default function Professionals() {
+function EmptyCell() {
+  return (
+    <span className="empty-cell" aria-label="Não informado">
+      —
+    </span>
+  );
+}
+
+// Registro com o botão de copiar, como em `profissionais.html`.
+function RegistrationCell({ professional }: { professional: Professional }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!professional.registration) {
+    return <EmptyCell />;
+  }
+
+  const label = formatRegistration(professional.registration);
+
+  return (
+    <span className="copy-cell">
+      {label}
+      <button
+        type="button"
+        className="copy-btn"
+        aria-label={copied ? 'Registro copiado' : `Copiar Registro ${label}`}
+        title={copied ? 'Registro copiado.' : undefined}
+        onClick={() => {
+          void navigator.clipboard
+            ?.writeText(label)
+            .then(() => setCopied(true));
+        }}
+      >
+        <Icon name={copied ? 'check' : 'copy'} className="icon-sm" />
+      </button>
+    </span>
+  );
+}
+
+// "Visualizar" do admin: perfil profissional e conta. Telefone, PTS ativos,
+// editar e desativar entram com a #54, a #55 e a #108.
+function ProfessionalViewDialog({
+  professional,
+  onClose,
+}: {
+  professional: Professional | null;
+  onClose: () => void;
+}) {
+  const item = (label: string, value: ReactNode) => (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value || <EmptyCell />}</dd>
+    </div>
+  );
+
+  return (
+    <Modal
+      open={professional !== null}
+      id="professional-view"
+      title={professional?.name ?? ''}
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn" onClick={onClose}>
+          Fechar
+        </button>
+      }
+    >
+      {professional && (
+        <>
+          <section>
+            <h3>Perfil profissional</h3>
+            <dl className="data-grid">
+              {item('Profissão', professional.specialism.name)}
+              {item('Conselho regional', professional.registration?.council)}
+              {item('Nº de registro', professional.registration?.number)}
+              {item('UF do registro', professional.registration?.state)}
+              {item('Instituição', professional.institution)}
+              {item('CNES', professional.cnes)}
+              {item(
+                'Situação da conta',
+                <span className="badge active">Ativo</span>,
+              )}
+            </dl>
+          </section>
+          <section>
+            <h3>Conta</h3>
+            <dl className="data-grid">{item('E-mail', professional.email)}</dl>
+          </section>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+// Lista de `profissionais.html` (o e-mail só vem para admin e profissional,
+// DP011). Situação e ações só para o admin; a situação é "Ativo" até existir
+// conta inativa (#108). A API filtra uma especialidade por vez.
+export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const search = useDebouncedSearch();
   const [specialism, setSpecialism] = useState<ProfessionalSpecialism | ''>('');
@@ -39,6 +137,7 @@ export default function Professionals() {
   const [retryKey, setRetryKey] = useState(0);
   const [result, setResult] = useState<ProfessionalsResponse | null>(null);
   const [error, setError] = useState('');
+  const [viewing, setViewing] = useState<Professional | null>(null);
 
   const term = search.term;
   const [lastQuery, setLastQuery] = useState({ term, specialism });
@@ -205,7 +304,17 @@ export default function Professionals() {
                 <tr>
                   <th scope="col">Profissional</th>
                   <th scope="col">Profissão</th>
+                  <th scope="col">Registro</th>
                   <th scope="col">E-mail</th>
+                  <th scope="col">Instituição</th>
+                  {isAdmin && (
+                    <>
+                      <th scope="col">Situação</th>
+                      <th scope="col" className="actions-col">
+                        <span className="sr-only">Ações</span>
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -222,13 +331,34 @@ export default function Professionals() {
                       </div>
                     </td>
                     <td>{professional.specialism.name}</td>
-                    <td>
-                      {professional.email ?? (
-                        <span className="empty-cell" aria-label="Não informado">
-                          —
-                        </span>
-                      )}
+                    <td className="nowrap">
+                      <RegistrationCell professional={professional} />
                     </td>
+                    <td>{professional.email ?? <EmptyCell />}</td>
+                    <td className="ux-col-lg">
+                      {professional.institution ?? <EmptyCell />}
+                    </td>
+                    {isAdmin && (
+                      <>
+                        <td>
+                          <span className="badge active">Ativo</span>
+                        </td>
+                        <td className="actions-col">
+                          <KebabMenu label={`Ações para ${professional.name}`}>
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => setViewing(professional)}
+                              >
+                                <Icon name="eye" className="icon-sm" />
+                                Visualizar
+                              </button>
+                            </li>
+                          </KebabMenu>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -249,6 +379,11 @@ export default function Professionals() {
           />
         </>
       )}
+
+      <ProfessionalViewDialog
+        professional={viewing}
+        onClose={() => setViewing(null)}
+      />
     </div>
   );
 }

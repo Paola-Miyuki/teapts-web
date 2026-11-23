@@ -68,7 +68,8 @@ src/
     profile/               meu perfil (GET /me): dados da conta, pessoais e a profissão; edit/
                            edita os dados (PATCH /me) e abre a troca de senha (POST /me/password)
     professionals/         profissionais (GET /professionals) na tabela de `profissionais.html`:
-                           busca por nome, filtro de especialidade e paginação
+                           busca por nome, filtro de especialidade e paginação; registro (com
+                           copiar) e instituição; para o admin, situação e menu ⋮ com Visualizar
     pts/
       novo/                criar proposta de PTS em passos (Paciente, Diagnóstico, Equipe e
                            prazos): paciente buscado pelo nome (GET /patients/available-for-pts?name=,
@@ -107,6 +108,7 @@ src/
     account.ts             GET /me, PATCH /me, POST /me/password e menu por perfil
     permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
     professionals.ts       GET /professionals (o e-mail vem `null` para quem não é admin nem profissional)
+                           e formatRegistration ("CRP-PR 12345")
     patients.ts            lista (getPatients) e detalhe (getPatient) dos pacientes, contas sem perfil
                            (com `q` e `signal`), cadastro do perfil e isValidPhone
     pts-status.ts          status do PTS e rótulos das telas

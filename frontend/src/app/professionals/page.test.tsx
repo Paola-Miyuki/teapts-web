@@ -42,10 +42,10 @@ const ACCOUNT = {
 };
 
 // /me responde com a conta; as demais chamadas vão para o mock de profissionais.
-function mockApi(professionals: jest.Mock) {
+function mockApi(professionals: jest.Mock, account: object = ACCOUNT) {
   (global.fetch as jest.Mock).mockImplementation((url: string) =>
     url.endsWith('/me')
-      ? Promise.resolve(mockResponse({ data: ACCOUNT }))
+      ? Promise.resolve(mockResponse({ data: account }))
       : professionals(url),
   );
 }
@@ -112,6 +112,9 @@ describe('ProfessionalsPage', () => {
                   id: 'psychologist',
                   name: 'Psicologia',
                 },
+                registration: null,
+                institution: null,
+                cnes: null,
               },
             ],
             pagination: {
@@ -145,6 +148,94 @@ describe('ProfessionalsPage', () => {
         credentials: 'include',
       },
     );
+  });
+
+  it('mostra registro, instituição e, para o admin, situação e Visualizar', async () => {
+    mockApi(
+      jest.fn(() =>
+        Promise.resolve(
+          mockResponse({
+            data: {
+              data: [
+                {
+                  id: 'professional-uuid',
+                  name: 'Ana Souza',
+                  email: 'ana@example.com',
+                  specialism: { id: 'psychologist', name: 'Psicologia' },
+                  registration: {
+                    council: 'CRP',
+                    number: '12345',
+                    state: 'PR',
+                  },
+                  institution: 'IMA',
+                  cnes: '2771112',
+                },
+              ],
+              pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+          }),
+        ),
+      ),
+      { ...ACCOUNT, role: 'admin', professionalProfileIds: [] },
+    );
+
+    render(<ProfessionalsPage />);
+
+    const row = (await screen.findByText('Ana Souza')).closest('tr')!;
+
+    expect(within(row).getByText('CRP-PR 12345')).toBeInTheDocument();
+    expect(
+      within(row).getByRole('button', { name: 'Copiar Registro CRP-PR 12345' }),
+    ).toBeInTheDocument();
+    expect(within(row).getByText('IMA')).toBeInTheDocument();
+    expect(within(row).getByText('Ativo')).toBeInTheDocument();
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana Souza' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Visualizar' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Ana Souza' });
+    expect(within(dialog).getByText('2771112')).toBeInTheDocument();
+    expect(within(dialog).getByText('CRP')).toBeInTheDocument();
+  });
+
+  it('não mostra situação nem ações para quem não é admin', async () => {
+    mockApi(
+      jest.fn(() =>
+        Promise.resolve(
+          mockResponse({
+            data: {
+              data: [
+                {
+                  id: 'professional-uuid',
+                  name: 'Ana Souza',
+                  email: 'ana@example.com',
+                  specialism: { id: 'psychologist', name: 'Psicologia' },
+                  registration: null,
+                  institution: null,
+                  cnes: null,
+                },
+              ],
+              pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+          }),
+        ),
+      ),
+    );
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana Souza');
+    expect(
+      screen.queryByRole('columnheader', { name: 'Situação' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Ações para Ana Souza' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Registro' }),
+    ).toBeInTheDocument();
   });
 
   it('exibe estado vazio quando não existem profissionais', async () => {
@@ -238,6 +329,9 @@ describe('ProfessionalsPage', () => {
                     id: 'psychologist',
                     name: 'Psicologia',
                   },
+                  registration: null,
+                  institution: null,
+                  cnes: null,
                 },
               ],
               pagination: {
@@ -290,6 +384,9 @@ describe('ProfessionalsPage', () => {
                     id: 'doctor',
                     name: 'Medicina',
                   },
+                  registration: null,
+                  institution: null,
+                  cnes: null,
                 },
               ],
               pagination: {
@@ -313,6 +410,9 @@ describe('ProfessionalsPage', () => {
                     id: 'doctor',
                     name: 'Medicina',
                   },
+                  registration: null,
+                  institution: null,
+                  cnes: null,
                 },
               ],
               pagination: {
