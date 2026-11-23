@@ -118,7 +118,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/` | redireciona para `/home` | — | — |
 | `/login` | Entrar | pública | `teapts-login.html` |
 | `/signup` | Criar conta | pública | `cadastro.html` |
-| `/home` | Início, Meu cuidado ou Aguardando perfil | conta da sessão | `inicio-paciente.html`, `aguardando-perfil.html` |
+| `/home` | Início, Meu cuidado ou Aguardando perfil | conta da sessão | `inicio.html`, `inicio-paciente.html`, `aguardando-perfil.html` |
 | `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
 | `/patients` | Pacientes cadastrados e "Adicionar paciente" | admin (`viewPatientRegistry`) | `pacientes.html`, `criar-paciente.html` |
 | `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | — |
@@ -131,6 +131,35 @@ As telas a implementar estão em `design/` como HTML estático. Abra
 `design/index.html` no navegador para ver todas; as cores, fontes e regras da
 marca estão em `design/brand-spec.md`. Use esses arquivos como referência
 visual: não importe nada de `design/` no código do app.
+
+Todas as telas são mockups com dados fixos, com o shell do `AppShell` e os
+estilos em `assets/teapts-mockups.css` e `assets/teapts-mockups.js`. O índice
+separa dois grupos:
+
+- **Listagens e detalhes** (`contas.html`, `pacientes.html`, `profissionais.html`,
+  `lista-pts.html`, `paciente.html`, `prontuario.html`, `pts-detalhe.html`):
+  seguem `.dev/telas-listagem.md`. Visualizar, criar, editar e excluir abrem
+  modais (exclusões pedem confirmação); visualizar de paciente abre o
+  prontuário (`paciente.html`), com todos os dados do paciente em abas (Dados
+  do paciente, Histórico de PTS, Atendimentos, Medicações, Documentos e Termos e
+  consentimentos); `prontuario.html` só abre a aba Documentos de `paciente.html`. O detalhe do PTS
+  tem o cartão do PTS em todas as abas e, embaixo dele, as abas (Visão geral,
+  Metas terapêuticas, Equipe, Atividades, Atendimentos e Timeline); há um
+  segundo exemplo em planejamento (`pts-planejamento.html`), e toda edição de
+  PTS abre `editar-pts.html`; os atendimentos usam o formato SOAP.
+- **Fluxos** (`teapts-login.html`, `cadastro.html`, `aguardando-perfil.html`,
+  `inicio.html`, `inicio-paciente.html`, `meu-perfil.html`, `criar-paciente.html`,
+  `criar-pts.html`, `propostas-pts.html`, `pts.html` (no modelo do detalhe do PTS, com a aba Timeline; `historico.html` só abre a aba),
+  `enviar-documento.html`): seguem a marcação e os estilos das telas do front
+  (`login.module.css`, `signup.module.css`, `ui.module.css` etc.).
+  `criar-paciente.html` é a página "Adicionar paciente". Nos formulários, só
+  o campo obrigatório leva *; o opcional não tem marca. Nenhum texto fica
+  embaixo do campo: o exemplo vai no placeholder e a explicação, no "?" ao
+  lado da label. Botões de excluir e desativar são vermelhos.
+
+A barra tracejada no topo é só do mockup e só aparece nas telas com mais de um
+papel ou com variantes: troca o papel ("Ver como"), o cenário do paciente (sem
+ou com PTS ativo) e as opções das decisões pendentes (DPs) da tela.
 
 ## Estilos
 
