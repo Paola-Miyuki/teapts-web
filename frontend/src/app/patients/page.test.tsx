@@ -592,9 +592,6 @@ describe('PatientsPage', () => {
       act(() => jest.advanceTimersByTime(300));
 
       expect(list).toHaveBeenCalledTimes(1);
-      expect(
-        screen.getByText('Digite ao menos 2 caracteres para buscar.'),
-      ).toBeInTheDocument();
     });
 
     it('busca na hora ao pressionar Enter, sem esperar o debounce', async () => {
@@ -668,7 +665,9 @@ describe('PatientsPage', () => {
         screen.queryByText('Nenhum paciente cadastrado'),
       ).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+      await user.click(
+        screen.getByRole('button', { name: 'Limpar campo de busca' }),
+      );
 
       expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
       expect(screen.getByRole('searchbox', SEARCH)).toHaveValue('');

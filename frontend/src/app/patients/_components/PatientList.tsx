@@ -20,16 +20,10 @@ type PatientListProps = {
   // Termo de busca efetivo (já com debounce, trim e mínimo de 2 caracteres).
   term: string;
   onAdd: () => void;
-  onClearSearch: () => void;
   canAdd: boolean;
 };
 
-export default function PatientList({
-  term,
-  onAdd,
-  onClearSearch,
-  canAdd,
-}: PatientListProps) {
+export default function PatientList({ term, onAdd, canAdd }: PatientListProps) {
   const router = useRouter();
 
   // Mudar o termo volta à página 1, sem precisar de efeito extra.
@@ -127,14 +121,6 @@ export default function PatientList({
           <h2>Nenhum paciente encontrado</h2>
 
           <p>Nenhum resultado para “{last.term}”. Revise o nome ou o e-mail.</p>
-
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSecondary}`}
-            onClick={onClearSearch}
-          >
-            Limpar busca
-          </button>
         </div>
       );
     }

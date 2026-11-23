@@ -108,7 +108,6 @@ function PatientRegistry({ account }: { account: Account }) {
 
         <PatientSearch
           value={search.input}
-          isTooShort={search.isTooShort}
           onChange={search.setInput}
           onCommit={search.commit}
           onClear={search.clear}
@@ -118,7 +117,6 @@ function PatientRegistry({ account }: { account: Account }) {
           key={listKey}
           term={search.term}
           onAdd={openAdd}
-          onClearSearch={search.clear}
           canAdd={can(account, 'createPatientProfile')}
         />
 

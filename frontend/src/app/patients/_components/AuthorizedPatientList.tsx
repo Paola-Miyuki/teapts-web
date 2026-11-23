@@ -22,12 +22,10 @@ function getInitial(name: string) {
 type AuthorizedPatientListProps = {
   // Termo de busca efetivo (já com debounce, trim e mínimo de 2 caracteres).
   term: string;
-  onClearSearch: () => void;
 };
 
 export default function AuthorizedPatientList({
   term,
-  onClearSearch,
 }: AuthorizedPatientListProps) {
   const router = useRouter();
 
@@ -128,15 +126,7 @@ export default function AuthorizedPatientList({
 
           <h2>Nenhum paciente encontrado</h2>
 
-          <p>Tente outro nome ou limpe a busca.</p>
-
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSecondary}`}
-            onClick={onClearSearch}
-          >
-            Limpar busca
-          </button>
+          <p>Tente outro nome.</p>
         </div>
       );
     }

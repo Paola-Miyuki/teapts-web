@@ -8,7 +8,6 @@ import styles from '../patients.module.css';
 
 type PatientSearchProps = {
   value: string;
-  isTooShort: boolean;
   onChange: (value: string) => void;
   onCommit: () => void;
   onClear: () => void;
@@ -18,7 +17,6 @@ type PatientSearchProps = {
 
 export default function PatientSearch({
   value,
-  isTooShort,
   onChange,
   onCommit,
   onClear,
@@ -45,7 +43,6 @@ export default function PatientSearch({
           className={`${ui.input} ${styles.searchInput}`}
           placeholder={label}
           aria-label={label}
-          aria-describedby={isTooShort ? 'patient-search-hint' : undefined}
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -63,12 +60,6 @@ export default function PatientSearch({
           </button>
         )}
       </div>
-
-      {isTooShort && (
-        <p id="patient-search-hint" className={ui.hint} role="status">
-          Digite ao menos 2 caracteres para buscar.
-        </p>
-      )}
     </div>
   );
 }

@@ -50,13 +50,12 @@ export default function AuthorizedPatients() {
       <PatientSearch
         label="Buscar paciente pelo nome"
         value={search.input}
-        isTooShort={search.isTooShort}
         onChange={search.setInput}
         onCommit={search.commit}
         onClear={search.clear}
       />
 
-      <AuthorizedPatientList term={search.term} onClearSearch={search.clear} />
+      <AuthorizedPatientList term={search.term} />
     </>
   );
 }

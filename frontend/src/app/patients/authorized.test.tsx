@@ -182,7 +182,7 @@ describe('Pacientes autorizados do profissional', () => {
     });
   });
 
-  it('não busca com menos de 2 caracteres e avisa', async () => {
+  it('não busca com menos de 2 caracteres', async () => {
     jest.useFakeTimers();
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     const { list } = mockApi();
@@ -193,12 +193,9 @@ describe('Pacientes autorizados do profissional', () => {
     act(() => jest.advanceTimersByTime(300));
 
     expect(list).toHaveBeenCalledTimes(1);
-    expect(
-      screen.getByText('Digite ao menos 2 caracteres para buscar.'),
-    ).toBeInTheDocument();
   });
 
-  it('mostra o vazio da busca e limpa com o botão', async () => {
+  it('mostra o vazio da busca e limpa com o ✕', async () => {
     mockedUseSearchParams.mockReturnValue(new URLSearchParams('name=zzz'));
     const user = userEvent.setup();
     const { list } = mockApi({
@@ -211,7 +208,9 @@ describe('Pacientes autorizados do profissional', () => {
       await screen.findByText('Nenhum paciente encontrado'),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Limpar campo de busca' }),
+    );
 
     expect(await screen.findByText('Maria Silva')).toBeInTheDocument();
     expect(list).toHaveBeenLastCalledWith(AUTHORIZED_URL, expect.anything());
