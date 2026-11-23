@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import type { Account } from '@/lib/account';
 
@@ -10,6 +11,7 @@ import {
   PtsProposalApiError,
   updatePtsProposal,
 } from '../api';
+import { personalData } from '@/test-utils/account';
 
 jest.mock('@/lib/supertokens', () => ({
   initSuperTokens: jest.fn(),
@@ -53,6 +55,7 @@ const account: Account = {
   name: 'Profissional Teste',
   email: 'profissional@example.com',
   role: 'user',
+  ...personalData,
   patientProfileId: null,
   professionalProfileIds: [RESPONSIBLE_ID],
 };
@@ -138,111 +141,85 @@ describe('EditPtsProposalForm', () => {
     (getProfessionalsForTeam as jest.Mock).mockResolvedValue(professionals);
   });
 
-  it('carrega a proposta e não oferece o responsável como integrante da equipe', async () => {
+  it('mostra o paciente, a situação social e a equipe atual nos passos', async () => {
+    const user = userEvent.setup();
     render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
 
+    expect(await screen.findByText('Paciente Teste')).toBeInTheDocument();
     expect(
-      await screen.findByDisplayValue('Paciente Teste'),
+      screen.getByRole('list', { name: 'Passo 1 de 3' }),
     ).toBeInTheDocument();
 
+    await user.click(screen.getByRole('button', { name: /Próximo/ }));
+    expect(
+      screen.getByRole('textbox', { name: /^Situação social/ }),
+    ).toHaveValue('Mora com a mãe.');
+
+    await user.click(screen.getByRole('button', { name: /Próximo/ }));
     expect(
       screen.getByDisplayValue('Responsável Teste · Psicologia'),
     ).toBeInTheDocument();
-
-    expect(screen.getByDisplayValue('Mora com a mãe.')).toBeInTheDocument();
-
     expect(
-      screen.queryByLabelText('Responsável Teste · Psicologia'),
+      screen.getByRole('button', { name: 'Remover Médico Teste da equipe' }),
+    ).toBeInTheDocument();
+
+    // O responsável não é oferecido como membro.
+    await user.click(
+      screen.getByRole('combobox', { name: 'Adicionar membro' }),
+    );
+    expect(
+      screen.queryByRole('option', { name: 'Responsável Teste · Psicologia' }),
     ).not.toBeInTheDocument();
-
-    expect(
-      await screen.findByLabelText('Médico Teste · Medicina'),
-    ).toBeChecked();
   });
 
   it('atualiza situação social e equipe e volta para as propostas', async () => {
-    (updatePtsProposal as jest.Mock).mockResolvedValue({
-      ...proposal,
-
-      socialSituation: 'Nova situação social.',
-
-      team: [
-        proposal.team[0],
-
-        {
-          id: OTHER_ID,
-          name: 'Fisioterapeuta Teste',
-
-          specialism: {
-            id: 'physiotherapist',
-            name: 'Fisioterapia',
-          },
-        },
-      ],
-    });
+    const user = userEvent.setup();
+    (updatePtsProposal as jest.Mock).mockResolvedValue(proposal);
 
     render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
 
-    const textarea = await screen.findByLabelText('Situação social');
+    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
+    const textarea = screen.getByRole('textbox', { name: /^Situação social/ });
+    await user.clear(textarea);
+    await user.type(textarea, 'Nova situação social.');
+    await user.click(screen.getByRole('button', { name: /Próximo/ }));
 
-    const physiotherapist = await screen.findByLabelText(
-      'Fisioterapeuta Teste · Fisioterapia',
+    await user.click(
+      screen.getByRole('combobox', { name: 'Adicionar membro' }),
     );
-
-    const saveButton = await screen.findByRole('button', {
-      name: 'Salvar proposta',
-    });
-
-    fireEvent.change(textarea, {
-      target: {
-        value: 'Nova situação social.',
-      },
-    });
-
-    fireEvent.click(physiotherapist);
-
-    fireEvent.click(saveButton);
+    await user.click(
+      screen.getByRole('option', {
+        name: 'Fisioterapeuta Teste · Fisioterapia',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Adicionar' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar proposta' }));
 
     await waitFor(() => {
       expect(updatePtsProposal).toHaveBeenCalledWith(PROPOSAL_ID, {
         socialSituation: 'Nova situação social.',
-
         teamProfessionalIds: [TEAM_ID, OTHER_ID],
       });
     });
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith(
-        `/pts/proposals?patientId=${PATIENT_ID}&updated=1`,
-      );
-    });
+    expect(mockPush).toHaveBeenCalledWith('/pts/proposals?updated=1');
   });
 
   it('valida situação social vazia', async () => {
+    const user = userEvent.setup();
     render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
 
-    const textarea = await screen.findByLabelText('Situação social');
-
-    const saveButton = await screen.findByRole('button', {
-      name: 'Salvar proposta',
-    });
-
-    fireEvent.change(textarea, {
-      target: {
-        value: '   ',
-      },
-    });
-
-    fireEvent.click(saveButton);
+    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
+    await user.clear(screen.getByRole('textbox', { name: /^Situação social/ }));
+    await user.click(screen.getByRole('button', { name: /Próximo/ }));
 
     expect(
       await screen.findByText('Descreva a situação social do paciente.'),
     ).toBeInTheDocument();
-
     expect(updatePtsProposal).not.toHaveBeenCalled();
   });
 
   it('exibe a mensagem da API quando a proposta já foi decidida', async () => {
+    const user = userEvent.setup();
     (updatePtsProposal as jest.Mock).mockRejectedValue(
       new PtsProposalApiError(
         409,
@@ -253,13 +230,9 @@ describe('EditPtsProposalForm', () => {
 
     render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
 
-    await screen.findByDisplayValue('Paciente Teste');
-
-    const saveButton = await screen.findByRole('button', {
-      name: 'Salvar proposta',
-    });
-
-    fireEvent.click(saveButton);
+    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
+    await user.click(screen.getByRole('button', { name: /Próximo/ }));
+    await user.click(screen.getByRole('button', { name: 'Salvar proposta' }));
 
     expect(
       await screen.findByText(

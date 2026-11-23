@@ -1,4 +1,5 @@
 import { getNavigation, type Account } from './account';
+import { personalData } from '@/test-utils/account';
 
 function account(overrides: Partial<Account> = {}): Account {
   return {
@@ -6,6 +7,7 @@ function account(overrides: Partial<Account> = {}): Account {
     name: 'Pessoa',
     email: 'pessoa@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: null,
     professionalProfileIds: [],
     ...overrides,
@@ -71,7 +73,7 @@ describe('getNavigation', () => {
       labels(account({ professionalProfileIds: ['professional'] })),
     ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
-      'Meu cuidado',
+      'Início',
       'PTS',
     ]);
     expect(labels(account())).toEqual(['Início']);

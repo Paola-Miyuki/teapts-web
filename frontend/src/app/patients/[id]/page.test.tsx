@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { Account } from '@/lib/account';
 
 import PatientDetail from './PatientDetail';
+import { personalData } from '@/test-utils/account';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -17,6 +18,7 @@ const PROFESSIONAL: Account = {
   name: 'Paula Profissional',
   email: 'paula@example.com',
   role: 'user',
+  ...personalData,
   patientProfileId: null,
   professionalProfileIds: ['professional-profile'],
 };

@@ -1,60 +1,63 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import ui from '@/components/ui.module.css';
+
+import Combobox from '@/components/Combobox';
+import HelpTooltip from '@/components/HelpTooltip';
 import Icon from '@/components/Icon';
-import { initSuperTokens } from '@/lib/supertokens';
+import TeamMembers from '@/components/pts/TeamMembers';
+import WizardSteps, {
+  PTS_STEPS,
+  type PtsStep,
+} from '@/components/pts/WizardSteps';
+import ui from '@/components/ui.module.css';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { Account } from '@/lib/account';
+import { initSuperTokens } from '@/lib/supertokens';
 import {
   createPts,
   listEligiblePatients,
   listProfessionals,
 } from './api/ptsApi';
 import { mapCreatePtsError, type CreatePtsError } from './errors';
-import {
-  ErrorMessage,
-  LoadingState,
-  PatientSelect,
-  ProfessionalTeamSelect,
-  SocialSituationInput,
-  SubmitButton,
-} from './_components';
-import styles from './novo.module.css';
-import {
-  inputCls,
-  labelCls,
-  helpCls,
-  fieldCls,
-  primaryBtnCls,
-  secondaryBtnCls,
-} from './styles';
+import { ErrorMessage } from './_components';
 import type { Patient, Professional, Pts } from './types';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
+
+type Step = PtsStep;
 
 interface FieldErrors {
   patient?: string;
   social?: string;
+  professional?: string;
 }
 
 type CreatePtsProps = {
   account?: Account;
 };
 
-function validate(patientId: string, social: string): FieldErrors {
-  const errors: FieldErrors = {};
+function Required() {
+  return (
+    <span className="ux-req" aria-hidden="true">
+      {' '}
+      *
+    </span>
+  );
+}
 
-  if (!patientId) {
-    errors.patient = 'Selecione o paciente.';
-  }
+function FieldError({ id, message }: { id: string; message?: string }) {
+  return message ? (
+    <p id={id} className={ui.fieldError}>
+      {message}
+    </p>
+  ) : null;
+}
 
-  if (!social.trim()) {
-    errors.social = 'Descreva a situação social do paciente.';
-  }
-
-  return errors;
+function professionalLabel(professional: Professional) {
+  return `${professional.name} · ${professional.specialism.name}`;
 }
 
 export function CreatePts({ account }: CreatePtsProps) {
@@ -64,12 +67,13 @@ export function CreatePts({ account }: CreatePtsProps) {
 
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading');
   const [reloadKey, setReloadKey] = useState(0);
+  const [step, setStep] = useState<Step>(0);
   const [responsibleId, setResponsibleId] = useState('');
   const [teamIds, setTeamIds] = useState<string[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
 
-  const [patientId, setPatientId] = useState('');
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [social, setSocial] = useState('');
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -78,6 +82,8 @@ export function CreatePts({ account }: CreatePtsProps) {
   const [created, setCreated] = useState<Pts | null>(null);
 
   const errorRef = useRef<HTMLDivElement>(null);
+  const isAdmin = account?.role === 'admin';
+  const accountProfileIds = account?.professionalProfileIds ?? [];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,47 +92,28 @@ export function CreatePts({ account }: CreatePtsProps) {
       listEligiblePatients(controller.signal),
       listProfessionals(controller.signal),
     ])
-      .then(([rawPatients, rawProfessionals]) => {
-        const loadedPatients: Patient[] = Array.isArray(rawPatients)
-          ? rawPatients
-          : ((rawPatients as { data?: Patient[] })?.data ?? []);
-
-        const loadedProfessionals: Professional[] = Array.isArray(
-          rawProfessionals,
-        )
-          ? rawProfessionals
-          : ((rawProfessionals as { data?: Professional[] })?.data ?? []);
-
-        const accountProfileIds = account?.professionalProfileIds ?? [];
-
-        const ownProfessionals = loadedProfessionals.filter((professional) =>
+      .then(([loadedPatients, loadedProfessionals]) => {
+        const own = loadedProfessionals.filter((professional) =>
           accountProfileIds.includes(professional.id),
         );
 
         setPatients(loadedPatients);
         setProfessionals(loadedProfessionals);
-
-        // O admin (RN022/DP017) não tem perfil: escolhe o responsável.
-        setResponsibleId(
-          account?.role !== 'admin' && ownProfessionals.length === 1
-            ? ownProfessionals[0].id
-            : '',
-        );
-
+        // O admin (RN022) não tem perfil: escolhe o responsável.
+        setResponsibleId(!isAdmin && own.length === 1 ? own[0].id : '');
         setLoadStatus('ready');
       })
-      .catch((error) => {
+      .catch(() => {
         if (!controller.signal.aborted) {
-          console.error('ERRO AO CARREGAR DADOS NO CREATE_PTS:', error);
           setLoadStatus('error');
         }
       });
 
     return () => controller.abort();
-  }, [account?.professionalProfileIds, account?.role, reloadKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.role, accountProfileIds.join(','), reloadKey]);
 
-  // Busca de pacientes pelo nome, com debounce (NFUS003): a lista traz só a
-  // primeira página, então o nome refina quem aparece no select.
+  // Busca de pacientes pelo nome, com debounce (NFUS003).
   const patientSearch = useDebouncedSearch();
   const patientTerm = patientSearch.term;
   const [searchedTerm, setSearchedTerm] = useState('');
@@ -156,52 +143,50 @@ export function CreatePts({ account }: CreatePtsProps) {
     }
   }, [submitError]);
 
-  const accountProfileIds = account?.professionalProfileIds ?? [];
-
-  const isAdmin = account?.role === 'admin';
-
-  // Profissional: só os próprios perfis. Admin: todos os profissionais.
-  const accountProfessionals = isAdmin
-    ? professionals
-    : professionals.filter((professional) =>
-        accountProfileIds.includes(professional.id),
-      );
-
-  const me =
-    !isAdmin && accountProfessionals.length === 1
-      ? accountProfessionals[0]
-      : (accountProfessionals.find(
-          (professional) => professional.id === responsibleId,
-        ) ?? null);
-
+  const ownProfessionals = professionals.filter((professional) =>
+    accountProfileIds.includes(professional.id),
+  );
+  const responsible =
+    professionals.find((professional) => professional.id === responsibleId) ??
+    null;
   const hasNoProfessionalProfile =
     loadStatus === 'ready' &&
     !!account &&
     !isAdmin &&
-    accountProfessionals.length === 0;
-
+    ownProfessionals.length === 0;
   const teamOptions = professionals.filter(
-    (professional) => professional.id !== me?.id,
+    (professional) => professional.id !== responsibleId,
   );
 
-  const toggleTeamMember = (id: string) => {
-    setTeamIds((ids) =>
-      ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id],
-    );
-  };
+  function goTo(next: Step) {
+    if (next > step) {
+      const errors: FieldErrors = {};
+
+      if (step === 0 && !patient) errors.patient = 'Selecione o paciente.';
+      if (step === 1 && !social.trim()) {
+        errors.social = 'Descreva a situação social do paciente.';
+      }
+
+      setFieldErrors(errors);
+
+      if (errors.patient || errors.social) {
+        document.getElementById(errors.patient ? 'patient' : 'social')?.focus();
+        return;
+      }
+    }
+
+    setStep(next);
+  }
 
   function reset() {
     setCreated(null);
-    setPatientId('');
+    setStep(0);
+    setPatient(null);
+    patientSearch.clear();
     setSocial('');
     setTeamIds([]);
     setFieldErrors({});
     setSubmitError(null);
-    setResponsibleId(
-      !isAdmin && accountProfessionals.length === 1
-        ? accountProfessionals[0].id
-        : '',
-    );
     setLoadStatus('loading');
     setReloadKey((key) => key + 1);
   }
@@ -209,269 +194,319 @@ export function CreatePts({ account }: CreatePtsProps) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isLoading || !me) {
+    if (step < 2) {
+      goTo((step + 1) as Step);
       return;
     }
 
-    const errors = validate(patientId, social);
+    if (isLoading || !patient) {
+      return;
+    }
 
-    setFieldErrors(errors);
+    if (!responsible) {
+      setFieldErrors({ professional: 'Selecione o profissional responsável.' });
+      document.getElementById('professional')?.focus();
+      return;
+    }
+
+    setFieldErrors({});
     setSubmitError(null);
-
-    if (errors.patient || errors.social) {
-      document.getElementById(errors.patient ? 'patient' : 'social')?.focus();
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      const selectedPatient = patients.find((p) => p.id === patientId);
-
       const pts = await createPts({
-        professionalId: me.id,
-        patientId,
+        professionalId: responsible.id,
+        patientId: patient.id,
         socialSituation: social.trim(),
-        teamProfessionalIds: teamIds,
+        teamProfessionalIds: teamIds.filter((id) => id !== responsible.id),
       });
 
       setCreated({
         ...pts,
-        patient: pts?.patient ?? {
-          id: patientId,
-          name: selectedPatient?.name ?? 'paciente',
-        },
+        patient: pts?.patient ?? patient,
         team: pts?.team ?? [],
       } as Pts);
     } catch (error) {
-      console.error('ERRO AO CRIAR PROPOSTA DE PTS:', error);
       const mapped = mapCreatePtsError(error);
 
       setSubmitError(mapped);
 
       if (mapped.kind === 'active-exists') {
         setFieldErrors({ patient: mapped.message });
+        setStep(0);
       }
     } finally {
       setIsLoading(false);
     }
   }
 
-  const patientName = created?.patient?.name ?? 'paciente';
-  const teamLength = created?.team?.length ?? 0;
+  if (created) {
+    const teamLength = created.team?.length ?? 0;
 
-  return (
-    <>
-      <div className={ui.heading}>
-        <h1>{created ? 'Proposta criada' : 'Criar proposta de PTS'}</h1>
-
-        {!created && (
-          <p>
-            Defina o paciente e a equipe para começar um plano de cuidado
-            compartilhado.
-          </p>
-        )}
-      </div>
-
-      <div className={styles.layout}>
-        {created ? (
-          <div
-            role="status"
-            data-testid="pts-created"
-            className={`${ui.empty} ${styles.successContainer}`}
-          >
-            <p>
-              A proposta para <strong>{patientName}</strong> foi criada e
-              aguarda a aprovação do paciente
-              {teamLength > 0
-                ? `, com ${teamLength} ${
-                    teamLength === 1 ? 'profissional' : 'profissionais'
-                  } na equipe inicial`
-                : ''}
-              .
-            </p>
-
-            <div className={styles.actions}>
-              <Link
-                href={`/pts/proposals?patientId=${created.patient.id}`}
-                className={primaryBtnCls}
-              >
-                Ver propostas do paciente
-              </Link>
-
-              <button type="button" onClick={reset} className={secondaryBtnCls}>
-                Criar outra proposta
-              </button>
-            </div>
+    return (
+      <>
+        <div className="heading">
+          <div>
+            <h1>Proposta criada</h1>
           </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            noValidate
-            data-form="pts"
-            className={`${ui.card} ${styles.form}`}
-          >
-            <div className={styles.steps}>
-              <span className={`${styles.step} ${styles.stepActive}`}>
-                <span className={styles.stepNumber}>1</span>
-                Elaborar proposta
-              </span>
+        </div>
 
-              <span aria-hidden="true" className={styles.stepSeparator}>
-                —
-              </span>
+        <section
+          className="ux-card ux-empty-card"
+          role="status"
+          data-testid="pts-created"
+        >
+          <p>
+            A proposta para <strong>{created.patient.name}</strong> foi criada e
+            aguarda a aprovação do paciente
+            {teamLength > 0
+              ? `, com ${teamLength} ${
+                  teamLength === 1 ? 'profissional' : 'profissionais'
+                } na equipe inicial`
+              : ''}
+            .
+          </p>
+          <div className="ux-inline">
+            <Link href="/pts/proposals" className="btn btn-primary">
+              Ver propostas
+            </Link>
+            <button type="button" className="btn" onClick={reset}>
+              Criar outra proposta
+            </button>
+          </div>
+        </section>
+      </>
+    );
+  }
 
-              <span className={styles.step}>
-                <span className={styles.stepNumber}>2</span>
-                Aprovação do paciente
-              </span>
-            </div>
+  let body: ReactNode;
 
-            {submitError && (
-              <ErrorMessage
-                ref={errorRef}
-                title={submitError.title}
-                message={submitError.message}
-              />
-            )}
+  if (step === 0) {
+    body = (
+      <div className="field">
+        <label className="field-label" htmlFor="patient">
+          Paciente
+          <Required />
+        </label>
+        <Combobox
+          id="patient"
+          options={patients.map((item) => ({
+            value: item.id,
+            label: item.name,
+          }))}
+          input={patientSearch.input}
+          onInputChange={(text) => {
+            patientSearch.setInput(text);
+            setPatient(null);
+          }}
+          onSelect={(option) => {
+            patientSearch.setInput(option.label);
+            setPatient({ id: option.value, name: option.label });
+            setFieldErrors((fields) => ({ ...fields, patient: undefined }));
 
-            <div className={fieldCls}>
-              <label htmlFor="professional" className={labelCls}>
-                {isAdmin
-                  ? 'Profissional responsável'
-                  : 'Seu perfil profissional'}
-              </label>
-
-              {!isAdmin && accountProfessionals.length === 1 ? (
-                <input
-                  id="professional"
-                  type="text"
-                  readOnly
-                  value={`${accountProfessionals[0]?.name ?? ''} ${
-                    accountProfessionals[0]?.specialism?.name
-                      ? `· ${accountProfessionals[0].specialism.name}`
-                      : ''
-                  }`}
-                  aria-describedby="professional-help"
-                  className={`${inputCls(false)} ${styles.readonly}`}
-                />
-              ) : (
-                <div className={styles.selectWrap}>
+            if (submitError?.kind === 'active-exists') {
+              setSubmitError(null);
+            }
+          }}
+          placeholder="Nome do paciente"
+          emptyText="Nenhum paciente elegível encontrado. Pacientes com PTS ativo ou rascunho não aparecem aqui."
+          listLabel="Pacientes elegíveis"
+          disabled={isLoading || loadStatus !== 'ready'}
+          invalid={Boolean(fieldErrors.patient)}
+          required
+          describedBy={fieldErrors.patient ? 'patient-error' : undefined}
+        />
+        <FieldError id="patient-error" message={fieldErrors.patient} />
+      </div>
+    );
+  } else if (step === 1) {
+    body = (
+      <div className="form-grid">
+        <div className="field full">
+          <span className="ux-labeltip">
+            <label className="field-label" htmlFor="social">
+              Situação social
+              <Required />
+            </label>
+            <HelpTooltip id="social-tip" label="Situação social">
+              Moradia, rotina da família, rede de apoio e acesso a serviços.
+              Nunca aparece ao paciente.
+            </HelpTooltip>
+          </span>
+          <textarea
+            className="input"
+            id="social"
+            rows={4}
+            placeholder="Ex.: mora com a mãe e a avó; a mãe trabalha à tarde"
+            value={social}
+            disabled={isLoading}
+            aria-required="true"
+            aria-invalid={fieldErrors.social ? 'true' : 'false'}
+            aria-describedby={
+              fieldErrors.social ? 'social-tip social-error' : 'social-tip'
+            }
+            onChange={(event) => {
+              setSocial(event.target.value);
+              setFieldErrors((fields) => ({ ...fields, social: undefined }));
+            }}
+          />
+          <FieldError id="social-error" message={fieldErrors.social} />
+        </div>
+      </div>
+    );
+  } else {
+    body = (
+      <>
+        <section className="ux-fsection">
+          <header>
+            <h3>Responsável</h3>
+          </header>
+          <div>
+            <div className="form-grid">
+              <div className="field full">
+                <label className="field-label" htmlFor="professional">
+                  Profissional responsável
+                </label>
+                {isAdmin ? (
                   <select
+                    className="select"
                     id="professional"
                     value={responsibleId}
-                    onChange={(event) => setResponsibleId(event.target.value)}
-                    required
-                    disabled={isLoading || accountProfessionals.length === 0}
-                    aria-describedby="professional-help"
-                    className={`${inputCls(false)} ${styles.select}`}
+                    disabled={isLoading}
+                    aria-invalid={fieldErrors.professional ? 'true' : 'false'}
+                    onChange={(event) => {
+                      setResponsibleId(event.target.value);
+                      setTeamIds((ids) =>
+                        ids.filter((id) => id !== event.target.value),
+                      );
+                    }}
                   >
-                    <option value="">
-                      {isAdmin
-                        ? 'Selecione o profissional responsável'
-                        : 'Selecione seu perfil profissional'}
-                    </option>
-
-                    {accountProfessionals.map((professional) => (
+                    <option value="">Selecione</option>
+                    {professionals.map((professional) => (
                       <option key={professional.id} value={professional.id}>
-                        {professional.name}{' '}
-                        {professional.specialism?.name
-                          ? `· ${professional.specialism.name}`
-                          : ''}
+                        {professionalLabel(professional)}
                       </option>
                     ))}
                   </select>
-
-                  <Icon name="chevronDown" className={styles.selectChevron} />
-                </div>
-              )}
-
-              <p id="professional-help" className={helpCls}>
-                {isAdmin
-                  ? 'O profissional escolhido será o responsável pelo PTS.'
-                  : 'Você será o profissional responsável por esta proposta.'}
-              </p>
+                ) : (
+                  <input
+                    className="input"
+                    id="professional"
+                    type="text"
+                    readOnly
+                    value={responsible ? professionalLabel(responsible) : ''}
+                  />
+                )}
+                <FieldError
+                  id="professional-error"
+                  message={fieldErrors.professional}
+                />
+              </div>
             </div>
+          </div>
+        </section>
 
-            {loadStatus === 'loading' && (
-              <LoadingState label="Carregando pacientes e profissionais..." />
-            )}
+        <TeamMembers
+          professionals={teamOptions}
+          selectedIds={teamIds}
+          onChange={setTeamIds}
+          disabled={isLoading}
+        />
+      </>
+    );
+  }
 
-            {loadStatus === 'error' && (
-              <ErrorMessage
-                title="Não foi possível carregar os dados"
-                message="Verifique sua conexão e tente novamente."
-                onRetry={() => {
-                  setLoadStatus('loading');
-                  setReloadKey((key) => key + 1);
-                }}
-              />
-            )}
-
-            {hasNoProfessionalProfile && (
-              <ErrorMessage
-                title="Sem perfil profissional"
-                message="Esta conta não possui perfil profissional. Procure o administrador para cadastrar um."
-              />
-            )}
-
-            {loadStatus === 'ready' && (
-              <>
-                <PatientSelect
-                  patients={patients}
-                  search={patientSearch.input}
-                  onSearch={patientSearch.setInput}
-                  value={patientId}
-                  disabled={isLoading}
-                  error={fieldErrors.patient}
-                  onChange={(value) => {
-                    setPatientId(value);
-                    setFieldErrors((fields) => ({
-                      ...fields,
-                      patient: undefined,
-                    }));
-
-                    if (submitError?.kind === 'active-exists') {
-                      setSubmitError(null);
-                    }
-                  }}
-                />
-
-                <ProfessionalTeamSelect
-                  professionals={teamOptions}
-                  selectedIds={teamIds}
-                  disabled={isLoading}
-                  onToggle={toggleTeamMember}
-                />
-
-                <SocialSituationInput
-                  value={social}
-                  disabled={isLoading}
-                  error={fieldErrors.social}
-                  onChange={(value) => {
-                    setSocial(value);
-                    setFieldErrors((fields) => ({
-                      ...fields,
-                      social: undefined,
-                    }));
-                  }}
-                />
-              </>
-            )}
-
-            <div className={styles.actions}>
-              <SubmitButton
-                loading={isLoading}
-                disabled={loadStatus !== 'ready' || !me}
-              />
-
-              <Link href="/home" className={secondaryBtnCls}>
-                Cancelar
-              </Link>
-            </div>
-          </form>
-        )}
+  return (
+    <>
+      <div className="heading">
+        <div>
+          <h1>Criar proposta de PTS</h1>
+        </div>
+        <div className="heading-actions">
+          <Link className="btn" href="/pts/proposals">
+            Cancelar
+          </Link>
+        </div>
       </div>
+
+      {loadStatus === 'error' && (
+        <ErrorMessage
+          title="Não foi possível carregar os dados"
+          message="Verifique sua conexão e tente novamente."
+          onRetry={() => {
+            setLoadStatus('loading');
+            setReloadKey((key) => key + 1);
+          }}
+        />
+      )}
+
+      {hasNoProfessionalProfile && (
+        <ErrorMessage
+          title="Sem perfil profissional"
+          message="Esta conta não possui perfil profissional. Procure o administrador para cadastrar um."
+        />
+      )}
+
+      {submitError && (
+        <ErrorMessage
+          ref={errorRef}
+          title={submitError.title}
+          message={submitError.message}
+        />
+      )}
+
+      <form onSubmit={handleSubmit} noValidate data-form="pts">
+        <section
+          className="ux-formcard ux-wz-step"
+          aria-labelledby="wz-title"
+          aria-busy={loadStatus === 'loading'}
+        >
+          <div className="ux-wz-head">
+            <WizardSteps current={step} />
+            <div>
+              <h2 id="wz-title">{PTS_STEPS[step]}</h2>
+            </div>
+          </div>
+
+          <div className="ux-wz-body">{body}</div>
+
+          <div className="ux-formcard-foot ux-wz-foot">
+            {step > 0 ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={isLoading}
+                onClick={() => goTo((step - 1) as Step)}
+              >
+                <Icon name="chevronLeft" className="icon-sm" />
+                Voltar
+              </button>
+            ) : (
+              <span />
+            )}
+
+            {step < 2 ? (
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loadStatus !== 'ready' || hasNoProfessionalProfile}
+              >
+                Próximo
+                <Icon name="chevronRight" className="icon-sm" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={isLoading || hasNoProfessionalProfile}
+              >
+                <Icon name="check" className="icon-sm" />
+                {isLoading ? 'Criando proposta...' : 'Criar proposta'}
+              </button>
+            )}
+          </div>
+        </section>
+      </form>
     </>
   );
 }

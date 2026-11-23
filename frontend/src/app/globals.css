@@ -76,3 +76,9 @@ header img,
   width: 40px !important;
   height: auto !important;
 }
+
+/* O preflight do Tailwind zera a margem do <dialog>; os modais dos mockups
+   (`dialog.modal`, components/Modal.tsx) ficam centralizados. */
+dialog.modal {
+  margin: auto;
+}

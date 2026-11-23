@@ -10,12 +10,15 @@ import type { NavItem } from '@/lib/account';
 import styles from './AppShell.module.css';
 import Icon from './Icon';
 
+/** Nível do caminho da página; o último não leva link. */
+export type Crumb = { label: string; href?: string };
+
 type AppShellProps = {
   userName: string;
   roleLabel: string;
   navItems: NavItem[];
   currentHref: string;
-  breadcrumb?: string;
+  breadcrumb?: string | Crumb[];
   children: ReactNode;
 };
 
@@ -58,6 +61,10 @@ export default function AppShell({
   }, []);
 
   const expanded = isMobile ? open : !collapsed;
+  const crumbs: Crumb[] =
+    typeof breadcrumb === 'string'
+      ? [{ label: breadcrumb }]
+      : (breadcrumb ?? []);
 
   const toggleLabel = isMobile
     ? expanded
@@ -138,6 +145,18 @@ export default function AppShell({
         </nav>
 
         <div className={styles.sideBottom}>
+          <Link
+            href="/profile"
+            className={`${styles.navLink} shell-navLink`}
+            aria-current={
+              currentHref.startsWith('/profile') ? 'page' : undefined
+            }
+            title="Meu perfil"
+          >
+            <Icon name="profile" className={styles.icon} />
+            <span className={styles.navLabel}>Meu perfil</span>
+          </Link>
+
           <LogoutButton className={styles.navLink}>
             <Icon name="logout" className={styles.icon} />
             <span className={styles.navLabel}>Sair da conta</span>
@@ -163,8 +182,10 @@ export default function AppShell({
 
           <Link
             href="/profile"
-            className={styles.headerProfile}
-            aria-current={currentHref === '/profile' ? 'page' : undefined}
+            className={`${styles.headerProfile} ux-header-end`}
+            aria-current={
+              currentHref.startsWith('/profile') ? 'page' : undefined
+            }
             aria-label={`Meu perfil: ${userName}, ${roleLabel}`}
             title="Meu perfil"
           >
@@ -180,16 +201,22 @@ export default function AppShell({
         </header>
 
         <main className={`${styles.content} shell-content`}>
-          {breadcrumb && (
+          {crumbs.length > 0 && (
             <nav
               className={`${styles.breadcrumb} shell-breadcrumb`}
               aria-label="Caminho da página"
             >
               <Link href="/home">Início</Link>
-              <span className="crumb">
-                <span aria-hidden="true">/</span>
-                <span>{breadcrumb}</span>
-              </span>
+              {crumbs.map((crumb, index) => (
+                <span key={crumb.label} className="crumb">
+                  <span aria-hidden="true">/</span>
+                  {crumb.href && index < crumbs.length - 1 ? (
+                    <Link href={crumb.href}>{crumb.label}</Link>
+                  ) : (
+                    <span>{crumb.label}</span>
+                  )}
+                </span>
+              ))}
             </nav>
           )}
 

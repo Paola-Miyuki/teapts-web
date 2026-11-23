@@ -65,26 +65,6 @@ export async function listEligiblePatients(
   return Array.isArray(response) ? response : (response.data ?? []);
 }
 
-export async function listAuthorizedPatients(
-  signal?: AbortSignal,
-): Promise<Patient[]> {
-  if (USE_MOCKS) {
-    return mockPatients;
-  }
-
-  const params = new URLSearchParams({
-    page: '1',
-    limit: '50',
-  });
-
-  const response = await request<PaginatedResponse<Patient> | Patient[]>(
-    `/patients/authorized?${params.toString()}`,
-    { signal },
-  );
-
-  return Array.isArray(response) ? response : (response.data ?? []);
-}
-
 export async function createPts(payload: CreatePtsPayload): Promise<Pts> {
   if (USE_MOCKS) {
     return mockCreatePts(payload);
