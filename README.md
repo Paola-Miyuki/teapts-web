@@ -191,39 +191,36 @@ Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `mi
 
 ### 5.2 Contas de teste
 
-Execute o seed para criar ou reutilizar as contas de teste:
+Execute o seed para criar ou reutilizar as contas e os PTS de teste:
 
 ```bash
 make seed                                  # Docker
 pnpm --dir backend run seed:test-user      # local
 ```
 
-O seed precisa do PostgreSQL e do SuperTokens em execução.
+O seed precisa do PostgreSQL e do SuperTokens em execução, com as migrations aplicadas.
 
-**Administrador**
+| Conta | E-mail / senha | Perfil e dados |
+| --- | --- | --- |
+| Administrador | `teste@teapts.local` / `teapts123` | papel `admin`; sem CPF nem dados pessoais (RN001) |
+| Profissional | `profissional@teapts.local` / `profissional123` | psicólogo, registro `CRP-PR 12345`, IMA, CNES `2771112`; CPF `123.456.789-09`, 12/06/1988, feminino |
+| Fisioterapeuta | `fisioterapeuta@teapts.local` / `profissional123` | Beatriz Lopes, registro `Crefito-PR 54321`, CER Curitiba; CPF `222.333.444-05`, 03/09/1985, feminino |
+| Paciente | `paciente@teapts.local` / `paciente123` | CNS `700 0012 3456 7894`; CPF `987.654.321-00`, 18/04/2000, masculino |
+| Paciente | `luna@teapts.local` / `paciente123` | Luna Ferreira, CNS `700 0022 2333 4444`; CPF `111.444.777-35`, 15/03/2007, feminino |
+| Paciente | `diego@teapts.local` / `paciente123` | Diego Alves, menor de idade, responsável tutelar Paula Alves, CNS `700 0055 5666 7777`; CPF `321.654.987-91`, 22/08/2015, masculino |
 
-- E-mail: `teste@teapts.local`
-- Senha: `teapts123`
-- Papel: `admin`
-- Sem CPF nem dados pessoais (conta de admin, RN001)
+PTS de teste (um de cada status):
 
-**Profissional**
+| Paciente | Status | Responsável | Equipe |
+| --- | --- | --- | --- |
+| Paciente de Teste | `draft` (proposta aguardando o paciente) | Profissional de Teste | Beatriz Lopes |
+| Luna Ferreira | `concluded` | Profissional de Teste | — |
+| Luna Ferreira | `rejected` | Beatriz Lopes | — |
+| Luna Ferreira | `running` | Profissional de Teste | Beatriz Lopes |
+| Diego Alves | `cancelled` | Profissional de Teste | — |
+| Diego Alves | `planning` | Beatriz Lopes | Profissional de Teste |
 
-- E-mail: `profissional@teapts.local`
-- Senha: `profissional123`
-- Papel: `user`
-- Perfil: psicólogo, registro `CRP-PR 12345`, instituição IMA, CNES `2771112`
-- CPF `123.456.789-09`, nascimento 12/06/1988, sexo feminino, mulher cisgênero, telefone `(41) 99100-2030`
-
-**Paciente**
-
-- E-mail: `paciente@teapts.local`
-- Senha: `paciente123`
-- Papel: `user`
-- Perfil: paciente, CNS `700 0012 3456 7894`
-- CPF `987.654.321-00`, nascimento 18/04/2000, sexo masculino, telefone `(41) 99812-3344`
-
-O seed cria ou reutiliza as contas (e grava de novo os dados pessoais delas) e garante o perfil de psicólogo da conta profissional e o perfil de paciente. Ele não redefine a senha de usuários já existentes no SuperTokens.
+O seed cria ou reutiliza as contas (e grava de novo os dados pessoais e os perfis delas). Os PTS só são criados para o paciente que ainda não tem nenhum PTS, então rodar o seed de novo não duplica nada. Ele não redefine a senha de usuários já existentes no SuperTokens. Para conferir: `make db-pts`.
 
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
 
@@ -236,6 +233,7 @@ make db-account                             # todas as colunas de account
 make db-patients                            # todas as colunas de patient, com o nome da conta
 make db-support-contacts                    # todas as colunas de support_contact, com o nome do paciente
 make db-professionals                       # todas as colunas de professional, com o nome da conta
+make db-pts                                 # todas as colunas dos PTS, com paciente, responsável e equipe
 make db-query SQL="\dt supertokens.*"       # tabelas do SuperTokens
 make psql                                   # sessão psql interativa
 ```
@@ -533,6 +531,7 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make db-patients` | Mostra todas as colunas de `patient`, com o nome da conta |
 | `make db-support-contacts` | Mostra todas as colunas de `support_contact`, com o nome do paciente |
 | `make db-professionals` | Mostra todas as colunas de `professional`, com o nome da conta |
+| `make db-pts` | Mostra todas as colunas dos PTS, com paciente, responsável e equipe |
 | `make db-query SQL="..."` | Roda um SQL qualquer |
 
 **Testes e qualidade** (rodam no host, sem container)

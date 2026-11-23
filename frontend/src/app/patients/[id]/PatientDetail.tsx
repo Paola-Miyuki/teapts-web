@@ -148,6 +148,11 @@ function PatientDetailContent({ id }: { id: string }) {
                 <div className="ux-badges">
                   <PtsStatusBadge status={patient.ptsStatus} />
                 </div>
+                {patient.activePtsId && (
+                  <Link className="link" href={`/pts/${patient.activePtsId}`}>
+                    Abrir PTS
+                  </Link>
+                )}
               </div>
 
               <div className="ux-idaccount">

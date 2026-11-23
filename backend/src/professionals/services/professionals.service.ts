@@ -25,6 +25,7 @@ import type {
   ProfessionalSummaryResponseDto,
 } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
+import { toProfessionalRegistration } from '../professional-registration';
 import {
   type ProfessionalRow,
   type ProfessionalsPage,
@@ -35,13 +36,6 @@ const SPECIALISM_NAMES: Record<Specialism, string> = {
   [Specialism.Psychologist]: 'Psicologia',
   [Specialism.Doctor]: 'Medicina',
   [Specialism.Physiotherapist]: 'Fisioterapia',
-};
-
-/** Conselho regional de cada especialidade (tabela de profissões do Dicionário de dados do front). */
-const SPECIALISM_COUNCILS: Record<Specialism, string> = {
-  [Specialism.Psychologist]: 'CRP',
-  [Specialism.Doctor]: 'CRM',
-  [Specialism.Physiotherapist]: 'Crefito',
 };
 
 /** Código do Postgres para violação de chave única (`unique_violation`). */
@@ -217,14 +211,11 @@ export class ProfessionalsService {
         id: row.professional_specialism,
         name: SPECIALISM_NAMES[row.professional_specialism],
       },
-      registration:
-        row.professional_council_number && row.professional_council_state
-          ? {
-              council: SPECIALISM_COUNCILS[row.professional_specialism],
-              number: row.professional_council_number,
-              state: row.professional_council_state,
-            }
-          : null,
+      registration: toProfessionalRegistration(
+        row.professional_specialism,
+        row.professional_council_number,
+        row.professional_council_state,
+      ),
       institution: row.professional_institution,
       cnes: row.professional_cnes,
     };

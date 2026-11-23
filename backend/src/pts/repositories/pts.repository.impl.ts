@@ -1,4 +1,5 @@
 import { escapeLike } from '../../common/search/escape-like';
+import { toProfessionalRegistration } from '../../professionals/professional-registration';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -151,22 +152,10 @@ export class PtsRepositoryImpl extends PtsRepository {
           id: fullPts.patient.accountId,
           name: fullPts.patient.account?.name ?? '',
         },
-        responsible: {
-          id: fullPts.responsible.id,
-          name: fullPts.responsible.account?.name ?? '',
-          specialism: {
-            id: String(fullPts.responsible.specialism),
-            name: String(fullPts.responsible.specialism),
-          },
-        },
-        team: (fullPts.team ?? []).map((professional) => ({
-          id: professional.id,
-          name: professional.account?.name ?? '',
-          specialism: {
-            id: String(professional.specialism),
-            name: String(professional.specialism),
-          },
-        })),
+        responsible: this.mapProfessional(fullPts.responsible),
+        team: (fullPts.team ?? []).map((professional) =>
+          this.mapProfessional(professional),
+        ),
       };
 
       await queryRunner.commitTransaction();
@@ -651,6 +640,11 @@ export class PtsRepositoryImpl extends PtsRepository {
           specialismNames[professional.specialism] ??
           String(professional.specialism),
       },
+      registration: toProfessionalRegistration(
+        professional.specialism,
+        professional.councilNumber,
+        professional.councilState,
+      ),
     };
   }
 }

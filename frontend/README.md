@@ -80,6 +80,8 @@ src/
                            paciente; o paciente (ou o admin, em nome dele) aprova ou rejeita
                            (POST /pts/proposals/:id/approve e /reject)
         [id]/edit/         editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
+      [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin:
+                           cabeçalho, Visão geral (situação social) e Equipe (registro e papel)
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
@@ -95,7 +97,7 @@ src/
     pts/                   peças das telas de proposta: WizardSteps (passos) e TeamMembers
                            (membros da equipe com busca, adicionar e remover)
     table/                 peças das tabelas dos mockups: KebabMenu (menu ⋮), MultiSelect,
-                           Pagination (faixa, páginas e itens por página) e PtsStatusBadge
+                           Pagination (faixa, páginas e itens por página), PtsStatusBadge e RegistrationCell (registro com copiar)
   styles/                  teapts-mockups.css e teapts-ui.css: classes globais dos mockups
                            (cópia de design/assets, sem as regras só do mockup)
   hooks/
@@ -113,6 +115,7 @@ src/
                            (com `q` e `signal`), cadastro do perfil e isValidPhone
     pts-status.ts          status do PTS e rótulos das telas
     proposals.ts           GET /pts/proposals (getProposals)
+    pts.ts                 GET /pts/:id (getPts)
     format.ts              datas, CPF, telefone (máscaras e exibição), idade e iniciais
   test-utils/
     account.ts             dados pessoais padrão da conta nos testes
@@ -150,6 +153,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 | `/pts/proposals/:id/edit` | Editar proposta de PTS | responsável ou admin, proposta em `draft` | `editar-proposta.html` |
+| `/pts/:id` | Detalhe do PTS (Visão geral e Equipe); aberto por "Abrir PTS" em Pacientes | admin e profissional da equipe (RN016) | `pts-detalhe.html` |
 
 ## Layouts (`design/`)
 

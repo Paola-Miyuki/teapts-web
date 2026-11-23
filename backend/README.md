@@ -25,7 +25,7 @@ Rode de dentro de `backend/` ou da raiz com `pnpm --dir backend run <script>`.
 | `migration:show`                     | lista as migrations (`[X]` = aplicada)                             |
 | `migration:run` / `migration:revert` | aplica as pendentes / desfaz a última                              |
 | `migration:generate <caminho>`       | gera migration comparando as entidades com o banco no ar           |
-| `seed:test-user`                     | cria `teste@teapts.local` / `teapts123`; precisa do SuperTokens no ar |
+| `seed:test-user`                     | cria as contas de teste (admin, profissionais e pacientes) e os PTS de teste; precisa do SuperTokens no ar |
 | `test` / `test:cov` / `test:watch`   | testes unitários (Jest em ESM)                                     |
 | `test:e2e`                           | sobe o `AppModule` e chama as rotas por HTTP                       |
 | `lint` / `typecheck`                 | ESLint / `tsc --noEmit`                                            |
@@ -265,6 +265,11 @@ Exige sessão autenticada e devolve o PTS em qualquer estado (RFPTS009), com
 da equipe, menos o PTS rejeitado (RN016); o paciente titular, os próprios PTS,
 sem `socialSituation` (RN028). Os erros possíveis são `400` (`Parâmetro
 inválido: id`), `401`, `403` (`FORBIDDEN`) e `404` (`PTS_NOT_FOUND`).
+
+Em todas as respostas de PTS (criação, propostas, ativo e por id), o
+responsável e cada membro da equipe trazem `registration` (`{ council, number,
+state }`, com o conselho vindo da especialidade, ou `null`), como no `GET
+/professionals`.
 
 ## GET /accounts
 

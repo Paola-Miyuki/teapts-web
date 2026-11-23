@@ -491,12 +491,14 @@ describe('PtsService.findActivePts', () => {
       id: 'prof-10',
       name: 'Profissional responsável',
       specialism: { id: 'psychologist', name: 'Psicologia' },
+      registration: null,
     },
     team: [
       {
         id: 'prof-11',
         name: 'Profissional da equipe',
         specialism: { id: 'doctor', name: 'Medicina' },
+        registration: null,
       },
     ],
   };
@@ -1082,6 +1084,7 @@ describe('PtsService com administrador (RN022)', () => {
       id: 'prof-10',
       name: 'Profissional responsável',
       specialism: { id: 'psychologist', name: 'Psicologia' },
+      registration: null,
     },
     team: [],
   };
@@ -1294,12 +1297,14 @@ describe('PtsService.findPtsById', () => {
       id: 'prof-10',
       name: 'Profissional responsável',
       specialism: { id: 'psychologist', name: 'Psicologia' },
+      registration: null,
     },
     team: [
       {
         id: 'prof-11',
         name: 'Profissional da equipe',
         specialism: { id: 'doctor', name: 'Medicina' },
+        registration: null,
       },
     ],
   };

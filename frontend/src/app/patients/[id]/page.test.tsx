@@ -82,6 +82,34 @@ describe('PatientDetail', () => {
     );
   });
 
+  it('leva ao PTS ativo do paciente', async () => {
+    mockApi(
+      respond(200, {
+        ...PATIENT,
+        ptsStatus: 'running',
+        activePtsId: 'pts-1',
+        readOnly: false,
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    expect(
+      await screen.findByRole('link', { name: 'Abrir PTS' }),
+    ).toHaveAttribute('href', '/pts/pts-1');
+  });
+
+  it('não mostra o link sem PTS ativo', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    expect(
+      screen.queryByRole('link', { name: 'Abrir PTS' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('mostra "Sem acesso" no 403', async () => {
     mockApi(
       respond(403, {

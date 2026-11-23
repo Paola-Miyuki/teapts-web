@@ -7,13 +7,13 @@ import { useRouter } from 'next/navigation';
 import Icon from '@/components/Icon';
 import Modal from '@/components/Modal';
 import KebabMenu from '@/components/table/KebabMenu';
+import RegistrationCell from '@/components/table/RegistrationCell';
 import MultiSelect from '@/components/table/MultiSelect';
 import Pagination, { PER_PAGE_OPTIONS } from '@/components/table/Pagination';
 import ui from '@/components/ui.module.css';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { ApiError } from '@/lib/api';
 import {
-  formatRegistration,
   getProfessionals,
   type Professional,
   type ProfessionalSpecialism,
@@ -35,36 +35,6 @@ function EmptyCell() {
   return (
     <span className="empty-cell" aria-label="Não informado">
       —
-    </span>
-  );
-}
-
-// Registro com o botão de copiar, como em `profissionais.html`.
-function RegistrationCell({ professional }: { professional: Professional }) {
-  const [copied, setCopied] = useState(false);
-
-  if (!professional.registration) {
-    return <EmptyCell />;
-  }
-
-  const label = formatRegistration(professional.registration);
-
-  return (
-    <span className="copy-cell">
-      {label}
-      <button
-        type="button"
-        className="copy-btn"
-        aria-label={copied ? 'Registro copiado' : `Copiar Registro ${label}`}
-        title={copied ? 'Registro copiado.' : undefined}
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(label)
-            .then(() => setCopied(true));
-        }}
-      >
-        <Icon name={copied ? 'check' : 'copy'} className="icon-sm" />
-      </button>
     </span>
   );
 }
@@ -332,7 +302,9 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
                     </td>
                     <td>{professional.specialism.name}</td>
                     <td className="nowrap">
-                      <RegistrationCell professional={professional} />
+                      <RegistrationCell
+                        registration={professional.registration}
+                      />
                     </td>
                     <td>{professional.email ?? <EmptyCell />}</td>
                     <td className="ux-col-lg">

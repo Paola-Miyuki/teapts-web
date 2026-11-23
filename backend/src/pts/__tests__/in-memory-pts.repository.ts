@@ -155,6 +155,7 @@ export class InMemoryPtsRepository extends PtsRepository {
         id: professionalId,
         name: `Membro ${professionalId}`,
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       }));
     }
 
@@ -253,11 +254,13 @@ export class InMemoryPtsRepository extends PtsRepository {
         id: input.responsibleProfessionalId,
         name: prof ? `Profissional ${prof.id}` : 'Responsável',
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       },
       team: (input.teamProfessionalIds ?? []).map((teamId) => ({
         id: teamId,
         name: `Membro ${teamId}`,
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       })),
     };
 

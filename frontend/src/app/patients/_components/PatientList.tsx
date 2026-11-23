@@ -485,6 +485,17 @@ export default function PatientList({
                             Visualizar
                           </Link>
                         </li>
+                        {patient.activePtsId && (
+                          <li>
+                            <Link
+                              role="menuitem"
+                              href={`/pts/${patient.activePtsId}`}
+                            >
+                              <Icon name="pts" className="icon-sm" />
+                              Abrir PTS
+                            </Link>
+                          </li>
+                        )}
                       </KebabMenu>
                     </td>
                   </tr>
