@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentos · TEA-PTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/teapts-src.css">
+<link rel="stylesheet" href="assets/teapts-mockups.css">
+<link rel="stylesheet" href="assets/teapts-ui.css">
+</head>
+<body class="min-h-full flex flex-col" data-nav="meus-documentos.html" data-roles="patient" data-dps="">
+<div class="shell-app">
+<aside id="sidebar" class="shell-sidebar"></aside>
+<div class="shell-workspace">
+<header class="shell-appHeader" id="app-header"></header>
+<main class="shell-content">
+<nav class="shell-breadcrumb" aria-label="Caminho da página"><a href="inicio.html" data-when="role:admin,professional">Início</a><a href="inicio-paciente.html" data-when="role:patient">Início</a><a href="aguardando-perfil.html" data-when="role:none">Início</a><span class="crumb"><span aria-hidden="true">/</span><span>Documentos</span></span></nav>
+<div class="mockbar" data-mockbar></div>
+<section>
+<div class="heading"><div><h1>Documentos</h1></div></div>
+<div class="ux-tcard" data-filters="my-uploads">
+  <div class="ux-tcard-head"><div><h2>Meus documentos</h2><p class="count" aria-live="polite" data-count-for="my-uploads" data-singular="documento" data-plural="documentos"></p></div><a class="btn btn-sm btn-primary" href="enviar-documento.html"><i data-icon="upload"></i>Enviar documento</a></div>
+  
+  <div class="ux-toolbar"><label class="field"><span>Busca</span><span class="with-icon"><i data-icon="search"></i><input class="input" type="search" data-search placeholder="Título do documento"></span></label><div class="ux-tools"><button type="button" class="btn filter-toggle" data-filter-toggle aria-expanded="false" aria-controls="my-uploads-more"><i data-icon="filter"></i>Filtros</button><button type="button" class="btn" data-clear="my-uploads"><i data-icon="close"></i>Limpar</button><label class="ux-sort" for="my-uploads-sort"><span>Ordenar por</span><select class="select" id="my-uploads-sort"><option>Data de envio</option><option>Data de emissão</option><option>Título</option></select><button type="button" class="btn btn-sm sort-dir" data-dir="desc" aria-label="Ordem decrescente"></button></label></div></div>
+  <div class="filter-more" id="my-uploads-more" hidden><div class="field"><span class="field-label">Categoria</span><details class="multi" data-key="cat" data-placeholder="Todas"><summary><span class="multi-value">Todas</span><i data-icon="down"></i></summary><div class="multi-panel"><label><input type="checkbox" value="termo">Termos e consentimentos</label><label><input type="checkbox" value="laudo">Laudo médico</label><label><input type="checkbox" value="exame">Exame</label><label><input type="checkbox" value="receita">Receita</label><label><input type="checkbox" value="terapeutico">Relatório terapêutico</label><label><input type="checkbox" value="escolar">Relatório escolar</label><label><input type="checkbox" value="pei">PEI</label><label><input type="checkbox" value="alta">Relatório de alta</label><label><input type="checkbox" value="tcle">TCLE</label><label><input type="checkbox" value="imagem">Autorização de uso de imagem</label><label><input type="checkbox" value="outro">Outro</label></div></details></div><div class="field"><label class="field-label" for="my-doc-issued">Data de emissão</label><select class="select" id="my-doc-issued" data-range><option value="">Qualquer data</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="custom">Personalizado</option></select><div class="range-custom" hidden><input class="input" type="date" aria-label="De"><input class="input" type="date" aria-label="Até"></div></div><div class="field"><label class="field-label" for="my-doc-sent">Enviado em</label><select class="select" id="my-doc-sent" data-range><option value="">Qualquer data</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="custom">Personalizado</option></select><div class="range-custom" hidden><input class="input" type="date" aria-label="De"><input class="input" type="date" aria-label="Até"></div></div></div>
+  <div class="table-wrap">
+  <table class="table" id="my-uploads" data-filter-table>
+    <thead><tr><th scope="col">Documento</th><th scope="col">Categoria</th><th scope="col">Emitido por</th><th scope="col">Data de emissão</th><th scope="col">Enviado em</th><th scope="col" class="actions-col"><span class="sr-only">Ações</span></th></tr></thead>
+    <tbody>
+      <tr data-cat="laudo" data-q="laudo neurológico"><td><div class="person"><span class="avatar ux-fileic" aria-hidden="true"><i data-icon="pdf"></i></span><div><strong>Laudo neurológico</strong><small>PDF · 1,2 MB</small></div></div></td><td>Laudo médico</td><td>Dra. Lúcia Prado, CRM-PR 33210</td><td class="num">10/02/2026</td><td class="num">14/02/2026</td><td class="actions-col"><button type="button" class="kebab-btn" aria-label="Ações para Laudo neurológico"></button><ul class="kebab-menu" role="menu" hidden><li><button type="button" role="menuitem" data-toast="Download por link temporário (simulação)."><i data-icon="eye"></i>Visualizar ou baixar</button></li></ul></td></tr>
+      <tr data-cat="exame" data-q="audiometria tonal"><td><div class="person"><span class="avatar ux-fileic" aria-hidden="true"><i data-icon="pdf"></i></span><div><strong>Audiometria tonal</strong><small>PDF · 2,4 MB</small></div></div></td><td>Exame</td><td>Clínica Ouvir, CRFa-PR 5521</td><td class="num">17/02/2026</td><td class="num">19/02/2026</td><td class="actions-col"><button type="button" class="kebab-btn" aria-label="Ações para Audiometria tonal"></button><ul class="kebab-menu" role="menu" hidden><li><button type="button" role="menuitem" data-toast="Download por link temporário (simulação)."><i data-icon="eye"></i>Visualizar ou baixar</button></li></ul></td></tr>
+      <tr data-cat="tcle termo" data-q="termo de consentimento do pts"><td><div class="person"><span class="avatar ux-fileic" aria-hidden="true"><i data-icon="pdf"></i></span><div><strong>Termo de consentimento do PTS</strong><small>PDF · 180 KB</small></div></div></td><td>TCLE</td><td><span class="empty-cell" aria-label="Não informado">—</span></td><td class="num">03/03/2026</td><td class="num">03/03/2026</td><td class="actions-col"><button type="button" class="kebab-btn" aria-label="Ações para Termo de consentimento do PTS"></button><ul class="kebab-menu" role="menu" hidden><li><button type="button" role="menuitem" data-toast="Download por link temporário (simulação)."><i data-icon="eye"></i>Visualizar ou baixar</button></li></ul></td></tr>
+      <tr data-empty hidden><td colspan="6"><div class="empty"><div class="empty-icon"><i data-icon="search" class="icon"></i></div><h2>Nenhum documento encontrado</h2><p>Revise a busca ou limpe os filtros.</p></div></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="ux-tfoot"><span>Mostrando 1–3 de 3</span><nav class="ux-pages" aria-label="Paginação"><button type="button" disabled aria-label="Página anterior"><i data-icon="chevronLeft"></i></button><button type="button" aria-current="page" aria-label="Página 1">1</button><button type="button" disabled aria-label="Próxima página"><i data-icon="chevronRight"></i></button></nav><label class="ux-perpage"><span>Itens por página</span><select class="select" aria-label="Itens por página"><option>10</option><option>25</option><option>50</option></select></label></div>
+</div>
+</section>
+</main>
+</div>
+</div>
+<script src="assets/teapts-mockups.js"></script>
+</body>
+</html>

@@ -14,7 +14,10 @@ export default function EditPtsProposalClient({
   return (
     <AuthenticatedPage
       currentHref="/pts/proposals"
-      breadcrumb="Editar proposta de PTS"
+      breadcrumb={[
+        { label: 'PTS', href: '/pts/proposals' },
+        { label: 'Editar proposta' },
+      ]}
     >
       {(account) => (
         <EditPtsProposalForm proposalId={proposalId} account={account} />

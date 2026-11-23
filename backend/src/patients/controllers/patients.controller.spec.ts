@@ -29,6 +29,7 @@ describe('GET /patients/authorized', () => {
   let guardCanActivate: jest.Mock;
   let patientsService: {
     findAuthorized: jest.Mock;
+    findOne: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -40,6 +41,7 @@ describe('GET /patients/authorized', () => {
       return true;
     });
     patientsService = {
+      findOne: jest.fn(async () => ({ id: 'patient-1', name: 'Maria Silva' })),
       findAuthorized: jest.fn(async () => ({
         data: [{ id: 'patient-1', name: 'Maria Silva' }],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
@@ -84,6 +86,23 @@ describe('GET /patients/authorized', () => {
     );
   });
 
+  it('passes the trimmed search and the filters to the service', async () => {
+    await request(app.getHttpServer()).get('/patients/authorized').query({
+      q: '  mari  ',
+      status: 'running,concluded',
+      sort: 'registeredAt',
+    });
+
+    expect(patientsService.findAuthorized).toHaveBeenCalledWith(
+      accountContext,
+      expect.objectContaining({
+        q: 'mari',
+        status: ['running', 'concluded'],
+        sort: 'registeredAt',
+      }),
+    );
+  });
+
   it('passes the normalized query to the service', async () => {
     await request(app.getHttpServer())
       .get('/patients/authorized')
@@ -93,6 +112,25 @@ describe('GET /patients/authorized', () => {
       accountContext,
       expect.objectContaining({ page: 2, limit: 25 }),
     );
+  });
+
+  it('routes GET /patients/:id to the detail with the account', async () => {
+    const id = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+    const response = await request(app.getHttpServer()).get(`/patients/${id}`);
+
+    expect(response.status).toBe(200);
+    expect(patientsService.findOne).toHaveBeenCalledWith(accountContext, id);
+  });
+
+  it('answers 400 for a patient id that is not a UUID', async () => {
+    const response = await request(app.getHttpServer()).get('/patients/abc');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'ERROR',
+      message: 'Parâmetro inválido: id',
+    });
+    expect(patientsService.findOne).not.toHaveBeenCalled();
   });
 
   it('returns a validation error without calling the service', async () => {

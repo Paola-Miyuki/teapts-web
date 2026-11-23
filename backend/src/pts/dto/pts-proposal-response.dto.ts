@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
+import { ProfessionalRegistrationResponseDto } from '../../professionals/dto/get-professionals-response.dto';
 
 export class PtsProposalSpecialismResponseDto {
   @ApiProperty({ example: 'psychologist' })
@@ -18,6 +19,10 @@ export class PtsProposalProfessionalResponseDto {
 
   @ApiProperty({ type: PtsProposalSpecialismResponseDto })
   specialism!: PtsProposalSpecialismResponseDto;
+
+  /** Registro no conselho; `null` nos perfis sem número e UF. */
+  @ApiProperty({ type: ProfessionalRegistrationResponseDto, nullable: true })
+  registration!: ProfessionalRegistrationResponseDto | null;
 }
 
 export class PtsProposalPatientResponseDto {

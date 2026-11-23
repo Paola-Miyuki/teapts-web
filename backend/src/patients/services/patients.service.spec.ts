@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 import {
   ConflictException,
+  ForbiddenException,
   InternalServerErrorException,
   Logger,
   NotFoundException,
@@ -12,14 +13,19 @@ import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import type { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import type { Patient } from '../entities/patient.entity';
 import type { NewPatient } from '../repositories/patients.repository';
+import type { SupportContact } from '../entities/support-contact.entity';
 import type {
   AuthorizedPatientsPage,
+  PatientRow,
+  PatientScope,
+  PatientsPage,
   PatientsRepository,
 } from '../repositories/patients.repository';
 import { PatientsService } from './patients.service';
@@ -27,19 +33,20 @@ import { PatientsService } from './patients.service';
 function createService() {
   const repository = {
     insert: jest.fn<(patient: NewPatient) => Promise<void>>(),
-    findAuthorizedPaginated:
+    findPatientsPaginated:
       jest.fn<
         (
-          accountId: string,
+          scope: PatientScope,
           filters: GetAuthorizedPatientsRequestDto,
-        ) => Promise<AuthorizedPatientsPage>
+        ) => Promise<PatientsPage>
       >(),
-    findAllPaginated:
+    findPatient:
       jest.fn<
-        (
-          filters: GetAuthorizedPatientsRequestDto,
-        ) => Promise<AuthorizedPatientsPage>
+        (scope: PatientScope, patientId: string) => Promise<PatientRow | null>
       >(),
+    patientExists: jest.fn<(patientId: string) => Promise<boolean>>(),
+    findSupportContacts:
+      jest.fn<(patientId: string) => Promise<SupportContact[]>>(),
     findAvailableForPtsPaginated:
       jest.fn<
         (
@@ -72,68 +79,93 @@ const adminAccount: AccountContext = {
   professionalProfileIds: [],
 };
 
+const row: PatientRow = {
+  patient_id: 'patient-1',
+  account_name: 'Maria Silva',
+  social_name: null,
+  email: 'maria@exemplo.com',
+  cpf: '11144477735',
+  cns: '700000000000005',
+  guardian_name: 'Ana Silva',
+  registered_at: new Date('2026-10-01T12:00:00.000Z'),
+  pts_status: PtsStateEnum.CONCLUDED,
+  active_pts_id: null,
+  read_only: true,
+};
+
+const listed = {
+  id: 'patient-1',
+  name: 'Maria Silva',
+  socialName: null,
+  email: 'maria@exemplo.com',
+  cns: '700000000000005',
+  guardianName: 'Ana Silva',
+  registeredAt: '2026-10-01T12:00:00.000Z',
+  ptsStatus: PtsStateEnum.CONCLUDED,
+  activePtsId: null,
+  readOnly: true,
+};
+
+const patientAccount: AccountContext = {
+  accountId: 'patient-9',
+  role: AccountRole.User,
+  patientProfileId: 'patient-9',
+  professionalProfileIds: [],
+};
+
 describe('PatientsService.findAuthorized', () => {
-  it('passes the account and filters and returns only the public summary', async () => {
+  it('limits the professional to the own scope and returns the list fields', async () => {
     const { repository, service } = createService();
-    const request = { page: 2, limit: 10 };
-    repository.findAuthorizedPaginated.mockResolvedValue({
-      rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+    const request = { page: 2, limit: 10, q: 'mari' };
+    repository.findPatientsPaginated.mockResolvedValue({
+      rows: [row],
       total: 11,
     });
 
     await expect(
       service.findAuthorized(professionalAccount, request),
     ).resolves.toEqual({
-      data: [{ id: 'patient-1', name: 'Maria Silva' }],
+      data: [listed],
       pagination: { page: 2, limit: 10, total: 11, totalPages: 2 },
     });
 
-    expect(repository.findAuthorizedPaginated).toHaveBeenCalledWith(
-      'account-1',
+    expect(repository.findPatientsPaginated).toHaveBeenCalledWith(
+      { kind: 'professional', accountId: 'account-1' },
       request,
     );
-    expect(repository.findAllPaginated).not.toHaveBeenCalled();
   });
 
-  it('returns every patient to the admin without the PTS filter', async () => {
+  it('returns every patient to the admin', async () => {
     const { repository, service } = createService();
     const request = { page: 1, limit: 10 };
-    repository.findAllPaginated.mockResolvedValue({
-      rows: [{ patient_id: 'patient-2', account_name: 'Ana Souza' }],
+    repository.findPatientsPaginated.mockResolvedValue({
+      rows: [
+        { ...row, read_only: false, registered_at: '2026-10-01 12:00:00' },
+      ],
       total: 1,
     });
 
-    await expect(
-      service.findAuthorized(adminAccount, request),
-    ).resolves.toEqual({
-      data: [{ id: 'patient-2', name: 'Ana Souza' }],
-      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-    });
+    const result = await service.findAuthorized(adminAccount, request);
 
-    expect(repository.findAllPaginated).toHaveBeenCalledWith(request);
-    expect(repository.findAuthorizedPaginated).not.toHaveBeenCalled();
+    expect(result.data[0]).toMatchObject({ readOnly: false });
+    expect(repository.findPatientsPaginated).toHaveBeenCalledWith(
+      { kind: 'all' },
+      request,
+    );
   });
 
-  it('returns a safe internal error when the admin query fails', async () => {
+  it('answers 403 to an account without a professional profile', async () => {
     const { repository, service } = createService();
-    repository.findAllPaginated.mockRejectedValue(new Error('details'));
 
     await expect(
-      service.findAuthorized(adminAccount, { page: 1, limit: 10 }),
-    ).rejects.toMatchObject({
-      response: {
-        status: 'ERROR',
-        message: 'Não foi possível consultar os pacientes autorizados.',
-      },
-    });
+      service.findAuthorized(patientAccount, { page: 1, limit: 10 }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.findPatientsPaginated).not.toHaveBeenCalled();
   });
 
   it('returns an empty page with zero total pages', async () => {
     const { repository, service } = createService();
-    repository.findAuthorizedPaginated.mockResolvedValue({
-      rows: [],
-      total: 0,
-    });
+    repository.findPatientsPaginated.mockResolvedValue({ rows: [], total: 0 });
 
     await expect(
       service.findAuthorized(professionalAccount, { page: 1, limit: 10 }),
@@ -211,7 +243,7 @@ describe('PatientsService.findAuthorized', () => {
 
   it('returns a safe internal error when the repository fails', async () => {
     const { repository, service } = createService();
-    repository.findAuthorizedPaginated.mockRejectedValue(
+    repository.findPatientsPaginated.mockRejectedValue(
       new Error('database connection details'),
     );
 
@@ -223,6 +255,70 @@ describe('PatientsService.findAuthorized', () => {
         message: 'Não foi possível consultar os pacientes autorizados.',
       },
     });
+  });
+});
+
+describe('PatientsService.findOne', () => {
+  it('returns the patient with CPF and support contacts to the team', async () => {
+    const { repository, service } = createService();
+    repository.patientExists.mockResolvedValue(true);
+    repository.findPatient.mockResolvedValue(row);
+    repository.findSupportContacts.mockResolvedValue([
+      {
+        name: 'Ana Silva',
+        description: 'Mãe',
+        email: null,
+        phone: '41999999999',
+      } as SupportContact,
+    ]);
+
+    await expect(
+      service.findOne(professionalAccount, 'patient-1'),
+    ).resolves.toEqual({
+      ...listed,
+      cpf: '11144477735',
+      supportContacts: [
+        { name: 'Ana Silva', description: 'Mãe', phone: '41999999999' },
+      ],
+    });
+    expect(repository.findPatient).toHaveBeenCalledWith(
+      { kind: 'professional', accountId: 'account-1' },
+      'patient-1',
+    );
+  });
+
+  it('answers 404 PATIENT_NOT_FOUND for a missing patient', async () => {
+    const { repository, service } = createService();
+    repository.patientExists.mockResolvedValue(false);
+
+    const error: unknown = await service
+      .findOne(adminAccount, 'patient-1')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toEqual({
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    });
+  });
+
+  it('answers 403 to a professional without access (RN016)', async () => {
+    const { repository, service } = createService();
+    repository.patientExists.mockResolvedValue(true);
+    repository.findPatient.mockResolvedValue(null);
+
+    await expect(
+      service.findOne(professionalAccount, 'patient-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('answers 403 to a patient account', async () => {
+    const { repository, service } = createService();
+
+    await expect(
+      service.findOne(patientAccount, 'patient-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.patientExists).not.toHaveBeenCalled();
   });
 });
 

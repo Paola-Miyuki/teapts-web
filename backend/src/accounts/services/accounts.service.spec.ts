@@ -3,6 +3,8 @@ import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { RecipeUserId } from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import { AccountRole } from '../enums/account-role.enum';
+import { Gender } from '../enums/gender.enum';
+import { Sex } from '../enums/sex.enum';
 import type {
   AccountsPage,
   AccountsQuery,
@@ -15,6 +17,7 @@ describe('AccountsService', () => {
     create: jest.fn<(value?: unknown) => unknown>(),
     save: jest.fn<(value?: unknown) => Promise<unknown>>(),
     findOne: jest.fn<(value?: unknown) => unknown>(),
+    exists: jest.fn<(value?: unknown) => Promise<boolean>>(),
   };
   const accountsRepository = {
     findPaginated: jest.fn<(filters: AccountsQuery) => Promise<AccountsPage>>(),
@@ -46,6 +49,12 @@ describe('AccountsService', () => {
         supertokensUserId: 'user-1',
         name: ' Pessoa Teste ',
         email: ' PESSOA@EXAMPLE.COM ',
+        socialName: ' ',
+        birthDate: '1990-05-20',
+        sex: Sex.Female,
+        gender: null,
+        cpf: '52998224725',
+        phone: '11987654321',
       }),
     ).resolves.toBe(account);
 
@@ -53,8 +62,23 @@ describe('AccountsService', () => {
       supertokensUserId: 'user-1',
       name: 'Pessoa Teste',
       email: 'pessoa@example.com',
+      socialName: null,
+      birthDate: '1990-05-20',
+      sex: Sex.Female,
+      gender: null,
+      cpf: '52998224725',
+      phone: '11987654321',
       role: AccountRole.User,
       lastUpdatedAt: null,
+    });
+  });
+
+  it('tells whether another account already uses the CPF', async () => {
+    accountRepository.exists.mockResolvedValue(true);
+
+    await expect(service.isCpfTaken('52998224725')).resolves.toBe(true);
+    expect(accountRepository.exists).toHaveBeenCalledWith({
+      where: { cpf: '52998224725' },
     });
   });
 
@@ -89,6 +113,13 @@ describe('AccountsService', () => {
       name: 'Maria Silva',
       email: 'maria@example.com',
       role: AccountRole.User,
+      socialName: null,
+      birthDate: '1990-05-20',
+      sex: Sex.Female,
+      gender: null,
+      cpf: '52998224725',
+      phone: null,
+      createdAt: new Date('2026-01-10T12:00:00.000Z'),
       lastUpdatedAt: null,
     };
 
@@ -112,6 +143,44 @@ describe('AccountsService', () => {
       expect(accountRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'Ana Silva' }),
       );
+    });
+
+    it('updates the personal data and returns it, keeping the CPF', async () => {
+      await expect(
+        service.updateMe(accountContext, {
+          socialName: 'Mari',
+          birthDate: '1991-02-03',
+          sex: Sex.Male,
+          gender: Gender.NonBinary,
+          phone: '11987654321',
+        }),
+      ).resolves.toMatchObject({
+        socialName: 'Mari',
+        birthDate: '1991-02-03',
+        sex: Sex.Male,
+        gender: Gender.NonBinary,
+        cpf: '52998224725',
+        phone: '11987654321',
+        createdAt: '2026-01-10T12:00:00.000Z',
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('clears the optional personal data sent as null', async () => {
+      accountRepository.findOne.mockResolvedValueOnce({
+        ...account,
+        socialName: 'Mari',
+        gender: Gender.Other,
+        phone: '11987654321',
+      } as never);
+
+      await expect(
+        service.updateMe(accountContext, {
+          socialName: null,
+          gender: null,
+          phone: null,
+        }),
+      ).resolves.toMatchObject({ socialName: null, gender: null, phone: null });
     });
 
     it('updates and normalizes a changed email', async () => {

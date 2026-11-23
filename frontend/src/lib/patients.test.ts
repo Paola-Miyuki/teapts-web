@@ -1,6 +1,7 @@
 import {
   getAccountsWithoutProfile,
-  getPatientAccounts,
+  getPatient,
+  getPatients,
   isValidPhone,
 } from './patients';
 
@@ -41,35 +42,6 @@ describe('consultas de contas', () => {
     });
   });
 
-  it('lista os pacientes sem o q quando não há busca', async () => {
-    await getPatientAccounts(1, 10);
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${API}/accounts?isPatient=true&page=1&limit=10`,
-      expect.objectContaining({ credentials: 'include' }),
-    );
-  });
-
-  it('manda o q codificado e o signal na lista de pacientes', async () => {
-    const { signal } = new AbortController();
-
-    await getPatientAccounts(2, 10, { q: 'maria silva', signal });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${API}/accounts?isPatient=true&q=maria+silva&page=2&limit=10`,
-      expect.objectContaining({ credentials: 'include', signal }),
-    );
-  });
-
-  it('não manda o q vazio', async () => {
-    await getPatientAccounts(1, 10, { q: '   ' });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      `${API}/accounts?isPatient=true&page=1&limit=10`,
-      expect.anything(),
-    );
-  });
-
   it('lista só contas sem perfil de paciente nem profissional', async () => {
     await getAccountsWithoutProfile();
 
@@ -87,6 +59,55 @@ describe('consultas de contas', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       `${API}/accounts?isPatient=false&isProfessional=false&q=mari&page=1&limit=20`,
       expect.objectContaining({ signal }),
+    );
+  });
+});
+
+describe('getPatients e getPatient', () => {
+  const API = 'http://localhost:3000';
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ data: [], pagination: {} }),
+    });
+  });
+
+  it('não envia filtros vazios nem a busca só com espaços', async () => {
+    await getPatients({ page: 1, limit: 10, q: '   ', status: [] });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/authorized?page=1&limit=10`,
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('envia q, status, responsável, datas e ordenação', async () => {
+    await getPatients({
+      page: 2,
+      limit: 25,
+      q: ' mari ',
+      status: ['concluded', 'none'],
+      responsibleProfessionalId: 'prof-1',
+      registeredFrom: '2026-01-01',
+      registeredTo: '2026-02-01',
+      sort: 'registeredAt',
+      order: 'desc',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/authorized?q=mari&status=concluded%2Cnone&responsibleProfessionalId=prof-1&registeredFrom=2026-01-01&registeredTo=2026-02-01&sort=registeredAt&order=desc&page=2&limit=25`,
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('busca o detalhe pelo id', async () => {
+    await getPatient('patient-1');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/patient-1`,
+      expect.objectContaining({ credentials: 'include' }),
     );
   });
 });

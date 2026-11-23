@@ -65,7 +65,37 @@ describe('UpdateMeRequestDto', () => {
   it('requires at least one field', async () => {
     await expect(getErrorBody(UpdateMeRequestDto, {})).resolves.toEqual({
       status: 'VALIDATION_ERROR',
-      message: 'Informe nome ou e-mail.',
+      message: 'Informe ao menos um dado da conta.',
+    });
+  });
+
+  it('normalizes the personal data and turns empty optionals into null', async () => {
+    await expect(
+      validate(UpdateMeRequestDto, {
+        socialName: '  ',
+        birthDate: '1990-05-20',
+        sex: 'female',
+        gender: null,
+        phone: '(11) 98765-4321',
+      }),
+    ).resolves.toEqual({
+      socialName: null,
+      birthDate: '1990-05-20',
+      sex: 'female',
+      gender: null,
+      phone: '11987654321',
+    });
+  });
+
+  it.each([
+    [{ birthDate: '2999-01-01' }, 'Informe uma data de nascimento válida.'],
+    [{ sex: 'other' }, 'Informe um sexo válido.'],
+    [{ gender: 'x' }, 'Informe um gênero válido.'],
+    [{ phone: '1234' }, 'Informe um telefone válido, com DDD.'],
+  ])('rejects invalid personal data %j', async (body, message) => {
+    await expect(getErrorBody(UpdateMeRequestDto, body)).resolves.toEqual({
+      status: 'VALIDATION_ERROR',
+      message,
     });
   });
 
