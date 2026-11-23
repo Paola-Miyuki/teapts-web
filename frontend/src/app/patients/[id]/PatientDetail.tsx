@@ -241,7 +241,10 @@ function PatientDetailContent({ id }: { id: string }) {
               ) : (
                 <ul className="ux-contact-tiles">
                   {patient.supportContacts.map((contact, index) => (
-                    <li className="ux-contact-tile" key={`${contact.name}-${index}`}>
+                    <li
+                      className="ux-contact-tile"
+                      key={`${contact.name}-${index}`}
+                    >
                       <span className="avatar" aria-hidden="true">
                         {initials(contact.name)}
                       </span>

@@ -33,7 +33,9 @@ const PATIENT = {
   ptsStatus: 'concluded',
   activePtsId: null,
   readOnly: true,
-  supportContacts: [{ name: 'Rosa Ribeiro', description: 'Avó', phone: '41996772211' }],
+  supportContacts: [
+    { name: 'Rosa Ribeiro', description: 'Avó', phone: '41996772211' },
+  ],
 };
 
 function respond(status: number, data: unknown) {
@@ -80,12 +82,17 @@ describe('PatientDetail', () => {
 
   it('mostra "Sem acesso" no 403', async () => {
     mockApi(
-      respond(403, { status: 'FORBIDDEN', message: 'Acesso restrito ao profissional.' }),
+      respond(403, {
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao profissional.',
+      }),
     );
 
     render(<PatientDetail id="patient-1" />);
 
-    expect(await screen.findByText('Sem acesso a este paciente')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Sem acesso a este paciente'),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Voltar para pacientes' }),
     ).toHaveAttribute('href', '/patients');

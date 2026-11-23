@@ -136,7 +136,11 @@ export default function Professionals() {
           </button>
 
           {specialism && (
-            <button type="button" className="btn" onClick={() => setSpecialism('')}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setSpecialism('')}
+            >
               <Icon name="close" className="icon-sm" />
               Limpar
             </button>
@@ -144,7 +148,11 @@ export default function Professionals() {
         </div>
       </div>
 
-      <div className="filter-more" id="professionals-more" hidden={!filtersOpen}>
+      <div
+        className="filter-more"
+        id="professionals-more"
+        hidden={!filtersOpen}
+      >
         <MultiSelect
           label="Especialidade"
           placeholder="Todas as especialidades"
@@ -152,8 +160,8 @@ export default function Professionals() {
           value={specialism ? [specialism] : []}
           onChange={(value) =>
             setSpecialism(
-              (value.filter((item) => item !== specialism)[0] ??
-                '') as ProfessionalSpecialism | '',
+              (value.filter((item) => item !== specialism)[0] ?? '') as
+                ProfessionalSpecialism | '',
             )
           }
         />

@@ -89,7 +89,10 @@ type PatientListProps = {
 
 // Lista de pacientes de `pacientes.html` (RFPAC002): busca, filtros,
 // ordenação e paginação ficam na URL para valer ao recarregar e ao voltar.
-export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps) {
+export default function PatientList({
+  isAdmin,
+  reloadKey = 0,
+}: PatientListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -102,10 +105,13 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
   const registeredToParam = searchParams.get('registeredTo') ?? '';
   const sort: PatientSort =
     searchParams.get('sort') === 'registeredAt' ? 'registeredAt' : 'name';
-  const order: SortOrder = searchParams.get('order') === 'desc' ? 'desc' : 'asc';
+  const order: SortOrder =
+    searchParams.get('order') === 'desc' ? 'desc' : 'asc';
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const limitParam = Number(searchParams.get('limit'));
-  const limit = PER_PAGE_OPTIONS.includes(limitParam) ? limitParam : DEFAULT_LIMIT;
+  const limit = PER_PAGE_OPTIONS.includes(limitParam)
+    ? limitParam
+    : DEFAULT_LIMIT;
 
   // Grava os parâmetros na URL; mudar busca ou filtro volta à página 1.
   function update(changes: Record<string, string>, keepPage = false) {
@@ -124,7 +130,9 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
     }
 
     const query = params.toString();
-    router.replace(query ? `/patients?${query}` : '/patients', { scroll: false });
+    router.replace(query ? `/patients?${query}` : '/patients', {
+      scroll: false,
+    });
   }
 
   const search = useDebouncedSearch({
@@ -173,9 +181,10 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
     key: string;
     response: PatientsListResponse;
   } | null>(null);
-  const [failure, setFailure] = useState<{ key: string; error: unknown } | null>(
-    null,
-  );
+  const [failure, setFailure] = useState<{
+    key: string;
+    error: unknown;
+  } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -294,7 +303,8 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
               value={sort}
               onChange={(event) =>
                 update({
-                  sort: event.target.value === 'registeredAt' ? 'registeredAt' : '',
+                  sort:
+                    event.target.value === 'registeredAt' ? 'registeredAt' : '',
                 })
               }
             >
@@ -305,10 +315,15 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
               type="button"
               className="btn btn-sm sort-dir"
               data-dir={order}
-              aria-label={order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'}
+              aria-label={
+                order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'
+              }
               onClick={() => update({ order: order === 'asc' ? 'desc' : '' })}
             >
-              <Icon name={order === 'asc' ? 'sortUp' : 'sortDown'} className="icon-sm" />
+              <Icon
+                name={order === 'asc' ? 'sortUp' : 'sortDown'}
+                className="icon-sm"
+              />
             </button>
           </label>
         </div>
@@ -356,14 +371,18 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
                 type="date"
                 aria-label="De"
                 value={registeredFromParam}
-                onChange={(event) => update({ registeredFrom: event.target.value })}
+                onChange={(event) =>
+                  update({ registeredFrom: event.target.value })
+                }
               />
               <input
                 className="input"
                 type="date"
                 aria-label="Até"
                 value={registeredToParam}
-                onChange={(event) => update({ registeredTo: event.target.value })}
+                onChange={(event) =>
+                  update({ registeredTo: event.target.value })
+                }
               />
             </div>
           )}
@@ -458,7 +477,10 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
                     <td className="actions-col">
                       <KebabMenu label={`Ações para ${patient.name}`}>
                         <li>
-                          <Link role="menuitem" href={`/patients/${patient.id}`}>
+                          <Link
+                            role="menuitem"
+                            href={`/patients/${patient.id}`}
+                          >
                             <Icon name="eye" className="icon-sm" />
                             Visualizar
                           </Link>
@@ -477,7 +499,9 @@ export default function PatientList({ isAdmin, reloadKey = 0 }: PatientListProps
             limit={limit}
             total={last.response.pagination.total}
             totalPages={last.response.pagination.totalPages}
-            onPageChange={(next) => update({ page: next > 1 ? String(next) : '' }, true)}
+            onPageChange={(next) =>
+              update({ page: next > 1 ? String(next) : '' }, true)
+            }
             onLimitChange={(next) =>
               update({ limit: next === DEFAULT_LIMIT ? '' : String(next) })
             }

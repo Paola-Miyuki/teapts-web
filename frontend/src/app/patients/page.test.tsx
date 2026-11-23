@@ -255,10 +255,9 @@ describe('PatientsPage', () => {
         await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
       );
 
-      expect(screen.getByRole('menuitem', { name: 'Visualizar' })).toHaveAttribute(
-        'href',
-        '/patients/1-0',
-      );
+      expect(
+        screen.getByRole('menuitem', { name: 'Visualizar' }),
+      ).toHaveAttribute('href', '/patients/1-0');
     });
 
     it('mostra ao profissional os pacientes vinculados e o filtro do papel', async () => {
@@ -267,7 +266,9 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
-      expect(await screen.findByText('Pacientes vinculados')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Pacientes vinculados'),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole('link', { name: 'Criar proposta de PTS' }),
       ).toHaveAttribute('href', '/pts/novo');
@@ -278,7 +279,9 @@ describe('PatientsPage', () => {
       await user.click(screen.getByRole('button', { name: 'Filtros' }));
 
       expect(
-        screen.getAllByRole('checkbox').map((box) => box.parentElement?.textContent),
+        screen
+          .getAllByRole('checkbox')
+          .map((box) => box.parentElement?.textContent),
       ).toEqual(['Em planejamento', 'Em andamento', 'Concluído', 'Cancelado']);
     });
 
@@ -298,9 +301,13 @@ describe('PatientsPage', () => {
 
       render(<PatientsPage />);
 
-      expect(await screen.findByText('Falha ao consultar.')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Falha ao consultar.'),
+      ).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+      await user.click(
+        screen.getByRole('button', { name: 'Tentar novamente' }),
+      );
 
       expect(
         await screen.findByText('Nenhum paciente cadastrado'),
@@ -309,7 +316,9 @@ describe('PatientsPage', () => {
 
     it('redireciona para o login quando a sessão expira', async () => {
       mockApi({
-        list: jest.fn().mockResolvedValue(mockResponse({ status: 401, ok: false })),
+        list: jest
+          .fn()
+          .mockResolvedValue(mockResponse({ status: 401, ok: false })),
       });
 
       render(<PatientsPage />);
@@ -589,11 +598,15 @@ describe('PatientsPage', () => {
 
     it('troca de página mantendo os filtros', async () => {
       const user = userEvent.setup();
-      mockedUseSearchParams.mockReturnValue(new URLSearchParams('status=running'));
+      mockedUseSearchParams.mockReturnValue(
+        new URLSearchParams('status=running'),
+      );
       mockApi({
         list: jest
           .fn()
-          .mockResolvedValue(mockResponse({ data: page(['Maria Sílvia'], 1, 3) })),
+          .mockResolvedValue(
+            mockResponse({ data: page(['Maria Sílvia'], 1, 3) }),
+          ),
       });
 
       render(<PatientsPage />);

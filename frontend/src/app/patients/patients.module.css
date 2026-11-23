@@ -165,14 +165,13 @@
 }
 
 @media (max-width: 640px) {
-
   .contactGrid,
-.contactData {
+  .contactData {
     grid-template-columns: 1fr;
   }
 
   .formActions > *,
-.contactActions > * {
+  .contactActions > * {
     flex: 1;
   }
 }
