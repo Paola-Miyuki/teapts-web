@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
-import HelpTooltip from '@/components/HelpTooltip';
 import Icon from '@/components/Icon';
 import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import RegistrationCell from '@/components/table/RegistrationCell';
@@ -17,6 +16,7 @@ import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
 import { getPts, type PtsDetail, type PtsProfessional } from '@/lib/pts';
 import TimelineTab from '@/components/pts/TimelineTab';
+import PtsSheetCards from '../_components/PtsSheetCards';
 import {
   AddTeamMembersModal,
   type PtsData,
@@ -211,6 +211,13 @@ function PtsDetailContent({
     (isAdmin || currentUserProfileIds.includes(pts.responsible.id)) &&
     ['planning', 'running'].includes(pts.status);
 
+  // RFPTS005 – equipe ou admin, com o PTS ativo; o paciente não edita.
+  const canEditPts =
+    !isPatient &&
+    (isAdmin ||
+      members.some((member) => currentUserProfileIds.includes(member.id))) &&
+    ['planning', 'running'].includes(pts.status);
+
   const handleTeamUpdated = (updatedPts: PtsData) => {
     setPts((prev) =>
       prev
@@ -252,12 +259,20 @@ function PtsDetailContent({
           )}
         </dl>
 
-        {canOpenRecord && (
+        {(canOpenRecord || canEditPts) && (
           <div className="heading-actions">
-            <Link className="btn" href={`/patients/${pts.patient.id}`}>
-              <Icon name="patient" className="icon-sm" />
-              Prontuário
-            </Link>
+            {canEditPts && (
+              <Link className="btn" href={`/pts/${pts.id}/edit`}>
+                <Icon name="edit" className="icon-sm" />
+                Editar PTS
+              </Link>
+            )}
+            {canOpenRecord && (
+              <Link className="btn" href={`/patients/${pts.patient.id}`}>
+                <Icon name="patient" className="icon-sm" />
+                Prontuário
+              </Link>
+            )}
           </div>
         )}
       </section>
@@ -312,25 +327,7 @@ function PtsDetailContent({
         </section>
       ) : tab === 'visao' && !isPatient ? (
         <section data-panel="visao" id="visao">
-          <div className="ux-stack">
-            <section className="ux-card" aria-labelledby="pv-social">
-              <div className="ux-card-head">
-                <div>
-                  <span className="ux-titletip">
-                    <h2 id="pv-social">Situação social</h2>
-                    <HelpTooltip id="pv-social-tip" label="Situação social">
-                      A situação social não aparece ao paciente.
-                    </HelpTooltip>
-                  </span>
-                </div>
-              </div>
-              <div className="ux-psec">
-                <p className="ux-ptext">
-                  {pts.socialSituation || <EmptyCell />}
-                </p>
-              </div>
-            </section>
-          </div>
+          <PtsSheetCards pts={pts} />
         </section>
       ) : (
         <section data-panel="equipe" id="equipe">

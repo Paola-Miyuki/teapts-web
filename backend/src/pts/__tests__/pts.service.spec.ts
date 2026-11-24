@@ -483,6 +483,17 @@ describe('PtsService.findActivePts', () => {
     id: 'active-100',
     status: PtsStateEnum.PLANNING,
     socialSituation: 'Situação social confidencial.',
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum confidencial.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação'],
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
     createdAt: '2026-10-15T12:00:00.000Z',
     acceptedAt: '2026-10-15T12:30:00.000Z',
     beganAt: null,
@@ -509,7 +520,7 @@ describe('PtsService.findActivePts', () => {
     service = new PtsService(repo);
   });
 
-  it('retorna o PTS sem situação social para o paciente titular', async () => {
+  it('retorna o PTS sem a ficha, só com a próxima revisão, para o paciente titular', async () => {
     const result = await service.findActivePts(
       { patientId: 'acc-patient-25' },
       patientAccount,
@@ -522,6 +533,10 @@ describe('PtsService.findActivePts', () => {
       beganAt: null,
     });
     expect(result).not.toHaveProperty('socialSituation');
+    expect(result).not.toHaveProperty('diagnosisSummary');
+    expect(result).not.toHaveProperty('cid');
+    expect(result).not.toHaveProperty('priorityNeeds');
+    expect(result.nextReviewAt).toBe('2027-10-01');
   });
 
   it('retorna o PTS completo para o responsável', async () => {
@@ -723,14 +738,29 @@ describe('PtsService.updatePtsProposal', () => {
   });
 });
 
-describe('PtsService.updateSocialSituation', () => {
+describe('PtsService.updatePtsSheet', () => {
   let repo: InMemoryPtsRepository;
   let service: PtsService;
+
+  const sheet = {
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: '  Diagnóstico em comum atualizado.  ',
+    cid: ' F84.0 ',
+    supportLevel: 2,
+    strengths: '',
+    priorityNeeds: ['Comunicação', '  ', ' Autonomia '],
+    socialSituation: ' Situação social atualizada. ',
+    vulnerabilities: null,
+    comorbidities: 'TDAH',
+    sensoryProfile: undefined,
+    communicationMethod: '   ',
+    nextReviewAt: '2027-10-01',
+  };
 
   beforeEach(() => {
     repo = seededRepo();
     service = new PtsService(repo);
-    repo.socialSituationTargets.set('pts-100', {
+    repo.sheetTargets.set('pts-100', {
       id: 'pts-100',
       status: PtsStateEnum.PLANNING,
       responsibleProfessionalId: 'prof-10',
@@ -738,83 +768,100 @@ describe('PtsService.updateSocialSituation', () => {
     });
   });
 
-  it('permite ao responsável atualizar a situação social do PTS ativo', async () => {
+  it('permite ao responsável atualizar a ficha, aparada e com opcional vazio como null', async () => {
     await expect(
-      service.updateSocialSituation(
-        'pts-100',
-        { socialSituation: 'Situação social atualizada.' },
-        responsibleAccount,
-      ),
+      service.updatePtsSheet('pts-100', sheet, responsibleAccount),
     ).resolves.toEqual({
       id: 'pts-100',
+      caseStudyDate: '2026-10-01',
+      diagnosisSummary: 'Diagnóstico em comum atualizado.',
+      cid: 'F84.0',
+      supportLevel: 2,
+      strengths: null,
+      priorityNeeds: ['Comunicação', 'Autonomia'],
       socialSituation: 'Situação social atualizada.',
+      vulnerabilities: null,
+      comorbidities: 'TDAH',
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2027-10-01',
     });
   });
 
-  it('permite que um membro da equipe atualize a situação social', async () => {
+  it('grava pts_updated com o profissional e a conta que executaram', async () => {
+    await service.updatePtsSheet('pts-100', sheet, teamAccount);
+
+    expect(repo.sheetUpdates).toHaveLength(1);
+    expect(repo.sheetUpdates[0]).toMatchObject({
+      ptsId: 'pts-100',
+      authorProfessionalId: 'prof-11',
+      executedByAccountId: teamAccount.accountId,
+      description: 'Ficha do PTS atualizada.',
+    });
+  });
+
+  it('permite ao admin, sem autor profissional no evento (RN029)', async () => {
     await expect(
-      service.updateSocialSituation(
-        'pts-100',
-        { socialSituation: 'Atualização feita pela equipe.' },
-        teamAccount,
-      ),
+      service.updatePtsSheet('pts-100', sheet, adminAccount),
     ).resolves.toMatchObject({ id: 'pts-100' });
+
+    expect(repo.sheetUpdates[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: adminAccount.accountId,
+    });
   });
 
   it('rejeita profissional sem vínculo com o PTS', async () => {
     await expectApiError(
-      () =>
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: 'Alteração indevida.' },
-          otherProfessionalAccount,
-        ),
+      () => service.updatePtsSheet('pts-100', sheet, otherProfessionalAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.sheetUpdates).toHaveLength(0);
+  });
+
+  it('rejeita o paciente', async () => {
+    await expectApiError(
+      () => service.updatePtsSheet('pts-100', sheet, patientAccount),
       403,
       'FORBIDDEN',
     );
   });
 
-  it('rejeita PTS fora de PLANNING ou RUNNING', async () => {
-    repo.socialSituationTargets.set('pts-100', {
-      id: 'pts-100',
-      status: PtsStateEnum.DRAFT,
-      responsibleProfessionalId: 'prof-10',
-      teamProfessionalIds: ['prof-11'],
-    });
+  it.each([
+    PtsStateEnum.DRAFT,
+    PtsStateEnum.REJECTED,
+    PtsStateEnum.CONCLUDED,
+    PtsStateEnum.CANCELLED,
+  ])('rejeita PTS em %s', async (status) => {
+    repo.sheetTargets.get('pts-100')!.status = status;
 
     await expectApiError(
-      () =>
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: 'Não deve alterar.' },
-          responsibleAccount,
-        ),
+      () => service.updatePtsSheet('pts-100', sheet, responsibleAccount),
       409,
       'PTS_NOT_ACTIVE',
     );
   });
 
-  it('rejeita situação social vazia', async () => {
-    await expectApiError(
-      () =>
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: '   ' },
-          responsibleAccount,
-        ),
-      400,
-      'VALIDATION_ERROR',
-    );
-  });
+  it.each(['diagnosisSummary', 'socialSituation'] as const)(
+    'rejeita %s vazio ou só com espaços',
+    async (field) => {
+      await expectApiError(
+        () =>
+          service.updatePtsSheet(
+            'pts-100',
+            { ...sheet, [field]: '   ' },
+            responsibleAccount,
+          ),
+        400,
+        'VALIDATION_ERROR',
+      );
+    },
+  );
 
   it('retorna 404 quando o PTS não existe', async () => {
     await expectApiError(
-      () =>
-        service.updateSocialSituation(
-          'pts-404',
-          { socialSituation: 'Nova situação.' },
-          responsibleAccount,
-        ),
+      () => service.updatePtsSheet('pts-404', sheet, responsibleAccount),
       404,
       'PTS_NOT_FOUND',
     );
@@ -1076,6 +1123,17 @@ describe('PtsService com administrador (RN022)', () => {
     id: 'active-100',
     status: PtsStateEnum.PLANNING,
     socialSituation: 'Situação social confidencial.',
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum confidencial.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação'],
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
     createdAt: '2026-10-15T12:00:00.000Z',
     acceptedAt: '2026-10-15T12:30:00.000Z',
     beganAt: null,
@@ -1092,12 +1150,6 @@ describe('PtsService com administrador (RN022)', () => {
   beforeEach(() => {
     repo = seededRepo();
     service = new PtsService(repo);
-    repo.socialSituationTargets.set('pts-100', {
-      id: 'pts-100',
-      status: PtsStateEnum.PLANNING,
-      responsibleProfessionalId: 'prof-10',
-      teamProfessionalIds: ['prof-11'],
-    });
   });
 
   const createDraft = async () => {
@@ -1216,34 +1268,6 @@ describe('PtsService com administrador (RN022)', () => {
     );
   });
 
-  it('atualiza a situação social do PTS ativo', async () => {
-    await expect(
-      service.updateSocialSituation(
-        'pts-100',
-        { socialSituation: 'Situação social atualizada.' },
-        adminAccount,
-      ),
-    ).resolves.toEqual({
-      id: 'pts-100',
-      socialSituation: 'Situação social atualizada.',
-    });
-  });
-
-  it('não atualiza a situação social de PTS fora de PLANNING e RUNNING', async () => {
-    repo.socialSituationTargets.get('pts-100')!.status = PtsStateEnum.DRAFT;
-
-    await expectApiError(
-      () =>
-        service.updateSocialSituation(
-          'pts-100',
-          { socialSituation: 'Nova.' },
-          adminAccount,
-        ),
-      409,
-      'PTS_NOT_ACTIVE',
-    );
-  });
-
   it('aprova a proposta em nome do paciente', async () => {
     const proposal = await createDraft();
 
@@ -1286,6 +1310,17 @@ describe('PtsService.findPtsById', () => {
     id: 'pts-old',
     status: PtsStateEnum.CONCLUDED,
     socialSituation: 'Situação social confidencial.',
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum confidencial.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação'],
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
     createdAt: '2026-01-10T12:00:00.000Z',
     acceptedAt: '2026-01-11T12:00:00.000Z',
     rejectedAt: null,
@@ -1520,6 +1555,17 @@ describe('PtsService.addTeamMembers (RFEM001)', () => {
     id: 'active-100',
     status: PtsStateEnum.PLANNING,
     socialSituation: 'Situação social confidencial.',
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum confidencial.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação'],
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
     createdAt: '2026-10-15T12:00:00.000Z',
     acceptedAt: '2026-10-15T12:30:00.000Z',
     beganAt: null,

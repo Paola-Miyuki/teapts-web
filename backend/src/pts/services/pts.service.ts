@@ -10,11 +10,12 @@ import type {
 } from '../dto/pts-proposal-response.dto';
 import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsSheetViewDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type {
-  UpdateSocialSituationRequestDto,
-  UpdateSocialSituationResponseDto,
-} from '../dto/update-social-situation.dto';
+  UpdatePtsSheetRequestDto,
+  UpdatePtsSheetResponseDto,
+} from '../dto/update-pts-sheet.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
@@ -41,7 +42,7 @@ import {
   cannotRemoveResponsible,
   teamEditForbidden,
   teamMemberNotFound,
-  socialSituationForbidden,
+  ptsSheetForbidden,
   teamProfessionalNotFound,
   validationError,
   ptsProposalDeleteForbidden,
@@ -50,6 +51,31 @@ import {
   newResponsibleNotFound,
   newResponsibleInvalid,
 } from '../pts.errors';
+
+// O paciente não vê a ficha (RN028): só a próxima revisão.
+const SHEET_FIELDS_HIDDEN_FROM_PATIENT = [
+  'caseStudyDate',
+  'diagnosisSummary',
+  'cid',
+  'supportLevel',
+  'strengths',
+  'priorityNeeds',
+  'socialSituation',
+  'vulnerabilities',
+  'comorbidities',
+  'sensoryProfile',
+  'communicationMethod',
+] as const;
+
+function withoutSheet<T extends PtsSheetViewDto>(pts: T): T {
+  const patientView = { ...pts };
+
+  for (const field of SHEET_FIELDS_HIDDEN_FROM_PATIENT) {
+    delete patientView[field];
+  }
+
+  return patientView;
+}
 
 @Injectable()
 export class PtsService {
@@ -222,9 +248,7 @@ export class PtsService {
     }
 
     if (isPatientOwner) {
-      const patientResponse = { ...activePts };
-      delete patientResponse.socialSituation;
-      return patientResponse;
+      return withoutSheet(activePts);
     }
 
     return activePts;
@@ -232,7 +256,7 @@ export class PtsService {
 
   /**
 - Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
-- paciente, os próprios, sem a situação social (RN028); o profissional, os
+- paciente, os próprios, sem a ficha, só com a próxima revisão (RN028); o profissional, os
 - de cuja equipe faz parte, menos o rejeitado (RN016).
    */
   async findPtsById(
@@ -260,9 +284,7 @@ export class PtsService {
     }
 
     if (account.patientProfileId === pts.patient.id) {
-      const patientResponse = { ...pts };
-      delete patientResponse.socialSituation;
-      return patientResponse;
+      return withoutSheet(pts);
     }
 
     throw ptsForbidden();
@@ -331,12 +353,28 @@ export class PtsService {
     });
   }
 
-  async updateSocialSituation(
+  /**
+   * Atualiza a ficha do PTS ativo (RFPTS005): equipe (inclusive o responsável)
+   * ou admin; o paciente cai no 403 por não ser da equipe.
+   */
+  async updatePtsSheet(
     id: string,
-    dto: UpdateSocialSituationRequestDto,
+    dto: UpdatePtsSheetRequestDto,
     account: AccountContext,
-  ): Promise<UpdateSocialSituationResponseDto> {
-    if (!dto.socialSituation?.trim()) {
+  ): Promise<UpdatePtsSheetResponseDto> {
+    const diagnosisSummary = dto.diagnosisSummary?.trim();
+    const socialSituation = dto.socialSituation?.trim();
+
+    if (!diagnosisSummary) {
+      throw validationError([
+        {
+          field: 'diagnosisSummary',
+          message: 'O diagnóstico em comum é obrigatório.',
+        },
+      ]);
+    }
+
+    if (!socialSituation) {
       throw validationError([
         {
           field: 'socialSituation',
@@ -345,20 +383,21 @@ export class PtsService {
       ]);
     }
 
-    const pts = await this.ptsRepository.findSocialSituationTarget(id);
+    const pts = await this.ptsRepository.findSheetTarget(id);
 
     if (!pts) {
       throw ptsNotFound();
     }
 
-    const isProfessionalOnPts =
-      account.professionalProfileIds.includes(pts.responsibleProfessionalId) ||
-      pts.teamProfessionalIds.some((professionalId) =>
-        account.professionalProfileIds.includes(professionalId),
-      );
+    const professionalOnPtsId = [
+      pts.responsibleProfessionalId,
+      ...pts.teamProfessionalIds,
+    ].find((professionalId) =>
+      account.professionalProfileIds.includes(professionalId),
+    );
 
-    if (!isAdmin(account) && !isProfessionalOnPts) {
-      throw socialSituationForbidden();
+    if (!isAdmin(account) && !professionalOnPtsId) {
+      throw ptsSheetForbidden();
     }
 
     if (
@@ -368,10 +407,35 @@ export class PtsService {
       throw ptsNotActive();
     }
 
-    return this.ptsRepository.updateSocialSituation(
-      id,
-      dto.socialSituation.trim(),
-    );
+    // Opcional vazio não é gravado (vira null).
+    const optional = (value: string | null | undefined) =>
+      value?.trim() || null;
+
+    return this.ptsRepository.updateSheet({
+      ptsId: id,
+      sheet: {
+        caseStudyDate: dto.caseStudyDate,
+        diagnosisSummary,
+        cid: optional(dto.cid),
+        supportLevel: dto.supportLevel ?? null,
+        strengths: optional(dto.strengths),
+        priorityNeeds: (dto.priorityNeeds ?? [])
+          .map((need) => need.trim())
+          .filter(Boolean),
+        socialSituation,
+        vulnerabilities: optional(dto.vulnerabilities),
+        comorbidities: optional(dto.comorbidities),
+        sensoryProfile: optional(dto.sensoryProfile),
+        communicationMethod: optional(dto.communicationMethod),
+        nextReviewAt: dto.nextReviewAt,
+      },
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: isAdmin(account)
+        ? null
+        : (professionalOnPtsId ?? null),
+      executedByAccountId: account.accountId,
+      description: 'Ficha do PTS atualizada.',
+    });
   }
 
   async approveProposal(

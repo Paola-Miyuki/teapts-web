@@ -44,9 +44,9 @@ import {
 } from '../dto/pts-proposal-response.dto';
 import { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
 import {
-  UpdateSocialSituationRequestDto,
-  UpdateSocialSituationResponseDto,
-} from '../dto/update-social-situation.dto';
+  UpdatePtsSheetRequestDto,
+  UpdatePtsSheetResponseDto,
+} from '../dto/update-pts-sheet.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
@@ -167,22 +167,22 @@ export class PtsController {
     return this.ptsService.updatePtsProposal(id, dto, account);
   }
 
-  @Patch(':id/social-situation')
+  @Patch(':id/sheet')
   @UseGuards(AuthGuard)
   @ApiCookieAuth()
   @ApiBearerAuth()
-  @ApiOkResponse({ type: UpdateSocialSituationResponseDto })
+  @ApiOkResponse({ type: UpdatePtsSheetResponseDto })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiForbiddenResponse({ type: ErrorResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
   @ApiConflictResponse({ type: ErrorResponseDto })
   @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
-  async updateSocialSituation(
+  async updatePtsSheet(
     @Param('id', parseProposalId) id: string,
-    @Body() dto: UpdateSocialSituationRequestDto,
+    @Body() dto: UpdatePtsSheetRequestDto,
     @CurrentAccount() account: AccountContext,
   ) {
-    return this.ptsService.updateSocialSituation(id, dto, account);
+    return this.ptsService.updatePtsSheet(id, dto, account);
   }
 
   @Post('proposals/:id/approve')

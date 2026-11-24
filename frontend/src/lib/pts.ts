@@ -18,6 +18,18 @@ export type ActivePts = {
   id: string;
   status: ActivePtsStatus | string;
   socialSituation?: string;
+  caseStudyDate?: string;
+  diagnosisSummary?: string;
+  cid?: string | null;
+  supportLevel?: number | null;
+  strengths?: string | null;
+  priorityNeeds?: string[];
+  vulnerabilities?: string | null;
+  comorbidities?: string | null;
+  sensoryProfile?: string | null;
+  communicationMethod?: string | null;
+  // O paciente só recebe a próxima revisão (RN028).
+  nextReviewAt?: string;
   createdAt: string;
   acceptedAt: string | null;
   beganAt: string | null;
@@ -49,18 +61,31 @@ export function getActivePts(patientId: string) {
   return request<ActivePts>(`/pts/active?${params.toString()}`);
 }
 
-export type UpdateSocialSituationResponse = {
-  id: string;
+// Ficha do PTS (RFPTS005): o corpo substitui a ficha inteira.
+export type PtsSheetInput = {
+  caseStudyDate: string;
+  diagnosisSummary: string;
+  cid: string | null;
+  supportLevel: number | null;
+  strengths: string | null;
+  priorityNeeds: string[];
   socialSituation: string;
+  vulnerabilities: string | null;
+  comorbidities: string | null;
+  sensoryProfile: string | null;
+  communicationMethod: string | null;
+  nextReviewAt: string;
 };
 
-export function updateSocialSituation(id: string, socialSituation: string) {
-  return request<UpdateSocialSituationResponse>(
-    `/pts/${encodeURIComponent(id)}/social-situation`,
+export type UpdatePtsSheetResponse = PtsSheetInput & { id: string };
+
+export function updatePtsSheet(id: string, sheet: PtsSheetInput) {
+  return request<UpdatePtsSheetResponse>(
+    `/pts/${encodeURIComponent(id)}/sheet`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ socialSituation }),
+      body: JSON.stringify(sheet),
     },
   );
 }
@@ -98,6 +123,18 @@ export type PtsDetail = {
   id: string;
   status: PtsStatus;
   socialSituation?: string;
+  caseStudyDate?: string;
+  diagnosisSummary?: string;
+  cid?: string | null;
+  supportLevel?: number | null;
+  strengths?: string | null;
+  priorityNeeds?: string[];
+  vulnerabilities?: string | null;
+  comorbidities?: string | null;
+  sensoryProfile?: string | null;
+  communicationMethod?: string | null;
+  // O paciente só recebe a próxima revisão (RN028).
+  nextReviewAt?: string;
   createdAt: string;
   acceptedAt: string | null;
   rejectedAt: string | null;

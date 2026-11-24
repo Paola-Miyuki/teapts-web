@@ -222,13 +222,6 @@
   border-top: 1px solid var(--border);
 }
 
-.socialSituation {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-line;
-}
-
 .muted {
   color: var(--muted);
   font-size: 13px;
@@ -313,19 +306,9 @@
   }
 }
 
-/* Situação social: botão no painel, aviso de sucesso e diálogo (RFPTS005) */
-.asideAction {
-  margin-top: 14px;
-}
-
+/* Aviso de sucesso e diálogos do PTS */
 .feedback {
   margin-bottom: 24px;
-}
-
-.textarea {
-  min-height: 140px;
-  resize: vertical;
-  line-height: 1.6;
 }
 
 .dialogActions {
