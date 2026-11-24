@@ -36,6 +36,7 @@ import {
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
 import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
+import { TransferPtsResponsibilityRequestDto } from '../dto/transfer-pts-responsibility.dto';
 import { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import {
   GetPtsProposalsResponseDto,
@@ -401,5 +402,101 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<PtsTeamResponseDto> {
     return this.ptsService.removeTeamMember(id, professionalId, account);
+  }
+
+  @Post(':id/team/transfer-responsibility')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Transfere a responsabilidade de um PTS ativo para outro profissional (RFEM002)',
+    description:
+      'Somente o profissional responsável atual (ou o admin) transfere a responsabilidade ' +
+      'de um PTS em PLANNING ou RUNNING para outro perfil profissional cadastrado e ativo (RN006, RN007). ' +
+      'O responsável anterior sai da equipe, o substituto assume e seu vínculo anterior como membro (se houver) é removido na mesma transação.',
+  })
+  @ApiOkResponse({ type: PtsTeamResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      VALIDATION_ERROR: {
+        summary: 'Payload ou parâmetro inválido',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Dados inválidos na solicitação.',
+        },
+      },
+      NEW_RESPONSIBLE_NOT_FOUND: {
+        summary: 'Substituto não cadastrado',
+        value: {
+          status: 'NEW_RESPONSIBLE_NOT_FOUND',
+          message:
+            'O profissional indicado para assumir a responsabilidade não está cadastrado.',
+        },
+      },
+      NEW_RESPONSIBLE_INVALID: {
+        summary: 'Substituto inválido ou igual ao responsável atual',
+        value: {
+          status: 'NEW_RESPONSIBLE_INVALID',
+          message:
+            'O profissional indicado para assumir a responsabilidade é inválido ou já é o responsável atual.',
+        },
+      },
+      TEAM_DUPLICATE_ACCOUNT: {
+        summary: 'Conta do substituto já presente em outro membro da equipe',
+        value: {
+          status: 'TEAM_DUPLICATE_ACCOUNT',
+          message:
+            'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+          professionalIds: ['5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a'],
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    examples: {
+      FORBIDDEN: {
+        summary: 'Conta sem o perfil responsável pelo PTS',
+        value: {
+          status: 'FORBIDDEN',
+          message: 'Somente o responsável pode alterar a equipe do PTS.',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_FOUND: {
+        summary: 'PTS não encontrado',
+        value: {
+          status: 'PTS_NOT_FOUND',
+          message: 'PTS não encontrado.',
+        },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_ACTIVE: {
+        summary: 'PTS não está em PLANNING ou RUNNING',
+        value: {
+          status: 'PTS_NOT_ACTIVE',
+          message: 'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
+        },
+      },
+    },
+  })
+  async transferResponsibility(
+    @Param('id', parseProposalId) id: string,
+    @Body() dto: TransferPtsResponsibilityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    return this.ptsService.transferResponsibility(id, dto, account);
   }
 }

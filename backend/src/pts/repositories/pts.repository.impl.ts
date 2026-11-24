@@ -25,6 +25,7 @@ import {
   type ProfessionalAccountRecord,
   type RemoveTeamMemberInput,
   type AddTeamMembersInput,
+  type TransferResponsibilityInput,
 } from './pts.repository';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
@@ -51,6 +52,9 @@ import {
   ptsProposalNotPending,
   teamEditForbidden,
   teamMemberNotFound,
+  newResponsibleNotFound,
+  newResponsibleInvalid,
+  teamDuplicateAccount,
 } from '../pts.errors';
 
 @Injectable()
@@ -861,6 +865,124 @@ export class PtsRepositoryImpl extends PtsRepository {
           queryRunner.manager,
         );
       }
+
+      const pts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: input.ptsId },
+        relations: {
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!pts) {
+        throw ptsNotFound();
+      }
+
+      await queryRunner.commitTransaction();
+
+      return this.toTeamResponse(pts);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async transferResponsibility(
+    input: TransferResponsibilityInput,
+  ): Promise<PtsTeamResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        input.authorProfessionalId !== null &&
+        locked.responsibleProfessionalId !== input.authorProfessionalId
+      ) {
+        throw teamEditForbidden();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsNotActive();
+      }
+
+      const newResponsible = await queryRunner.manager.findOne(Professional, {
+        where: { id: input.newResponsibleId },
+        relations: { account: true },
+      });
+
+      if (!newResponsible) {
+        throw newResponsibleNotFound();
+      }
+
+      if (
+        !newResponsible.account ||
+        newResponsible.id === locked.responsibleProfessionalId
+      ) {
+        throw newResponsibleInvalid();
+      }
+
+      const duplicateRows = (await queryRunner.query(
+        `SELECT p.id
+         FROM professional_participating_on_therapeutic_journey participation
+         INNER JOIN professional p ON p.id = participation.professional_id
+         WHERE participation.therapeutic_journey_id = $1
+           AND p.account_id = $2
+           AND p.id <> $3`,
+        [input.ptsId, newResponsible.account.id, input.newResponsibleId],
+      )) as Array<{ id: string }>;
+
+      if (duplicateRows.length > 0) {
+        throw teamDuplicateAccount([input.newResponsibleId]);
+      }
+
+      const previousResponsibleId = locked.responsibleProfessionalId;
+
+      await queryRunner.manager.update(PtsEntity, input.ptsId, {
+        responsibleProfessionalId: input.newResponsibleId,
+      });
+
+      await queryRunner.manager
+        .createQueryBuilder()
+        .delete()
+        .from('professional_participating_on_therapeutic_journey')
+        .where('therapeutic_journey_id = :ptsId', { ptsId: input.ptsId })
+        .andWhere('professional_id IN (:...professionalIds)', {
+          professionalIds: [previousResponsibleId, input.newResponsibleId],
+        })
+        .execute();
+
+      await this.timelineRecorder.record(
+        {
+          type: TimelineRecordType.ResponsibilityTransferred,
+          description: input.description,
+          targetId: input.newResponsibleId,
+          targetType: TimelineRecordTarget.TeamMember,
+          ptsId: input.ptsId,
+          authorProfessionalId: input.authorProfessionalId,
+          executedByAccountId: input.executedByAccountId,
+        },
+        queryRunner.manager,
+      );
 
       const pts = await queryRunner.manager.findOne(PtsEntity, {
         where: { id: input.ptsId },

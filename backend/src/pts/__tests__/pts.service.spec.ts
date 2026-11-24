@@ -1813,6 +1813,170 @@ describe('PtsService.removeTeamMember', () => {
     });
   });
 
+  describe('PtsService.transferResponsibility', () => {
+    let repo: InMemoryPtsRepository;
+    let service: PtsService;
+
+    const responsible = {
+      id: 'prof-10',
+      name: 'Kaio Segunda Conta',
+      specialism: { id: 'psychologist', name: 'Psicologia' },
+      registration: null,
+    };
+    const member = {
+      id: 'prof-11',
+      name: 'Ana Souza',
+      specialism: { id: 'doctor', name: 'Medicina' },
+      registration: null,
+    };
+
+    const seedPts = (status: PtsStateEnum = PtsStateEnum.RUNNING) => {
+      repo.ptsTeams.set('pts-100', {
+        id: 'pts-100',
+        status,
+        responsible,
+        team: [member],
+      });
+    };
+
+    beforeEach(() => {
+      repo = seededRepo();
+      service = new PtsService(repo);
+      seedPts();
+    });
+
+    it('transfere para membro da equipe e remove o responsável anterior', async () => {
+      const result = await service.transferResponsibility(
+        'pts-100',
+        { newResponsibleId: 'prof-11' },
+        responsibleAccount,
+      );
+
+      expect(result).toEqual({
+        id: 'pts-100',
+        status: PtsStateEnum.RUNNING,
+        responsible: member,
+        team: [],
+      });
+      expect(repo.transferredRecords).toEqual([
+        {
+          ptsId: 'pts-100',
+          newResponsibleId: 'prof-11',
+          authorProfessionalId: 'prof-10',
+          executedByAccountId: 'acc-1',
+          description:
+            'Kaio Segunda Conta transferiu a responsabilidade do PTS para Profissional prof-11',
+        },
+      ]);
+    });
+
+    it('mantém a equipe quando o substituto ainda não é membro', async () => {
+      const result = await service.transferResponsibility(
+        'pts-100',
+        { newResponsibleId: 'prof-15' },
+        responsibleAccount,
+      );
+
+      expect(result.responsible.id).toBe('prof-15');
+      expect(result.team).toEqual([member]);
+    });
+
+    it('retorna 404 quando o PTS não existe', async () => {
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-999',
+            { newResponsibleId: 'prof-15' },
+            responsibleAccount,
+          ),
+        404,
+        'PTS_NOT_FOUND',
+      );
+    });
+
+    it('retorna 403 para outro profissional', async () => {
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-15' },
+            teamAccount,
+          ),
+        403,
+        'FORBIDDEN',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+
+    it.each([
+      PtsStateEnum.DRAFT,
+      PtsStateEnum.CONCLUDED,
+      PtsStateEnum.CANCELLED,
+      PtsStateEnum.REJECTED,
+    ])('retorna 409 quando o PTS está em %s', async (status) => {
+      seedPts(status);
+
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-15' },
+            responsibleAccount,
+          ),
+        409,
+        'PTS_NOT_ACTIVE',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+
+    it('retorna 400 quando o substituto não está cadastrado', async () => {
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-missing' },
+            responsibleAccount,
+          ),
+        400,
+        'NEW_RESPONSIBLE_NOT_FOUND',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+
+    it('retorna 400 quando o substituto é o responsável atual', async () => {
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-10' },
+            responsibleAccount,
+          ),
+        400,
+        'NEW_RESPONSIBLE_INVALID',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+
+    it('retorna 400 quando outra pessoa da equipe já usa a conta do substituto', async () => {
+      repo.professionals.set('prof-30', {
+        id: 'prof-30',
+        accountId: 'acc-2',
+      });
+
+      await expectApiError(
+        () =>
+          service.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-30' },
+            responsibleAccount,
+          ),
+        400,
+        'TEAM_DUPLICATE_ACCOUNT',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+  });
+
   it('o acesso do removido ao PTS cessa', async () => {
     await service.removeTeamMember('pts-100', 'prof-11', responsibleAccount);
 

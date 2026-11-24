@@ -394,6 +394,63 @@ describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
     });
   });
 
+  describe('PtsController POST /pts/:id/team/transfer-responsibility', () => {
+    let repo: InMemoryPtsRepository;
+    let controller: PtsController;
+
+    beforeEach(() => {
+      repo = seededRepo();
+      controller = new PtsController(new PtsService(repo));
+      repo.ptsTeams.set('pts-100', {
+        id: 'pts-100',
+        status: PtsStateEnum.RUNNING,
+        responsible: {
+          id: 'prof-10',
+          name: 'Kaio Segunda Conta',
+          specialism: { id: 'psychologist', name: 'Psicologia' },
+          registration: null,
+        },
+        team: [
+          {
+            id: 'prof-11',
+            name: 'Ana Souza',
+            specialism: { id: 'doctor', name: 'Medicina' },
+            registration: null,
+          },
+        ],
+      });
+    });
+
+    it('transfere pela rota e devolve o responsável e a equipe atualizados', async () => {
+      const result = await controller.transferResponsibility(
+        'pts-100',
+        { newResponsibleId: 'prof-11' },
+        responsibleAccount,
+      );
+
+      expect(result).toMatchObject({
+        id: 'pts-100',
+        responsible: { id: 'prof-11' },
+        team: [],
+      });
+      expect(repo.transferredRecords).toHaveLength(1);
+    });
+
+    it('nega a transferência a quem não é o responsável', async () => {
+      await expectApiError(
+        () =>
+          controller.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-15' },
+            teamAccount,
+          ),
+        403,
+        'FORBIDDEN',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+  });
+
   it('remove o membro pela rota e devolve a equipe atualizada', async () => {
     const result = await controller.removeTeamMember(
       'pts-100',

@@ -179,3 +179,17 @@ export const teamDuplicateAccount = (ids: string[]) =>
     'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
     { professionalIds: ids },
   );
+
+export const newResponsibleNotFound = () =>
+  new PtsApiError(
+    HttpStatus.BAD_REQUEST,
+    'NEW_RESPONSIBLE_NOT_FOUND',
+    'O profissional indicado para assumir a responsabilidade não está cadastrado.',
+  );
+
+export const newResponsibleInvalid = () =>
+  new PtsApiError(
+    HttpStatus.BAD_REQUEST,
+    'NEW_RESPONSIBLE_INVALID',
+    'O profissional indicado para assumir a responsabilidade é inválido ou já é o responsável atual.',
+  );
