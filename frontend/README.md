@@ -79,7 +79,9 @@ src/
       proposals/           propostas em rascunho (GET /pts/proposals, busca `q` e paginação na
                            URL): tabela com menu ⋮ para o profissional e o admin, cartões para o
                            paciente; o paciente (ou o admin, em nome dele) aprova ou rejeita
-                           (POST /pts/proposals/:id/approve e /reject)
+                           (POST /pts/proposals/:id/approve e /reject); o responsável e o admin
+                           excluem a proposta em `draft` pelo menu ⋮, com confirmação
+                           (DELETE /pts/proposals/:id)
         [id]/edit/         editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
       [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin:
                            cabeçalho, Visão geral (situação social) e Equipe (registro e papel)

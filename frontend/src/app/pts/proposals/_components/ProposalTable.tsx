@@ -19,8 +19,10 @@ import {
   type ProposalsResponse,
   type PtsProposal,
 } from '@/lib/proposals';
+import DeleteProposalDialog from './DeleteProposalDialog';
 import ProposalDecisionDialog from './ProposalDecisionDialog';
 import ProposalViewDialog, { professionalLabel } from './ProposalViewDialog';
+import { useDeleteProposal } from './useDeleteProposal';
 import { useProposalDecision } from './useProposalDecision';
 
 const DEFAULT_LIMIT = 10;
@@ -28,6 +30,15 @@ const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
 function canEdit(account: Account, proposal: PtsProposal) {
   return can(account, 'editPtsProposal', {
+    pts: {
+      status: proposal.status,
+      responsibleProfessionalId: proposal.responsible.id,
+    },
+  });
+}
+
+function canDelete(account: Account, proposal: PtsProposal) {
+  return can(account, 'deletePtsProposal', {
     pts: {
       status: proposal.status,
       responsibleProfessionalId: proposal.responsible.id,
@@ -89,6 +100,9 @@ export default function ProposalTable({ account }: { account: Account }) {
   const decision = useProposalDecision(() =>
     setRetryKey((current) => current + 1),
   );
+  const removal = useDeleteProposal(() =>
+    setRetryKey((current) => current + 1),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -132,12 +146,14 @@ export default function ProposalTable({ account }: { account: Account }) {
 
   return (
     <>
-      {(wasUpdated || decision.feedback) && (
+      {(wasUpdated || decision.feedback || removal.feedback) && (
         <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
           <div className={ui.alertIcon}>
             <Icon name="checkCircle" />
           </div>
-          <span>{decision.feedback || 'Proposta atualizada.'}</span>
+          <span>
+            {decision.feedback || removal.feedback || 'Proposta atualizada.'}
+          </span>
         </div>
       )}
 
@@ -328,6 +344,20 @@ export default function ProposalTable({ account }: { account: Account }) {
                               </li>
                             </>
                           )}
+                          {canDelete(account, proposal) && (
+                            <li>
+                              <div className="sep" />
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="danger"
+                                onClick={() => removal.start(proposal)}
+                              >
+                                <Icon name="trash" className="icon-sm" />
+                                Excluir proposta
+                              </button>
+                            </li>
+                          )}
                         </KebabMenu>
                       </td>
                     </tr>
@@ -357,6 +387,14 @@ export default function ProposalTable({ account }: { account: Account }) {
         proposal={viewing}
         canEdit={viewing ? canEdit(account, viewing) : false}
         onClose={() => setViewing(null)}
+      />
+
+      <DeleteProposalDialog
+        proposal={removal.pending}
+        submitting={removal.submitting}
+        error={removal.error}
+        onConfirm={removal.confirm}
+        onClose={removal.cancel}
       />
 
       <ProposalDecisionDialog

@@ -17,7 +17,8 @@ export type PermissionAction =
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
-  | 'editPtsProposal';
+  | 'editPtsProposal'
+  | 'deletePtsProposal';
 
 // Mesmos valores do PtsStateEnum da API.
 export type PtsStatus =
@@ -89,6 +90,7 @@ export function can(
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
       case 'editPtsProposal':
+      case 'deletePtsProposal':
         return pts?.status === 'draft';
       default:
         return true;
@@ -134,6 +136,7 @@ export function can(
       // é ator do sistema (RN025).
       return patient && pts?.status === 'draft';
     case 'editPtsProposal':
+    case 'deletePtsProposal':
       // RFPTS005 – profissional responsável, só em DRAFT.
       return (
         professional &&
