@@ -19,6 +19,8 @@ import type { GetAccountsRequestDto } from '../dto/get-accounts-request.dto';
 import type { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
+import type { Gender } from '../enums/gender.enum';
+import type { Sex } from '../enums/sex.enum';
 import {
   type AccountsPage,
   AccountsRepository,
@@ -35,6 +37,14 @@ export interface CreateForSupertokensUserDto {
   supertokensUserId: string;
   name: string;
   email: string;
+  socialName: string | null;
+  birthDate: string;
+  sex: Sex;
+  gender: Gender | null;
+  /** Só dígitos. */
+  cpf: string;
+  /** Só dígitos, com DDD. */
+  phone: string | null;
 }
 
 export interface AccountContext {
@@ -42,6 +52,29 @@ export interface AccountContext {
   role: AccountRole;
   patientProfileId: string | null;
   professionalProfileIds: string[];
+}
+
+/** Resposta do GET/PATCH /me a partir da conta e do contexto da sessão. */
+export function toMeResponse(
+  account: Account,
+  context: AccountContext,
+): MeResponseDto {
+  return {
+    accountId: account.id,
+    name: account.name,
+    email: account.email,
+    role: account.role,
+    socialName: account.socialName,
+    birthDate: account.birthDate,
+    sex: account.sex,
+    gender: account.gender,
+    cpf: account.cpf,
+    phone: account.phone,
+    createdAt: account.createdAt.toISOString(),
+    updatedAt: account.lastUpdatedAt?.toISOString() ?? null,
+    patientProfileId: context.patientProfileId,
+    professionalProfileIds: context.professionalProfileIds,
+  };
 }
 
 const SUPERTOKENS_TENANT_ID = 'public';
@@ -65,11 +98,22 @@ export class AccountsService {
       supertokensUserId: dto.supertokensUserId,
       name: dto.name.trim(),
       email: dto.email.trim().toLowerCase(),
+      socialName: dto.socialName?.trim() || null,
+      birthDate: dto.birthDate,
+      sex: dto.sex,
+      gender: dto.gender,
+      cpf: dto.cpf,
+      phone: dto.phone,
       role: AccountRole.User,
       lastUpdatedAt: null,
     });
 
     return await this.accountRepository.save(account);
+  }
+
+  /** CPF (só dígitos) já usado por outra conta (RN001). */
+  async isCpfTaken(cpf: string): Promise<boolean> {
+    return this.accountRepository.exists({ where: { cpf } });
   }
 
   async resolveAccountContext(
@@ -152,13 +196,23 @@ export class AccountsService {
       }
     }
 
+    const updated: Account = {
+      ...account,
+      name: nextName,
+      email: nextEmail,
+      socialName:
+        request.socialName === undefined
+          ? account.socialName
+          : request.socialName?.trim() || null,
+      birthDate: request.birthDate ?? account.birthDate,
+      sex: request.sex ?? account.sex,
+      gender: request.gender === undefined ? account.gender : request.gender,
+      phone: request.phone === undefined ? account.phone : request.phone,
+      lastUpdatedAt: new Date(),
+    };
+
     try {
-      await this.accountRepository.save({
-        ...account,
-        name: nextName,
-        email: nextEmail,
-        lastUpdatedAt: new Date(),
-      });
+      await this.accountRepository.save(updated);
     } catch (error) {
       if (emailChanged) {
         try {
@@ -177,14 +231,7 @@ export class AccountsService {
       throw error;
     }
 
-    return {
-      accountId: account.id,
-      name: nextName,
-      email: nextEmail,
-      role: account.role,
-      patientProfileId: accountContext.patientProfileId,
-      professionalProfileIds: accountContext.professionalProfileIds,
-    };
+    return toMeResponse(updated, accountContext);
   }
 
   async changePassword(

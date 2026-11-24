@@ -1,7 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsInt,
+  IsOptional,
+  IsString,
   IsUUID,
   Max,
   Min,
@@ -13,7 +15,7 @@ export const DEFAULT_PTS_PROPOSALS_LIMIT = 20;
 export const MAX_PTS_PROPOSALS_LIMIT = 50;
 
 function invalidParameter(
-  parameter: 'patientId' | 'page' | 'limit',
+  parameter: 'patientId' | 'q' | 'page' | 'limit',
 ): ValidationOptions {
   return {
     message: `Parâmetro inválido: ${parameter}`,
@@ -31,14 +33,31 @@ function toNumber(defaultValue: number) {
   };
 }
 
+/** Texto opcional: espaços externos saem, e vazio equivale a sem filtro. */
+function toOptionalText({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() || undefined : value;
+}
+
 export class GetPtsProposalsQueryDto {
-  @ApiProperty({
-    description: 'ID da conta do paciente',
+  @ApiPropertyOptional({
+    description:
+      'ID da conta do paciente. Sem ele, o admin vê todas as propostas, o profissional as de que é responsável ou membro e o paciente as próprias.',
     example: '123e4567-e89b-12d3-a456-426614174000',
     format: 'uuid',
   })
+  @Transform(toOptionalText)
+  @IsOptional()
   @IsUUID(undefined, invalidParameter('patientId'))
-  patientId!: string;
+  patientId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Parte do nome ou do nome social do paciente, sem diferenciar maiúsculas.',
+  })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsString(invalidParameter('q'))
+  q?: string;
 
   @ApiPropertyOptional({
     type: 'integer',

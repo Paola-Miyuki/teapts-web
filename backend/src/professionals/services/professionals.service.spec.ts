@@ -8,6 +8,7 @@ import {
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import type { AccountContext } from '../../accounts/services/accounts.service';
 import type { Patient } from '../../patients/entities/patient.entity';
 import type { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
@@ -45,6 +46,20 @@ function createService() {
   return { repository, accountRepository, service };
 }
 
+const professionalAccount: AccountContext = {
+  accountId: 'account-professional',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['profile-1'],
+};
+
+const patientAccount: AccountContext = {
+  accountId: 'account-patient',
+  role: AccountRole.User,
+  patientProfileId: 'account-patient',
+  professionalProfileIds: [],
+};
+
 const request: GetProfessionalsRequestDto = {
   page: 2,
   limit: 10,
@@ -61,6 +76,10 @@ describe('ProfessionalsService.findAll', () => {
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
         },
@@ -68,7 +87,9 @@ describe('ProfessionalsService.findAll', () => {
       total: 11,
     });
 
-    await expect(service.findAll(request)).resolves.toEqual({
+    await expect(
+      service.findAll(professionalAccount, request),
+    ).resolves.toEqual({
       data: [
         {
           id: '550e8400-e29b-41d4-a716-446655440000',
@@ -78,6 +99,9 @@ describe('ProfessionalsService.findAll', () => {
             id: Specialism.Psychologist,
             name: 'Psicologia',
           },
+          registration: { council: 'CRP', number: '12345', state: 'PR' },
+          institution: 'IMA',
+          cnes: null,
         },
       ],
       pagination: {
@@ -91,12 +115,62 @@ describe('ProfessionalsService.findAll', () => {
     expect(repository.findPaginated).toHaveBeenCalledWith(request);
   });
 
+  // O e-mail do profissional não vai para o paciente (DP011).
+  it('hides the e-mail from an account that is not admin nor professional', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({
+      rows: [
+        {
+          professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
+          account_name: 'Maria Silva',
+          account_email: 'maria@example.com',
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.findAll(patientAccount, request);
+
+    expect(result.data[0].email).toBeNull();
+  });
+
+  it('shows the e-mail to the admin', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({
+      rows: [
+        {
+          professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'PR',
+          professional_institution: 'IMA',
+          professional_cnes: null,
+          account_name: 'Maria Silva',
+          account_email: 'maria@example.com',
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.findAll(
+      { ...patientAccount, role: AccountRole.Admin, patientProfileId: null },
+      request,
+    );
+
+    expect(result.data[0].email).toBe('maria@example.com');
+  });
+
   it('returns an empty page when there are no matches', async () => {
     const { repository, service } = createService();
     repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
 
     await expect(
-      service.findAll({ page: 3, limit: 10 }),
+      service.findAll(professionalAccount, { page: 3, limit: 10 }),
     ).resolves.toMatchObject({
       data: [],
       pagination: {
@@ -114,14 +188,14 @@ describe('ProfessionalsService.findAll', () => {
       new Error('database connection details'),
     );
 
-    await expect(service.findAll({ page: 1, limit: 10 })).rejects.toMatchObject(
-      {
-        response: {
-          status: 'ERROR',
-          message: 'Não foi possível consultar os profissionais.',
-        },
+    await expect(
+      service.findAll(professionalAccount, { page: 1, limit: 10 }),
+    ).rejects.toMatchObject({
+      response: {
+        status: 'ERROR',
+        message: 'Não foi possível consultar os profissionais.',
       },
-    );
+    });
   });
 });
 
@@ -180,24 +254,6 @@ describe('ProfessionalsService.create', () => {
     });
   });
 
-  it('creates a profile with another specialism for the same account', async () => {
-    const { accountRepository, repository, service } = createService();
-    accountRepository.findOne.mockResolvedValue({
-      ...userAccount,
-      professionalProfiles: [
-        { accountId, specialism: Specialism.Doctor } as Professional,
-      ],
-    });
-    repository.insert.mockResolvedValue(professionalId);
-
-    await expect(
-      service.create({ accountId, specialism: Specialism.Psychologist }),
-    ).resolves.toMatchObject({
-      id: professionalId,
-      specialism: { id: Specialism.Psychologist, name: 'Psicologia' },
-    });
-  });
-
   it('returns 404 ACCOUNT_NOT_FOUND when the account does not exist', async () => {
     const { accountRepository, repository, service } = createService();
     accountRepository.findOne.mockResolvedValue(null);
@@ -246,12 +302,14 @@ describe('ProfessionalsService.create', () => {
     expect(repository.insert).not.toHaveBeenCalled();
   });
 
-  it('returns 409 PROFESSIONAL_PROFILE_ALREADY_EXISTS for a repeated specialism', async () => {
+  // Uma conta tem no máximo um perfil profissional (RN002), em qualquer
+  // especialidade.
+  it('returns 409 PROFESSIONAL_PROFILE_ALREADY_EXISTS when the account already has a profile', async () => {
     const { accountRepository, repository, service } = createService();
     accountRepository.findOne.mockResolvedValue({
       ...userAccount,
       professionalProfiles: [
-        { accountId, specialism: Specialism.Psychologist } as Professional,
+        { accountId, specialism: Specialism.Doctor } as Professional,
       ],
     });
 
@@ -260,8 +318,7 @@ describe('ProfessionalsService.create', () => {
     expect(error).toBeInstanceOf(ConflictException);
     expect((error as ConflictException).getResponse()).toEqual({
       status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-      message:
-        'A conta já possui um perfil profissional com essa especialidade.',
+      message: 'A conta já possui um perfil profissional.',
     });
     expect(repository.insert).not.toHaveBeenCalled();
   });
@@ -276,8 +333,7 @@ describe('ProfessionalsService.create', () => {
     ).rejects.toMatchObject({
       response: {
         status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-        message:
-          'A conta já possui um perfil profissional com essa especialidade.',
+        message: 'A conta já possui um perfil profissional.',
       },
     });
   });

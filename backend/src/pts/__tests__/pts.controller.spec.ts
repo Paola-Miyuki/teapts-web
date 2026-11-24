@@ -53,6 +53,7 @@ describe('PtsController GET /pts/active', () => {
         id: 'prof-10',
         name: 'Profissional responsável',
         specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
       },
       team: [],
     });

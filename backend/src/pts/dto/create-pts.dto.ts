@@ -1,3 +1,4 @@
+import type { ProfessionalRegistration } from '../../professionals/professional-registration';
 import {
   IsNotEmpty,
   IsOptional,
@@ -36,6 +37,8 @@ export interface PtsProfessionalDto {
   id: string;
   name: string;
   specialism: PtsSpecialismDto;
+  /** Registro no conselho; `null` nos perfis sem número e UF. */
+  registration: ProfessionalRegistration | null;
 }
 
 export class CreatePtsResponseDto {

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { Account } from '@/lib/account';
 
 import PatientsPage from './page';
+import { personalData } from '@/test-utils/account';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -16,25 +17,29 @@ const mockedUseRouter = useRouter as jest.Mock;
 const mockedUseSearchParams = useSearchParams as jest.Mock;
 
 const API = 'http://localhost:3000';
-const PATIENTS_URL = `${API}/accounts?isPatient=true&page=1&limit=10`;
+const PATIENTS_URL = `${API}/patients/authorized?page=1&limit=10`;
 const ACCOUNTS_URL = `${API}/accounts?isPatient=false&isProfessional=false&page=1&limit=20`;
 
 const ACCOUNT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+
+const PROFESSIONAL: Account = {
+  accountId: 'professional-uuid',
+  name: 'Paula Profissional',
+  email: 'paula@example.com',
+  role: 'user',
+  ...personalData,
+  patientProfileId: null,
+  professionalProfileIds: ['professional-profile'],
+};
 
 const ADMIN: Account = {
   accountId: 'admin-uuid',
   name: 'Ana Admin',
   email: 'admin@example.com',
   role: 'admin',
+  ...personalData,
   patientProfileId: null,
   professionalProfileIds: [],
-};
-
-const PROFESSIONAL: Account = {
-  ...ADMIN,
-  name: 'Priscila Martins',
-  role: 'user',
-  professionalProfileIds: ['professional-profile-uuid'],
 };
 
 const ACCOUNTS = {
@@ -50,7 +55,14 @@ function page(names: string[], current = 1, totalPages = 1) {
     data: names.map((name, index) => ({
       id: `${current}-${index}`,
       name,
+      socialName: null,
       email: `${name.split(' ')[0].toLowerCase()}@exemplo.com`,
+      cns: index === 0 ? '700001234567891' : null,
+      guardianName: index === 0 ? 'Juliana Ribeiro' : null,
+      registeredAt: '2026-02-14T12:00:00.000Z',
+      ptsStatus: index === 0 ? 'running' : null,
+      activePtsId: index === 0 ? 'pts-1' : null,
+      readOnly: false,
     })),
     pagination: {
       page: current,
@@ -102,7 +114,7 @@ function mockApi({
         return Promise.resolve(mockResponse({ data: account }));
       }
 
-      if (url.startsWith(`${API}/accounts?isPatient=true`)) {
+      if (url.startsWith(`${API}/patients/authorized`)) {
         return list(url, init);
       }
 
@@ -189,107 +201,123 @@ describe('PatientsPage', () => {
   });
 
   describe('acesso e lista', () => {
-    it('bloqueia quem não é admin sem chamar /accounts', async () => {
-      mockApi({ account: PROFESSIONAL });
+    it('bloqueia quem não é admin nem profissional sem chamar a lista', async () => {
+      mockApi({ account: { ...ADMIN, role: 'user' } });
 
       render(<PatientsPage />);
 
       expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
-      expect(
-        screen.getByRole('link', { name: 'Voltar para o início' }),
-      ).toHaveAttribute('href', '/home');
       expect(
         screen.queryByRole('button', { name: 'Adicionar paciente' }),
       ).not.toBeInTheDocument();
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('lista os pacientes com o item do menu ativo', async () => {
-      const { list, accounts } = mockApi();
+    it('mostra as colunas do layout para o admin', async () => {
+      const { list } = mockApi();
 
       render(<PatientsPage />);
 
-      const items = within(
-        await screen.findByRole('list', { name: 'Pacientes' }),
-      );
+      const table = within(await screen.findByRole('table'));
 
-      expect(items.getByText('Maria Sílvia')).toBeInTheDocument();
-      expect(items.getByText('maria@exemplo.com')).toBeInTheDocument();
-      expect(items.getByText('Diego Alves')).toBeInTheDocument();
+      expect(
+        table.getAllByRole('columnheader').map((cell) => cell.textContent),
+      ).toEqual([
+        'Paciente',
+        'E-mail',
+        'CNS',
+        'Responsável tutelar',
+        'Status do PTS',
+        'Cadastrado em',
+        'Ações',
+      ]);
+      expect(table.getByText('Maria Sílvia')).toBeInTheDocument();
+      expect(table.getByText('maria@exemplo.com')).toBeInTheDocument();
+      expect(table.getByText('700 0012 3456 7891')).toBeInTheDocument();
+      expect(table.getByText('Juliana Ribeiro')).toBeInTheDocument();
+      expect(table.getByText('Em andamento')).toHaveClass('badge', 'running');
+      expect(table.getByText('Sem PTS')).toHaveClass('badge', 'none');
+      expect(table.getAllByText('14/02/2026')).toHaveLength(2);
+      expect(
+        table.queryByRole('link', { name: 'Maria Sílvia' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Pacientes cadastrados')).toBeInTheDocument();
       expect(list).toHaveBeenCalledWith(
         PATIENTS_URL,
         expect.objectContaining({ credentials: 'include' }),
       );
-      // As contas do select só carregam quando o modal abre.
-      expect(accounts).not.toHaveBeenCalled();
+    });
 
-      const menu = within(
-        screen.getByRole('navigation', { name: 'Menu principal' }),
+    it('abre o paciente pelo "Visualizar" do menu', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
       );
 
-      expect(menu.getByRole('link', { name: 'Pacientes' })).toHaveAttribute(
-        'aria-current',
-        'page',
-      );
-    });
-
-    it('mostra o loading enquanto os pacientes carregam', async () => {
-      mockApi({ list: jest.fn(() => new Promise<Response>(() => {})) });
-
-      render(<PatientsPage />);
-
       expect(
-        await screen.findByText('Carregando pacientes...'),
-      ).toBeInTheDocument();
+        screen.getByRole('menuitem', { name: 'Visualizar' }),
+      ).toHaveAttribute('href', '/patients/1-0');
     });
 
-    it('avisa quando não há pacientes e abre o modal pelo vazio', async () => {
+    it('mostra ao profissional os pacientes vinculados e o filtro do papel', async () => {
       const user = userEvent.setup();
-      mockApi({
-        list: jest
-          .fn()
-          .mockResolvedValue(mockResponse({ data: page([], 1, 0) })),
-      });
+      mockApi({ account: PROFESSIONAL });
 
       render(<PatientsPage />);
 
       expect(
-        await screen.findByText('Nenhum paciente cadastrado'),
+        await screen.findByText('Pacientes vinculados'),
       ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: 'Criar proposta de PTS' }),
+      ).toHaveAttribute('href', '/pts/novo');
+      expect(
+        screen.queryByRole('button', { name: 'Adicionar paciente' }),
+      ).not.toBeInTheDocument();
 
-      const [, emptyButton] = screen.getAllByRole('button', {
-        name: 'Adicionar paciente',
-      });
+      await user.click(screen.getByRole('button', { name: 'Filtros' }));
 
-      await user.click(emptyButton);
-
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(
+        screen
+          .getAllByRole('checkbox')
+          .map((box) => box.parentElement?.textContent),
+      ).toEqual(['Em planejamento', 'Em andamento', 'Concluído', 'Cancelado']);
     });
 
-    it('mostra o erro e tenta de novo', async () => {
+    it('mostra o vazio sem pacientes e o erro com nova tentativa', async () => {
       const user = userEvent.setup();
-      const { list } = mockApi({
-        list: jest
-          .fn()
-          .mockResolvedValueOnce(mockResponse({ status: 500, ok: false }))
-          .mockResolvedValue(mockResponse({ data: page(['Maria Sílvia']) })),
-      });
+      const list = jest
+        .fn()
+        .mockResolvedValueOnce(
+          mockResponse({
+            status: 500,
+            ok: false,
+            data: { status: 'ERROR', message: 'Falha ao consultar.' },
+          }),
+        )
+        .mockResolvedValue(mockResponse({ data: page([]) }));
+      mockApi({ list });
 
       render(<PatientsPage />);
 
       expect(
-        await screen.findByText('Não foi possível carregar os pacientes'),
+        await screen.findByText('Falha ao consultar.'),
       ).toBeInTheDocument();
 
       await user.click(
         screen.getByRole('button', { name: 'Tentar novamente' }),
       );
 
-      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
-      expect(list).toHaveBeenCalledTimes(2);
+      expect(
+        await screen.findByText('Nenhum paciente cadastrado'),
+      ).toBeInTheDocument();
     });
 
-    it('redireciona para o login quando a lista responde 401', async () => {
+    it('redireciona para o login quando a sessão expira', async () => {
       mockApi({
         list: jest
           .fn()
@@ -299,29 +327,6 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
 
       await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
-    });
-
-    it('pagina a lista', async () => {
-      const user = userEvent.setup();
-      const { list } = mockApi({
-        list: jest
-          .fn()
-          .mockResolvedValueOnce(mockResponse({ data: page(['João'], 1, 2) }))
-          .mockResolvedValue(mockResponse({ data: page(['Kaio'], 2, 2) })),
-      });
-
-      render(<PatientsPage />);
-
-      expect(await screen.findByText('Página 1 de 2')).toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Próxima' }));
-
-      expect(await screen.findByText('Kaio')).toBeInTheDocument();
-      expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
-      expect(list).toHaveBeenLastCalledWith(
-        `${API}/accounts?isPatient=true&page=2&limit=10`,
-        expect.objectContaining({ credentials: 'include' }),
-      );
     });
   });
 
@@ -336,7 +341,9 @@ describe('PatientsPage', () => {
 
       await user.click(select);
 
-      const options = await screen.findAllByRole('option');
+      const options = await within(
+        await screen.findByRole('listbox'),
+      ).findAllByRole('option');
 
       expect(options.map((option) => option.textContent)).toEqual([
         JOAO,
@@ -466,7 +473,7 @@ describe('PatientsPage', () => {
       expect(
         dialog.getByRole('group', { name: /Contatos de suporte/ }),
       ).toHaveAccessibleDescription(
-        'Pessoas que ajudam no cuidado. Um contato de suporte não é responsável tutelar e não acessa informações clínicas.',
+        'Pessoas que ajudam no cuidado. Não acessam o sistema nem os dados clínicos.',
       );
 
       const help = dialog.getByRole('button', { name: 'Ajuda: Conta' });
@@ -500,299 +507,122 @@ describe('PatientsPage', () => {
     });
   });
 
-  describe('busca por nome ou e-mail em /patients', () => {
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    // Resposta da lista com o total igual ao número de nomes.
-    function results(names: string[], current = 1, totalPages = 1) {
-      return {
-        data: names.map((name, index) => ({
-          id: `${current}-${index}`,
-          name,
-          email: `${name.split(' ')[0].toLowerCase()}@exemplo.com`,
-        })),
-        pagination: {
-          page: current,
-          limit: 10,
-          total: names.length,
-          totalPages: names.length === 0 ? 0 : totalPages,
-        },
-      };
-    }
-
-    // A lista responde conforme o `q` da URL; sem `q`, usa a chave ''.
-    function listByTerm(byTerm: Record<string, string[]>) {
-      return jest.fn((url: string) => {
-        const q = new URL(url).searchParams.get('q') ?? '';
-
-        return Promise.resolve(
-          mockResponse({ data: results(byTerm[q] ?? []) }),
-        );
-      });
-    }
-
-    const SEARCH = { name: 'Buscar por nome ou e-mail' };
-
-    it('lê o termo da URL e busca com ele', async () => {
-      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=maria'));
-      const { list } = mockApi({
-        list: listByTerm({ maria: ['Maria Sílvia'] }),
-      });
-
-      render(<PatientsPage />);
-
-      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
-      expect(screen.getByRole('searchbox', SEARCH)).toHaveValue('maria');
-      expect(screen.getByText('1 paciente encontrado')).toBeInTheDocument();
-      expect(list).toHaveBeenCalledWith(
-        `${API}/accounts?isPatient=true&q=maria&page=1&limit=10`,
-        expect.objectContaining({ credentials: 'include' }),
-      );
-    });
-
-    it('busca 300 ms depois da última tecla e grava o termo na URL', async () => {
-      jest.useFakeTimers();
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-      const { list } = mockApi({
-        list: listByTerm({
-          '': ['Maria Sílvia', 'Diego Alves'],
-          mar: ['Maria Sílvia'],
-        }),
-      });
-
-      render(<PatientsPage />);
-
-      await user.type(await screen.findByRole('searchbox', SEARCH), 'mar');
-
-      expect(list).toHaveBeenCalledTimes(1);
-
-      act(() => jest.advanceTimersByTime(299));
-
-      expect(list).toHaveBeenCalledTimes(1);
-
-      act(() => jest.advanceTimersByTime(1));
-
-      await waitFor(() =>
-        expect(list).toHaveBeenLastCalledWith(
-          `${API}/accounts?isPatient=true&q=mar&page=1&limit=10`,
-          expect.anything(),
+  describe('busca, filtros, ordenação e paginação na URL', () => {
+    it('carrega a busca, os filtros e a ordenação da URL', async () => {
+      mockedUseSearchParams.mockReturnValue(
+        new URLSearchParams(
+          'q=mari&status=running,none&registered=custom&registeredFrom=2026-01-01&registeredTo=2026-02-01&sort=registeredAt&order=desc&page=2&limit=25',
         ),
       );
-      expect(replace).toHaveBeenCalledWith('/patients?q=mar', {
-        scroll: false,
-      });
-      await waitFor(() =>
-        expect(screen.queryByText('Diego Alves')).not.toBeInTheDocument(),
-      );
-    });
-
-    it('não busca com menos de 2 caracteres e avisa', async () => {
-      jest.useFakeTimers();
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       const { list } = mockApi();
 
       render(<PatientsPage />);
 
-      await user.type(await screen.findByRole('searchbox', SEARCH), 'm');
-      act(() => jest.advanceTimersByTime(300));
+      await screen.findByRole('table');
 
-      expect(list).toHaveBeenCalledTimes(1);
-      expect(
-        screen.getByText('Digite ao menos 2 caracteres para buscar.'),
-      ).toBeInTheDocument();
-    });
-
-    it('busca na hora ao pressionar Enter, sem esperar o debounce', async () => {
-      jest.useFakeTimers();
-      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
-      const { list } = mockApi({
-        list: listByTerm({ '': ['Diego Alves'], ana: ['Ana Lima'] }),
-      });
-
-      render(<PatientsPage />);
-
-      await user.type(
-        await screen.findByRole('searchbox', SEARCH),
-        'ana{Enter}',
-      );
-
-      expect(await screen.findByText('Ana Lima')).toBeInTheDocument();
-      expect(list).toHaveBeenLastCalledWith(
-        `${API}/accounts?isPatient=true&q=ana&page=1&limit=10`,
+      expect(list).toHaveBeenCalledWith(
+        `${API}/patients/authorized?q=mari&status=running%2Cnone&registeredFrom=2026-01-01&registeredTo=2026-02-01&sort=registeredAt&order=desc&page=2&limit=25`,
         expect.anything(),
       );
-    });
-
-    it('limpa a busca com o Esc e com o ✕', async () => {
-      const user = userEvent.setup();
-      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=maria'));
-      const { list } = mockApi({
-        list: listByTerm({
-          maria: ['Maria Sílvia'],
-          '': ['Maria Sílvia', 'Diego Alves'],
-        }),
-      });
-
-      render(<PatientsPage />);
-
-      const box = await screen.findByRole('searchbox', SEARCH);
-
-      await screen.findByText('Maria Sílvia');
-      await user.type(box, '{Escape}');
-
-      expect(box).toHaveValue('');
-      expect(await screen.findByText('Diego Alves')).toBeInTheDocument();
-      expect(replace).toHaveBeenLastCalledWith('/patients', { scroll: false });
-      expect(list).toHaveBeenLastCalledWith(PATIENTS_URL, expect.anything());
-
-      await user.type(box, 'diego{Enter}');
-      await user.click(
-        screen.getByRole('button', { name: 'Limpar campo de busca' }),
-      );
-
-      expect(box).toHaveValue('');
+      expect(screen.getByRole('searchbox')).toHaveValue('mari');
+      expect(screen.getByLabelText('Ordenar por')).toHaveValue('registeredAt');
       expect(
-        screen.queryByRole('button', { name: 'Limpar campo de busca' }),
-      ).not.toBeInTheDocument();
-    });
-
-    it('mostra a mensagem própria sem resultados e limpa pelo botão', async () => {
-      const user = userEvent.setup();
-      mockedUseSearchParams.mockReturnValue(new URLSearchParams('q=zzz'));
-      mockApi({ list: listByTerm({ '': ['Maria Sílvia'] }) });
-
-      render(<PatientsPage />);
-
-      expect(
-        await screen.findByText('Nenhum paciente encontrado'),
+        screen.getByRole('button', { name: 'Ordem decrescente' }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(/Nenhum resultado para “zzz”/),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText('Nenhum paciente cadastrado'),
-      ).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Limpar busca' }));
-
-      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
-      expect(screen.getByRole('searchbox', SEARCH)).toHaveValue('');
+      expect(screen.getByText(/com os filtros atuais/)).toBeInTheDocument();
     });
 
-    it('mantém os resultados anteriores enquanto a busca carrega', async () => {
+    it('grava a busca em q, depois do debounce', async () => {
       const user = userEvent.setup();
-      const list = jest
-        .fn()
-        .mockResolvedValueOnce(
-          mockResponse({ data: results(['Maria Sílvia']) }),
-        )
-        .mockImplementationOnce(() => new Promise<Response>(() => {}));
+      mockApi();
 
-      mockApi({ list });
       render(<PatientsPage />);
+      await screen.findByRole('table');
 
-      await screen.findByText('Maria Sílvia');
-      await user.type(screen.getByRole('searchbox', SEARCH), 'ana{Enter}');
+      await user.type(screen.getByRole('searchbox'), 'diego{Enter}');
 
-      expect(await screen.findByText('Buscando...')).toBeInTheDocument();
-      expect(screen.getByText('Maria Sílvia')).toBeInTheDocument();
-      expect(
-        screen.getByRole('list', { name: 'Pacientes' }).parentElement,
-      ).toHaveAttribute('aria-busy', 'true');
+      expect(replace).toHaveBeenCalledWith('/patients?q=diego', {
+        scroll: false,
+      });
     });
 
-    it('descarta a resposta de uma busca superada', async () => {
+    it('grava o status escolhido e limpa os filtros', async () => {
       const user = userEvent.setup();
-      let resolveOld: (response: Response) => void = () => {};
-      const list = jest.fn((url: string) => {
-        const q = new URL(url).searchParams.get('q');
+      mockApi();
 
-        if (q === 'ma') {
-          return new Promise<Response>((resolve) => {
-            resolveOld = resolve;
-          });
-        }
-
-        return Promise.resolve(
-          mockResponse({
-            data: results(q === 'maria' ? ['Maria Sílvia'] : ['Diego Alves']),
-          }),
-        );
-      });
-
-      mockApi({ list });
       render(<PatientsPage />);
+      await screen.findByRole('table');
 
-      const box = await screen.findByRole('searchbox', SEARCH);
+      await user.click(screen.getByRole('button', { name: 'Filtros' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Concluído' }));
 
-      await screen.findByText('Diego Alves');
-      await user.type(box, 'ma{Enter}');
-      await user.type(box, 'ria{Enter}');
-
-      expect(await screen.findByText('Maria Sílvia')).toBeInTheDocument();
-
-      await act(async () => {
-        resolveOld(mockResponse({ data: results(['Resposta velha']) }));
+      expect(replace).toHaveBeenLastCalledWith('/patients?status=concluded', {
+        scroll: false,
       });
-
-      expect(screen.getByText('Maria Sílvia')).toBeInTheDocument();
-      expect(screen.queryByText('Resposta velha')).not.toBeInTheDocument();
     });
 
-    it('volta à página 1 quando o termo muda', async () => {
+    it('mostra Limpar só com filtro além da busca', async () => {
       const user = userEvent.setup();
-      const list = jest.fn((url: string) => {
-        const params = new URL(url).searchParams;
-        const current = Number(params.get('page'));
-
-        return Promise.resolve(
-          mockResponse({
-            data: results(
-              [params.get('q') ? 'Ana Lima' : `Paciente ${current}`],
-              current,
-              2,
-            ),
-          }),
-        );
-      });
-
-      mockApi({ list });
-      render(<PatientsPage />);
-
-      await screen.findByText('Página 1 de 2');
-      await user.click(screen.getByRole('button', { name: 'Próxima' }));
-      await screen.findByText('Página 2 de 2');
-      await user.type(screen.getByRole('searchbox', SEARCH), 'ana{Enter}');
-
-      expect(await screen.findByText('Ana Lima')).toBeInTheDocument();
-      expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
-      expect(list).toHaveBeenLastCalledWith(
-        `${API}/accounts?isPatient=true&q=ana&page=1&limit=10`,
-        expect.anything(),
+      mockedUseSearchParams.mockReturnValue(
+        new URLSearchParams('q=mari&status=draft'),
       );
+      mockApi();
+
+      render(<PatientsPage />);
+      await screen.findByRole('table');
+
+      await user.click(screen.getByRole('button', { name: 'Limpar' }));
+
+      expect(replace).toHaveBeenLastCalledWith('/patients?q=mari', {
+        scroll: false,
+      });
     });
 
-    it('mostra a message da API quando a lista falha', async () => {
+    it('ordena por data de cadastro e inverte a ordem', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+      await screen.findByRole('table');
+
+      await user.selectOptions(
+        screen.getByLabelText('Ordenar por'),
+        'registeredAt',
+      );
+      expect(replace).toHaveBeenLastCalledWith('/patients?sort=registeredAt', {
+        scroll: false,
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Ordem crescente' }));
+      expect(replace).toHaveBeenLastCalledWith('/patients?order=desc', {
+        scroll: false,
+      });
+    });
+
+    it('troca de página mantendo os filtros', async () => {
+      const user = userEvent.setup();
+      mockedUseSearchParams.mockReturnValue(
+        new URLSearchParams('status=running'),
+      );
       mockApi({
-        list: jest.fn().mockResolvedValue(
-          mockResponse({
-            status: 500,
-            ok: false,
-            data: {
-              status: 'ERROR',
-              message: 'Não foi possível consultar as contas.',
-            },
-          }),
-        ),
+        list: jest
+          .fn()
+          .mockResolvedValue(
+            mockResponse({ data: page(['Maria Sílvia'], 1, 3) }),
+          ),
       });
 
       render(<PatientsPage />);
+      await screen.findByRole('table');
 
-      expect(
-        await screen.findByText('Não foi possível consultar as contas.'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Mostrando 1–10 de 30')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Próxima página' }));
+
+      expect(replace).toHaveBeenLastCalledWith(
+        '/patients?status=running&page=2',
+        { scroll: false },
+      );
     });
   });
 
@@ -899,7 +729,9 @@ describe('PatientsPage', () => {
       await screen.findByRole('listbox');
       await user.keyboard('{ArrowDown}');
 
-      const options = screen.getAllByRole('option');
+      const options = within(screen.getByRole('listbox')).getAllByRole(
+        'option',
+      );
 
       expect(select).toHaveAttribute('aria-activedescendant', options[0].id);
 
