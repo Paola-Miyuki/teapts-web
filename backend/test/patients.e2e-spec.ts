@@ -88,6 +88,27 @@ describe('patient profile (e2e)', () => {
   };
   let patientsRepository: {
     insert: jest.Mock<(patient: unknown) => Promise<void>>;
+    patientExists: jest.Mock<(patientId: string) => Promise<boolean>>;
+    findPatient: jest.Mock<
+      (scope: unknown, patientId: string) => Promise<unknown>
+    >;
+    findSupportContacts: jest.Mock<(patientId: string) => Promise<unknown[]>>;
+    findSupportContact: jest.Mock<
+      (patientId: string, contactId: string) => Promise<unknown>
+    >;
+    insertSupportContact: jest.Mock<
+      (patientId: string, values: unknown) => Promise<unknown>
+    >;
+    updateSupportContact: jest.Mock<
+      (
+        patientId: string,
+        contactId: string,
+        values: unknown,
+      ) => Promise<unknown>
+    >;
+    deleteSupportContact: jest.Mock<
+      (patientId: string, contactId: string) => Promise<boolean>
+    >;
   };
   let accountsRepository: {
     findPaginated: jest.Mock<(filters: unknown) => Promise<unknown>>;
@@ -106,7 +127,16 @@ describe('patient profile (e2e)', () => {
 
   beforeEach(async () => {
     accountRepository = { findOne: jest.fn() };
-    patientsRepository = { insert: jest.fn() };
+    patientsRepository = {
+      insert: jest.fn(),
+      patientExists: jest.fn(),
+      findPatient: jest.fn(),
+      findSupportContacts: jest.fn(),
+      findSupportContact: jest.fn(),
+      insertSupportContact: jest.fn(),
+      updateSupportContact: jest.fn(),
+      deleteSupportContact: jest.fn(),
+    };
     accountsRepository = { findPaginated: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
@@ -182,8 +212,13 @@ describe('patient profile (e2e)', () => {
       .send(body);
 
     expect(response.status).toBe(201);
-    expect(response.body).toEqual(body);
-    expect(patientsRepository.insert).toHaveBeenCalledWith(body);
+    const saved = {
+      accountId,
+      supportContacts: [{ ...body.supportContacts[0], isEmergency: false }],
+    };
+
+    expect(response.body).toEqual(saved);
+    expect(patientsRepository.insert).toHaveBeenCalledWith(saved);
   });
 
   it('answers 401 without a session', async () => {
@@ -327,5 +362,171 @@ describe('patient profile (e2e)', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.status).toBe('PATIENT_PROFILE_ALREADY_EXISTS');
+  });
+  describe('support contacts (RFPAC003)', () => {
+    const patientId = '5f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b';
+    const contactId = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+    const stored = {
+      id: contactId,
+      patientId,
+      name: 'Joana Silva',
+      description: 'Avó',
+      email: null,
+      phone: '(11) 98765-4321',
+      isEmergency: true,
+    };
+    const response = {
+      id: contactId,
+      name: 'Joana Silva',
+      description: 'Avó',
+      email: null,
+      phone: '(11) 98765-4321',
+      isEmergency: true,
+    };
+
+    function signInProfessional() {
+      currentSession = {
+        getAccessTokenPayload: () => ({
+          accountId: 'professional-account',
+          role: 'user',
+          patientProfileId: null,
+          professionalProfileIds: ['professional-1'],
+        }),
+      };
+    }
+
+    beforeEach(() => {
+      patientsRepository.patientExists.mockResolvedValue(true);
+    });
+
+    it('lists the contacts to the own patient', async () => {
+      currentSession = {
+        getAccessTokenPayload: () => ({
+          accountId: patientId,
+          role: 'user',
+          patientProfileId: patientId,
+          professionalProfileIds: [],
+        }),
+      };
+      patientsRepository.findSupportContacts.mockResolvedValue([stored]);
+
+      const result = await request(app.getHttpServer()).get(
+        `/patients/${patientId}/support-contacts`,
+      );
+
+      expect(result.status).toBe(200);
+      expect(result.body).toEqual({ data: [response] });
+    });
+
+    it('creates a contact for a member of an active PTS and answers 201', async () => {
+      signInProfessional();
+      patientsRepository.findPatient.mockResolvedValue({ read_only: false });
+      patientsRepository.insertSupportContact.mockResolvedValue(stored);
+
+      const result = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/support-contacts`)
+        .send({
+          name: 'Joana Silva',
+          description: 'Avó',
+          phone: '(11) 98765-4321',
+          isEmergency: true,
+        });
+
+      expect(result.status).toBe(201);
+      expect(result.body).toEqual(response);
+    });
+
+    it('answers 403 to a professional of a closed PTS and does not write', async () => {
+      signInProfessional();
+      patientsRepository.findPatient.mockResolvedValue({ read_only: true });
+
+      const result = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/support-contacts`)
+        .send({ name: 'Joana', phone: '(11) 98765-4321' });
+
+      expect(result.status).toBe(403);
+      expect(result.body.status).toBe('FORBIDDEN');
+      expect(patientsRepository.insertSupportContact).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 for an emergency contact without phone', async () => {
+      signIn('admin');
+
+      const result = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/support-contacts`)
+        .send({ name: 'Joana', email: 'joana@exemplo.com', isEmergency: true });
+
+      expect(result.status).toBe(400);
+      expect(result.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o telefone do contato de emergência.',
+      });
+    });
+
+    it('patches a contact keeping the other fields', async () => {
+      signIn('admin');
+      patientsRepository.findSupportContact.mockResolvedValue(stored);
+      patientsRepository.updateSupportContact.mockResolvedValue({
+        ...stored,
+        name: 'Joana Souza',
+      });
+
+      const result = await request(app.getHttpServer())
+        .patch(`/patients/${patientId}/support-contacts/${contactId}`)
+        .send({ name: 'Joana Souza' });
+
+      expect(result.status).toBe(200);
+      expect(result.body.name).toBe('Joana Souza');
+      expect(patientsRepository.updateSupportContact).toHaveBeenCalledWith(
+        patientId,
+        contactId,
+        expect.objectContaining({ name: 'Joana Souza', phone: stored.phone }),
+      );
+    });
+
+    it('answers 404 SUPPORT_CONTACT_NOT_FOUND when deleting a missing contact', async () => {
+      signIn('admin');
+      patientsRepository.deleteSupportContact.mockResolvedValue(false);
+
+      const result = await request(app.getHttpServer()).delete(
+        `/patients/${patientId}/support-contacts/${contactId}`,
+      );
+
+      expect(result.status).toBe(404);
+      expect(result.body.status).toBe('SUPPORT_CONTACT_NOT_FOUND');
+    });
+
+    it('deletes the contact and answers 204', async () => {
+      signIn('admin');
+      patientsRepository.deleteSupportContact.mockResolvedValue(true);
+
+      const result = await request(app.getHttpServer()).delete(
+        `/patients/${patientId}/support-contacts/${contactId}`,
+      );
+
+      expect(result.status).toBe(204);
+    });
+
+    it('answers 400 for a contactId that is not a UUID', async () => {
+      signIn('admin');
+
+      const result = await request(app.getHttpServer()).delete(
+        `/patients/${patientId}/support-contacts/abc`,
+      );
+
+      expect(result.status).toBe(400);
+      expect(result.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: contactId',
+      });
+    });
+
+    it('answers 401 without a session', async () => {
+      const result = await request(app.getHttpServer()).get(
+        `/patients/${patientId}/support-contacts`,
+      );
+
+      expect(result.status).toBe(401);
+    });
   });
 });

@@ -20,9 +20,10 @@ export async function listProfessionals(
     );
   }
 
+  // 50 é o máximo da paginação compartilhada (NF).
   const params = new URLSearchParams({
     page: '1',
-    limit: '100',
+    limit: '50',
   });
 
   if (ids?.length) {
@@ -36,40 +37,28 @@ export async function listProfessionals(
   return Array.isArray(response) ? response : (response.data ?? []);
 }
 
+// Pacientes sem PTS ativo, buscados pelo nome com a paginação padrão (20);
+// a busca completa (CPF, CNS) entra com a #80/#81.
 export async function listEligiblePatients(
   signal?: AbortSignal,
+  name?: string,
 ): Promise<Patient[]> {
+  const term = name?.trim() ?? '';
+
   if (USE_MOCKS) {
-    return mockPatients;
+    return mockPatients.filter((patient) =>
+      patient.name.toLowerCase().includes(term.toLowerCase()),
+    );
   }
 
-  const params = new URLSearchParams({
-    page: '1',
-    limit: '100',
-  });
+  const params = new URLSearchParams({ page: '1', limit: '20' });
+
+  if (term) {
+    params.set('name', term);
+  }
 
   const response = await request<PaginatedResponse<Patient> | Patient[]>(
     `/patients/available-for-pts?${params.toString()}`,
-    { signal },
-  );
-
-  return Array.isArray(response) ? response : (response.data ?? []);
-}
-
-export async function listAuthorizedPatients(
-  signal?: AbortSignal,
-): Promise<Patient[]> {
-  if (USE_MOCKS) {
-    return mockPatients;
-  }
-
-  const params = new URLSearchParams({
-    page: '1',
-    limit: '100',
-  });
-
-  const response = await request<PaginatedResponse<Patient> | Patient[]>(
-    `/patients/authorized?${params.toString()}`,
     { signal },
   );
 

@@ -184,3 +184,52 @@ describe('PtsRepositoryImpl.rejectProposal', () => {
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });
 });
+
+describe('PtsRepositoryImpl.softDeleteProposal', () => {
+  function withSoftDelete(rows: Partial<PtsEntity>[]) {
+    const created = createRepository(rows);
+    const softDelete = jest.fn(async () => ({ affected: 1 }));
+    Object.assign(created.queryRunner.manager, { softDelete });
+    return { ...created, softDelete };
+  }
+
+  it('trava a proposta e preenche só o deletedAt, em uma transação', async () => {
+    const { repository, query, queryRunner, softDelete } = withSoftDelete([
+      draft('a'),
+    ]);
+
+    await repository.softDeleteProposal('a');
+
+    expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(softDelete).toHaveBeenCalledWith(PtsEntity, 'a');
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it('não exclui proposta aprovada antes do lock', async () => {
+    const { repository, queryRunner, softDelete } = withSoftDelete([
+      { id: 'a', status: PtsStateEnum.PLANNING, patientId: 'patient-1' },
+    ]);
+
+    await expectApiError(
+      () => repository.softDeleteProposal('a'),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+
+    expect(softDelete).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  it('responde 404 quando a proposta sumiu (ou já foi excluída) antes do lock', async () => {
+    const { repository, softDelete } = withSoftDelete([]);
+
+    await expectApiError(
+      () => repository.softDeleteProposal('a'),
+      404,
+      'PTS_NOT_FOUND',
+    );
+    expect(softDelete).not.toHaveBeenCalled();
+  });
+});

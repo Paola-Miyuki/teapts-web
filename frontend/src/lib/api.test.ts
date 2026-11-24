@@ -30,6 +30,15 @@ describe('request', () => {
     });
   });
 
+  it('devolve undefined na resposta 204, sem ler o corpo', async () => {
+    const json = jest.fn();
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 204, json });
+
+    await expect(request('/x', { method: 'DELETE' })).resolves.toBeUndefined();
+    expect(json).not.toHaveBeenCalled();
+  });
+
   it('lança ApiError com o status, o code e a message do corpo de erro', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       mockResponse({

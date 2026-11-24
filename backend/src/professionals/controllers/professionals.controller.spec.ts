@@ -19,19 +19,33 @@ import { ProfessionalsService } from '../services/professionals.service';
 
 // O teste valida o contrato HTTP das rotas, com o ValidationPipe global, o
 // guard de autenticação e a restrição ao admin no cadastro.
+const listingAccount: AccountContext = {
+  accountId: 'account-1',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['profile-1'],
+};
+
 describe('GET /professionals', () => {
   let app: INestApplication;
   let guardCanActivate: jest.Mock;
   let professionalsService: {
     findAll: jest.Mock<
       (
-        input: Parameters<ProfessionalsService['findAll']>[0],
+        account: Parameters<ProfessionalsService['findAll']>[0],
+        input: Parameters<ProfessionalsService['findAll']>[1],
       ) => Promise<GetProfessionalsResponseDto>
     >;
   };
 
   beforeEach(async () => {
-    guardCanActivate = jest.fn(() => true);
+    guardCanActivate = jest.fn((context: unknown) => {
+      (context as ExecutionContext)
+        .switchToHttp()
+        .getRequest<{ accountContext?: AccountContext }>().accountContext =
+        listingAccount;
+      return true;
+    });
     professionalsService = {
       findAll: jest.fn(async () => ({
         data: [
@@ -43,6 +57,9 @@ describe('GET /professionals', () => {
               id: Specialism.Psychologist,
               name: 'Psicologia',
             },
+            registration: null,
+            institution: null,
+            cnes: null,
           },
         ],
         pagination: {
@@ -100,6 +117,9 @@ describe('GET /professionals', () => {
             id: Specialism.Psychologist,
             name: 'Psicologia',
           },
+          registration: null,
+          institution: null,
+          cnes: null,
         },
       ],
       pagination: {
@@ -109,7 +129,7 @@ describe('GET /professionals', () => {
         totalPages: 1,
       },
     });
-    expect(professionalsService.findAll).toHaveBeenCalledWith({
+    expect(professionalsService.findAll).toHaveBeenCalledWith(listingAccount, {
       page: 1,
       limit: 10,
       name: 'Maria',
@@ -130,7 +150,7 @@ describe('GET /professionals', () => {
       });
 
     expect(response.status).toBe(200);
-    expect(professionalsService.findAll).toHaveBeenCalledWith({
+    expect(professionalsService.findAll).toHaveBeenCalledWith(listingAccount, {
       page: 2,
       limit: 20,
       name: 'Maria',

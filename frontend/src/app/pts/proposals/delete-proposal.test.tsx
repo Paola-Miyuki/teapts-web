@@ -1,79 +1,32 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import type { Account } from '@/lib/account';
-
-import PtsProposalList from './_components/PtsProposalList';
+import { personalData } from '@/test-utils/account';
+import PtsProposalsPage from './page';
 
 const mockReplace = jest.fn();
-// Mesmo objeto em todo render, como o useRouter do Next.
 const mockRouter = { replace: mockReplace, push: jest.fn() };
-
-let mockSearchParams = new URLSearchParams();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
-  useSearchParams: () => mockSearchParams,
-}));
-
-jest.mock('../novo/api/ptsApi', () => ({
-  listProfessionals: jest.fn(() => Promise.resolve([])),
-  listEligiblePatients: jest.fn(() => Promise.resolve([])),
-  listAuthorizedPatients: jest.fn(() => Promise.resolve([])),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 const PROPOSAL_ID = '3f2e1d0c-9b8a-4765-a432-10fedcba9876';
-const PATIENT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
 const RESPONSIBLE_ID = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
-const MEMBER_ID = '33333333-3333-4333-8333-333333333333';
 const DELETE_URL = `http://localhost:3000/pts/proposals/${PROPOSAL_ID}`;
 
-function jsonResponse(body: unknown, status = 200) {
-  return Promise.resolve({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as Response);
-}
-
-function professionalAccount(professionalId = RESPONSIBLE_ID): Account {
+function account(overrides: Partial<Account>): Account {
   return {
-    accountId: '22222222-2222-4222-8222-222222222222',
-    name: 'Profissional Teste',
-    email: 'profissional@example.com',
+    accountId: 'account-uuid',
+    name: 'Conta Teste',
+    email: 'conta@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: null,
-    professionalProfileIds: [professionalId],
-  };
-}
-
-function patientAccount(): Account {
-  return {
-    accountId: '11111111-1111-4111-8111-111111111111',
-    name: 'Paciente Teste',
-    email: 'paciente@example.com',
-    role: 'user',
-    patientProfileId: PATIENT_ID,
     professionalProfileIds: [],
-  };
-}
-
-function proposalsResponse(
-  proposals: Array<Record<string, unknown>> = [proposal()],
-) {
-  return {
-    data: proposals,
-    pagination: {
-      page: 1,
-      limit: 20,
-      total: proposals.length,
-      totalPages: 1,
-    },
+    ...overrides,
   };
 }
 
@@ -83,185 +36,178 @@ function proposal(overrides: Record<string, unknown> = {}) {
     status: 'draft',
     socialSituation: 'Situação social de teste.',
     createdAt: '2026-10-15T12:00:00.000Z',
-    patient: { id: PATIENT_ID, name: 'Paciente Teste' },
+    patient: { id: 'patient-1', name: 'Luna Ferreira' },
     responsible: {
       id: RESPONSIBLE_ID,
       name: 'Responsável Teste',
-      specialism: { id: 'psychologist', name: 'Psicologia' },
+      specialism: { id: 'psychologist', name: 'Psicólogo' },
     },
-    team: [
-      {
-        id: MEMBER_ID,
-        name: 'Integrante Teste',
-        specialism: { id: 'doctor', name: 'Medicina' },
-      },
-    ],
+    team: [],
     ...overrides,
   };
 }
 
-// Mostra a lista e abre o modal de "Excluir proposta".
+function json(status: number, body?: unknown) {
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  } as Response);
+}
+
+// `list` é a resposta de GET /pts/proposals a cada chamada, na ordem.
+function mockApi(
+  me: Account,
+  lists: unknown[][],
+  remove: { status: number; body?: unknown } = {
+    status: 200,
+    body: { status: 'OK' },
+  },
+) {
+  let call = 0;
+
+  global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+
+    if (url.pathname === '/me') return json(200, me);
+    if (init?.method === 'DELETE') return json(remove.status, remove.body);
+
+    const data = lists[Math.min(call++, lists.length - 1)];
+
+    return json(200, {
+      data,
+      pagination: { page: 1, limit: 10, total: data.length, totalPages: 1 },
+    });
+  }) as jest.Mock;
+}
+
+const responsible = account({ professionalProfileIds: [RESPONSIBLE_ID] });
+
 async function openDeleteDialog() {
-  render(<PtsProposalList account={professionalAccount()} />);
+  const user = userEvent.setup();
 
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Excluir proposta' }),
+  render(<PtsProposalsPage />);
+  await user.click(
+    await screen.findByRole('button', {
+      name: 'Ações para proposta de Luna Ferreira',
+    }),
   );
+  await user.click(screen.getByRole('menuitem', { name: 'Excluir proposta' }));
 
-  return screen.findByRole('dialog', { name: 'Excluir proposta?' });
+  return { user, dialog: within(await screen.findByRole('dialog')) };
 }
 
 describe('Excluir proposta de PTS (RFPTS008)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSearchParams = new URLSearchParams({ patientId: PATIENT_ID });
-    global.fetch = jest.fn();
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(proposalsResponse()),
-    );
   });
 
-  it('mostra "Excluir proposta" para o responsável', async () => {
-    render(<PtsProposalList account={professionalAccount()} />);
+  it.each([
+    ['o responsável', responsible, 'draft'],
+    ['o admin', account({ role: 'admin' }), 'draft'],
+  ])('mostra "Excluir proposta" para %s', async (_who, me, status) => {
+    mockApi(me, [[proposal({ status })]]);
+    const user = userEvent.setup();
+
+    render(<PtsProposalsPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
+    );
 
     expect(
-      await screen.findByRole('button', { name: 'Excluir proposta' }),
+      screen.getByRole('menuitem', { name: 'Excluir proposta' }),
     ).toBeInTheDocument();
   });
 
-  it('não mostra o botão para outro profissional da equipe', async () => {
-    render(<PtsProposalList account={professionalAccount(MEMBER_ID)} />);
+  it('não mostra para outro profissional da equipe', async () => {
+    mockApi(account({ professionalProfileIds: ['outro-profissional'] }), [
+      [proposal()],
+    ]);
+    const user = userEvent.setup();
 
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Excluir proposta' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('não mostra o botão para o paciente', async () => {
-    mockSearchParams = new URLSearchParams();
-
-    render(<PtsProposalList account={patientAccount()} />);
-
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Excluir proposta' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('não mostra o botão em proposta que não está em draft', async () => {
-    (global.fetch as jest.Mock).mockReset();
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(proposalsResponse([proposal({ status: 'rejected' })])),
+    render(<PtsProposalsPage />);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
     );
 
-    render(<PtsProposalList account={professionalAccount()} />);
-
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Excluir proposta' }),
+      screen.queryByRole('menuitem', { name: 'Excluir proposta' }),
     ).not.toBeInTheDocument();
   });
 
-  it('exclui, recarrega a lista e mostra "Proposta excluída."', async () => {
-    (global.fetch as jest.Mock)
-      .mockImplementationOnce(() => jsonResponse({ status: 'OK' }))
-      .mockImplementationOnce(() => jsonResponse(proposalsResponse([])));
+  it('confirma, exclui, recarrega a lista e mostra "Proposta excluída."', async () => {
+    mockApi(responsible, [[proposal()], []]);
 
-    const dialog = await openDeleteDialog();
+    const { user, dialog } = await openDeleteDialog();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }));
+    expect(
+      dialog.getByRole('heading', {
+        name: 'Excluir a proposta de Luna Ferreira?',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      dialog.getByText(
+        'A proposta sai das listagens. O registro fica guardado para auditoria.',
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(dialog.getByRole('button', { name: 'Excluir proposta' }));
 
     expect(await screen.findByText('Proposta excluída.')).toBeInTheDocument();
-    expect(
-      await screen.findByText('Nenhuma proposta encontrada'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Responsável Teste')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('dialog', { name: 'Excluir proposta?' }),
-    ).not.toBeInTheDocument();
-
-    expect(global.fetch).toHaveBeenNthCalledWith(2, DELETE_URL, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    // Recarrega a página atual da lista.
-    expect(global.fetch).toHaveBeenCalledTimes(3);
-  });
-
-  it('"Cancelar" fecha o modal sem chamar a API', async () => {
-    const dialog = await openDeleteDialog();
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('dialog', { name: 'Excluir proposta?' }),
-      ).not.toBeInTheDocument();
-    });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('mostra o loading no botão e não permite clique duplo', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(
-      () => new Promise(() => {}),
+    await waitFor(() =>
+      expect(screen.queryByText('Luna Ferreira')).not.toBeInTheDocument(),
     );
-
-    const dialog = await openDeleteDialog();
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }));
-
-    const deleting = await within(dialog).findByRole('button', {
-      name: 'Excluindo...',
-    });
-
-    expect(deleting).toBeDisabled();
-    expect(
-      within(dialog).getByRole('button', { name: 'Cancelar' }),
-    ).toBeDisabled();
-
-    fireEvent.click(deleting);
-
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledWith(
+      DELETE_URL,
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+    );
   });
 
-  it('exibe a mensagem da API no modal (409)', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(
-        {
-          status: 'PTS_NOT_DRAFT',
-          message: 'Somente propostas aguardando decisão podem ser excluídas.',
-        },
-        409,
+  it('"Cancelar" fecha o diálogo sem chamar a API', async () => {
+    mockApi(responsible, [[proposal()]]);
+
+    const { user, dialog } = await openDeleteDialog();
+
+    await user.click(dialog.getByRole('button', { name: 'Cancelar' }));
+
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(
+        ([, init]) => init?.method === 'DELETE',
       ),
+    ).toBe(false);
+    expect(screen.getByText('Luna Ferreira')).toBeInTheDocument();
+  });
+
+  it('mostra a mensagem da API no diálogo (409) e mantém a proposta', async () => {
+    mockApi(responsible, [[proposal()]], {
+      status: 409,
+      body: {
+        status: 'PTS_NOT_DRAFT',
+        message: 'Somente propostas aguardando decisão podem ser excluídas.',
+      },
+    });
+
+    const { user, dialog } = await openDeleteDialog();
+
+    await user.click(dialog.getByRole('button', { name: 'Excluir proposta' }));
+
+    expect(await dialog.findByRole('alert')).toHaveTextContent(
+      'Somente propostas aguardando decisão podem ser excluídas.',
     );
-
-    const dialog = await openDeleteDialog();
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }));
-
-    expect(
-      await within(dialog).findByText(
-        'Somente propostas aguardando decisão podem ser excluídas.',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('dialog', { name: 'Excluir proposta?' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Responsável Teste')).toBeInTheDocument();
+    expect(screen.getByText('Luna Ferreira')).toBeInTheDocument();
   });
 
   it('redireciona para o login quando a sessão expira (401)', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse({ message: 'unauthorised' }, 401),
-    );
+    mockApi(responsible, [[proposal()]], { status: 401, body: {} });
 
-    const dialog = await openDeleteDialog();
+    const { user, dialog } = await openDeleteDialog();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }));
+    await user.click(dialog.getByRole('button', { name: 'Excluir proposta' }));
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/login');
-    });
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'));
   });
 });

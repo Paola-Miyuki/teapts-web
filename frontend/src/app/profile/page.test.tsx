@@ -10,11 +10,16 @@ import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 
 import type { Account } from '@/lib/account';
+import { personalData } from '@/test-utils/account';
 
+import ProfileEditRoute from './edit/page';
 import ProfilePage from './page';
+
+let mockSearchParams = new URLSearchParams();
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 const mockedUseRouter = useRouter as jest.Mock;
@@ -25,6 +30,14 @@ const ACCOUNT: Account = {
   name: 'Maria Silva',
   email: 'maria@example.com',
   role: 'user',
+  ...personalData,
+  birthDate: '1988-06-12',
+  sex: 'female',
+  gender: 'cis_woman',
+  cpf: '52998224725',
+  phone: '41991002030',
+  createdAt: '2026-03-12T12:00:00.000Z',
+  updatedAt: '2026-10-02T12:00:00.000Z',
   patientProfileId: null,
   professionalProfileIds: ['professional-uuid'],
 };
@@ -60,6 +73,39 @@ function mockApi({
         return patch(url, init);
       }
 
+      if (url.startsWith(`${API}/professionals?`)) {
+        return Promise.resolve(
+          response({
+            data: [
+              {
+                id: 'professional-uuid',
+                name: account.name,
+                email: account.email,
+                specialism: { id: 'psychologist', name: 'Psicólogo' },
+              },
+            ],
+            pagination: { page: 1, limit: 1, total: 1, totalPages: 1 },
+          }),
+        );
+      }
+
+      if (url === `${API}/patients/patient-uuid/support-contacts`) {
+        return Promise.resolve(
+          response({
+            data: [
+              {
+                id: 'contact-1',
+                name: 'Juliana Ribeiro',
+                description: 'Mãe',
+                email: null,
+                phone: '41998123344',
+                isEmergency: true,
+              },
+            ],
+          }),
+        );
+      }
+
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     },
   );
@@ -72,132 +118,183 @@ async function renderProfile() {
   await screen.findByRole('heading', { name: ACCOUNT.name });
 }
 
+async function renderEdit() {
+  render(<ProfileEditRoute />);
+  await screen.findByRole('heading', { name: 'Editar perfil', level: 1 });
+}
+
 describe('ProfilePage', () => {
   const replace = jest.fn();
+  const push = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedUseRouter.mockReturnValue({ replace });
+    mockSearchParams = new URLSearchParams();
+    mockedUseRouter.mockReturnValue({ replace, push });
     global.fetch = jest.fn();
   });
 
-  it('renderiza os dados da conta e Meu perfil no AppShell', async () => {
+  it('mostra os dados da conta, os pessoais e a profissão', async () => {
+    mockApi();
+
+    await renderProfile();
+
+    const facts = screen.getByRole('heading', {
+      name: 'Dados da conta',
+    }).parentElement!;
+    expect(within(facts).getByText('maria@example.com')).toBeInTheDocument();
+    expect(within(facts).getByText('(41) 99100-2030')).toBeInTheDocument();
+    expect(within(facts).getByText('12/03/2026')).toBeInTheDocument();
+    expect(within(facts).getByText('02/10/2026')).toBeInTheDocument();
+
+    expect(screen.getByText('12/06/1988')).toBeInTheDocument();
+    expect(
+      screen.getByText(/^\d+ anos?, \d+ (mês|meses) e \d+ dias?$/),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Feminino')).toBeInTheDocument();
+    expect(screen.getByText('Mulher cisgênero')).toBeInTheDocument();
+    expect(screen.getByText('529.982.247-25')).toBeInTheDocument();
+    expect(await screen.findByText('Psicólogo')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Editar perfil' })).toHaveAttribute(
+      'href',
+      '/profile/edit',
+    );
+    expect(
+      within(screen.getByRole('complementary')).getByRole('link', {
+        name: 'Meu perfil',
+      }),
+    ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('mostra os contatos de suporte do paciente, só para leitura', async () => {
+    mockApi({
+      account: {
+        ...ACCOUNT,
+        patientProfileId: 'patient-uuid',
+        professionalProfileIds: [],
+      },
+    });
+
+    await renderProfile();
+
+    const card = within(
+      (
+        await screen.findByRole('heading', { name: 'Contatos de suporte' })
+      ).closest('section')!,
+    );
+
+    expect(card.getByText('Juliana Ribeiro')).toBeInTheDocument();
+    expect(card.getByText('Emergência')).toBeInTheDocument();
+    expect(card.getByText('(41) 99812-3344')).toBeInTheDocument();
+    expect(
+      card.queryByRole('button', { name: /Adicionar|Editar|Remover/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('não mostra contatos de suporte ao profissional', async () => {
     mockApi();
 
     await renderProfile();
 
     expect(
-      screen.getByRole('heading', { name: 'Meu perfil' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Seus dados de identificação e os perfis associados à sua conta.',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText('Profissional')).toHaveLength(2);
-    expect(screen.getByText('E-mail')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'As permissões de acesso dependem dos perfis e dos vínculos autorizados para a sua conta.',
-      ),
-    ).toBeInTheDocument();
-    // O perfil fica no cabeçalho (não na barra lateral) e marca a página.
-    expect(screen.getByRole('link', { name: /^Meu perfil: / })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(
-      within(screen.getByRole('complementary')).queryByRole('link', {
-        name: /Meu perfil/,
-      }),
+      screen.queryByRole('heading', { name: 'Contatos de suporte' }),
     ).not.toBeInTheDocument();
   });
 
-  it('edita somente o nome e atualiza o cartão e o cabeçalho', async () => {
-    const user = userEvent.setup();
-    const updated = { ...ACCOUNT, name: 'Maria Souza' };
-    const { patch } = mockApi({
-      patch: jest.fn().mockResolvedValue(response(updated)),
-    });
+  it('mostra o aviso de dados atualizados vindo da edição', async () => {
+    mockSearchParams = new URLSearchParams('updated=1');
+    mockApi();
 
     await renderProfile();
-    await user.click(screen.getByRole('button', { name: 'Editar' }));
-    await user.clear(screen.getByLabelText('Nome completo'));
-    await user.type(screen.getByLabelText('Nome completo'), 'Maria Souza');
-    await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Maria Souza' }),
-      ).toBeInTheDocument(),
-    );
-    expect(patch).toHaveBeenCalledWith(
-      `${API}/me`,
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ name: 'Maria Souza' }),
-      }),
-    );
     expect(
       screen.getByText('Seus dados foram atualizados com sucesso.'),
     ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'Salvando...' }),
-      ).not.toBeInTheDocument(),
-    );
   });
 
-  it('valida nome e e-mail sem chamar PATCH', async () => {
+  it('não mostra CPF para o administrador', async () => {
+    mockApi({
+      account: {
+        ...ACCOUNT,
+        role: 'admin',
+        cpf: null,
+        professionalProfileIds: [],
+      },
+    });
+
+    await renderProfile();
+
+    expect(screen.queryByText('CPF')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dados profissionais')).not.toBeInTheDocument();
+  });
+
+  it('envia só os campos alterados e volta para Meu perfil', async () => {
     const user = userEvent.setup();
     const { patch } = mockApi();
 
-    await renderProfile();
-    await user.click(screen.getByRole('button', { name: 'Editar' }));
-    await user.clear(screen.getByLabelText('Nome completo'));
-    await user.clear(screen.getByLabelText('E-mail'));
-    await user.type(screen.getByLabelText('E-mail'), 'invalido');
+    await renderEdit();
+    await user.clear(screen.getByLabelText(/Nome completo/));
+    await user.type(screen.getByLabelText(/Nome completo/), 'Maria Souza');
+    await user.type(screen.getByLabelText('Nome social'), 'Mari');
+    await user.selectOptions(screen.getByLabelText('Gênero'), '');
+    await user.clear(screen.getByLabelText('Telefone'));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith('/profile?updated=1'),
+    );
+    expect(JSON.parse(patch.mock.calls[0][1].body)).toEqual({
+      name: 'Maria Souza',
+      socialName: 'Mari',
+      gender: null,
+      phone: null,
+    });
+  });
+
+  it('valida os campos obrigatórios sem chamar PATCH', async () => {
+    const user = userEvent.setup();
+    const { patch } = mockApi();
+
+    await renderEdit();
+    await user.clear(screen.getByLabelText(/Nome completo/));
+    await user.clear(screen.getByLabelText(/^E-mail/));
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(screen.getByText('Informe seu nome completo.')).toBeInTheDocument();
-    expect(
-      screen.getByText('Informe um e-mail válido, como nome@exemplo.com.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Informe seu e-mail.')).toBeInTheDocument();
     expect(patch).not.toHaveBeenCalled();
   });
 
-  it('mostra o erro 409 no e-mail e preserva o texto digitado', async () => {
+  it('mostra o erro 409 no e-mail', async () => {
     const user = userEvent.setup();
     mockApi({
       patch: jest.fn().mockResolvedValue(
         response(
           {
             status: 'EMAIL_ALREADY_EXISTS',
-            message: 'Este e-mail já está em uso.',
+            message: 'Este e-mail já está cadastrado.',
           },
           409,
         ),
       ),
     });
 
-    await renderProfile();
-    await user.click(screen.getByRole('button', { name: 'Editar' }));
-    const email = screen.getByLabelText('E-mail');
-    await user.clear(email);
-    await user.type(email, 'usado@example.com');
+    await renderEdit();
+    await user.clear(screen.getByLabelText(/^E-mail/));
+    await user.type(screen.getByLabelText(/^E-mail/), 'outra@example.com');
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(
-      await screen.findByText('Este e-mail já está em uso.'),
+      await screen.findByText('Este e-mail já está cadastrado.'),
     ).toBeInTheDocument();
-    expect(screen.getByDisplayValue('usado@example.com')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^E-mail/)).toHaveValue('outra@example.com');
   });
 
   it('troca a senha, fecha o formulário e mostra sucesso', async () => {
     const user = userEvent.setup();
     const { password } = mockApi();
 
-    await renderProfile();
+    await renderEdit();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual');
     await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
@@ -229,7 +326,7 @@ describe('ProfilePage', () => {
     const user = userEvent.setup();
     const { password } = mockApi();
 
-    await renderProfile();
+    await renderEdit();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual');
     await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
@@ -249,7 +346,7 @@ describe('ProfilePage', () => {
     const user = userEvent.setup();
     const { password } = mockApi();
 
-    await renderProfile();
+    await renderEdit();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual1');
     await user.type(screen.getByLabelText('Nova senha'), 'senha-atual1');
@@ -279,7 +376,7 @@ describe('ProfilePage', () => {
       ),
     });
 
-    await renderProfile();
+    await renderEdit();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
     await user.type(screen.getByLabelText('Senha atual'), 'errada');
     await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
@@ -299,12 +396,8 @@ describe('ProfilePage', () => {
     const password = jest.fn().mockReturnValue(new Promise<Response>(() => {}));
     mockApi({ password });
 
-    await renderProfile();
+    await renderEdit();
     await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
-
-    const idleEscape = new Event('cancel', { cancelable: true });
-    fireEvent(screen.getByRole('dialog'), idleEscape);
-    expect(idleEscape.defaultPrevented).toBe(false);
 
     await user.type(screen.getByLabelText('Senha atual'), 'senha-atual1');
     await user.type(screen.getByLabelText('Nova senha'), 'senha-nova1');
@@ -321,6 +414,22 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('fecha o modal de senha no Esc quando nada está pendente', async () => {
+    const user = userEvent.setup();
+    mockApi();
+
+    await renderEdit();
+    await user.click(screen.getByRole('button', { name: /Redefinir senha/ }));
+    fireEvent(
+      screen.getByRole('dialog'),
+      new Event('cancel', { cancelable: true }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Senha atual')).not.toBeInTheDocument(),
+    );
+  });
+
   it('redireciona para login quando GET /me retorna 401', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(
       response({ status: 'UNAUTHORISED', message: 'Não autenticado.' }, 401),
@@ -329,32 +438,5 @@ describe('ProfilePage', () => {
     render(<ProfilePage />);
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
-  });
-
-  it('desabilita o envio enquanto a atualização está pendente', async () => {
-    const user = userEvent.setup();
-    let resolvePatch!: (value: Response) => void;
-    const patch = jest.fn().mockReturnValue(
-      new Promise<Response>((resolve) => {
-        resolvePatch = resolve;
-      }),
-    );
-    mockApi({ patch });
-
-    await renderProfile();
-    await user.click(screen.getByRole('button', { name: 'Editar' }));
-    await user.clear(screen.getByLabelText('Nome completo'));
-    await user.type(screen.getByLabelText('Nome completo'), 'Maria Souza');
-    await user.click(screen.getByRole('button', { name: 'Salvar' }));
-
-    expect(screen.getByRole('button', { name: 'Salvando...' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Salvando...' })).toBeDisabled();
-
-    resolvePatch(response({ ...ACCOUNT, name: 'Maria Souza' }));
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Maria Souza' }),
-      ).toBeInTheDocument(),
-    );
   });
 });

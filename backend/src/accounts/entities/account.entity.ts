@@ -9,6 +9,8 @@ import {
   Unique,
 } from 'typeorm';
 import { AccountRole } from '../enums/account-role.enum';
+import { Gender } from '../enums/gender.enum';
+import { Sex } from '../enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 
@@ -17,6 +19,7 @@ import { Professional } from '../../professionals/entities/professional.entity';
 @Entity('account')
 @Unique('UQ_account_email', ['email'])
 @Unique('UQ_account_supertokens_user_id', ['supertokensUserId'])
+@Unique('UQ_account_cpf', ['cpf'])
 export class Account {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_account' })
   id!: string;
@@ -30,15 +33,43 @@ export class Account {
   @Column('text', { name: 'supertokens_user_id' })
   supertokensUserId!: string;
 
+  @Column('text', { name: 'social_name', nullable: true })
+  socialName!: string | null;
+
+  // Unico entre contas; nulo so na conta de administrador e nas contas
+  // antigas, criadas antes do campo (RN001).
+  @Column('text', { nullable: true })
+  cpf!: string | null;
+
+  // Data de nascimento e sexo sao obrigatorios no cadastro (RFAUT001); nulos so
+  // na conta de administrador e nas contas criadas antes dos campos.
+  @Column('date', { name: 'birth_date', nullable: true })
+  birthDate!: string | null;
+
+  @Column({ type: 'enum', enum: Sex, enumName: 'sex_e', nullable: true })
+  sex!: Sex | null;
+
   @Column({
-    name: 'last_updated_at',
+    type: 'enum',
+    enum: Gender,
+    enumName: 'gender_e',
+    nullable: true,
+  })
+  gender!: Gender | null;
+
+  // So digitos, com DDD.
+  @Column('text', { nullable: true })
+  phone!: string | null;
+
+  @Column({
+    name: 'updated_at',
     type: 'timestamp',
     precision: 3,
     nullable: true,
   })
   lastUpdatedAt!: Date | null;
 
-  @CreateDateColumn({ type: 'timestamp', precision: 3 })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 3 })
   createdAt!: Date;
 
   @Column({

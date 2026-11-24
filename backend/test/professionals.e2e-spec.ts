@@ -138,25 +138,6 @@ describe('professional profile (e2e)', () => {
     expect(professionalsRepository.insert).toHaveBeenCalledWith(body);
   });
 
-  it('creates another specialism for an account that is already a professional', async () => {
-    signIn('admin');
-    accountRepository.findOne.mockResolvedValue({
-      ...userAccount,
-      professionalProfiles: [{ accountId, specialism: 'doctor' }],
-    });
-    professionalsRepository.insert.mockResolvedValue(professionalId);
-
-    const response = await request(app.getHttpServer())
-      .post('/professionals')
-      .send(body);
-
-    expect(response.status).toBe(201);
-    expect(response.body.specialism).toEqual({
-      id: 'psychologist',
-      name: 'Psicologia',
-    });
-  });
-
   it('answers 401 without a session', async () => {
     const response = await request(app.getHttpServer())
       .post('/professionals')
@@ -230,12 +211,11 @@ describe('professional profile (e2e)', () => {
       },
     ],
     [
-      'the same specialism on the account',
-      { professionalProfiles: [{ accountId, specialism: 'psychologist' }] },
+      'an account that already has a professional profile',
+      { professionalProfiles: [{ accountId, specialism: 'doctor' }] },
       {
         status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-        message:
-          'A conta já possui um perfil profissional com essa especialidade.',
+        message: 'A conta já possui um perfil profissional.',
       },
     ],
   ])('answers 409 for %s', async (_case, account, error) => {
