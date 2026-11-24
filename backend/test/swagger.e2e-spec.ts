@@ -76,6 +76,9 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
   ['/patients', 'post'],
+  ['/patients/{patientId}/support-contacts', 'get'],
+  ['/patients/{patientId}/support-contacts', 'post'],
+  ['/patients/{patientId}/support-contacts/{contactId}', 'patch'],
   ['/professionals', 'post'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
@@ -185,8 +188,12 @@ describe('Swagger (e2e)', () => {
     );
 
     expect(byName.patientId).toMatchObject({
-      required: true,
+      required: false,
       schema: { type: 'string', format: 'uuid' },
+    });
+    expect(byName.q).toMatchObject({
+      required: false,
+      schema: { type: 'string' },
     });
 
     expect(byName.page).toMatchObject({
@@ -209,7 +216,11 @@ describe('Swagger (e2e)', () => {
     '%s %s has a tag and a success response schema',
     async (path, method) => {
       const operation = (await getDocument()).paths[path][method];
-      const created = ['/patients', '/professionals'].includes(path);
+      const created = [
+        '/patients',
+        '/professionals',
+        '/patients/{patientId}/support-contacts',
+      ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
 
       expect(operation.tags?.length).toBeGreaterThan(0);
@@ -259,6 +270,22 @@ describe('Swagger (e2e)', () => {
     ['/patients', 'post', '404'],
     ['/patients', 'post', '409'],
     ['/patients', 'post', '500'],
+    ['/patients/{patientId}/support-contacts', 'get', '400'],
+    ['/patients/{patientId}/support-contacts', 'get', '403'],
+    ['/patients/{patientId}/support-contacts', 'get', '404'],
+    ['/patients/{patientId}/support-contacts', 'get', '500'],
+    ['/patients/{patientId}/support-contacts', 'post', '400'],
+    ['/patients/{patientId}/support-contacts', 'post', '403'],
+    ['/patients/{patientId}/support-contacts', 'post', '404'],
+    ['/patients/{patientId}/support-contacts', 'post', '500'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '400'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '403'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '404'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '500'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '400'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '403'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '404'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '500'],
     ['/professionals', 'post', '400'],
     ['/professionals', 'post', '403'],
     ['/professionals', 'post', '404'],
@@ -287,7 +314,7 @@ describe('Swagger (e2e)', () => {
     });
     expect(byName.limit).toMatchObject({
       required: false,
-      schema: { type: 'integer', default: 10, minimum: 1, maximum: 100 },
+      schema: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
     });
     expect(byName.ids).toMatchObject({
       required: false,
@@ -299,7 +326,8 @@ describe('Swagger (e2e)', () => {
 
   it.each([
     ['/accounts', 20, 50],
-    ['/patients/authorized', 10, 100],
+    ['/patients/authorized', 20, 50],
+    ['/patients/available-for-pts', 20, 50],
   ])(
     'documents the GET %s pagination defaults and limits',
     async (path, defaultLimit, maxLimit) => {
@@ -354,6 +382,16 @@ describe('Swagger (e2e)', () => {
       'name',
       'email',
     ]);
+  });
+
+  it('documents DELETE of a support contact with 204 and the session', async () => {
+    const operation = (await getDocument()).paths[
+      '/patients/{patientId}/support-contacts/{contactId}'
+    ].delete;
+
+    expect(operation.tags?.length).toBeGreaterThan(0);
+    expect(operation.responses).toHaveProperty('204');
+    expect(operation.responses).toHaveProperty('401');
   });
 
   it('lists the three POST /patients conflicts', async () => {

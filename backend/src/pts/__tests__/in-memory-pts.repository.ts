@@ -1,6 +1,7 @@
 import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -21,6 +22,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   patientsWithApprovedActivePts = new Set<string>();
   created: CreatePtsResponseDto[] = [];
   activePts: ActivePtsResponseDto[] = [];
+  ptsById = new Map<string, PtsDetailResponseDto>();
   socialSituationTargets = new Map<string, SocialSituationTarget>();
   /** Ids com deletedAt preenchido (exclusão lógica). */
   deletedIds = new Set<string>();
@@ -66,16 +68,20 @@ export class InMemoryPtsRepository extends PtsRepository {
   ): Promise<FindPtsProposalsResult> {
     const {
       patientId,
+      q,
       isPatient,
       isAdmin,
       professionalProfileIds,
       page,
       limit,
     } = input;
+    const term = q?.toLocaleLowerCase('pt-BR');
 
     const draftProposals = this.visible.filter(
       (proposal) =>
-        proposal.patient.id === patientId &&
+        (!patientId || proposal.patient.id === patientId) &&
+        (!term ||
+          proposal.patient.name.toLocaleLowerCase('pt-BR').includes(term)) &&
         proposal.status === PtsStateEnum.DRAFT,
     );
 
@@ -131,6 +137,10 @@ export class InMemoryPtsRepository extends PtsRepository {
     return this.activePts.find((pts) => pts.patient.id === patientId) ?? null;
   }
 
+  async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
+    return this.ptsById.get(id) ?? null;
+  }
+
   async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
     return (
       (this.visible.find((proposal) => proposal.id === id) as
@@ -156,6 +166,7 @@ export class InMemoryPtsRepository extends PtsRepository {
         id: professionalId,
         name: `Membro ${professionalId}`,
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       }));
     }
 
@@ -254,11 +265,13 @@ export class InMemoryPtsRepository extends PtsRepository {
         id: input.responsibleProfessionalId,
         name: prof ? `Profissional ${prof.id}` : 'Responsável',
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       },
       team: (input.teamProfessionalIds ?? []).map((teamId) => ({
         id: teamId,
         name: `Membro ${teamId}`,
         specialism: { id: 'default', name: 'Geral' },
+        registration: null,
       })),
     };
 

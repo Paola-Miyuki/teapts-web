@@ -48,6 +48,7 @@ import {
 } from '../dto/update-social-situation.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
+import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { PtsService } from '../services/pts.service';
 
 const parseProposalId = new ParseUUIDPipe({
@@ -122,6 +123,23 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.findActivePts(query, account);
+  }
+
+  /** PTS em qualquer estado, pelo id (RFPTS009). Fica depois das rotas fixas. */
+  @Get(':id')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: PtsDetailResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async findById(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.findPtsById(id, account);
   }
 
   @Patch('proposals/:id')

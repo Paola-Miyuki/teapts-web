@@ -15,6 +15,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import { isAdmin } from '../../auth/account-context';
 import { Specialism } from '../enums/specialism.enum';
 import type { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
 import type { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
@@ -23,6 +25,7 @@ import type {
   ProfessionalSummaryResponseDto,
 } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
+import { toProfessionalRegistration } from '../professional-registration';
 import {
   type ProfessionalRow,
   type ProfessionalsPage,
@@ -38,11 +41,11 @@ const SPECIALISM_NAMES: Record<Specialism, string> = {
 /** Código do Postgres para violação de chave única (`unique_violation`). */
 const UNIQUE_VIOLATION = '23505';
 
-/** Erro `409` de conta que já tem perfil com a mesma especialidade (RN002). */
+/** Erro `409` de conta que já tem perfil profissional (RN002). */
 function professionalProfileAlreadyExists(): ConflictException {
   return new ConflictException({
     status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-    message: 'A conta já possui um perfil profissional com essa especialidade.',
+    message: 'A conta já possui um perfil profissional.',
   });
 }
 
@@ -71,12 +74,17 @@ export class ProfessionalsService {
   /**
    * Busca profissionais com filtros combináveis e paginação.
    *
+   * O e-mail só vai para o admin e para o profissional (telas-listagem,
+   * DP011); para as outras contas, sai `null`.
+   *
+   * @param account contexto da conta autenticada
    * @param request parâmetros já validados pelo ValidationPipe global
    * @returns profissionais compatíveis e metadados da paginação
    * @throws InternalServerErrorException quando a consulta ao banco falha,
    *   sem expor o erro original
    */
   async findAll(
+    account: AccountContext,
     request: GetProfessionalsRequestDto,
   ): Promise<GetProfessionalsResponseDto> {
     let page: ProfessionalsPage;
@@ -92,9 +100,14 @@ export class ProfessionalsService {
     }
 
     const { rows, total } = page;
+    const canSeeEmail =
+      isAdmin(account) || account.professionalProfileIds.length > 0;
 
     return {
-      data: rows.map((row) => this.toResponse(row)),
+      data: rows.map((row) => ({
+        ...this.toResponse(row),
+        email: canSeeEmail ? row.account_email : null,
+      })),
       pagination: {
         page: request.page,
         limit: request.limit,
@@ -108,16 +121,16 @@ export class ProfessionalsService {
    * Cadastra um perfil profissional para uma conta de usuário comum.
    *
    * Admin, paciente e profissional usam contas separadas (RN002): a conta
-   * não pode ser de admin nem ter perfil de paciente. Uma conta pode ter
-   * vários perfis profissionais, um por especialidade.
+   * não pode ser de admin nem ter perfil de paciente, e tem no máximo um
+   * perfil profissional.
    *
    * @param request corpo já validado pelo ValidationPipe global
    * @returns perfil criado, com os dados públicos da conta
    * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
    * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta é de
    *   admin, `ACCOUNT_HAS_PATIENT_PROFILE` quando ela tem perfil de paciente e
-   *   `PROFESSIONAL_PROFILE_ALREADY_EXISTS` quando já tem perfil com a mesma
-   *   especialidade, inclusive em pedidos simultâneos
+   *   `PROFESSIONAL_PROFILE_ALREADY_EXISTS` quando já tem perfil
+   *   profissional, inclusive em pedidos simultâneos
    * @throws InternalServerErrorException quando a gravação falha por outro
    *   motivo, sem expor o erro original
    */
@@ -150,11 +163,7 @@ export class ProfessionalsService {
       });
     }
 
-    const hasSameSpecialism = (account.professionalProfiles ?? []).some(
-      (profile) => profile.specialism === request.specialism,
-    );
-
-    if (hasSameSpecialism) {
+    if (account.professionalProfiles?.length) {
       throw professionalProfileAlreadyExists();
     }
 
@@ -202,6 +211,13 @@ export class ProfessionalsService {
         id: row.professional_specialism,
         name: SPECIALISM_NAMES[row.professional_specialism],
       },
+      registration: toProfessionalRegistration(
+        row.professional_specialism,
+        row.professional_council_number,
+        row.professional_council_state,
+      ),
+      institution: row.professional_institution,
+      cnes: row.professional_cnes,
     };
   }
 }

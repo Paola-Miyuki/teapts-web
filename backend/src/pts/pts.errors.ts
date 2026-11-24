@@ -120,6 +120,13 @@ export const activePtsAlreadyExists = () =>
     'O paciente já possui um PTS aprovado e ativo.',
   );
 
+export const ptsForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso a este PTS.',
+  );
+
 export const ptsNotFound = () =>
   new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
 

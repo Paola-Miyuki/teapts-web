@@ -1,3 +1,6 @@
+import { escapeLike } from '../../common/search/escape-like';
+import { toProfessionalRegistration } from '../../professionals/professional-registration';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -151,22 +154,10 @@ export class PtsRepositoryImpl extends PtsRepository {
           id: fullPts.patient.accountId,
           name: fullPts.patient.account?.name ?? '',
         },
-        responsible: {
-          id: fullPts.responsible.id,
-          name: fullPts.responsible.account?.name ?? '',
-          specialism: {
-            id: String(fullPts.responsible.specialism),
-            name: String(fullPts.responsible.specialism),
-          },
-        },
-        team: (fullPts.team ?? []).map((professional) => ({
-          id: professional.id,
-          name: professional.account?.name ?? '',
-          specialism: {
-            id: String(professional.specialism),
-            name: String(professional.specialism),
-          },
-        })),
+        responsible: this.mapProfessional(fullPts.responsible),
+        team: (fullPts.team ?? []).map((professional) =>
+          this.mapProfessional(professional),
+        ),
       };
 
       await queryRunner.commitTransaction();
@@ -188,6 +179,7 @@ export class PtsRepositoryImpl extends PtsRepository {
   ): Promise<FindPtsProposalsResult> {
     const {
       patientId,
+      q,
       isPatient,
       isAdmin,
       professionalProfileIds,
@@ -203,10 +195,23 @@ export class PtsRepositoryImpl extends PtsRepository {
       .leftJoinAndSelect('responsible.account', 'responsibleAccount')
       .leftJoinAndSelect('proposal.team', 'team')
       .leftJoinAndSelect('team.account', 'teamAccount')
-      .where('proposal.patientId = :patientId', { patientId })
-      .andWhere('proposal.status = :status', {
+      .where('proposal.status = :status', {
         status: PtsStateEnum.DRAFT,
       });
+
+    if (patientId) {
+      query.andWhere('proposal.patientId = :patientId', { patientId });
+    }
+
+    if (q) {
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where('patientAccount.name ILIKE :term', {
+            term: `%${escapeLike(q)}%`,
+          }).orWhere('patientAccount.socialName ILIKE :term');
+        }),
+      );
+    }
 
     if (!isPatient && !isAdmin) {
       this.restrictToProfessionals(query, 'proposal', professionalProfileIds);
@@ -319,6 +324,21 @@ export class PtsRepositoryImpl extends PtsRepository {
       .getOne();
 
     return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.id = :id', { id })
+      .getOne();
+
+    return pts ? this.toDetailResponse(pts) : null;
   }
 
   async updateDraftProposal(
@@ -635,6 +655,16 @@ export class PtsRepositoryImpl extends PtsRepository {
     };
   }
 
+  private toDetailResponse(pts: PtsEntity): PtsDetailResponseDto {
+    return {
+      ...this.toActiveResponse(pts),
+      status: pts.status,
+      rejectedAt: pts.rejectedAt?.toISOString() ?? null,
+      concludedAt: pts.concludedAt?.toISOString() ?? null,
+      cancelledAt: pts.cancelledAt?.toISOString() ?? null,
+    };
+  }
+
   private mapProfessional(professional: Professional) {
     const specialismNames: Record<Specialism, string> = {
       [Specialism.Psychologist]: 'Psicologia',
@@ -651,6 +681,11 @@ export class PtsRepositoryImpl extends PtsRepository {
           specialismNames[professional.specialism] ??
           String(professional.specialism),
       },
+      registration: toProfessionalRegistration(
+        professional.specialism,
+        professional.councilNumber,
+        professional.councilState,
+      ),
     };
   }
 }

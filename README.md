@@ -18,7 +18,7 @@ Escolha livre, e dá para alternar: os dois usam o mesmo `.env` e o mesmo banco.
 
 1. [Pré-requisitos](#1-pré-requisitos) e [Setup](#2-setup) (`make env`, `make install`, preencher `DATABASE_PASSWORD`).
 2. Suba a stack: [local](#3-rodar-local) **ou** [Docker](#4-rodar-no-docker).
-3. Crie as contas de teste: [5.2](#52-contas-de-teste).
+3. Crie a conta de teste: [5.2](#52-conta-de-teste).
 4. Teste o login com os curls de [6.4](#64-testar-com-curl).
 
 Este README cobre a stack inteira. Scripts, variáveis e estrutura de cada projeto ficam em [`backend/README.md`](backend/README.md) e [`frontend/README.md`](frontend/README.md).
@@ -91,7 +91,7 @@ cd backend  && pnpm start:dev     # http://localhost:3000
 cd frontend && pnpm dev -p 3001   # http://localhost:3001
 ```
 
-**3.5 Crie as contas de teste** ([5.2](#52-contas-de-teste)) e teste o login ([6.4](#64-testar-com-curl)). A tela de login fica em <http://localhost:3001/login>.
+**3.5 Crie a conta de teste** ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)). A tela de login fica em <http://localhost:3001/login>.
 
 **Mudou `frontend/.env`?** Pare o `pnpm dev` e suba de novo: as `NEXT_PUBLIC_*` entram no bundle no build, e o servidor em execução não relê o arquivo. No Docker, o equivalente é `make rebuild-frontend-no-cache`.
 
@@ -111,7 +111,7 @@ make up-d      # builda (na 1ª vez), sobe postgres → supertokens → backend 
 make ps        # todos "running"/"healthy"
 ```
 
-Frontend em <http://localhost:3001> (login em `/login`), backend em <http://localhost:3000>. Em seguida, crie as contas de teste com `make seed` ([5.2](#52-contas-de-teste)) e teste o login ([6.4](#64-testar-com-curl)).
+Frontend em <http://localhost:3001> (login em `/login`), backend em <http://localhost:3000>. Em seguida, crie a conta de teste com `make seed` ([5.2](#52-conta-de-teste)) e teste o login ([6.4](#64-testar-com-curl)).
 
 Todo alvo que sobe o backend (`up`, `up-d`, `rebuild`, `rebuild-no-cache`, `rebuild-backend`) espera o container ficar em execução e então roda `make migrate`. Se a migration falhar, o comando termina com erro **e os containers continuam no ar** — investigue com `make logs-backend` e rode `make migrate` de novo. `make up` sobe em segundo plano e segue os logs, então `Ctrl+C` só fecha os logs: para parar de verdade, use `make down`.
 
@@ -180,6 +180,10 @@ Editar a entidade não altera o banco. Sem o passo 3, a coluna não existe e a p
 
 `migrate-show` marca com `[X]` as aplicadas e com `[ ]` as pendentes. A migration inicial pressupõe banco vazio. Nunca edite migration já aplicada: crie outra.
 
+**Nomes no banco:** colunas em snake_case, enums com sufixo `_e` e restrições com os prefixos `PK_`, `FK_`, `UQ_`, `IDX_` e `CHK_`. Nas entidades, a propriedade continua em camelCase e aponta para a coluna com `name:` (ex.: `accountId` → `account_id`). A migration `StandardizeColumnNames` renomeou as colunas antigas em camelCase; branch aberta antes dela precisa usar os nomes novos.
+
+A migration `AlignPatientAndProfessionalConstraints` troca a restrição para um perfil profissional por conta (`UQ_professional_account`) e falha se alguma conta tiver mais de um perfil profissional: apague os perfis a mais antes de aplicar.
+
 Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `migrations` e só roda as pendentes. Por isso `make up`, `make up-d` e os `make rebuild*` já migram sozinhos, e você raramente digita `make migrate`.
 
 > ⚠️ **No Docker, os alvos de migration leem o código compilado** (`dist/database/data-source.js`), porque a imagem final não tem ts-node. Migration que você acabou de escrever só existe no host: rode `make rebuild-backend`, que recompila **e** aplica. `make migrate` sozinho não vê o arquivo novo.
@@ -187,38 +191,36 @@ Aplicar de novo é seguro: o TypeORM grava cada migration aplicada na tabela `mi
 
 ### 5.2 Contas de teste
 
-Execute o seed para criar ou reutilizar as contas de teste:
+Execute o seed para criar ou reutilizar as contas e os PTS de teste:
 
 ```bash
 make seed                                  # Docker
 pnpm --dir backend run seed:test-user      # local
 ```
 
-O seed precisa do PostgreSQL e do SuperTokens em execução.
+O seed precisa do PostgreSQL e do SuperTokens em execução, com as migrations aplicadas.
 
-**Administrador**
+| Conta | E-mail / senha | Perfil e dados |
+| --- | --- | --- |
+| Administrador | `teste@teapts.local` / `teapts123` | papel `admin`; sem CPF nem dados pessoais (RN001) |
+| Profissional | `profissional@teapts.local` / `profissional123` | psicólogo, registro `CRP-PR 12345`, IMA, CNES `2771112`; CPF `123.456.789-09`, 12/06/1988, feminino |
+| Fisioterapeuta | `fisioterapeuta@teapts.local` / `profissional123` | Beatriz Lopes, registro `Crefito-PR 54321`, CER Curitiba; CPF `222.333.444-05`, 03/09/1985, feminino |
+| Paciente | `paciente@teapts.local` / `paciente123` | CNS `700 0012 3456 7894`; CPF `987.654.321-00`, 18/04/2000, masculino |
+| Paciente | `luna@teapts.local` / `paciente123` | Luna Ferreira, CNS `700 0022 2333 4444`; CPF `111.444.777-35`, 15/03/2007, feminino |
+| Paciente | `diego@teapts.local` / `paciente123` | Diego Alves, menor de idade, responsável tutelar Paula Alves, CNS `700 0055 5666 7777`; CPF `321.654.987-91`, 22/08/2015, masculino |
 
-- E-mail: `teste@teapts.local`
-- Senha: `teapts123`
-- Papel: `admin`
+PTS de teste (um de cada status):
 
-**Profissional**
+| Paciente | Status | Responsável | Equipe |
+| --- | --- | --- | --- |
+| Paciente de Teste | `draft` (proposta aguardando o paciente) | Profissional de Teste | Beatriz Lopes |
+| Luna Ferreira | `concluded` | Profissional de Teste | — |
+| Luna Ferreira | `rejected` | Beatriz Lopes | — |
+| Luna Ferreira | `running` | Profissional de Teste | Beatriz Lopes |
+| Diego Alves | `cancelled` | Profissional de Teste | — |
+| Diego Alves | `planning` | Beatriz Lopes | Profissional de Teste |
 
-- E-mail: `profissional@teapts.local`
-- Senha: `profissional123`
-- Papel: `user`
-- Perfil: psicólogo
-
-**Paciente**
-
-- E-mail: `paciente@teapts.local`
-- Senha: `paciente123`
-- Papel: `user`
-- Perfil: paciente
-
-O seed cria ou reutiliza as contas e garante que existam o perfil de psicólogo da conta profissional e o perfil de paciente da conta paciente. Ele não redefine a senha de usuários já existentes no SuperTokens.
-
-Para testar fluxos com mais de um profissional (equipe, responsável e outro profissional), cadastre outras contas em `/auth/signup` e crie os perfis com o admin (`POST /professionals` e `POST /patients`).
+O seed cria ou reutiliza as contas (e grava de novo os dados pessoais e os perfis delas). Os PTS só são criados para o paciente que ainda não tem nenhum PTS, então rodar o seed de novo não duplica nada. Ele não redefine a senha de usuários já existentes no SuperTokens. Para conferir: `make db-pts`.
 
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
 
@@ -226,8 +228,12 @@ Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as 
 ### 5.3 Testar se o banco está de pé
 
 ```bash
-make db-tables                              # tabelas do public: account, patient, professional, migrations
-make db-account                             # mostra as contas
+make db-tables                              # tabelas do public: account, patient, support_contact, professional, PTS, migrations
+make db-account                             # todas as colunas de account
+make db-patients                            # todas as colunas de patient, com o nome da conta
+make db-support-contacts                    # todas as colunas de support_contact, com o nome do paciente
+make db-professionals                       # todas as colunas de professional, com o nome da conta
+make db-pts                                 # todas as colunas dos PTS, com paciente, responsável e equipe
 make db-query SQL="\dt supertokens.*"       # tabelas do SuperTokens
 make psql                                   # sessão psql interativa
 ```
@@ -261,7 +267,7 @@ make up-d      # já aplica as migrations
 make seed
 ```
 
-Como o SuperTokens usa o mesmo volume, o `make clean` também apaga os usuários e as sessões dele. Depois do reset, só existem as contas criadas pelo `make seed`.
+Como o SuperTokens usa o mesmo volume, o `make clean` também apaga os usuários e as sessões dele. Depois do reset, só existe a conta criada pelo `make seed`.
 
 Trocar `DATABASE_PASSWORD` **não** muda a senha de um banco já criado no volume: altere no PostgreSQL ou recrie o volume (com backup antes).
 
@@ -277,12 +283,13 @@ A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita
 | --- | --- | --- |
 | SuperTokens Core | container `supertokens`, porta 3567 | e-mail, senha (hash) e sessões, no schema `supertokens` do Postgres |
 | Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
-| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role` e o vínculo `supertokens_user_id` |
+| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) e o vínculo `supertokens_user_id` |
 
-A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` (no máximo um) e `professional` (vários, um por especialidade). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
+A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` e `professional`, no máximo um de cada (RN002). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
 
 ```text
-POST /auth/signup (email, password, name)
+POST /auth/signup (email, password, name, birthDate, sex, cpf; socialName, gender, phone opcionais)
+  -> backend valida os campos (CPF com dígito verificador e sem outra conta)
   -> SuperTokens cria a identidade
   -> backend cria a linha em account (role = user)
      (se o banco falhar, a identidade é apagada do SuperTokens)
@@ -321,12 +328,12 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 
 | Método | Rota | Corpo / headers | Resposta |
 | --- | --- | --- | --- |
-| POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name` | `200 {"status":"OK","user":{...}}` e sessão |
+| POST | `/auth/signup` | `rid: emailpassword`; `formFields`: `email`, `password`, `name`, `birthDate`, `sex`, `cpf` e, opcionais, `socialName`, `gender`, `phone` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/signin` | `rid: emailpassword`; `formFields`: `email`, `password` | `200 {"status":"OK","user":{...}}` e sessão |
 | POST | `/auth/session/refresh` | refresh token | novos tokens |
 | POST | `/auth/logout` | access token; corpo opcional `{"allSessions": true}` | `200 {"status":"OK"}` |
 | GET | `/me` | access token | dados da conta |
-| PATCH | `/me` | access token; `{ name?, email? }` | dados da conta atualizados |
+| PATCH | `/me` | access token; `{ name?, email?, socialName?, birthDate?, sex?, gender?, phone? }` | dados da conta atualizados |
 | POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |
@@ -348,7 +355,7 @@ As rotas do SDK (`/auth/signup`, `/auth/signin` e `/auth/session/refresh`) são 
 
 ### 6.4 Testar com curl
 
-Com a stack no ar e as contas de teste criadas ([5.2](#52-contas-de-teste)):
+Com a stack no ar e a conta de teste criada ([5.2](#52-conta-de-teste)):
 
 ```bash
 API=http://localhost:3000
@@ -386,6 +393,14 @@ O `GET /me` deve responder:
   "name": "Usuario de Teste",
   "email": "teste@teapts.local",
   "role": "admin",
+  "socialName": null,
+  "birthDate": null,
+  "sex": null,
+  "gender": null,
+  "cpf": null,
+  "phone": null,
+  "createdAt": "<data do cadastro>",
+  "updatedAt": null,
   "patientProfileId": null,
   "professionalProfileIds": []
 }
@@ -396,7 +411,7 @@ O `GET /me` deve responder:
 ```bash
 curl -s -X POST "$API/auth/signup" \
   -H 'rid: emailpassword' -H 'st-auth-mode: header' -H 'Content-Type: application/json' \
-  -d '{"formFields":[{"id":"email","value":"maria@teapts.local"},{"id":"password","value":"Senha123"},{"id":"name","value":"Maria"}]}'
+  -d '{"formFields":[{"id":"email","value":"maria@teapts.local"},{"id":"password","value":"Senha123"},{"id":"name","value":"Maria"},{"id":"birthDate","value":"1990-05-20"},{"id":"sex","value":"female"},{"id":"cpf","value":"52998224725"}]}'
 ```
 
 **Mesmo fluxo com cookies** (como o navegador faz):
@@ -417,7 +432,7 @@ Respostas que indicam problema:
 | --- | --- |
 | login (`/auth/signin`) `200 {"status":"WRONG_CREDENTIALS_ERROR"}` | e-mail ou senha errados, ou o usuário não existe (rode `make seed` ou cadastre) |
 | login/signup `500` | conta órfã (usuário no SuperTokens sem linha em `account`) ou Core inacessível — veja `make logs-backend` |
-| signup `200 {"status":"FIELD_ERROR",...}` | `name` vazio ou senha fraca; a mensagem diz qual campo |
+| signup `200 {"status":"FIELD_ERROR",...}` | campo obrigatório faltando (`Field is not optional`), CPF inválido ou já cadastrado, data de nascimento, sexo, gênero ou telefone inválidos, ou senha fraca; a mensagem diz qual campo |
 | signup `200 {"status":"EMAIL_ALREADY_EXISTS_ERROR"}` | e-mail já cadastrado |
 | `/me` `401 {"message":"unauthorised"}` | nenhum token chegou: o login não deu `OK` ou faltou `Authorization`/cookie |
 | `/me` `401 {"message":"try refresh token"}` | access token expirado: chame `/auth/session/refresh` |
@@ -510,9 +525,13 @@ Os testes unitários e e2e **não precisam de banco**: a conexão é substituíd
 | `make migrate-show` | Lista as migrations, `[X]` = aplicada |
 | `make migrate-revert` | Desfaz a última |
 | `make migrate-generate NAME=AddFoo` | Gera migration a partir das entidades, **no host** (precisa de `make up-d-db`) |
-| `make seed` | Cria as contas de teste (admin, profissional e paciente) no SuperTokens e em `account`, com os perfis ([5.2](#52-contas-de-teste)) |
+| `make seed` | Cria a conta de teste no SuperTokens e em `account` |
 | `make db-tables` | Lista as tabelas |
-| `make db-account` | Mostra as contas |
+| `make db-account` | Mostra todas as colunas de `account` |
+| `make db-patients` | Mostra todas as colunas de `patient`, com o nome da conta |
+| `make db-support-contacts` | Mostra todas as colunas de `support_contact`, com o nome do paciente |
+| `make db-professionals` | Mostra todas as colunas de `professional`, com o nome da conta |
+| `make db-pts` | Mostra todas as colunas dos PTS, com paciente, responsável e equipe |
 | `make db-query SQL="..."` | Roda um SQL qualquer |
 
 **Testes e qualidade** (rodam no host, sem container)

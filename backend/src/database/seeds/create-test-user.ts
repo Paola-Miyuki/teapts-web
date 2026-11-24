@@ -4,35 +4,240 @@ import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { Gender } from '../../accounts/enums/gender.enum';
+import { Sex } from '../../accounts/enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
+import type { Uf } from '../../professionals/enums/uf.enum';
+import { PtsEntity } from '../../pts/entities/pts.entity';
+import { PtsStateEnum } from '../enums/pts-state.enum';
 
 const TENANT_ID = 'public';
 
-const TEST_USERS = [
+// Dados pessoais do cadastro (RFAUT001): a conta de admin não tem CPF nem os
+// dados obrigatórios da conta de usuário (RN001). CPF, CNS e telefone só com
+// dígitos, válidos pelos dígitos verificadores.
+const NO_PERSONAL_DATA = {
+  socialName: null,
+  birthDate: null,
+  sex: null,
+  gender: null,
+  cpf: null,
+  phone: null,
+};
+
+type ProfessionalSeed = {
+  specialism: Specialism;
+  councilNumber: string;
+  councilState: Uf;
+  institution: string | null;
+  cnes: string | null;
+};
+
+type PatientSeed = {
+  cns: string;
+  guardianName: string | null;
+};
+
+type TestUser = {
+  key: string;
+  email: string;
+  password: string;
+  name: string;
+  role: AccountRole;
+  personal: Pick<
+    Account,
+    'socialName' | 'birthDate' | 'sex' | 'gender' | 'cpf' | 'phone'
+  >;
+  professional?: ProfessionalSeed;
+  patient?: PatientSeed;
+};
+
+const TEST_USERS: TestUser[] = [
   {
+    key: 'admin',
     email: 'teste@teapts.local',
     password: 'teapts123',
     name: 'Usuario de Teste',
     role: AccountRole.Admin,
-    profile: 'none',
+    personal: NO_PERSONAL_DATA,
   },
   {
+    key: 'professional',
     email: 'profissional@teapts.local',
     password: 'profissional123',
     name: 'Profissional de Teste',
     role: AccountRole.User,
-    profile: 'professional',
+    personal: {
+      socialName: null,
+      birthDate: '1988-06-12',
+      sex: Sex.Female,
+      gender: Gender.CisWoman,
+      cpf: '12345678909',
+      phone: '41991002030',
+    },
+    // Registro no conselho (CRP, da especialidade), instituição e CNES.
+    professional: {
+      specialism: Specialism.Psychologist,
+      councilNumber: '12345',
+      councilState: 'PR',
+      institution: 'IMA',
+      cnes: '2771112',
+    },
   },
   {
+    key: 'physiotherapist',
+    email: 'fisioterapeuta@teapts.local',
+    password: 'profissional123',
+    name: 'Beatriz Lopes',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '1985-09-03',
+      sex: Sex.Female,
+      gender: null,
+      cpf: '22233344405',
+      phone: '41997001122',
+    },
+    professional: {
+      specialism: Specialism.Physiotherapist,
+      councilNumber: '54321',
+      councilState: 'PR',
+      institution: 'CER Curitiba',
+      cnes: null,
+    },
+  },
+  {
+    key: 'patient',
     email: 'paciente@teapts.local',
     password: 'paciente123',
     name: 'Paciente de Teste',
     role: AccountRole.User,
-    profile: 'patient',
+    personal: {
+      socialName: null,
+      birthDate: '2000-04-18',
+      sex: Sex.Male,
+      gender: null,
+      cpf: '98765432100',
+      phone: '41998123344',
+    },
+    patient: { cns: '700001234567894', guardianName: null },
   },
-] as const;
+  {
+    key: 'luna',
+    email: 'luna@teapts.local',
+    password: 'paciente123',
+    name: 'Luna Ferreira',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '2007-03-15',
+      sex: Sex.Female,
+      gender: Gender.CisWoman,
+      cpf: '11144477735',
+      phone: '41996554433',
+    },
+    patient: { cns: '700002223334444', guardianName: null },
+  },
+  {
+    key: 'diego',
+    email: 'diego@teapts.local',
+    password: 'paciente123',
+    name: 'Diego Alves',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '2015-08-22',
+      sex: Sex.Male,
+      gender: null,
+      cpf: '32165498791',
+      phone: null,
+    },
+    // Menor de 18 anos: tem responsável tutelar.
+    patient: { cns: '700005556667777', guardianName: 'Paula Alves' },
+  },
+];
+
+type PtsSeed = {
+  patient: string;
+  responsible: string;
+  team: string[];
+  status: PtsStateEnum;
+  socialSituation: string;
+  createdAt: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  beganAt?: string;
+  concludedAt?: string;
+  cancelledAt?: string;
+};
+
+// Um PTS de cada status, para as telas e as regras de acesso (RN016): o
+// paciente de teste tem uma proposta aguardando a decisão; Luna tem um PTS
+// concluído, uma proposta rejeitada e o PTS em andamento; Diego tem um PTS
+// cancelado e o PTS em planejamento, com a fisioterapeuta como responsável.
+const TEST_PTS: PtsSeed[] = [
+  {
+    patient: 'patient',
+    responsible: 'professional',
+    team: ['physiotherapist'],
+    status: PtsStateEnum.DRAFT,
+    socialSituation:
+      'Mora com os pais; trabalha meio período e faz curso técnico à noite.',
+    createdAt: '2026-10-28T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    responsible: 'professional',
+    team: [],
+    status: PtsStateEnum.CONCLUDED,
+    socialSituation: 'Mora com a mãe; cursava o ensino médio.',
+    createdAt: '2025-09-10T13:00:00.000Z',
+    acceptedAt: '2025-09-15T13:00:00.000Z',
+    beganAt: '2025-10-01T13:00:00.000Z',
+    concludedAt: '2026-05-30T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    responsible: 'physiotherapist',
+    team: [],
+    status: PtsStateEnum.REJECTED,
+    socialSituation: 'Mora com a mãe; concluindo o ensino médio.',
+    createdAt: '2026-06-10T13:00:00.000Z',
+    rejectedAt: '2026-06-15T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    responsible: 'professional',
+    team: ['physiotherapist'],
+    status: PtsStateEnum.RUNNING,
+    socialSituation:
+      'Mora com a mãe; concluindo o ensino médio e quer fazer curso técnico.',
+    createdAt: '2026-07-01T13:00:00.000Z',
+    acceptedAt: '2026-07-05T13:00:00.000Z',
+    beganAt: '2026-08-01T13:00:00.000Z',
+  },
+  {
+    patient: 'diego',
+    responsible: 'professional',
+    team: [],
+    status: PtsStateEnum.CANCELLED,
+    socialSituation: 'Mora com a mãe e a avó; a mãe trabalha à tarde.',
+    createdAt: '2026-03-02T13:00:00.000Z',
+    acceptedAt: '2026-03-06T13:00:00.000Z',
+    cancelledAt: '2026-05-12T13:00:00.000Z',
+  },
+  {
+    patient: 'diego',
+    responsible: 'physiotherapist',
+    team: ['professional'],
+    status: PtsStateEnum.PLANNING,
+    socialSituation: 'Mora com a mãe e a avó; a avó busca na escola às terças.',
+    createdAt: '2026-10-10T13:00:00.000Z',
+    acceptedAt: '2026-10-20T13:00:00.000Z',
+  },
+];
 
 function initSupertokens(): void {
   const config = new ConfigService();
@@ -78,9 +283,7 @@ async function findOrCreateSupertokensUserId(
   return existing.id;
 }
 
-async function createOrReuseAccount(
-  user: (typeof TEST_USERS)[number],
-): Promise<Account> {
+async function createOrReuseAccount(user: TestUser): Promise<Account> {
   const accounts = dataSource.getRepository(Account);
   const supertokensUserId = await findOrCreateSupertokensUserId(
     user.email,
@@ -100,6 +303,7 @@ async function createOrReuseAccount(
 
     account.name = user.name;
     account.role = user.role;
+    Object.assign(account, user.personal);
 
     account = await accounts.save(account);
     console.log(`Conta reutilizada: ${account.email} (${account.role})`);
@@ -112,6 +316,7 @@ async function createOrReuseAccount(
       email: user.email,
       supertokensUserId,
       role: user.role,
+      ...user.personal,
       lastUpdatedAt: null,
     }),
   );
@@ -120,46 +325,79 @@ async function createOrReuseAccount(
   return account;
 }
 
-async function ensureProfessionalProfile(account: Account): Promise<void> {
+async function ensureProfessionalProfile(
+  account: Account,
+  data: ProfessionalSeed,
+): Promise<Professional> {
   const professionals = dataSource.getRepository(Professional);
+  const existing = await professionals.findOneBy({ accountId: account.id });
 
-  const existingProfile = await professionals.findOneBy({
-    accountId: account.id,
-    specialism: Specialism.Psychologist,
-  });
-
-  if (existingProfile) {
-    console.log('Perfil profissional de teste ja existe.');
-    return;
+  if (existing) {
+    console.log(`Perfil profissional reutilizado: ${account.email}`);
+    return professionals.save(Object.assign(existing, data));
   }
 
   const profile = await professionals.save(
-    professionals.create({
-      accountId: account.id,
-      specialism: Specialism.Psychologist,
-    }),
+    professionals.create({ accountId: account.id, ...data }),
   );
 
-  console.log(`Perfil profissional criado: ${profile.id}`);
+  console.log(`Perfil profissional criado: ${account.email}`);
+  return profile;
 }
 
-async function ensurePatientProfile(account: Account): Promise<void> {
+async function ensurePatientProfile(
+  account: Account,
+  data: PatientSeed,
+): Promise<void> {
   const patients = dataSource.getRepository(Patient);
 
-  const existingProfile = await patients.findOneBy({
-    accountId: account.id,
-  });
-
-  if (existingProfile) {
-    console.log('Perfil de paciente de teste ja existe.');
+  if (await patients.existsBy({ accountId: account.id })) {
+    await patients.update({ accountId: account.id }, data);
+    console.log(`Perfil de paciente reutilizado: ${account.email}`);
     return;
   }
 
-  await dataSource.query('INSERT INTO "patient" ("accountId") VALUES ($1)', [
-    account.id,
-  ]);
+  await patients.insert({ accountId: account.id, ...data });
+  console.log(`Perfil de paciente criado: ${account.email}`);
+}
 
-  console.log(`Perfil de paciente criado: ${account.id}`);
+// Cria os PTS de teste do paciente que ainda não tem nenhum PTS; com algum
+// PTS, o paciente fica como está, e o seed pode rodar de novo.
+async function ensureTestPts(
+  patientIds: Map<string, string>,
+  professionals: Map<string, Professional>,
+): Promise<void> {
+  const ptsRepository = dataSource.getRepository(PtsEntity);
+  const date = (value?: string) => (value ? new Date(value) : null);
+
+  for (const patientKey of new Set(TEST_PTS.map((pts) => pts.patient))) {
+    const patientId = patientIds.get(patientKey)!;
+
+    if (await ptsRepository.existsBy({ patientId })) {
+      console.log(`PTS de teste ja existem: ${patientKey}`);
+      continue;
+    }
+
+    for (const pts of TEST_PTS.filter((item) => item.patient === patientKey)) {
+      await ptsRepository.save(
+        ptsRepository.create({
+          patientId,
+          responsibleProfessionalId: professionals.get(pts.responsible)!.id,
+          team: pts.team.map((key) => professionals.get(key)!),
+          status: pts.status,
+          socialSituation: pts.socialSituation,
+          createdAt: new Date(pts.createdAt),
+          acceptedAt: date(pts.acceptedAt),
+          rejectedAt: date(pts.rejectedAt),
+          beganAt: date(pts.beganAt),
+          concludedAt: date(pts.concludedAt),
+          cancelledAt: date(pts.cancelledAt),
+        }),
+      );
+    }
+
+    console.log(`PTS de teste criados: ${patientKey}`);
+  }
 }
 
 async function createTestUsers(): Promise<void> {
@@ -167,20 +405,28 @@ async function createTestUsers(): Promise<void> {
   await dataSource.initialize();
 
   try {
+    const patientIds = new Map<string, string>();
+    const professionals = new Map<string, Professional>();
+
     for (const user of TEST_USERS) {
       const account = await createOrReuseAccount(user);
 
-      if (user.profile === 'professional') {
-        await ensureProfessionalProfile(account);
+      if (user.professional) {
+        professionals.set(
+          user.key,
+          await ensureProfessionalProfile(account, user.professional),
+        );
       }
 
-      if (user.profile === 'patient') {
-        await ensurePatientProfile(account);
+      if (user.patient) {
+        await ensurePatientProfile(account, user.patient);
+        patientIds.set(user.key, account.id);
       }
 
-      console.log(`Login de teste: ${user.email}`);
-      console.log(`Senha de teste: ${user.password}`);
+      console.log(`Login de teste: ${user.email} / ${user.password}`);
     }
+
+    await ensureTestPts(patientIds, professionals);
   } finally {
     await dataSource.destroy();
   }

@@ -7,14 +7,15 @@ import { useAccount } from '@/hooks/useAccount';
 import { getNavigation, getProfileKind, ROLE_LABELS } from '@/lib/account';
 import type { Account, ProfileKind } from '@/lib/account';
 import { can, type PermissionAction } from '@/lib/permissions';
-import AppShell from './AppShell';
+import AppShell, { type Crumb } from './AppShell';
 import styles from './AppShell.module.css';
 import ui from './ui.module.css';
 
 type AuthenticatedPageProps = {
   currentHref: string;
   requiredAction?: PermissionAction;
-  breadcrumb?: string | ((kind: ProfileKind) => string | undefined);
+  breadcrumb?:
+    string | Crumb[] | ((kind: ProfileKind) => string | Crumb[] | undefined);
   children:
     | ReactNode
     | ((

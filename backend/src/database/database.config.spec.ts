@@ -9,7 +9,14 @@ import { CreatePatientAndProfessional1791148860000 } from './migrations/17911488
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
-import { AddDeletedAtToPts1791148900000 } from './migrations/1791148900000-AddDeletedAtToPts';
+import { AddPatientListFields1791148910000 } from './migrations/1791148910000-AddPatientListFields';
+import { StandardizeColumnNames1791148920000 } from './migrations/1791148920000-StandardizeColumnNames';
+import { CreateSupportContact1791148930000 } from './migrations/1791148930000-CreateSupportContact';
+import { AlignPatientAndProfessionalConstraints1791148940000 } from './migrations/1791148940000-AlignPatientAndProfessionalConstraints';
+import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
+import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
+import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
+import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
   'DATABASE_HOST',
@@ -70,14 +77,20 @@ describe('getDatabaseOptions', () => {
 
   it('registers the entities and migrations explicitly', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
-      entities: [Account, Patient, Professional, Pts],
+      entities: [Account, Patient, SupportContact, Professional, Pts],
       migrations: [
         CreateAccount1791072000000,
         LinkAccountToSupertokens1791148800000,
         CreatePatientAndProfessional1791148860000,
         CreatePtsTables1791148870000,
         AddProfessionalAccountSpecialismUnique1791148880000,
-        AddDeletedAtToPts1791148900000,
+        AddPatientListFields1791148910000,
+        StandardizeColumnNames1791148920000,
+        CreateSupportContact1791148930000,
+        AlignPatientAndProfessionalConstraints1791148940000,
+        AddAccountPersonalFields1791148950000,
+        AddProfessionalCouncilFields1791148960000,
+        AddDeletedAtToPts1791148970000,
       ],
     });
   });

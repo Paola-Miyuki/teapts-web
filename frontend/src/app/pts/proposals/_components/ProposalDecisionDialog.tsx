@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-
-import Icon from '@/components/Icon';
+import Modal from '@/components/Modal';
 import ui from '@/components/ui.module.css';
 
 import type { ProposalDecision } from '../api';
-import styles from '../proposals.module.css';
 
 type ProposalDecisionDialogProps = {
   decision: ProposalDecision | null;
+  // Nome do paciente quando o admin decide em nome dele (RN029).
+  onBehalfOf?: string;
   submitting: boolean;
   error: string;
   onConfirm: () => void;
@@ -18,114 +17,73 @@ type ProposalDecisionDialogProps = {
 
 const COPY: Record<
   ProposalDecision,
-  { title: string; message: string; confirm: string }
+  { title: string; message: string; confirm: string; className: string }
 > = {
   approve: {
-    title: 'Aceitar proposta?',
+    title: 'Aprovar a proposta?',
     message:
-      'As outras propostas pendentes serão rejeitadas e o PTS entra em planejamento.',
-    confirm: 'Escolher esta equipe',
+      'O PTS passa para Em planejamento e a equipe começa a organizar as atividades.',
+    confirm: 'Aprovar proposta',
+    className: 'btn btn-primary',
   },
   reject: {
-    title: 'Rejeitar proposta?',
-    message:
-      'A proposta sai da sua lista. As outras continuam aguardando sua decisão.',
-    confirm: 'Rejeitar',
+    title: 'Rejeitar a proposta?',
+    message: 'A proposta fica como Rejeitada. A equipe pode montar outra.',
+    confirm: 'Rejeitar proposta',
+    className: 'btn btn-danger-soft',
   },
 };
 
-// <dialog> nativo, como o AddPatientModal: showModal() prende o foco e o Esc
-// fecha. Durante o envio, o Esc e o clique no fundo não fecham.
+// Confirmação de `propostas-pts.html` (decide-approve e decide-reject).
 export default function ProposalDecisionDialog({
   decision,
+  onBehalfOf,
   submitting,
   error,
   onConfirm,
   onClose,
 }: ProposalDecisionDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const open = decision !== null;
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-
-    if (!dialog) {
-      return;
-    }
-
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
-  function handleClose() {
-    if (!submitting) {
-      onClose();
-    }
-  }
-
-  const copy = decision ? COPY[decision] : null;
+  const copy = decision ? COPY[decision] : COPY.approve;
+  const title =
+    onBehalfOf && decision
+      ? `${decision === 'approve' ? 'Aprovar' : 'Rejeitar'} a proposta em nome de ${onBehalfOf}?`
+      : copy.title;
 
   return (
-    <dialog
-      ref={dialogRef}
-      className={ui.dialog}
-      aria-labelledby="proposal-decision-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        handleClose();
-      }}
-      onClose={handleClose}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) {
-          handleClose();
-        }
-      }}
-    >
-      {copy && (
+    <Modal
+      open={decision !== null}
+      id="proposal-decision"
+      size="sm"
+      title={title}
+      description={copy.message}
+      busy={submitting}
+      onClose={onClose}
+      footer={
         <>
           <button
             type="button"
-            className={`${ui.iconButton} ${ui.dialogClose}`}
-            aria-label="Fechar janela"
-            onClick={handleClose}
+            className="btn"
+            onClick={onClose}
             disabled={submitting}
           >
-            <Icon name="close" className={ui.icon} />
+            Cancelar
           </button>
-
-          <h2 id="proposal-decision-title">{copy.title}</h2>
-
-          <p>{copy.message}</p>
-
-          {error && (
-            <div className={`${ui.alert} ${ui.alertError}`} role="alert">
-              <p>{error}</p>
-            </div>
-          )}
-
-          <div className={styles.decisionActions}>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnSecondary}`}
-              onClick={handleClose}
-              disabled={submitting}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnPrimary}`}
-              onClick={onConfirm}
-              disabled={submitting}
-            >
-              {submitting ? 'Enviando...' : copy.confirm}
-            </button>
-          </div>
+          <button
+            type="button"
+            className={copy.className}
+            onClick={onConfirm}
+            disabled={submitting}
+          >
+            {submitting ? 'Enviando...' : copy.confirm}
+          </button>
         </>
+      }
+    >
+      {error && (
+        <div className={`${ui.alert} ${ui.alertError}`} role="alert">
+          <p>{error}</p>
+        </div>
       )}
-    </dialog>
+    </Modal>
   );
 }

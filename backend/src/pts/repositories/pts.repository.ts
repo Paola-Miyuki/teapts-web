@@ -1,3 +1,4 @@
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
@@ -19,7 +20,10 @@ export interface CreateDraftInput {
 
 export interface FindPtsProposalsInput {
   accountId: string;
-  patientId: string;
+  /** null: propostas de todos os pacientes que a conta pode ver. */
+  patientId: string | null;
+  /** Parte do nome ou do nome social do paciente. */
+  q: string | null;
   isPatient: boolean;
   isAdmin: boolean;
   professionalProfileIds: string[];
@@ -76,6 +80,8 @@ export abstract class PtsRepository {
   ): Promise<ActivePtsResponseDto | null>;
 
   abstract findProposalById(id: string): Promise<PtsProposalResponseDto | null>;
+
+  abstract findPtsById(id: string): Promise<PtsDetailResponseDto | null>;
 
   abstract updateDraftProposal(
     input: UpdatePtsProposalInput,

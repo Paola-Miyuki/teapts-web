@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adicionar profissional · TEA-PTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/teapts-src.css">
+<link rel="stylesheet" href="assets/teapts-mockups.css">
+<link rel="stylesheet" href="assets/teapts-ui.css">
+</head>
+<body class="min-h-full flex flex-col" data-nav="profissionais.html" data-roles="admin" data-dps="">
+<div class="shell-app">
+<aside id="sidebar" class="shell-sidebar"></aside>
+<div class="shell-workspace">
+<header class="shell-appHeader" id="app-header"></header>
+<main class="shell-content">
+<nav class="shell-breadcrumb" aria-label="Caminho da página"><a href="inicio.html" data-when="role:admin,professional">Início</a><a href="inicio-paciente.html" data-when="role:patient">Início</a><a href="aguardando-perfil.html" data-when="role:none">Início</a><span class="crumb"><span aria-hidden="true">/</span><a href="profissionais.html">Profissionais</a></span><span class="crumb"><span aria-hidden="true">/</span><span>Adicionar profissional</span></span></nav>
+<div class="mockbar" data-mockbar></div>
+<section>
+<div class="heading"><div><h1>Adicionar profissional</h1></div></div>
+<form class="ux-formcard" novalidate data-saved="Profissional cadastrado (simulação).">
+  <div class="ux-formcard-head"><div><h2>Novo perfil profissional</h2></div></div>
+  <section class="ux-fsection"><header><h3>Conta</h3></header><div><div class="field"><label class="field-label" for="pro-account">Conta<span class="ux-req" aria-hidden="true"> *</span></label><div class="pat-combobox" data-combo><div class="pat-search"><input id="pro-account" type="text" role="combobox" class="input pat-comboboxInput" autocomplete="off" placeholder="Busque por nome ou e-mail" aria-expanded="false" aria-controls="pro-account-list" aria-autocomplete="list" aria-required="true"></div><ul id="pro-account-list" role="listbox" aria-label="Contas disponíveis" class="pat-listbox" hidden><li id="pro-account-opt-0" role="option" aria-selected="false" class="pat-option" data-value="Bruno Takeda · bruno.takeda@gmail.com" data-q="bruno takeda bruno.takeda@gmail.com">Bruno Takeda · bruno.takeda@gmail.com</li><li id="pro-account-opt-1" role="option" aria-selected="false" class="pat-option" data-value="Priscila Martins · priscila.martins@gmail.com" data-q="priscila martins priscila.martins@gmail.com">Priscila Martins · priscila.martins@gmail.com</li><li id="pro-account-opt-2" role="option" aria-selected="false" class="pat-option" data-value="Sofia Andrade · sofia.andrade@outlook.com" data-q="sofia andrade sofia.andrade@outlook.com">Sofia Andrade · sofia.andrade@outlook.com</li></ul><div class="pat-comboboxStatus combo-empty" role="status" aria-live="polite" hidden><p>Nenhuma conta encontrada.</p></div></div></div></div></section>
+  <section class="ux-fsection"><header><span class="ux-titletip"><h3>Perfil profissional</h3><span class="tip-wrapper"><button type="button" class="tip-trigger" aria-label="Ajuda: Perfil profissional" aria-describedby="fs-perfil-profissional-tip" aria-expanded="false"><i data-icon="help" class="tip-icon"></i></button><span id="fs-perfil-profissional-tip" role="tooltip" class="tip-bubble">Com registro em dois conselhos, informe um.</span></span></span></header><div><div class="form-grid"><div class="field "><label class="field-label" for="cpro-prof">Profissão<span class="ux-req" aria-hidden="true"> *</span></label><select class="select" id="cpro-prof" data-council-target="cpro-council" aria-required="true"><option value="" selected data-council="">Selecione</option><option value="medico" data-council="CRM">Médico</option><option value="medico-familia" data-council="CRM">Médico de família e comunidade</option><option value="pediatra" data-council="CRM">Pediatra</option><option value="neuropediatra" data-council="CRM">Neuropediatra</option><option value="neurologista" data-council="CRM">Neurologista</option><option value="psiquiatra-infantil" data-council="CRM">Psiquiatra da infância e adolescência</option><option value="geneticista" data-council="CRM">Geneticista</option><option value="enfermeiro" data-council="Coren">Enfermeiro</option><option value="tec-enfermagem" data-council="Coren">Técnico de enfermagem</option><option value="psicologo" data-council="CRP">Psicólogo</option><option value="neuropsicologo" data-council="CRP">Neuropsicólogo</option><option value="assistente" data-council="CRESS">Assistente social</option><option value="nutricionista" data-council="CRN">Nutricionista</option><option value="fisioterapeuta" data-council="Crefito">Fisioterapeuta</option><option value="to" data-council="Crefito">Terapeuta ocupacional</option><option value="farmaceutico" data-council="CRF">Farmacêutico</option><option value="fono" data-council="CRFa">Fonoaudiólogo</option><option value="dentista" data-council="CRO">Cirurgião-dentista</option><option value="odontopediatra" data-council="CRO">Odontopediatra</option><option value="educador-fisico" data-council="CREF">Profissional de educação física</option></select></div><div class="field "><span class="ux-labeltip"><label class="field-label" for="cpro-council">Conselho regional</label><span class="tip-wrapper"><button type="button" class="tip-trigger" aria-label="Ajuda: Conselho regional" aria-describedby="tip-f9" aria-expanded="false"><i data-icon="help" class="tip-icon"></i></button><span id="tip-f9" role="tooltip" class="tip-bubble">Preenchido pela profissão.</span></span></span><input class="input" id="cpro-council" type="text" value="" readonly></div><div class="field "><label class="field-label" for="cpro-number">Nº de registro<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="cpro-number" type="text" value="" aria-required="true" placeholder="Ex.: 12345"></div><div class="field "><label class="field-label" for="cpro-uf">UF do registro<span class="ux-req" aria-hidden="true"> *</span></label><select class="select" id="cpro-uf" aria-required="true"><option value="">UF</option><option value="PR" selected>PR</option><option value="SC">SC</option><option value="SP">SP</option><option value="RS">RS</option><option value="MG">MG</option><option value="RJ">RJ</option></select></div><div class="field "><label class="field-label" for="cpro-inst">Instituição ou serviço de vínculo</label><input class="input" id="cpro-inst" type="text" value="" placeholder="Ex.: Clínica Escola de Saúde"></div><div class="field "><label class="field-label" for="cpro-cnes">CNES</label><input class="input" id="cpro-cnes" type="text" value="" placeholder="0000000"></div></div></div></section>
+  <div class="ux-formcard-foot"><a class="btn" href="profissionais.html">Cancelar</a><button type="submit" class="btn btn-primary"><i data-icon="check"></i>Cadastrar profissional</button></div>
+</form>
+</section>
+</main>
+</div>
+</div>
+<script src="assets/teapts-mockups.js"></script>
+</body>
+</html>

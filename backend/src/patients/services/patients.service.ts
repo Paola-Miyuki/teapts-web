@@ -3,8 +3,10 @@
 // A query da consulta fica no PatientsRepository; aqui ficam o erro seguro, a
 // conversão para o contrato público e os metadados da paginação.
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -19,12 +21,32 @@ import { isAdmin } from '../../auth/account-context';
 import { toPagination } from '../../common/pagination/pagination';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
-import type { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
+import type {
+  AuthorizedPatientResponseDto,
+  GetAuthorizedPatientsResponseDto,
+} from '../dto/get-authorized-patients-response.dto';
+import type { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-request.dto';
+import type { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
+import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
-import type { SupportContactDto } from '../dto/support-contact.dto';
+import type { SupportContact } from '../entities/support-contact.entity';
+import {
+  type SupportContactChannels,
+  type SupportContactDto,
+  supportContactChannelError,
+} from '../dto/support-contact.dto';
+import type {
+  GetSupportContactsResponseDto,
+  SupportContactResponseDto,
+} from '../dto/support-contact-response.dto';
+import type { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import {
   type AuthorizedPatientsPage,
+  type PatientRow,
+  type PatientScope,
+  type PatientsPage,
   PatientsRepository,
+  type SupportContactValues,
 } from '../repositories/patients.repository';
 
 /** Código do Postgres para violação de chave única (`unique_violation`). */
@@ -64,12 +86,98 @@ function toSupportContact(contact: SupportContactDto): SupportContactDto {
     }
   }
 
+  normalized.isEmergency = contact.isEmergency ?? false;
+
   return normalized;
 }
 
 /**
  * Consulta pacientes autorizados e cadastra perfis de paciente.
  */
+function forbiddenPatient(): ForbiddenException {
+  return new ForbiddenException({
+    status: 'FORBIDDEN',
+    message: 'Acesso restrito ao profissional.',
+  });
+}
+
+/**
+ * Escopo de quem consulta: o administrador vê todos (RN022); o profissional,
+ * os pacientes dos PTS de que faz ou fez parte (RN016). Conta sem perfil
+ * profissional, que não seja de administrador, recebe 403 (RFPAC002.E04).
+ */
+function patientScope(account: AccountContext): PatientScope {
+  if (isAdmin(account)) {
+    return { kind: 'all' };
+  }
+
+  if (account.professionalProfileIds.length === 0) {
+    throw forbiddenPatient();
+  }
+
+  return { kind: 'professional', accountId: account.accountId };
+}
+
+function toSupportContactResponse(
+  contact: SupportContact,
+): SupportContactResponseDto {
+  return {
+    id: contact.id,
+    name: contact.name,
+    description: contact.description,
+    email: contact.email,
+    phone: contact.phone,
+    isEmergency: contact.isEmergency,
+  };
+}
+
+/** Erro `400` do contato que não segue a regra do cadastro (RFPAC001.E03). */
+function invalidSupportContact(message: string): BadRequestException {
+  return new BadRequestException({ status: 'VALIDATION_ERROR', message });
+}
+
+function patientNotFound(): NotFoundException {
+  return new NotFoundException({
+    status: 'PATIENT_NOT_FOUND',
+    message: 'Paciente não encontrado.',
+  });
+}
+
+function supportContactNotFound(): NotFoundException {
+  return new NotFoundException({
+    status: 'SUPPORT_CONTACT_NOT_FOUND',
+    message: 'Contato de suporte não encontrado.',
+  });
+}
+
+/** Texto sem espaços externos; vazio vira `null`. */
+function textOrNull(value: string | null | undefined): string | null {
+  const text = value?.trim();
+
+  return text ? text : null;
+}
+
+function toIsoDate(value: Date | string): string {
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
+}
+
+function toAuthorizedPatient(row: PatientRow): AuthorizedPatientResponseDto {
+  return {
+    id: row.patient_id,
+    name: row.account_name,
+    socialName: row.social_name,
+    email: row.email,
+    cns: row.cns,
+    guardianName: row.guardian_name,
+    registeredAt: toIsoDate(row.registered_at),
+    ptsStatus: row.pts_status,
+    activePtsId: row.active_pts_id,
+    readOnly: row.read_only === true,
+  };
+}
+
 @Injectable()
 export class PatientsService {
   private readonly logger = new Logger(PatientsService.name);
@@ -95,15 +203,14 @@ export class PatientsService {
     account: AccountContext,
     request: GetAuthorizedPatientsRequestDto,
   ): Promise<GetAuthorizedPatientsResponseDto> {
-    let page: AuthorizedPatientsPage;
+    const scope = patientScope(account);
+    let page: PatientsPage;
 
     try {
-      page = isAdmin(account)
-        ? await this.patientsRepository.findAllPaginated(request)
-        : await this.patientsRepository.findAuthorizedPaginated(
-            account.accountId,
-            request,
-          );
+      page = await this.patientsRepository.findPatientsPaginated(
+        scope,
+        request,
+      );
     } catch (error) {
       this.logger.error('Authorized patients query failed', error);
       throw new InternalServerErrorException({
@@ -112,26 +219,267 @@ export class PatientsService {
       });
     }
 
-    const { rows, total } = page;
+    return {
+      data: page.rows.map(toAuthorizedPatient),
+      pagination: toPagination(request, page.total),
+    };
+  }
+
+  async findOne(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<PatientDetailResponseDto> {
+    const scope = patientScope(account);
+    let row: PatientRow | null;
+    let exists: boolean;
+
+    try {
+      exists = await this.patientsRepository.patientExists(patientId);
+      row = exists
+        ? await this.patientsRepository.findPatient(scope, patientId)
+        : null;
+    } catch (error) {
+      this.logger.error('Patient detail query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar o paciente.',
+      });
+    }
+
+    if (!exists) {
+      throw patientNotFound();
+    }
+
+    if (!row) {
+      throw forbiddenPatient();
+    }
+
+    let contacts: SupportContact[];
+
+    try {
+      contacts = await this.patientsRepository.findSupportContacts(patientId);
+    } catch (error) {
+      this.logger.error('Patient support contacts query failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível consultar o paciente.',
+      });
+    }
 
     return {
-      data: rows.map((row) => ({
-        id: row.patient_id,
-        name: row.account_name,
-      })),
-      pagination: toPagination(request, total),
+      ...toAuthorizedPatient(row),
+      cpf: row.cpf,
+      supportContacts: contacts.map(toSupportContactResponse),
     };
   }
 
   /**
-   * Busca pacientes disponíveis para criação de uma nova proposta de PTS.
-   * Só a conta com perfil profissional ou o administrador consulta (RFPTS001,
-   * RN022).
+   * Lista os contatos de suporte do paciente (RFPAC003). Quem vê: o admin, o
+   * profissional com vínculo (RN016, inclusive de PTS encerrado) e o próprio
+   * paciente (RN028).
+   *
+   * @throws NotFoundException `PATIENT_NOT_FOUND`
+   * @throws ForbiddenException quando a conta não tem acesso ao paciente
    */
+  async findSupportContacts(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<GetSupportContactsResponseDto> {
+    let contacts: SupportContact[];
+
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'read');
+      contacts = await this.patientsRepository.findSupportContacts(patientId);
+    } catch (error) {
+      throw this.supportContactError(error, 'consultar os contatos de suporte');
+    }
+
+    return { data: contacts.map(toSupportContactResponse) };
+  }
+
+  /**
+   * Cria um contato de suporte (RFPAC003). Só o admin e o membro de PTS ativo
+   * do paciente (RN024). Contato de suporte não concede acesso (RN017).
+   *
+   * @throws BadRequestException `VALIDATION_ERROR` quando faltam e-mail e
+   *   telefone, ou o contato de emergência não tem telefone
+   */
+  async createSupportContact(
+    account: AccountContext,
+    patientId: string,
+    request: SupportContactDto,
+  ): Promise<SupportContactResponseDto> {
+    const values: SupportContactValues = {
+      name: request.name.trim(),
+      description: textOrNull(request.description),
+      email: textOrNull(request.email),
+      phone: textOrNull(request.phone),
+      isEmergency: request.isEmergency ?? false,
+    };
+
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+      this.assertSupportContactChannels(values);
+
+      return toSupportContactResponse(
+        await this.patientsRepository.insertSupportContact(patientId, values),
+      );
+    } catch (error) {
+      throw this.supportContactError(error, 'cadastrar o contato de suporte');
+    }
+  }
+
+  /**
+   * Atualiza um contato de suporte (RFPAC003). Os campos ausentes ficam como
+   * estão e `null` limpa o campo opcional; a regra do contato inteiro vale
+   * para o resultado.
+   *
+   * @throws NotFoundException `SUPPORT_CONTACT_NOT_FOUND` quando o contato não
+   *   existe ou é de outro paciente
+   */
+  async updateSupportContact(
+    account: AccountContext,
+    patientId: string,
+    contactId: string,
+    request: UpdateSupportContactRequestDto,
+  ): Promise<SupportContactResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      const current = await this.patientsRepository.findSupportContact(
+        patientId,
+        contactId,
+      );
+
+      if (!current) {
+        throw supportContactNotFound();
+      }
+
+      const values: SupportContactValues = {
+        name: request.name?.trim() ?? current.name,
+        description:
+          request.description === undefined
+            ? current.description
+            : textOrNull(request.description),
+        email:
+          request.email === undefined
+            ? current.email
+            : textOrNull(request.email),
+        phone:
+          request.phone === undefined
+            ? current.phone
+            : textOrNull(request.phone),
+        isEmergency: request.isEmergency ?? current.isEmergency,
+      };
+
+      this.assertSupportContactChannels(values);
+
+      const updated = await this.patientsRepository.updateSupportContact(
+        patientId,
+        contactId,
+        values,
+      );
+
+      if (!updated) {
+        throw supportContactNotFound();
+      }
+
+      return toSupportContactResponse(updated);
+    } catch (error) {
+      throw this.supportContactError(error, 'atualizar o contato de suporte');
+    }
+  }
+
+  /**
+   * Remove um contato de suporte (RFPAC003). Só o admin e o membro de PTS
+   * ativo do paciente (RN024).
+   *
+   * @throws NotFoundException `SUPPORT_CONTACT_NOT_FOUND`
+   */
+  async deleteSupportContact(
+    account: AccountContext,
+    patientId: string,
+    contactId: string,
+  ): Promise<void> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      if (
+        !(await this.patientsRepository.deleteSupportContact(
+          patientId,
+          contactId,
+        ))
+      ) {
+        throw supportContactNotFound();
+      }
+    } catch (error) {
+      throw this.supportContactError(error, 'remover o contato de suporte');
+    }
+  }
+
+  /**
+   * Confere o acesso aos contatos: `read` para o admin, o profissional com
+   * vínculo (RN016) e o próprio paciente; `write` só para o admin e o membro
+   * de PTS ativo (RN024), com o profissional de PTS encerrado só lendo.
+   */
+  private async assertSupportContactAccess(
+    account: AccountContext,
+    patientId: string,
+    mode: 'read' | 'write',
+  ): Promise<void> {
+    if (!(await this.patientsRepository.patientExists(patientId))) {
+      throw patientNotFound();
+    }
+
+    if (isAdmin(account)) {
+      return;
+    }
+
+    if (mode === 'read' && account.patientProfileId === patientId) {
+      return;
+    }
+
+    if (account.professionalProfileIds.length === 0) {
+      throw forbiddenPatient();
+    }
+
+    const row = await this.patientsRepository.findPatient(
+      { kind: 'professional', accountId: account.accountId },
+      patientId,
+    );
+
+    if (!row || (mode === 'write' && row.read_only)) {
+      throw forbiddenPatient();
+    }
+  }
+
+  /** Aplica a regra do contato inteiro (e-mail ou telefone, emergência). */
+  private assertSupportContactChannels(contact: SupportContactChannels): void {
+    const message = supportContactChannelError(contact);
+
+    if (message) {
+      throw invalidSupportContact(message);
+    }
+  }
+
+  /** Deixa passar os erros da API e troca os demais por um erro seguro. */
+  private supportContactError(error: unknown, action: string): Error {
+    if (error instanceof HttpException) {
+      return error;
+    }
+
+    this.logger.error(`Support contact failed: ${action}`, error);
+
+    return new InternalServerErrorException({
+      status: 'ERROR',
+      message: `Não foi possível ${action}.`,
+    });
+  }
+
   async findAvailableForPts(
     account: AccountContext,
-    request: GetAuthorizedPatientsRequestDto,
-  ): Promise<GetAuthorizedPatientsResponseDto> {
+    request: GetAvailablePatientsRequestDto,
+  ): Promise<GetAvailablePatientsResponseDto> {
     if (!isAdmin(account) && account.professionalProfileIds.length === 0) {
       throw new ForbiddenException({
         status: 'FORBIDDEN',

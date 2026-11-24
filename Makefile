@@ -2,12 +2,12 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 .PHONY: help env install \
-	up up-d up-d-db wait-backend rebuild rebuild-no-cache rebuild-backend rebuild-frontend rebuild-frontend-no-cache \
+	up up-d up-d-db stop start wait-backend rebuild rebuild-no-cache rebuild-backend rebuild-frontend rebuild-frontend-no-cache \
 	restart restart-backend restart-frontend down clean ps health \
 	logs logs-backend logs-frontend logs-db \
 	shell-backend shell-frontend psql \
 	migrate migrate-revert migrate-show migrate-generate seed \
-	db-tables db-account db-query \
+	db-tables db-account db-patients db-support-contacts db-professionals db-pts db-query \
 	test test-e2e typecheck lint format format-check check
 
 # Variáveis
@@ -185,14 +185,26 @@ migrate-generate: ## Gera migration a partir das entidades, no host (uso: make m
 	@test -n "$(NAME)" || { echo "ERRO: informe NAME, ex.: make migrate-generate NAME=AddFoo"; exit 1; }
 	$(BE) migration:generate src/database/migrations/$(NAME)
 
-seed: ## Cria as contas de teste: admin, profissional (psicólogo) e paciente (README 5.2)
+seed: ## Cria as contas de teste (admin, profissionais e pacientes) e os PTS de teste
 	$(BE_DB) node dist/database/seeds/create-test-user.js
 
 db-tables: ## Lista as tabelas do banco
 	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\dt"'
 
-db-account: ## Mostra as contas da tabela account
-	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT id, name, email, role, \"createdAt\" FROM account;"'
+db-account: ## Mostra todas as colunas da tabela account
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\x auto" -c "SELECT * FROM account ORDER BY created_at;"'
+
+db-patients: ## Mostra todas as colunas de patient, com o nome da conta
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\x auto" -c "SELECT a.name AS account_name, p.* FROM patient p JOIN account a ON a.id = p.account_id ORDER BY a.name;"'
+
+db-support-contacts: ## Mostra todas as colunas de support_contact, com o nome do paciente
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\x auto" -c "SELECT a.name AS patient_name, c.* FROM support_contact c JOIN account a ON a.id = c.patient_id ORDER BY a.name, c.created_at;"'
+
+db-professionals: ## Mostra todas as colunas de professional, com o nome da conta
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\x auto" -c "SELECT a.name AS account_name, pr.* FROM professional pr JOIN account a ON a.id = pr.account_id ORDER BY a.name;"'
+
+db-pts: ## Mostra todas as colunas dos PTS, com paciente, responsável e equipe
+	docker exec -t $(C_POSTGRES) sh -c 'exec psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "\\x auto" -c "SELECT pa.name AS patient_name, ra.name AS responsible_name, (SELECT string_agg(ta.name, chr(44) || chr(32)) FROM professional_participating_on_therapeutic_journey t JOIN professional tp ON tp.id = t.professional_id JOIN account ta ON ta.id = tp.account_id WHERE t.therapeutic_journey_id = s.id) AS team, s.* FROM projeto_terapeutico_singular s JOIN account pa ON pa.id = s.patient_id JOIN professional r ON r.id = s.responsible_professional_id JOIN account ra ON ra.id = r.account_id ORDER BY pa.name, s.created_at;"'
 
 db-query: ## Roda um SQL no banco (uso: make db-query SQL="select * from account")
 	@test -n "$(SQL)" || { echo 'ERRO: informe SQL, ex.: make db-query SQL="\dt"'; exit 1; }

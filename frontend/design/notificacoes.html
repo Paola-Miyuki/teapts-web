@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notificações · TEA-PTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/teapts-src.css">
+<link rel="stylesheet" href="assets/teapts-mockups.css">
+<link rel="stylesheet" href="assets/teapts-ui.css">
+</head>
+<body class="min-h-full flex flex-col" data-nav="" data-roles="professional,patient,admin" data-dps="">
+<div class="shell-app">
+<aside id="sidebar" class="shell-sidebar"></aside>
+<div class="shell-workspace">
+<header class="shell-appHeader" id="app-header"></header>
+<main class="shell-content">
+<nav class="shell-breadcrumb" aria-label="Caminho da página"><a href="inicio.html" data-when="role:admin,professional">Início</a><a href="inicio-paciente.html" data-when="role:patient">Início</a><a href="aguardando-perfil.html" data-when="role:none">Início</a><span class="crumb"><span aria-hidden="true">/</span><span>Notificações</span></span></nav>
+<div class="mockbar" data-mockbar></div>
+<section>
+<div class="heading"><div><h1>Notificações</h1></div></div>
+<div data-when="role:professional"><div class="ux-tcard" data-filters="notes-professional">
+  <div class="ux-tcard-head"><div><h2>Notificações</h2><p class="count" aria-live="polite" data-count-for="notes-professional" data-singular="notificação" data-plural="notificações"></p></div><button type="button" class="btn btn-sm" data-toast="Todas as notificações marcadas como lidas (simulação)."><i data-icon="check"></i>Marcar todas como lidas</button></div>
+  <div class="chip-filter ux-tabs" data-key="read" role="group" aria-label="Filtrar por situação"><button type="button" data-value="" aria-pressed="true">Todas</button><button type="button" data-value="unread" aria-pressed="false">Não lidas</button></div>
+  
+  
+  <div class="table-wrap">
+  <table class="table ux-notes-t" id="notes-professional" data-filter-table>
+    <thead><tr><th scope="col">Notificação</th></tr></thead>
+    <tbody>
+      <tr data-read="unread"><td><div class="ux-note-item is-unread"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Reavaliação próxima</span><p>A reavaliação do PTS de Ana Clara Ribeiro vence em 30 dias (03/12/2026).</p><small>03/11/2026, 06:00 · não lida</small></div><a class="btn btn-sm" href="reavaliacao.html">Registrar reavaliação</a></div></td></tr>
+      <tr data-read="unread"><td><div class="ux-note-item is-unread"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Reavaliação próxima</span><p>A reavaliação do PTS de João Pedro Santos vence em 30 dias (18/12/2026).</p><small>18/11/2026, 06:00 · não lida</small></div><a class="btn btn-sm" href="pts-detalhe.html">Abrir PTS</a></div></td></tr>
+      <tr data-read="read"><td><div class="ux-note-item"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Reavaliação próxima</span><p>A reavaliação do PTS de Maria Sílvia Barreto Pessoa de Moraes vence em 30 dias (10/11/2026).</p><small>11/10/2026, 06:00 · lida</small></div><a class="btn btn-sm" href="pts-detalhe.html">Abrir PTS</a></div></td></tr>
+      <tr data-read="read"><td><div class="ux-note-item"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Reavaliação próxima</span><p>A reavaliação do PTS de Carla Menezes vence em 30 dias (30/08/2026).</p><small>31/07/2026, 06:00 · lida</small></div><a class="btn btn-sm" href="pts-detalhe.html">Abrir PTS</a></div></td></tr>
+      <tr data-empty hidden><td colspan="1"><div class="empty"><div class="empty-icon"><i data-icon="search" class="icon"></i></div><h2>Nenhuma notificação não lida</h2><p>Você está em dia.</p></div></td></tr>
+    </tbody>
+  </table>
+  </div>
+  
+</div></div><div data-when="role:patient"><div class="ux-tcard" data-filters="notes-patient">
+  <div class="ux-tcard-head"><div><h2>Notificações</h2><p class="count" aria-live="polite" data-count-for="notes-patient" data-singular="notificação" data-plural="notificações"></p></div><button type="button" class="btn btn-sm" data-toast="Todas as notificações marcadas como lidas (simulação)."><i data-icon="check"></i>Marcar todas como lidas</button></div>
+  <div class="chip-filter ux-tabs" data-key="read" role="group" aria-label="Filtrar por situação"><button type="button" data-value="" aria-pressed="true">Todas</button><button type="button" data-value="unread" aria-pressed="false">Não lidas</button></div>
+  
+  
+  <div class="table-wrap">
+  <table class="table ux-notes-t" id="notes-patient" data-filter-table>
+    <thead><tr><th scope="col">Notificação</th></tr></thead>
+    <tbody>
+      <tr data-read="unread"><td><div class="ux-note-item is-unread"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Sua reavaliação está próxima</span><p>A equipe vai rever as metas do seu PTS até 03/12/2026.</p><small>03/11/2026, 06:00 · não lida</small></div><a class="btn btn-sm" href="pts.html">Ver meu PTS</a></div></td></tr>
+      <tr data-read="read"><td><div class="ux-note-item"><span class="ux-note-ic" aria-hidden="true"><i data-icon="clock"></i></span><div><span class="ux-note-title">Sua reavaliação está próxima</span><p>A equipe vai rever as metas do seu 1º PTS até 30/12/2025.</p><small>30/11/2025, 06:00 · lida</small></div><a class="btn btn-sm" href="pts.html">Ver meu PTS</a></div></td></tr>
+      <tr data-empty hidden><td colspan="1"><div class="empty"><div class="empty-icon"><i data-icon="search" class="icon"></i></div><h2>Nenhuma notificação não lida</h2><p>Você está em dia.</p></div></td></tr>
+    </tbody>
+  </table>
+  </div>
+  
+</div></div>
+<section class="ux-card ux-empty-card" data-when="role:admin"><h2>O administrador não recebe notificações</h2></section>
+
+</section>
+</main>
+</div>
+</div>
+<script src="assets/teapts-mockups.js"></script>
+</body>
+</html>
