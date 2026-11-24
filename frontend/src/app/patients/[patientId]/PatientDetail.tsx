@@ -16,6 +16,8 @@ import {
   type PatientDetail as Patient,
   type SupportContact,
 } from '@/lib/patients';
+import ClinicalDataCard from '../_components/ClinicalDataCard';
+import MedicationsCard from '../_components/MedicationsCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import styles from '../patients.module.css';
 
@@ -68,6 +70,7 @@ function PatientDetailContent({
 }) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [activeTab, setActiveTab] = useState<'dados' | 'medicacoes'>('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -146,12 +149,31 @@ function PatientDetailContent({
   return (
     <section>
       <nav className="tabs ux-ptabs" aria-label="Seções do paciente">
-        <a href="#dados" aria-current="page">
+        <a
+          href="#dados"
+          aria-current={activeTab === 'dados' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('dados');
+          }}
+        >
           Dados do paciente
+        </a>
+
+        <a
+          href="#medicacoes"
+          aria-current={activeTab === 'medicacoes' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('medicacoes');
+          }}
+        >
+          Medicações
         </a>
       </nav>
 
-      <section data-panel="dados" id="dados">
+      {activeTab === 'dados' && (
+        <section data-panel="dados" id="dados">
         <div className="ux-profile">
           <div className="ux-profile-side">
             <section className="ux-card ux-idcard" aria-labelledby="pat-id">
@@ -249,6 +271,24 @@ function PatientDetailContent({
               </div>
             </section>
 
+            <ClinicalDataCard
+              patientId={patient.id}
+              data={patient}
+              canEdit={can(account, 'manageClinicalData', {
+                patientReadOnly: patient.readOnly,
+              })}
+              onSaved={(clinicalData) =>
+                setPatient((current) =>
+                  current
+                    ? {
+                        ...current,
+                        ...clinicalData,
+                      }
+                    : current,
+                )
+              }
+/>
+
             <SupportContactsCard
               patientId={patient.id}
               patientName={patient.name}
@@ -261,6 +301,18 @@ function PatientDetailContent({
           </div>
         </div>
       </section>
+      )}
+
+      {activeTab === 'medicacoes' && (
+        <section data-panel="medicacoes" id="medicacoes">
+          <MedicationsCard
+            patientId={patient.id}
+            canEdit={can(account, 'manageMedications', {
+              patientReadOnly: patient.readOnly,
+            })}
+          />
+        </section>
+      )}
     </section>
   );
 }

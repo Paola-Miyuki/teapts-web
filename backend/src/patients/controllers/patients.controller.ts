@@ -40,11 +40,17 @@ import {
   ErrorResponseDto,
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
+import { ClinicalDataResponseDto } from '../dto/clinical-data-response.dto';
 import { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
 import { GetEligiblePatientsRequestDto } from '../dto/get-eligible-patients-request.dto';
 import { GetEligiblePatientsResponseDto } from '../dto/get-eligible-patients-response.dto';
+import { MedicationRequestDto } from '../dto/medication-request.dto';
+import {
+  GetMedicationsResponseDto,
+  MedicationResponseDto,
+} from '../dto/medication-response.dto';
 import { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import { PatientResponseDto } from '../dto/patient-response.dto';
 import {
@@ -52,6 +58,7 @@ import {
   SupportContactResponseDto,
 } from '../dto/support-contact-response.dto';
 import { SupportContactDto } from '../dto/support-contact.dto';
+import { UpdateClinicalDataRequestDto } from '../dto/update-clinical-data-request.dto';
 import { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import { PatientsService } from '../services/patients.service';
 
@@ -67,6 +74,7 @@ function invalidParam(name: string): ParseUUIDPipe {
 
 const parsePatientId = invalidParam('patientId');
 const parseContactId = invalidParam('contactId');
+const parseMedicationId = invalidParam('medicationId');
 
 const SUPPORT_CONTACT_FORBIDDEN = {
   status: 'FORBIDDEN',
@@ -283,6 +291,216 @@ export class PatientsController {
     return this.patientsService.create(body);
   }
 
+
+  /**
+   * Atualiza historico clinico e alergias do paciente (RFPAC007).
+   */
+  @Patch('patients/:patientId/clinical-data')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: ClinicalDataResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Dados clinicos invalidos.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador ou a equipe de um PTS ativo.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente nao encontrado.',
+    },
+  })
+  async updateClinicalData(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Body() body: UpdateClinicalDataRequestDto,
+  ): Promise<ClinicalDataResponseDto> {
+    return this.patientsService.updateClinicalData(
+      account,
+      patientId,
+      body,
+    );
+  }
+
+  /**
+   * Lista as medicacoes do paciente.
+   */
+  @Get('patients/:patientId/medications')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: GetMedicationsResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso negado ao paciente.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente nao encontrado.',
+    },
+  })
+  async findMedications(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+  ): Promise<GetMedicationsResponseDto> {
+    return this.patientsService.findMedications(account, patientId);
+  }
+
+  /**
+   * Cadastra uma medicacao do paciente.
+   */
+  @Post('patients/:patientId/medications')
+  @UseGuards(AuthGuard)
+  @ApiCreatedResponse({ type: MedicationResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Medicamento, dose, frequencia e inicio sao obrigatorios.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador ou a equipe de um PTS ativo.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente nao encontrado.',
+    },
+  })
+  async createMedication(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Body() body: MedicationRequestDto,
+  ): Promise<MedicationResponseDto> {
+    return this.patientsService.createMedication(
+      account,
+      patientId,
+      body,
+    );
+  }
+
+  /**
+   * Atualiza uma medicacao existente.
+   */
+  @Patch('patients/:patientId/medications/:medicationId')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: MedicationResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Dados da medicacao invalidos.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador ou a equipe de um PTS ativo.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PATIENT_NOT_FOUND: {
+        summary: 'Paciente',
+        value: {
+          status: 'PATIENT_NOT_FOUND',
+          message: 'Paciente nao encontrado.',
+        },
+      },
+      MEDICATION_NOT_FOUND: {
+        summary: 'Medicacao',
+        value: {
+          status: 'MEDICATION_NOT_FOUND',
+          message: 'Medicacao nao encontrada.',
+        },
+      },
+    },
+  })
+  async updateMedication(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Param('medicationId', parseMedicationId) medicationId: string,
+    @Body() body: MedicationRequestDto,
+  ): Promise<MedicationResponseDto> {
+    return this.patientsService.updateMedication(
+      account,
+      patientId,
+      medicationId,
+      body,
+    );
+  }
+
+  /**
+   * Suspende uma medicacao sem apagar o registro.
+   */
+  @Post('patients/:patientId/medications/:medicationId/stop')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: MedicationResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'A data de fim nao pode ser anterior a data de inicio.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador ou a equipe de um PTS ativo.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PATIENT_NOT_FOUND: {
+        summary: 'Paciente',
+        value: {
+          status: 'PATIENT_NOT_FOUND',
+          message: 'Paciente nao encontrado.',
+        },
+      },
+      MEDICATION_NOT_FOUND: {
+        summary: 'Medicacao',
+        value: {
+          status: 'MEDICATION_NOT_FOUND',
+          message: 'Medicacao nao encontrada.',
+        },
+      },
+    },
+  })
+  async stopMedication(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Param('medicationId', parseMedicationId) medicationId: string,
+  ): Promise<MedicationResponseDto> {
+    return this.patientsService.stopMedication(
+      account,
+      patientId,
+      medicationId,
+    );
+  }
   /**
    * Lista os contatos de suporte do paciente (RFPAC003): admin, profissional
    * com vínculo (RN016) e o próprio paciente.
@@ -447,3 +665,5 @@ export class PatientsController {
     );
   }
 }
+
+

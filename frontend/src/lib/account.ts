@@ -129,6 +129,14 @@ export function getNavigation(account: Account, currentHref: string) {
     items.push({ href: '/pts', icon: 'check', label: 'Meu PTS' });
   }
 
+  if (can(account, 'viewOwnCare')) {
+    items.push({
+      href: '/medications',
+      icon: 'clipboard',
+      label: 'Medicações',
+    });
+  }
+
   if (can(account, 'viewPtsProposals')) {
     items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }

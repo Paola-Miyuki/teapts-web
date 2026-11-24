@@ -29,6 +29,14 @@ import type { GetEligiblePatientsRequestDto } from '../dto/get-eligible-patients
 import type { GetEligiblePatientsResponseDto } from '../dto/get-eligible-patients-response.dto';
 import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
+import type { ClinicalDataResponseDto } from '../dto/clinical-data-response.dto';
+import type { MedicationRequestDto } from '../dto/medication-request.dto';
+import type {
+  GetMedicationsResponseDto,
+  MedicationResponseDto,
+} from '../dto/medication-response.dto';
+import type { UpdateClinicalDataRequestDto } from '../dto/update-clinical-data-request.dto';
+import type { Medication } from '../entities/medication.entity';
 import type { SupportContact } from '../entities/support-contact.entity';
 import {
   type SupportContactChannels,
@@ -41,8 +49,11 @@ import type {
 } from '../dto/support-contact-response.dto';
 import type { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import {
+  type ClinicalDataValues,
   type EligiblePatientsPage,
+  type PatientDetailRow,
   type PatientRow,
+  type MedicationValues,
   type PatientScope,
   type PatientsPage,
   PatientsRepository,
@@ -150,6 +161,67 @@ function supportContactNotFound(): NotFoundException {
   });
 }
 
+
+function medicationNotFound(): NotFoundException {
+  return new NotFoundException({
+    status: 'MEDICATION_NOT_FOUND',
+    message: 'Medica��o n�o encontrada.',
+  });
+}
+
+function invalidMedication(message: string): BadRequestException {
+  return new BadRequestException({
+    status: 'VALIDATION_ERROR',
+    message,
+  });
+}
+
+function toMedicationResponse(
+  medication: Medication,
+): MedicationResponseDto {
+  return {
+    id: medication.id,
+    patientId: medication.patientId,
+    drugName: medication.drugName,
+    dose: medication.dose,
+    frequency: medication.frequency,
+    prescriber: medication.prescriber,
+    reason: medication.reason,
+    startDate: medication.startDate,
+    endDate: medication.endDate,
+  };
+}
+
+function toMedicationValues(
+  request: MedicationRequestDto,
+): MedicationValues {
+  const drugName = request.drugName.trim();
+  const dose = request.dose.trim();
+  const frequency = request.frequency.trim();
+
+  if (!drugName || !dose || !frequency) {
+    throw invalidMedication(
+      'Medicamento, dose e frequ�ncia s�o obrigat�rios.',
+    );
+  }
+
+  if (request.endDate && request.endDate < request.startDate) {
+    throw invalidMedication(
+      'A data de fim n�o pode ser anterior � data de in�cio.',
+    );
+  }
+
+  return {
+    drugName,
+    dose,
+    frequency,
+    prescriber: textOrNull(request.prescriber),
+    reason: textOrNull(request.reason),
+    startDate: request.startDate,
+    endDate: request.endDate ?? null,
+  };
+}
+
 /** Texto sem espaços externos; vazio vira `null`. */
 function textOrNull(value: string | null | undefined): string | null {
   const text = value?.trim();
@@ -230,7 +302,7 @@ export class PatientsService {
     patientId: string,
   ): Promise<PatientDetailResponseDto> {
     const scope = patientScope(account);
-    let row: PatientRow | null;
+    let row: PatientDetailRow | null;
     let exists: boolean;
 
     try {
@@ -269,10 +341,247 @@ export class PatientsService {
     return {
       ...toAuthorizedPatient(row),
       cpf: row.cpf,
+      clinicalHistory: row.clinical_history,
+      surgicalHistory: row.surgical_history,
+      familyHistory: row.family_history,
+      habits: row.habits,
+      developmentalMilestones: row.developmental_milestones,
+      allergies: row.allergies,
+      noKnownAllergies: row.no_known_allergies,
       supportContacts: contacts.map(toSupportContactResponse),
     };
   }
 
+
+  /**
+   * Atualiza historico clinico e alergias do paciente (RFPAC007).
+   */
+  async updateClinicalData(
+    account: AccountContext,
+    patientId: string,
+    request: UpdateClinicalDataRequestDto,
+  ): Promise<ClinicalDataResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      const current = await this.patientsRepository.findPatient(
+        { kind: 'all' },
+        patientId,
+      );
+
+      if (!current) {
+        throw patientNotFound();
+      }
+
+      const noKnownAllergies =
+        request.noKnownAllergies ?? current.no_known_allergies;
+
+      const requestedAllergies =
+        request.allergies === undefined
+          ? undefined
+          : textOrNull(request.allergies);
+
+      if (
+        noKnownAllergies &&
+        requestedAllergies !== undefined &&
+        requestedAllergies !== null
+      ) {
+        throw new BadRequestException({
+          status: 'VALIDATION_ERROR',
+          message:
+            'N�o informe alergias quando "Nenhuma alergia conhecida" estiver marcada.',
+        });
+      }
+
+      const allergies = noKnownAllergies
+        ? null
+        : requestedAllergies === undefined
+          ? current.allergies
+          : requestedAllergies;
+
+      const values: ClinicalDataValues = {
+        clinicalHistory:
+          request.clinicalHistory === undefined
+            ? current.clinical_history
+            : textOrNull(request.clinicalHistory),
+
+        surgicalHistory:
+          request.surgicalHistory === undefined
+            ? current.surgical_history
+            : textOrNull(request.surgicalHistory),
+
+        familyHistory:
+          request.familyHistory === undefined
+            ? current.family_history
+            : textOrNull(request.familyHistory),
+
+        habits:
+          request.habits === undefined
+            ? current.habits
+            : textOrNull(request.habits),
+
+        developmentalMilestones:
+          request.developmentalMilestones === undefined
+            ? current.developmental_milestones
+            : textOrNull(request.developmentalMilestones),
+
+        allergies,
+        noKnownAllergies,
+      };
+
+      const updated = await this.patientsRepository.updateClinicalData(
+        patientId,
+        values,
+        account.accountId,
+      );
+
+      if (!updated) {
+        throw patientNotFound();
+      }
+
+      return {
+        patientId: updated.accountId,
+        clinicalHistory: updated.clinicalHistory,
+        surgicalHistory: updated.surgicalHistory,
+        familyHistory: updated.familyHistory,
+        habits: updated.habits,
+        developmentalMilestones: updated.developmentalMilestones,
+        allergies: updated.allergies,
+        noKnownAllergies: updated.noKnownAllergies,
+      };
+    } catch (error) {
+      throw this.patientDataError(
+        error,
+        'atualizar os dados clinicos do paciente',
+      );
+    }
+  }
+
+  /**
+   * Lista as medicacoes do paciente.
+   */
+  async findMedications(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<GetMedicationsResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'read');
+
+      const medications =
+        await this.patientsRepository.findMedications(patientId);
+
+      return {
+        data: medications.map(toMedicationResponse),
+      };
+    } catch (error) {
+      throw this.patientDataError(error, 'consultar as medicacoes');
+    }
+  }
+
+  /**
+   * Cadastra uma medicacao de uso continuo.
+   */
+  async createMedication(
+    account: AccountContext,
+    patientId: string,
+    request: MedicationRequestDto,
+  ): Promise<MedicationResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      const medication = await this.patientsRepository.insertMedication(
+        patientId,
+        toMedicationValues(request),
+        account.accountId,
+      );
+
+      return toMedicationResponse(medication);
+    } catch (error) {
+      throw this.patientDataError(error, 'cadastrar a medicacao');
+    }
+  }
+
+  /**
+   * Atualiza uma medicacao existente.
+   */
+  async updateMedication(
+    account: AccountContext,
+    patientId: string,
+    medicationId: string,
+    request: MedicationRequestDto,
+  ): Promise<MedicationResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      const current = await this.patientsRepository.findMedication(
+        patientId,
+        medicationId,
+      );
+
+      if (!current) {
+        throw medicationNotFound();
+      }
+
+      const updated = await this.patientsRepository.updateMedication(
+        patientId,
+        medicationId,
+        toMedicationValues(request),
+      );
+
+      if (!updated) {
+        throw medicationNotFound();
+      }
+
+      return toMedicationResponse(updated);
+    } catch (error) {
+      throw this.patientDataError(error, 'atualizar a medicacao');
+    }
+  }
+
+  /**
+   * Suspende uma medicacao preenchendo end_date.
+   */
+  async stopMedication(
+    account: AccountContext,
+    patientId: string,
+    medicationId: string,
+  ): Promise<MedicationResponseDto> {
+    try {
+      await this.assertSupportContactAccess(account, patientId, 'write');
+
+      const current = await this.patientsRepository.findMedication(
+        patientId,
+        medicationId,
+      );
+
+      if (!current) {
+        throw medicationNotFound();
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      if (today < current.startDate) {
+        throw invalidMedication(
+          'A data de fim nao pode ser anterior a data de inicio.',
+        );
+      }
+
+      const stopped = await this.patientsRepository.stopMedication(
+        patientId,
+        medicationId,
+        account.accountId,
+        today,
+      );
+
+      if (!stopped) {
+        throw medicationNotFound();
+      }
+
+      return toMedicationResponse(stopped);
+    } catch (error) {
+      throw this.patientDataError(error, 'suspender a medicacao');
+    }
+  }
   /**
    * Lista os contatos de suporte do paciente (RFPAC003). Quem vê: o admin, o
    * profissional com vínculo (RN016, inclusive de PTS encerrado) e o próprio
@@ -463,6 +772,19 @@ export class PatientsService {
   }
 
   /** Deixa passar os erros da API e troca os demais por um erro seguro. */
+
+  private patientDataError(error: unknown, action: string): Error {
+    if (error instanceof HttpException) {
+      return error;
+    }
+
+    this.logger.error(`Patient clinical data failed: ${action}`, error);
+
+    return new InternalServerErrorException({
+      status: 'ERROR',
+      message: `Nao foi possivel ${action}.`,
+    });
+  }
   private supportContactError(error: unknown, action: string): Error {
     if (error instanceof HttpException) {
       return error;
