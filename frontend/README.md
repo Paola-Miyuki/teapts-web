@@ -85,8 +85,11 @@ src/
         [proposalId]/edit/ editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
       [ptsId]/             detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin
                            e de `pts.html` para o paciente (sem a ficha nem o prontuário): cabeçalho,
-                           Visão geral (situação social, só a equipe), Equipe (registro e papel) e
-                           Timeline; `/pts/:id#timeline` abre direto na Timeline (atalho de `historico.html`)
+                           Visão geral (situação social, só a equipe), Equipe (registro e papel; o
+                           responsável e o admin adicionam profissionais com o PTS em planejamento ou
+                           andamento, por `AddTeamMembersModal` em `pts/_components`: busca em
+                           GET /professionals?q= e POST /pts/:id/team) e Timeline; `/pts/:id#timeline`
+                           abre direto na Timeline (atalho de `historico.html`)
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,

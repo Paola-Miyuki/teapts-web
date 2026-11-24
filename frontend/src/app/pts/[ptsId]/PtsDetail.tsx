@@ -17,6 +17,10 @@ import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
 import { getPts, type PtsDetail, type PtsProfessional } from '@/lib/pts';
 import TimelineTab from '@/components/pts/TimelineTab';
+import {
+  AddTeamMembersModal,
+  type PtsData,
+} from '../_components/AddTeamMembersModal';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
@@ -92,6 +96,8 @@ export default function PtsDetailPage({ id }: { id: string }) {
           onLoaded={setPatientName}
           isPatient={kind === 'patient'}
           canOpenRecord={can(account, 'viewAuthorizedPatients')}
+          currentUserProfileIds={account.professionalProfileIds ?? []}
+          isAdmin={account.role === 'admin'}
         />
       )}
     </AuthenticatedPage>
@@ -103,11 +109,15 @@ function PtsDetailContent({
   onLoaded,
   isPatient,
   canOpenRecord,
+  currentUserProfileIds,
+  isAdmin,
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
   isPatient: boolean;
   canOpenRecord: boolean;
+  currentUserProfileIds: string[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [pts, setPts] = useState<PtsDetail | null>(null);
@@ -195,6 +205,22 @@ function PtsDetailContent({
   }
 
   const members = [pts.responsible, ...pts.team];
+  // RFEM001 – só o responsável ou o admin, e só com o PTS em planejamento ou
+  // andamento (a API responde 409 PTS_NOT_ACTIVE fora disso).
+  const canManageTeam =
+    (isAdmin || currentUserProfileIds.includes(pts.responsible.id)) &&
+    ['planning', 'running'].includes(pts.status);
+
+  const handleTeamUpdated = (updatedPts: PtsData) => {
+    setPts((prev) =>
+      prev
+        ? {
+            ...prev,
+            team: updatedPts.team as PtsProfessional[],
+          }
+        : prev,
+    );
+  };
 
   return (
     <>
@@ -308,7 +334,13 @@ function PtsDetailContent({
         </section>
       ) : (
         <section data-panel="equipe" id="equipe">
-          <TeamTable members={members} responsibleId={pts.responsible.id} />
+          <TeamTable
+            ptsId={pts.id}
+            members={members}
+            responsibleId={pts.responsible.id}
+            canManageTeam={canManageTeam}
+            onTeamUpdated={handleTeamUpdated}
+          />
         </section>
       )}
     </>
@@ -316,13 +348,22 @@ function PtsDetailContent({
 }
 
 function TeamTable({
+  ptsId,
   members,
   responsibleId,
+  canManageTeam,
+  onTeamUpdated,
 }: {
+  ptsId: string;
   members: PtsProfessional[];
   responsibleId: string;
+  canManageTeam: boolean;
+  onTeamUpdated: (updatedPts: PtsData) => void;
 }) {
   const [term, setTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [successFeedback, setSuccessFeedback] = useState<string | null>(null);
+
   const query = term.trim().toLocaleLowerCase('pt-BR');
   const shown = members.filter(
     (member) =>
@@ -336,6 +377,8 @@ function TeamTable({
         .includes(query),
   );
 
+  const excludedIds = members.map((member) => member.id);
+
   return (
     <div className="ux-tcard">
       <div className="ux-tcard-head">
@@ -346,7 +389,41 @@ function TeamTable({
             {members.length === 1 ? 'profissional' : 'profissionais'}
           </p>
         </div>
+
+        {canManageTeam && (
+          <div className="ux-tools">
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setSuccessFeedback(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Icon name="plus" className="icon-sm" />
+              Adicionar profissional
+            </button>
+          </div>
+        )}
       </div>
+
+      {successFeedback && (
+        <div
+          role="status"
+          style={{
+            margin: '0 1.25rem 1rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '0.5rem',
+            backgroundColor: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+          }}
+        >
+          {successFeedback}
+        </div>
+      )}
 
       <div className="ux-toolbar">
         <label className="field">
@@ -409,6 +486,19 @@ function TeamTable({
             </tbody>
           </table>
         </div>
+      )}
+
+      {canManageTeam && (
+        <AddTeamMembersModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          ptsId={ptsId}
+          excludedIds={excludedIds}
+          onSuccess={(updatedPts) => {
+            onTeamUpdated(updatedPts);
+            setSuccessFeedback('Equipe atualizada.');
+          }}
+        />
       )}
     </div>
   );

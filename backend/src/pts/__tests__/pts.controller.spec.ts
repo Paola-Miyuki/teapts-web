@@ -291,6 +291,82 @@ describe('PtsController DELETE /pts/proposals/:id', () => {
   });
 });
 
+describe('PtsController POST /pts/:id/team', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.activePts.push({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      socialSituation: 'Situação social confidencial.',
+      createdAt: '2026-10-15T12:00:00.000Z',
+      acceptedAt: '2026-10-15T12:30:00.000Z',
+      beganAt: null,
+      patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+      responsible: {
+        id: 'prof-10',
+        name: 'Profissional responsável',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Profissional da equipe',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  });
+
+  it('adiciona profissionais à equipe pela rota POST /pts/:id/team', async () => {
+    const result = await controller.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      responsible: { id: 'prof-10' },
+      team: [{ id: 'prof-11' }, { id: 'prof-15' }],
+    });
+  });
+
+  it('nega a alteração da equipe a quem não é o responsável', async () => {
+    await expectApiError(
+      () =>
+        controller.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          teamAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga 409 PTS_NOT_ACTIVE quando o PTS não está em PLANNING ou RUNNING', async () => {
+    repo.activePts[0].status = PtsStateEnum.DRAFT as PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () =>
+        controller.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          responsibleAccount,
+        ),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+  });
+});
+
 describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
   let repo: InMemoryPtsRepository;
   let controller: PtsController;

@@ -1512,6 +1512,260 @@ describe('PtsService.deleteProposal', () => {
   });
 });
 
+describe('PtsService.addTeamMembers (RFEM001)', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const activePts: ActivePtsResponseDto = {
+    id: 'active-100',
+    status: PtsStateEnum.PLANNING,
+    socialSituation: 'Situação social confidencial.',
+    createdAt: '2026-10-15T12:00:00.000Z',
+    acceptedAt: '2026-10-15T12:30:00.000Z',
+    beganAt: null,
+    patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+    responsible: {
+      id: 'prof-10',
+      name: 'Profissional responsável',
+      specialism: { id: 'psychologist', name: 'Psicologia' },
+      registration: null,
+    },
+    team: [
+      {
+        id: 'prof-11',
+        name: 'Profissional da equipe',
+        specialism: { id: 'doctor', name: 'Medicina' },
+        registration: null,
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    repo.activePts.push({
+      ...activePts,
+      team: [...activePts.team],
+    });
+    service = new PtsService(repo);
+  });
+
+  it('responsável adiciona perfis cadastrados à equipe de um PTS em PLANNING ou RUNNING', async () => {
+    const result = await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15', 'prof-20'] },
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      responsible: { id: 'prof-10' },
+      team: [{ id: 'prof-11' }, { id: 'prof-15' }, { id: 'prof-20' }],
+    });
+  });
+
+  it('permite adicionar membros quando o PTS está em RUNNING', async () => {
+    repo.activePts[0].status = PtsStateEnum.RUNNING;
+
+    const result = await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      responsibleAccount,
+    );
+
+    expect(result.status).toBe(PtsStateEnum.RUNNING);
+    expect(result.team.map((m) => m.id)).toEqual(['prof-11', 'prof-15']);
+  });
+
+  it('permite ao admin adicionar membros à equipe (RN022)', async () => {
+    const result = await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      adminAccount,
+    );
+
+    expect(result.team.map((m) => m.id)).toEqual(['prof-11', 'prof-15']);
+  });
+
+  it('retorna 404 PTS_NOT_FOUND quando o PTS não existe', async () => {
+    await expectApiError(
+      () =>
+        service.addTeamMembers(
+          'pts-inexistente',
+          { professionalIds: ['prof-15'] },
+          responsibleAccount,
+        ),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it.each([
+    ['membro da equipe', teamAccount],
+    ['outro profissional', otherProfessionalAccount],
+    ['paciente', patientAccount],
+    ['conta sem perfil', noProfileAccount],
+  ])(
+    'retorna 403 FORBIDDEN quando %s tenta alterar a equipe (RN006)',
+    async (_label, account) => {
+      await expectApiError(
+        () =>
+          service.addTeamMembers(
+            'active-100',
+            { professionalIds: ['prof-15'] },
+            account,
+          ),
+        403,
+        'FORBIDDEN',
+      );
+
+      expect(repo.activePts[0].team.map((m) => m.id)).toEqual(['prof-11']);
+    },
+  );
+
+  it.each([
+    PtsStateEnum.DRAFT,
+    PtsStateEnum.CONCLUDED,
+    PtsStateEnum.CANCELLED,
+    PtsStateEnum.REJECTED,
+  ])('retorna 409 PTS_NOT_ACTIVE quando o PTS está em %s', async (status) => {
+    repo.activePts[0].status = status as PtsStateEnum.PLANNING;
+
+    const error = await expectApiError(
+      () =>
+        service.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          responsibleAccount,
+        ),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+
+    expect(error.message).toBe(
+      'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
+    );
+    expect(repo.activePts[0].team.map((m) => m.id)).toEqual(['prof-11']);
+  });
+
+  it('retorna 400 TEAM_PROFESSIONAL_NOT_FOUND quando algum perfil não está cadastrado (sem adicionar nenhum)', async () => {
+    const error = await expectApiError(
+      () =>
+        service.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15', 'prof-404'] },
+          responsibleAccount,
+        ),
+      400,
+      'TEAM_PROFESSIONAL_NOT_FOUND',
+    );
+
+    expect(error.professionalIds).toEqual(['prof-404']);
+    expect(repo.activePts[0].team.map((m) => m.id)).toEqual(['prof-11']);
+  });
+
+  it('retorna 400 TEAM_DUPLICATE_ACCOUNT se a conta já for responsável ou já estiver na equipe, sem adicionar nenhum (RN008)', async () => {
+    // Segundo perfil profissional da conta do responsável (acc-1)
+    repo.professionals.set('prof-10-b', {
+      id: 'prof-10-b',
+      accountId: 'acc-1',
+    });
+    // Segundo perfil profissional da conta de um membro existente (acc-2)
+    repo.professionals.set('prof-11-b', {
+      id: 'prof-11-b',
+      accountId: 'acc-2',
+    });
+
+    const error = await expectApiError(
+      () =>
+        service.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15', 'prof-10-b', 'prof-11-b'] },
+          responsibleAccount,
+        ),
+      400,
+      'TEAM_DUPLICATE_ACCOUNT',
+    );
+
+    expect(error.professionalIds).toEqual(['prof-10-b', 'prof-11-b']);
+    expect(repo.activePts[0].team.map((m) => m.id)).toEqual(['prof-11']);
+  });
+
+  it('grava um member_added por profissional, com o responsável como autor', async () => {
+    repo.accountNames.set('acc-1', 'Kaio Segunda Conta');
+
+    await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15', 'prof-20'] },
+      responsibleAccount,
+    );
+
+    expect(repo.addedRecords).toEqual([
+      {
+        ptsId: 'active-100',
+        professionalId: 'prof-15',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'acc-1',
+        description:
+          'Kaio Segunda Conta adicionou Profissional prof-15 à equipe',
+      },
+      {
+        ptsId: 'active-100',
+        professionalId: 'prof-20',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'acc-1',
+        description:
+          'Kaio Segunda Conta adicionou Profissional prof-20 à equipe',
+      },
+    ]);
+  });
+
+  it('grava o admin como quem executou, sem profissional atribuído (RN029)', async () => {
+    repo.accountNames.set('acc-admin', 'Kaio Admin');
+
+    await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      adminAccount,
+    );
+
+    expect(repo.addedRecords).toEqual([
+      expect.objectContaining({
+        authorProfessionalId: null,
+        executedByAccountId: 'acc-admin',
+        description: 'Kaio Admin adicionou Profissional prof-15 à equipe',
+      }),
+    ]);
+  });
+
+  it('usa o nome do responsável quando a conta não tem nome cadastrado', async () => {
+    await service.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      responsibleAccount,
+    );
+
+    expect(repo.addedRecords[0].description).toBe(
+      'Profissional responsável adicionou Profissional prof-15 à equipe',
+    );
+  });
+
+  it('não grava evento quando a adição é recusada', async () => {
+    await expectApiError(
+      () =>
+        service.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          teamAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+
+    expect(repo.addedRecords).toHaveLength(0);
+  });
+});
+
 describe('PtsService.removeTeamMember', () => {
   let repo: InMemoryPtsRepository;
   let service: PtsService;

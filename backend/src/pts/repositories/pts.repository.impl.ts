@@ -21,7 +21,10 @@ import {
   type UpdatePtsProposalInput,
   type SocialSituationTarget,
   type ProposalDecisionTarget,
+  type PtsTeamTarget,
+  type ProfessionalAccountRecord,
   type RemoveTeamMemberInput,
+  type AddTeamMembersInput,
 } from './pts.repository';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
@@ -754,6 +757,134 @@ export class PtsRepositoryImpl extends PtsRepository {
         this.mapProfessional(professional),
       ),
     };
+  }
+
+  async findPtsTeamTarget(id: string): Promise<PtsTeamTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: {
+        responsible: { account: true },
+        team: { account: true },
+      },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      responsibleAccountId: pts.responsible?.account?.id ?? '',
+      responsibleName: pts.responsible?.account?.name ?? '',
+      teamMembers: (pts.team ?? []).map((member) => ({
+        professionalId: member.id,
+        accountId: member.account?.id ?? '',
+      })),
+    };
+  }
+
+  async findProfessionalsWithAccountByIds(
+    ids: string[],
+  ): Promise<ProfessionalAccountRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const found = await this.professionalRepository.find({
+      where: { id: In(ids) },
+      relations: { account: true },
+    });
+
+    return found.map((professional) => ({
+      id: professional.id,
+      accountId: professional.account?.id ?? '',
+      name: professional.account?.name ?? '',
+    }));
+  }
+
+  async addTeamMembers(
+    input: AddTeamMembersInput,
+  ): Promise<PtsTeamResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava o PTS e refaz as checagens: uma transferência de
+      // responsabilidade ou um encerramento simultâneo não passam despercebidos.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        input.authorProfessionalId !== null &&
+        locked.responsibleProfessionalId !== input.authorProfessionalId
+      ) {
+        throw teamEditForbidden();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsNotActive();
+      }
+
+      for (const member of input.members) {
+        await queryRunner.query(
+          `INSERT INTO professional_participating_on_therapeutic_journey
+            (professional_id, therapeutic_journey_id)
+           VALUES ($1, $2)`,
+          [member.professionalId, input.ptsId],
+        );
+
+        await this.timelineRecorder.record(
+          {
+            type: TimelineRecordType.MemberAdded,
+            description: member.description,
+            targetId: member.professionalId,
+            targetType: TimelineRecordTarget.TeamMember,
+            ptsId: input.ptsId,
+            authorProfessionalId: input.authorProfessionalId,
+            executedByAccountId: input.executedByAccountId,
+          },
+          queryRunner.manager,
+        );
+      }
+
+      const pts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: input.ptsId },
+        relations: {
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!pts) {
+        throw ptsNotFound();
+      }
+
+      await queryRunner.commitTransaction();
+
+      return this.toTeamResponse(pts);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   private toProposalResponse(proposal: PtsEntity): PtsProposalResponseDto {

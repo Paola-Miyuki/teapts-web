@@ -155,7 +155,7 @@ export const teamEditForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,
     'FORBIDDEN',
-    'Somente o responsável pode alterar a equipe.',
+    'Somente o responsável pode alterar a equipe do PTS.',
   );
 
 export const teamMemberNotFound = () =>
@@ -170,4 +170,12 @@ export const cannotRemoveResponsible = () =>
     HttpStatus.CONFLICT,
     'CANNOT_REMOVE_RESPONSIBLE',
     'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
+  );
+
+export const teamDuplicateAccount = (ids: string[]) =>
+  new PtsApiError(
+    HttpStatus.BAD_REQUEST,
+    'TEAM_DUPLICATE_ACCOUNT',
+    'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+    { professionalIds: ids },
   );

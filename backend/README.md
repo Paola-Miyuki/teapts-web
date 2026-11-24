@@ -112,7 +112,8 @@ src/
                                                GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
                                                PATCH /pts/:id/social-situation, POST
                                                /pts/proposals/:id/approve e /reject,
-                                               DELETE /pts/proposals/:id e
+                                               DELETE /pts/proposals/:id,
+                                               POST /pts/:id/team e
                                                DELETE /pts/:id/team/:professionalId, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
                                                equipe e admin), estados do PTS e decisão das propostas
@@ -206,6 +207,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
+| POST | `/pts/:id/team` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team](#post-ptsidteam) |
 | DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
 | GET | `/pts/:id/timeline` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id/timeline](#get-ptsidtimeline) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
@@ -551,6 +553,38 @@ Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
 para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
 proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
 simultânea não deixa excluir um PTS que acabou de ser aprovado.
+
+## POST /pts/:id/team
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN006 e
+RN022) adicionam profissionais à equipe de um PTS em `planning` ou `running`
+(RFEM001). Na proposta em `draft`, a equipe muda pela edição da proposta.
+
+```json
+{ "professionalIds": ["5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a"] }
+```
+
+`professionalIds` tem ao menos um UUID, sem repetidos. Cada conta entra uma
+vez na equipe, com um único perfil, contando o responsável (RN008).
+
+Na mesma transação, os vínculos em
+`professional_participating_on_therapeutic_journey` são criados e um
+`timeline_record` por profissional adicionado é gravado pelo
+`TimelineRecorderService` (com o `EntityManager` da transação):
+`type: member_added`, `target_type: team_member`, `target_id` = id do
+profissional adicionado, `pts_id`, `author_professional_id` = responsável
+(nulo quando o admin adiciona) e `executed_by_account_id` = conta que
+executou (RN029). A descrição segue o padrão da timeline: "<quem executou>
+adicionou <membro> à equipe".
+
+A resposta `200` retorna o PTS com o responsável e a equipe atualizada, no
+mesmo formato do `DELETE` abaixo. Os erros possíveis são `400`
+(`VALIDATION_ERROR`, `TEAM_PROFESSIONAL_NOT_FOUND` ou
+`TEAM_DUPLICATE_ACCOUNT`, os dois últimos com `professionalIds`), `401`
+(sem sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_ACTIVE`). Nenhum profissional é adicionado se algum falhar. A
+transação trava o PTS (`pessimistic_write`) e refaz as checagens de
+responsável e de estado.
 
 ## DELETE /pts/:id/team/:professionalId
 

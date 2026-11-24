@@ -307,4 +307,64 @@ describe('PtsDetail', () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
+
+  describe('botão "Adicionar profissional" (RFEM001)', () => {
+    const ADMIN: Account = {
+      ...PROFESSIONAL,
+      accountId: 'admin-uuid',
+      role: 'admin',
+      professionalProfileIds: [],
+    };
+    const MEMBER: Account = {
+      ...PROFESSIONAL,
+      professionalProfileIds: ['prof-2'],
+    };
+
+    async function openTeam(pts: unknown, account: Account) {
+      mockApi(respond(200, pts), account);
+
+      render(<PtsDetailPage id="pts-1" />);
+
+      fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+      await screen.findByRole('heading', { name: 'Equipe multidisciplinar' });
+    }
+
+    const addButton = () =>
+      screen.queryByRole('button', { name: /adicionar profissional/i });
+
+    it.each(['planning', 'running'])(
+      'aparece para o responsável com o PTS em %s',
+      async (status) => {
+        await openTeam({ ...PTS, status }, PROFESSIONAL);
+
+        expect(addButton()).toBeInTheDocument();
+      },
+    );
+
+    it('aparece para o admin (RN022)', async () => {
+      await openTeam(PTS, ADMIN);
+
+      expect(addButton()).toBeInTheDocument();
+    });
+
+    it('não aparece para membro da equipe que não é o responsável', async () => {
+      await openTeam(PTS, MEMBER);
+
+      expect(addButton()).not.toBeInTheDocument();
+    });
+
+    it.each(['draft', 'concluded', 'cancelled', 'rejected'])(
+      'não aparece, nem para o responsável nem para o admin, com o PTS em %s',
+      async (status) => {
+        await openTeam({ ...PTS, status }, PROFESSIONAL);
+        expect(addButton()).not.toBeInTheDocument();
+      },
+    );
+
+    it('não aparece para o admin com o PTS encerrado', async () => {
+      await openTeam({ ...PTS, status: 'concluded' }, ADMIN);
+
+      expect(addButton()).not.toBeInTheDocument();
+    });
+  });
 });

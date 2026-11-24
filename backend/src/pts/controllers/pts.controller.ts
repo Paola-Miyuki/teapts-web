@@ -50,6 +50,7 @@ import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
+import { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
 import { PtsService } from '../services/pts.service';
 
 const parseUuidParam = (name: string) =>
@@ -252,6 +253,95 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<DeletePtsProposalResponseDto> {
     return this.ptsService.deleteProposal(id, account);
+  }
+
+  @Post(':id/team')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Adiciona profissionais à equipe multidisciplinar de um PTS ativo (RFEM001)',
+    description:
+      'Somente o profissional responsável adiciona perfis cadastrados a um PTS em PLANNING ou RUNNING. ' +
+      'Cada conta participa com no máximo um perfil, contando o responsável (RN008). ' +
+      'Os vínculos e um evento member_added por profissional entram na mesma transação.',
+  })
+  @ApiOkResponse({ type: PtsTeamResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      VALIDATION_ERROR: {
+        summary: 'Payload ou parâmetro inválido',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Dados inválidos na solicitação.',
+        },
+      },
+      TEAM_PROFESSIONAL_NOT_FOUND: {
+        summary: 'Perfil profissional inexistente',
+        value: {
+          status: 'TEAM_PROFESSIONAL_NOT_FOUND',
+          message:
+            'Profissionais da equipe não encontrados: 5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a.',
+          professionalIds: ['5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a'],
+        },
+      },
+      TEAM_DUPLICATE_ACCOUNT: {
+        summary: 'Conta já presente na equipe ou como responsável',
+        value: {
+          status: 'TEAM_DUPLICATE_ACCOUNT',
+          message:
+            'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+          professionalIds: ['5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a'],
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    examples: {
+      FORBIDDEN: {
+        summary: 'Conta sem o perfil responsável pelo PTS',
+        value: {
+          status: 'FORBIDDEN',
+          message: 'Somente o responsável pode alterar a equipe do PTS.',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_FOUND: {
+        summary: 'PTS não encontrado',
+        value: {
+          status: 'PTS_NOT_FOUND',
+          message: 'PTS não encontrado.',
+        },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_ACTIVE: {
+        summary: 'PTS não está em PLANNING ou RUNNING',
+        value: {
+          status: 'PTS_NOT_ACTIVE',
+          message: 'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
+        },
+      },
+    },
+  })
+  async addTeamMembers(
+    @Param('id', parseProposalId) id: string,
+    @Body() dto: AddPtsTeamMembersRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    return this.ptsService.addTeamMembers(id, dto, account);
   }
 
   @Delete(':id/team/:professionalId')

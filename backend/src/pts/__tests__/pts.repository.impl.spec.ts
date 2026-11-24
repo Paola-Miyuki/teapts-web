@@ -295,6 +295,7 @@ function createTeamRepository(locked: Partial<PtsEntity> | null, affected = 1) {
       insert: jest.fn(async () => ({ identifiers: [] })),
       findOne: jest.fn(async () => reloaded),
     },
+    query: jest.fn(async () => []),
     connect: jest.fn(async () => undefined),
     startTransaction: jest.fn(async () => {
       queryRunner.isTransactionActive = true;
@@ -442,6 +443,124 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
       'TEAM_MEMBER_NOT_FOUND',
     );
 
+    expect(queryRunner.manager.insert).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.addTeamMembers', () => {
+  const input = {
+    ptsId: 'pts-1',
+    members: [
+      {
+        professionalId: 'prof-15',
+        description: 'Kaio Segunda Conta adicionou Kaio Felipe à equipe',
+      },
+      {
+        professionalId: 'prof-20',
+        description: 'Kaio Segunda Conta adicionou Ana Souza à equipe',
+      },
+    ],
+    authorProfessionalId: 'prof-10',
+    executedByAccountId: 'account-10',
+  };
+  const planning: Partial<PtsEntity> = {
+    id: 'pts-1',
+    status: PtsStateEnum.PLANNING,
+    responsibleProfessionalId: 'prof-10',
+  };
+
+  it('trava o PTS, cria os vínculos e grava um member_added por profissional na mesma transação', async () => {
+    const { repository, lockQuery, queryRunner } =
+      createTeamRepository(planning);
+
+    const result = await repository.addTeamMembers(input);
+
+    expect(lockQuery.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(queryRunner.query).toHaveBeenCalledTimes(2);
+    expect(queryRunner.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining(
+        'INSERT INTO professional_participating_on_therapeutic_journey',
+      ),
+      ['prof-15', 'pts-1'],
+    );
+    expect(queryRunner.query).toHaveBeenNthCalledWith(2, expect.any(String), [
+      'prof-20',
+      'pts-1',
+    ]);
+    expect(queryRunner.manager.insert).toHaveBeenCalledTimes(2);
+    expect(queryRunner.manager.insert).toHaveBeenNthCalledWith(
+      1,
+      TimelineRecordEntity,
+      {
+        type: TimelineRecordType.MemberAdded,
+        description: 'Kaio Segunda Conta adicionou Kaio Felipe à equipe',
+        targetId: 'prof-15',
+        targetType: TimelineRecordTarget.TeamMember,
+        ptsId: 'pts-1',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'account-10',
+      },
+    );
+    expect(queryRunner.manager.insert).toHaveBeenNthCalledWith(
+      2,
+      TimelineRecordEntity,
+      expect.objectContaining({
+        type: TimelineRecordType.MemberAdded,
+        targetId: 'prof-20',
+      }),
+    );
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+    expect(result.id).toBe('pts-1');
+  });
+
+  it('grava o admin sem profissional atribuído (RN029)', async () => {
+    const { repository, queryRunner } = createTeamRepository(planning);
+
+    await repository.addTeamMembers({ ...input, authorProfessionalId: null });
+
+    expect(queryRunner.manager.insert).toHaveBeenCalledWith(
+      TimelineRecordEntity,
+      expect.objectContaining({
+        authorProfessionalId: null,
+        executedByAccountId: 'account-10',
+      }),
+    );
+  });
+
+  it('desfaz os vínculos quando a gravação da timeline falha', async () => {
+    const { repository, queryRunner } = createTeamRepository(planning);
+    queryRunner.manager.insert.mockRejectedValueOnce(new Error('falha'));
+
+    await expect(repository.addTeamMembers(input)).rejects.toThrow('falha');
+
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PTS sumiu antes do lock', null, 404, 'PTS_NOT_FOUND'],
+    [
+      'responsabilidade transferida antes do lock',
+      { ...planning, responsibleProfessionalId: 'prof-99' },
+      403,
+      'FORBIDDEN',
+    ],
+    [
+      'PTS encerrado antes do lock',
+      { ...planning, status: PtsStateEnum.CONCLUDED },
+      409,
+      'PTS_NOT_ACTIVE',
+    ],
+  ])('não adiciona quando o %s', async (_label, locked, status, code) => {
+    const { repository, queryRunner } = createTeamRepository(locked);
+
+    await expectApiError(() => repository.addTeamMembers(input), status, code);
+
+    expect(queryRunner.query).not.toHaveBeenCalled();
     expect(queryRunner.manager.insert).not.toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });
