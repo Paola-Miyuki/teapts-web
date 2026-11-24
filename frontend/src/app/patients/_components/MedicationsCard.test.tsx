@@ -47,16 +47,9 @@ describe('MedicationsCard', () => {
       }),
     );
 
-    render(
-      <MedicationsCard
-        patientId="patient-1"
-        canEdit={false}
-      />,
-    );
+    render(<MedicationsCard patientId="patient-1" canEdit={false} />);
 
-    expect(
-      await screen.findByText('Risperidona'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Risperidona')).toBeInTheDocument();
 
     expect(screen.getByText('Dose: 0,5 mg')).toBeInTheDocument();
 
@@ -64,7 +57,9 @@ describe('MedicationsCard', () => {
       screen.getByText('Frequência: 1x ao dia, à noite'),
     ).toBeInTheDocument();
 
-    expect(screen.getByText('Em uso', { selector: 'span.badge' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Em uso', { selector: 'span.badge' }),
+    ).toBeInTheDocument();
 
     expect(
       screen.queryByRole('button', {
@@ -96,10 +91,7 @@ describe('MedicationsCard', () => {
       (url: string | URL | Request, init?: RequestInit) => {
         const requestUrl = String(url);
 
-        if (
-          requestUrl.endsWith('/medications') &&
-          init?.method === 'POST'
-        ) {
+        if (requestUrl.endsWith('/medications') && init?.method === 'POST') {
           return Promise.resolve(respond(201, saved));
         }
 
@@ -111,12 +103,7 @@ describe('MedicationsCard', () => {
       },
     ) as jest.Mock;
 
-    render(
-      <MedicationsCard
-        patientId="patient-1"
-        canEdit
-      />,
-    );
+    render(<MedicationsCard patientId="patient-1" canEdit />);
 
     await screen.findByText('Nenhuma medicação encontrada.');
 
@@ -171,9 +158,7 @@ describe('MedicationsCard', () => {
       startDate: '2026-11-24',
     });
 
-    expect(
-      await screen.findByText('Melatonina'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Melatonina')).toBeInTheDocument();
 
     expect(
       screen.getByText('Medicação adicionada com sucesso.'),
@@ -205,12 +190,7 @@ describe('MedicationsCard', () => {
       },
     ) as jest.Mock;
 
-    render(
-      <MedicationsCard
-        patientId="patient-1"
-        canEdit
-      />,
-    );
+    render(<MedicationsCard patientId="patient-1" canEdit />);
 
     await screen.findByText('Risperidona');
 
@@ -255,9 +235,7 @@ describe('MedicationsCard', () => {
       startDate: '2026-11-01',
     });
 
-    expect(
-      await screen.findByText('Dose: 1 mg'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Dose: 1 mg')).toBeInTheDocument();
 
     expect(
       screen.getByText('Medicação atualizada com sucesso.'),
@@ -275,9 +253,7 @@ describe('MedicationsCard', () => {
         const requestUrl = String(url);
 
         if (
-          requestUrl.endsWith(
-            '/medications/medication-1/stop',
-          ) &&
+          requestUrl.endsWith('/medications/medication-1/stop') &&
           init?.method === 'POST'
         ) {
           return Promise.resolve(respond(200, stopped));
@@ -291,12 +267,7 @@ describe('MedicationsCard', () => {
       },
     ) as jest.Mock;
 
-    render(
-      <MedicationsCard
-        patientId="patient-1"
-        canEdit
-      />,
-    );
+    render(<MedicationsCard patientId="patient-1" canEdit />);
 
     await screen.findByText('Risperidona');
 
@@ -316,15 +287,11 @@ describe('MedicationsCard', () => {
       );
     });
 
-    expect(
-      await screen.findByText('Suspensa'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Suspensa')).toBeInTheDocument();
 
     expect(screen.getByText('Risperidona')).toBeInTheDocument();
 
-    expect(
-      screen.getByText('Fim: 24/11/2026'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Fim: 24/11/2026')).toBeInTheDocument();
 
     expect(
       screen.queryByRole('button', {
@@ -353,12 +320,7 @@ describe('MedicationsCard', () => {
       },
     ) as jest.Mock;
 
-    render(
-      <MedicationsCard
-        patientId="patient-1"
-        canEdit
-      />,
-    );
+    render(<MedicationsCard patientId="patient-1" canEdit />);
 
     await screen.findByText('Nenhuma medicação encontrada.');
 
@@ -391,9 +353,7 @@ describe('MedicationsCard', () => {
     );
 
     expect(
-      await screen.findByText(
-        'Acesso restrito ao profissional.',
-      ),
+      await screen.findByText('Acesso restrito ao profissional.'),
     ).toBeInTheDocument();
 
     expect(

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AccountsModule } from '../accounts/accounts.module';
 import { PtsEntity } from '../pts/entities/pts.entity';
 import { TimelineController } from './controllers/timeline.controller';
 import { TimelineRecordEntity } from './entities/timeline-record.entity';
@@ -10,7 +11,10 @@ import { TimelineRecorderService } from './services/timeline-recorder.service';
 import { TimelineService } from './services/timeline.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TimelineRecordEntity, PtsEntity])],
+  imports: [
+    AccountsModule,
+    TypeOrmModule.forFeature([TimelineRecordEntity, PtsEntity]),
+  ],
   controllers: [TimelineController],
   providers: [
     TimelineService,

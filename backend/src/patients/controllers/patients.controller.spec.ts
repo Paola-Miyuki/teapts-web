@@ -54,7 +54,6 @@ describe('GET /patients/authorized', () => {
       controllers: [PatientsController],
       providers: [
         { provide: PatientsService, useValue: patientsService },
-        AuthGuard,
         AdminGuard,
       ],
     })
@@ -195,7 +194,6 @@ describe('GET /patients (eligible for a new proposal)', () => {
       controllers: [PatientsController],
       providers: [
         { provide: PatientsService, useValue: patientsService },
-        AuthGuard,
         AdminGuard,
       ],
     })
@@ -275,7 +273,6 @@ describe('POST /patients', () => {
       controllers: [PatientsController],
       providers: [
         { provide: PatientsService, useValue: patientsService },
-        AuthGuard,
         AdminGuard,
       ],
     })
@@ -382,7 +379,6 @@ describe('support contacts routes', () => {
       controllers: [PatientsController],
       providers: [
         { provide: PatientsService, useValue: patientsService },
-        AuthGuard,
         AdminGuard,
       ],
     })

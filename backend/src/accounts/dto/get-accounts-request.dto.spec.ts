@@ -71,4 +71,51 @@ describe('GetAccountsRequestDto', () => {
       message: `Parâmetro inválido: ${parameter}`,
     });
   });
+
+  it.each([
+    [{ profile: 'none' }, { profile: ['none'] }],
+    [{ profile: 'none, patient' }, { profile: ['none', 'patient'] }],
+    [
+      { profile: ['admin', 'patient,admin'] },
+      { profile: ['admin', 'patient'] },
+    ],
+    [{ profile: '' }, {}],
+    [{ status: 'inactive' }, { status: 'inactive' }],
+    [{ status: '' }, {}],
+    [
+      { createdFrom: '2026-10-01', createdTo: ' 2026-11-24 ' },
+      { createdFrom: '2026-10-01', createdTo: '2026-11-24' },
+    ],
+    [
+      { sort: 'createdAt', order: 'desc' },
+      { sort: 'createdAt', order: 'desc' },
+    ],
+  ])('normalizes the new parameters %j', async (query, expected) => {
+    await expect(normalize(query)).resolves.toEqual({
+      page: 1,
+      limit: 20,
+      ...expected,
+    });
+  });
+
+  it.each([
+    ['profile', { profile: 'guest' }],
+    ['profile', { profile: 'none,guest' }],
+    ['status', { status: 'blocked' }],
+    ['status', { status: ['active', 'inactive'] }],
+    ['createdFrom', { createdFrom: '2026-13-01' }],
+    ['createdFrom', { createdFrom: '2026-02-30' }],
+    ['createdTo', { createdTo: '24/11/2026' }],
+    ['createdTo', { createdTo: '2026-11-24T10:00:00' }],
+    ['sort', { sort: 'email' }],
+    ['order', { order: 'up' }],
+  ])('rejects an invalid %s parameter %j', async (parameter, query) => {
+    const error: unknown = await normalize(query).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(BadRequestException);
+    expect((error as BadRequestException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: `Parâmetro inválido: ${parameter}`,
+    });
+  });
 });

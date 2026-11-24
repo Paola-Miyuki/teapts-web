@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository, type SelectQueryBuilder } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { escapeLike } from '../../common/search/escape-like';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -75,6 +76,7 @@ export type PatientRow = {
   account_name: string;
   social_name: string | null;
   email: string;
+  phone: string | null;
   cpf: string | null;
   cns: string | null;
   guardian_name: string | null;
@@ -215,6 +217,10 @@ export class PatientsRepository {
     filters: AuthorizedPatientsQuery,
   ): Promise<PatientsPage> {
     const inner = this.scopedPatients(scope);
+    // Conta desativada sai da lista (RFAUT005); o detalhe segue acessível.
+    inner.andWhere('account.status = :activeStatus', {
+      activeStatus: AccountStatus.Active,
+    });
     applySearch(inner, filters.q);
 
     if (filters.responsibleProfessionalId !== undefined) {
@@ -374,6 +380,7 @@ export class PatientsRepository {
         'account.name AS account_name',
         'account.social_name AS social_name',
         'account.email AS email',
+        'account.phone AS phone',
         'account.cpf AS cpf',
         'patient.cns AS cns',
         'patient.guardian_name AS guardian_name',
@@ -732,4 +739,3 @@ export class PatientsRepository {
     return this.findMedication(patientId, medicationId);
   }
 }
-

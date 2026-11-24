@@ -209,6 +209,17 @@ O seed precisa do PostgreSQL e do SuperTokens em execução, com as migrations a
 | Paciente | `luna@teapts.local` / `paciente123` | Luna Ferreira, CNS `700 0022 2333 4444`; CPF `111.444.777-35`, 15/03/2007, feminino |
 | Paciente | `diego@teapts.local` / `paciente123` | Diego Alves, menor de idade, responsável tutelar Paula Alves, CNS `700 0055 5666 7777`; CPF `321.654.987-91`, 22/08/2015, masculino |
 
+Contas sem perfil, para testar a tela Contas do admin (`/accounts`). A cada execução do seed a situação delas volta ao que está na tabela, então dá para desativar e testar de novo:
+
+| Conta | E-mail / senha | Situação e dados |
+| --- | --- | --- |
+| Bruno Takeda | `bruno@teapts.local` / `conta123` | ativa, sem perfil; CPF `390.533.447-05`, criada em 10/11/2026 |
+| Priscila Martins | `priscila@teapts.local` / `conta123` | ativa, sem perfil; CPF `529.982.247-25`, criada em 14/11/2026 |
+| Sofia Andrade | `sofia@teapts.local` / `conta123` | ativa, sem perfil, sem telefone; CPF `168.995.350-09`, criada em 30/08/2026 |
+| Marcelo Duarte | `marcela@teapts.local` / `conta123` | ativa, sem perfil, nome social "Marcela Duarte" (a lista mostra e busca pelo nome social); CPF `135.792.468-28`, criada em 02/10/2026 |
+| Helena Rocha | `helena@teapts.local` / `conta123` | inativa (desativada em 01/09/2026), sem perfil; CPF `246.813.579-28`, criada em 17/04/2026 |
+| Kaio Segunda Conta | `kaio.admin@teapts.local` / `teapts123` | segunda conta de administrador, sem CPF nem perfil, criada em 05/01/2026 |
+
 PTS de teste (um de cada status):
 
 | Paciente | Status | Responsável | Equipe |
@@ -283,9 +294,11 @@ A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita
 | --- | --- | --- |
 | SuperTokens Core | container `supertokens`, porta 3567 | e-mail, senha (hash) e sessões, no schema `supertokens` do Postgres |
 | Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
-| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) e o vínculo `supertokens_user_id` |
+| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) a situação (`status`, `deactivated_at`, `deactivated_by_account_id`) e o vínculo `supertokens_user_id` |
 
 A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` e `professional`, no máximo um de cada (RN002). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
+
+**Excluir conta é lógica (RFAUT005, RN021).** `DELETE /me` (o titular) e `DELETE /accounts/:id` (admin) gravam `account.status = 'inactive'` e revogam todas as sessões no SuperTokens; nada é apagado, e os perfis seguem a situação da conta. A conta inativa é recusada no login (resposta de credenciais erradas, sem revelar o motivo) e o `AuthGuard` lê `account.status` no banco a cada requisição, então um token ainda válido também recebe `401`. O perfil profissional sai das equipes de PTS em `planning` ou `running`; se for responsável por PTS ativo, a rota responde `409 ACCOUNT_IS_PTS_RESPONSIBLE` até a transferência. Inativos saem do `GET /patients/authorized` e da seleção de equipes; o admin continua vendo-os no `GET /accounts` e no `GET /professionals`, com `status`.
 
 ```text
 POST /auth/signup (email, password, name, birthDate, sex, cpf; socialName, gender, phone opcionais)
@@ -335,6 +348,10 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | GET | `/me` | access token | dados da conta |
 | PATCH | `/me` | access token; `{ name?, email?, socialName?, birthDate?, sex?, gender?, phone? }` | dados da conta atualizados |
 | POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
+| DELETE | `/me` | access token | `200 { id, status: "inactive", deactivatedAt }`; desativa a própria conta e revoga as sessões |
+| GET | `/accounts` | access token de admin; `q`, `profile`, `status`, `createdFrom`, `createdTo`, `sort`, `order`, `page`, `limit` | contas paginadas, com perfil, especialidades e situação |
+| GET | `/accounts/:id` | access token de admin | dados da conta e o perfil |
+| DELETE | `/accounts/:id` | access token de admin | mesma resposta, para qualquer conta |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |
 

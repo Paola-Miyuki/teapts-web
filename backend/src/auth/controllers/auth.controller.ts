@@ -7,6 +7,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -23,6 +24,8 @@ import {
   ApiCookieAuth,
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
   ApiOperation,
   ApiOkResponse,
   ApiTags,
@@ -31,6 +34,7 @@ import {
 import type { SessionRequest } from 'supertokens-node/framework/express';
 import { AuthGuard } from '../guards/auth.guard';
 import { CurrentAccount } from '../decorators/current-account.decorator';
+import { DeactivateAccountResponseDto } from '../../accounts/dto/deactivate-account-response.dto';
 import { LogoutRequestDto } from '../dto/logout-request.dto';
 import { LogoutResponseDto } from '../dto/logout-response.dto';
 import { MeResponseDto } from '../dto/me-response.dto';
@@ -115,6 +119,57 @@ export class AuthController {
     @Body() body: UpdateMeRequestDto,
   ): Promise<MeResponseDto> {
     return this.accountsService.updateMe(account, body);
+  }
+
+  @Delete('me')
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Desativa a conta atual (exclusão lógica)' })
+  @ApiOkResponse({ type: DeactivateAccountResponseDto })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: { status: 'ACCOUNT_NOT_FOUND', message: 'Conta não encontrada.' },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      alreadyDeactivated: {
+        summary: 'Conta já desativada',
+        value: {
+          status: 'ACCOUNT_ALREADY_DEACTIVATED',
+          message: 'A conta já está desativada.',
+        },
+      },
+      ptsResponsible: {
+        summary: 'Responsável por PTS ativo',
+        value: {
+          status: 'ACCOUNT_IS_PTS_RESPONSIBLE',
+          message:
+            'A conta tem perfil responsável por um PTS ativo. Transfira a responsabilidade antes de desativar.',
+        },
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível desativar a conta.',
+    },
+  })
+  /**
+   * Desativa a própria conta (exclusão lógica, RFAUT005, RN021). As sessões
+   * da conta são revogadas, inclusive a desta requisição.
+   *
+   * @param account contexto validado pelo AuthGuard
+   * @returns id, situação e momento da desativação
+   */
+  async deactivateMe(
+    @CurrentAccount() account: AccountContext,
+  ): Promise<DeactivateAccountResponseDto> {
+    return this.accountsService.deactivate(
+      account.accountId,
+      account.accountId,
+    );
   }
 
   @Post('me/password')

@@ -25,7 +25,7 @@ Rode de dentro de `backend/` ou da raiz com `pnpm --dir backend run <script>`.
 | `migration:show`                     | lista as migrations (`[X]` = aplicada)                             |
 | `migration:run` / `migration:revert` | aplica as pendentes / desfaz a última                              |
 | `migration:generate <caminho>`       | gera migration comparando as entidades com o banco no ar           |
-| `seed:test-user`                     | cria as contas de teste (admin, profissionais e pacientes) e os PTS de teste; precisa do SuperTokens no ar |
+| `seed:test-user`                     | cria as contas de teste (admin, profissionais, pacientes e contas sem perfil) e os PTS de teste; precisa do SuperTokens no ar |
 | `test` / `test:cov` / `test:watch`   | testes unitários (Jest em ESM)                                     |
 | `test:e2e`                           | sobe o `AppModule` e chama as rotas por HTTP                       |
 | `lint` / `typecheck`                 | ESLint / `tsc --noEmit`                                            |
@@ -75,13 +75,14 @@ src/
     pagination/pagination-query.dto.ts     page/limit da query (padrão 1 e 20, máximo 50)
     pagination/pagination.ts               bloco pagination da resposta (toPagination)
   accounts/
-    controllers/accounts.controller.ts     GET /accounts, só admin
-    services/accounts.service.ts           cria a conta no signup, monta o contexto da sessão
-                                           e lista as contas
-    repositories/accounts.repository.ts    query da listagem (só contas user) com busca, filtros e paginação
+    controllers/accounts.controller.ts     GET /accounts, GET /accounts/:id e DELETE /accounts/:id, só admin
+    services/accounts.service.ts           cria a conta no signup, monta o contexto da sessão,
+                                           lista as contas, detalha uma conta e desativa a conta (revoga as sessões)
+    repositories/accounts.repository.ts    query da listagem (perfil, situação, data, ordenação) com busca e paginação;
+                                           transação da desativação
     dto/                                   contratos e validação da listagem
     entities/account.entity.ts
-    enums/                                 account_role_e, sex_e e gender_e
+    enums/                                 account_role_e, account_status_e, sex_e e gender_e
   professionals/
     controllers/professionals.controller.ts    GET /professionals protegido por sessão
                                                e POST /professionals, só admin
@@ -146,11 +147,11 @@ src/
                                            signInPOST e createNewSession; signOutPOST desligado
     sign-up-fields.ts                      validação e leitura dos campos do signup (CPF com
                                            dígito verificador, data, sexo, gênero, telefone)
-    controllers/auth.controller.ts         GET /me, PATCH /me, POST /me/password e POST /auth/logout
+    controllers/auth.controller.ts         GET /me, PATCH /me, DELETE /me, POST /me/password e POST /auth/logout
     dto/logout-request.dto.ts              corpo do logout (allSessions)
     dto/me-response.dto.ts, logout-response.dto.ts   respostas do /me e do logout
     account-context.ts                     valida o payload da sessão
-    guards/auth.guard.ts                   adapta o verifySession aos guards do NestJS
+    guards/auth.guard.ts                   adapta o verifySession aos guards do NestJS e recusa conta inativa (401)
     guards/admin.guard.ts                  depois do AuthGuard, exige o papel admin (403)
     decorators/current-account.decorator.ts   entrega o contexto ao controller
     supertokens-exception.filter.ts        erros do SuperTokens no pipeline do NestJS
@@ -187,6 +188,9 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | POST | `/me/password` | conta da sessão | [POST /me/password](#post-mepassword) |
 | POST | `/auth/logout` | conta da sessão | README da raiz, 6.3 |
 | GET | `/accounts` | admin | [GET /accounts](#get-accounts) |
+| GET | `/accounts/:id` | admin | [GET /accounts/:id](#get-accountsid) |
+| DELETE | `/accounts/:id` | admin | [DELETE /me e DELETE /accounts/:id](#delete-me-e-delete-accountsid) |
+| DELETE | `/me` | conta da sessão | [DELETE /me e DELETE /accounts/:id](#delete-me-e-delete-accountsid) |
 | GET | `/patients/authorized` | profissional (admin vê todos os pacientes) | [GET /patients/authorized](#get-patientsauthorized) |
 | GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
 | GET | `/patients/:id` | admin ou profissional com acesso (RN016) | [GET /patients/:id](#get-patientsid) |
@@ -308,30 +312,46 @@ state }`, com o conselho vindo da especialidade, ou `null`), como no `GET
 
 ## GET /accounts
 
-Exige sessão autenticada com papel `admin` e lista as contas de usuário para
-escolher a conta (ex.: no cadastro de perfil de paciente ou profissional),
-ordenadas por nome. Contas de admin nunca aparecem, porque não recebem perfil
-de paciente nem profissional (RN002).
+Exige sessão autenticada com papel `admin` e lista as contas (tela Contas do
+administrador e escolha da conta no cadastro de perfil de paciente ou
+profissional). Sem filtros, traz todas as contas, inclusive as de admin e as
+desativadas.
 
-Parâmetros de query:
+Parâmetros de query (todos opcionais):
 
-- `q`: busca parcial por nome ou e-mail, sem diferenciar maiúsculas; os espaços
-  externos são removidos, `%`, `_` e `\` valem como texto e vazio equivale a
-  sem busca; opcional;
-- `isPatient`: `true` só contas com perfil de paciente, `false` só contas sem;
-  opcional;
-- `isProfessional`: `true` só contas com perfil profissional, `false` só
-  contas sem; opcional;
-- `page`: página, padrão `1`, mínimo `1`;
-- `limit`: quantidade por página, padrão `20`, mínimo `1` e máximo `50`.
+- `q`: busca parcial por nome, nome social, e-mail ou CPF (com ou sem
+  pontuação), sem diferenciar maiúsculas; os espaços externos são removidos,
+  `%`, `_` e `\` valem como texto e vazio equivale a sem busca;
+- `profile`: `none` (conta sem perfil de paciente nem profissional e que não é
+  admin), `patient`, `professional` e `admin`; lista separada por vírgula ou
+  repetida; a conta entra se bater com qualquer valor;
+- `status`: `active` ou `inactive`; omitido traz as duas;
+- `createdFrom` e `createdTo`: data de criação, `AAAA-MM-DD`, inclusivas;
+- `sort`: `name` (padrão, nome exibido: o social, se houver) ou `createdAt`;
+  `order`: `asc` (padrão) ou `desc`;
+- `isPatient` e `isProfessional`: `true` ou `false`; filtros do combobox de
+  perfis, que mantêm só contas de usuário (RN002) sem/com o perfil;
+- `page` (padrão `1`) e `limit` (padrão `20`, máximo `50`).
 
-A busca e os filtros se combinam e entram antes da paginação, então o `total`
-já vem filtrado. Sem busca nem filtros, lista todas as contas de usuário. A
-resposta contém `{ data: [{ id, name, email }], pagination: { page, limit,
-total, totalPages } }`. Os erros possíveis são
-`400` (`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem
-sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
+Os filtros se combinam e entram antes da paginação, então o `total` já vem
+filtrado. A resposta é `{ data: [{ id, name, socialName, email, cpf, role,
+profile, specialisms, status, createdAt }], pagination: { page, limit, total,
+totalPages } }`: `name` é o nome exibido, `cpf` é `null` no admin, `role` é
+`user` ou `admin`, `profile` é `none`, `patient`, `professional` ou `admin`,
+`specialisms` traz as do perfil profissional (vazio nos demais) e `status` é
+`active` ou `inactive`. Os erros possíveis são `400`
+(`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem sessão),
+`403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 (`Não foi possível consultar as contas.`).
+
+## GET /accounts/:id
+
+Só `admin`. Devolve os dados do modal "Dados da conta": `id`, `fullName`,
+`socialName`, `birthDate`, `sex`, `gender`, `cpf`, `email`, `phone`, `role`,
+`status`, `createdAt`, `updatedAt` (`null` se nunca atualizada) e `profile`
+(`{ type: 'none' | 'patient' | 'professional' | 'admin', specialisms: string[] }`).
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID), `401`,
+`403` (`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`) e `500`.
 
 ## PATCH /me
 
@@ -363,6 +383,33 @@ telefone, com DDD, é gravado só com dígitos. Responde `200` com o mesmo corpo
 Os erros possíveis são `400` (`VALIDATION_ERROR`), `401` (sem sessão), `403`
 (`FORBIDDEN` quando o corpo tenta alterar `role`), `409`
 (`EMAIL_ALREADY_EXISTS`) e `500` (`Não foi possível atualizar o e-mail.`).
+
+## DELETE /me e DELETE /accounts/:id
+
+Desativam a conta (exclusão lógica, RFAUT005 e RN021; também é a desativação de
+profissional, RFPRO004). `DELETE /me` é do titular, com qualquer sessão válida;
+`DELETE /accounts/:id` é só do `admin` e aceita qualquer conta (o `id` é UUID).
+Não há corpo.
+
+Numa transação, a conta recebe `status = 'inactive'`, `deactivated_at` e
+`deactivated_by_account_id` (quem pediu), e o perfil profissional sai das
+equipes dos PTS em `planning` ou `running`. Registros do profissional mantêm a
+autoria; perfis e dados clínicos não são apagados. Depois da transação, todas
+as sessões da conta são revogadas no SuperTokens (se a revogação falhar, só vai
+para o log: o `AuthGuard` já recusa a conta inativa). A conta inativa também
+não faz login: a resposta é a de credenciais erradas, sem revelar o motivo.
+
+Responde `200` com `{ id, status: "inactive", deactivatedAt }`. Os erros
+possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID), `401`, `403`
+(`FORBIDDEN`, só em `/accounts/:id`), `404` (`ACCOUNT_NOT_FOUND`), `409`
+(`ACCOUNT_ALREADY_DEACTIVATED` ou `ACCOUNT_IS_PTS_RESPONSIBLE`, quando o perfil
+profissional é responsável por PTS ativo, RN007) e `500`.
+
+Efeito nas consultas: a conta inativa sai do `GET /patients/authorized` e do
+`GET /professionals` (seleção de equipes) para quem não é admin; o admin a vê
+no `GET /accounts` e no `GET /professionals`, com `status` (`active` ou
+`inactive`). A migration `AddAccountStatus` cria `account_status_e` e as três
+colunas; a FK `FK_patient_account` já é `ON DELETE RESTRICT`.
 
 ## POST /me/password
 

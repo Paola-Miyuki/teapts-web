@@ -8,6 +8,7 @@ import {
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import type { Patient } from '../../patients/entities/patient.entity';
 import type { Professional } from '../entities/professional.entity';
@@ -82,6 +83,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
         },
       ],
       total: 11,
@@ -102,6 +104,7 @@ describe('ProfessionalsService.findAll', () => {
           registration: { council: 'CRP', number: '12345', state: 'PR' },
           institution: 'IMA',
           cnes: null,
+          status: AccountStatus.Active,
         },
       ],
       pagination: {
@@ -112,7 +115,30 @@ describe('ProfessionalsService.findAll', () => {
       },
     });
 
-    expect(repository.findPaginated).toHaveBeenCalledWith(request);
+    expect(repository.findPaginated).toHaveBeenCalledWith({
+      ...request,
+      includeInactive: false,
+    });
+  });
+
+  it('lets the admin see the professionals of deactivated accounts', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
+
+    await service.findAll(
+      {
+        accountId: 'admin-1',
+        role: AccountRole.Admin,
+        patientProfileId: null,
+        professionalProfileIds: [],
+      },
+      request,
+    );
+
+    expect(repository.findPaginated).toHaveBeenCalledWith({
+      ...request,
+      includeInactive: true,
+    });
   });
 
   // O e-mail do profissional não vai para o paciente (DP011).
@@ -129,6 +155,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
         },
       ],
       total: 1,
@@ -152,6 +179,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
         },
       ],
       total: 1,

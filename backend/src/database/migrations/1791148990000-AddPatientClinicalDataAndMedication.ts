@@ -1,9 +1,7 @@
 ﻿import { MigrationInterface, QueryRunner } from 'typeorm';
 
 // Dados clínicos e medicações do paciente (RFPAC007).
-export class AddPatientClinicalDataAndMedication1791148990000
-  implements MigrationInterface
-{
+export class AddPatientClinicalDataAndMedication1791148990000 implements MigrationInterface {
   name = 'AddPatientClinicalDataAndMedication1791148990000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -79,6 +77,3 @@ export class AddPatientClinicalDataAndMedication1791148990000
     `);
   }
 }
-
-
-

@@ -78,6 +78,9 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
+  ['/accounts/{id}', 'get'],
+  ['/accounts/{id}', 'delete'],
+  ['/me', 'delete'],
   ['/patients', 'post'],
   ['/patients/{patientId}/support-contacts', 'get'],
   ['/patients/{patientId}/support-contacts', 'post'],
@@ -287,6 +290,18 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/timeline', 'get', '404'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
+    ['/accounts/{id}', 'get', '400'],
+    ['/accounts/{id}', 'get', '403'],
+    ['/accounts/{id}', 'get', '404'],
+    ['/accounts/{id}', 'get', '500'],
+    ['/accounts/{id}', 'delete', '400'],
+    ['/accounts/{id}', 'delete', '403'],
+    ['/accounts/{id}', 'delete', '404'],
+    ['/accounts/{id}', 'delete', '409'],
+    ['/accounts/{id}', 'delete', '500'],
+    ['/me', 'delete', '404'],
+    ['/me', 'delete', '409'],
+    ['/me', 'delete', '500'],
     ['/patients', 'post', '400'],
     ['/patients', 'post', '403'],
     ['/patients', 'post', '404'],
@@ -394,16 +409,78 @@ describe('Swagger (e2e)', () => {
       required: false,
       schema: { type: 'boolean' },
     });
+    expect(byName.profile).toMatchObject({
+      required: false,
+      schema: {
+        type: 'array',
+        items: { enum: ['none', 'patient', 'professional', 'admin'] },
+      },
+    });
+    expect(byName.status).toMatchObject({
+      required: false,
+      schema: { enum: ['active', 'inactive'] },
+    });
+    expect(byName.createdFrom).toMatchObject({ required: false });
+    expect(byName.createdTo).toMatchObject({ required: false });
+    expect(byName.sort).toMatchObject({
+      required: false,
+      schema: { enum: ['name', 'createdAt'], default: 'name' },
+    });
+    expect(byName.order).toMatchObject({
+      required: false,
+      schema: { enum: ['asc', 'desc'], default: 'asc' },
+    });
+  });
+
+  it('documents GET /accounts/{id} with the id and the account schema', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/accounts/{id}'].get;
+
+    expect(operation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'id', in: 'path', required: true }),
+      ]),
+    );
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/GetAccountResponseDto',
+    );
+    expect(components.schemas.GetAccountResponseDto.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'fullName',
+        'socialName',
+        'birthDate',
+        'sex',
+        'gender',
+        'cpf',
+        'email',
+        'phone',
+        'role',
+        'status',
+        'createdAt',
+        'updatedAt',
+        'profile',
+      ]),
+    );
   });
 
   it('returns the email of each GET /accounts item', async () => {
     const { components } = await getDocument();
 
-    expect(components.schemas.AccountSummaryResponseDto.required).toEqual([
-      'id',
-      'name',
-      'email',
-    ]);
+    expect(components.schemas.AccountSummaryResponseDto.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'name',
+        'socialName',
+        'email',
+        'cpf',
+        'role',
+        'profile',
+        'specialisms',
+        'status',
+        'createdAt',
+      ]),
+    );
   });
 
   it('documents DELETE of a support contact with 204 and the session', async () => {

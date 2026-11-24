@@ -5,6 +5,7 @@
 // resposta é o mesmo.
 
 import { ApiProperty } from '@nestjs/swagger';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Specialism } from '../enums/specialism.enum';
 import { UFS, type Uf } from '../enums/uf.enum';
 
@@ -41,6 +42,9 @@ export class ProfessionalSummaryResponseDto {
   /** CNES, 7 dígitos. */
   @ApiProperty({ type: String, nullable: true, example: '2771112' })
   cnes: string | null;
+  /** Situação da conta do profissional; só o admin recebe os inativos. */
+  @ApiProperty({ enum: AccountStatus, example: 'active' })
+  status: AccountStatus;
 }
 
 /** Dados da paginação da consulta. */

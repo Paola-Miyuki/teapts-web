@@ -20,6 +20,7 @@ import { AddProfessionalCouncilFields1791148960000 } from './migrations/17911489
 import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
 import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-CreateTimelineRecord';
 import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1791148990000-AddPatientClinicalDataAndMedication';
+import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -105,6 +106,7 @@ describe('getDatabaseOptions', () => {
         AddDeletedAtToPts1791148970000,
         CreateTimelineRecord1791148980000,
         AddPatientClinicalDataAndMedication1791148990000,
+        AddAccountStatus1791149000000,
       ],
     });
   });

@@ -4,6 +4,7 @@ import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import dataSource from '../data-source';
 import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Gender } from '../../accounts/enums/gender.enum';
 import { Sex } from '../../accounts/enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
@@ -52,7 +53,111 @@ type TestUser = {
   >;
   professional?: ProfessionalSeed;
   patient?: PatientSeed;
+  // Criação da conta (para os filtros de data da tela Contas) e, em `inactive`,
+  // a data em que ela foi desativada. Sem `inactive`, a conta fica ativa.
+  createdAt?: string;
+  inactive?: string;
 };
+
+// Contas sem perfil de paciente nem profissional, para testar a tela Contas
+// do admin (filtros, "Tornar paciente", "Desativar", conta inativa e a conta
+// de administrador, que não recebe perfil). Cada execução do seed devolve a
+// situação delas ao que está aqui, então dá para desativar e testar de novo.
+const ACCOUNTS_WITHOUT_PROFILE: TestUser[] = [
+  {
+    key: 'bruno',
+    email: 'bruno@teapts.local',
+    password: 'conta123',
+    name: 'Bruno Takeda',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '1992-02-27',
+      sex: Sex.Male,
+      gender: null,
+      cpf: '39053344705',
+      phone: '41991112233',
+    },
+    createdAt: '2026-11-10T13:00:00.000Z',
+  },
+  {
+    key: 'priscila',
+    email: 'priscila@teapts.local',
+    password: 'conta123',
+    name: 'Priscila Martins',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '1990-05-09',
+      sex: Sex.Female,
+      gender: Gender.CisWoman,
+      cpf: '52998224725',
+      phone: '41992223344',
+    },
+    createdAt: '2026-11-14T13:00:00.000Z',
+  },
+  {
+    key: 'sofia',
+    email: 'sofia@teapts.local',
+    password: 'conta123',
+    name: 'Sofia Andrade',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '1995-08-30',
+      sex: Sex.Female,
+      gender: null,
+      cpf: '16899535009',
+      phone: null,
+    },
+    createdAt: '2026-08-30T13:00:00.000Z',
+  },
+  {
+    // Nome social: a lista mostra e busca pelo nome social.
+    key: 'marcela',
+    email: 'marcela@teapts.local',
+    password: 'conta123',
+    name: 'Marcelo Duarte',
+    role: AccountRole.User,
+    personal: {
+      socialName: 'Marcela Duarte',
+      birthDate: '1998-10-21',
+      sex: Sex.Male,
+      gender: Gender.TransWoman,
+      cpf: '13579246828',
+      phone: '41993334455',
+    },
+    createdAt: '2026-10-02T13:00:00.000Z',
+  },
+  {
+    // Conta inativa, sem perfil: aparece só com a Situação "Inativa" ou "todas".
+    key: 'helena',
+    email: 'helena@teapts.local',
+    password: 'conta123',
+    name: 'Helena Rocha',
+    role: AccountRole.User,
+    personal: {
+      socialName: null,
+      birthDate: '1987-12-04',
+      sex: Sex.Female,
+      gender: Gender.CisWoman,
+      cpf: '24681357928',
+      phone: '41994445566',
+    },
+    createdAt: '2026-04-17T13:00:00.000Z',
+    inactive: '2026-09-01T13:00:00.000Z',
+  },
+  {
+    // Segunda conta de administrador: sem CPF nem perfil (RN001, RN002).
+    key: 'admin2',
+    email: 'kaio.admin@teapts.local',
+    password: 'teapts123',
+    name: 'Kaio Segunda Conta',
+    role: AccountRole.Admin,
+    personal: NO_PERSONAL_DATA,
+    createdAt: '2026-01-05T13:00:00.000Z',
+  },
+];
 
 const TEST_USERS: TestUser[] = [
   {
@@ -283,6 +388,29 @@ async function findOrCreateSupertokensUserId(
   return existing.id;
 }
 
+// Devolve a conta à situação do seed: data de criação e ativa ou inativa.
+async function applyAccountState(
+  account: Account,
+  user: TestUser,
+): Promise<void> {
+  const state = user.inactive
+    ? {
+        status: AccountStatus.Inactive,
+        deactivatedAt: new Date(user.inactive),
+        deactivatedByAccountId: null,
+      }
+    : {
+        status: AccountStatus.Active,
+        deactivatedAt: null,
+        deactivatedByAccountId: null,
+      };
+
+  await dataSource.getRepository(Account).update(account.id, {
+    ...(user.createdAt ? { createdAt: new Date(user.createdAt) } : {}),
+    ...state,
+  });
+}
+
 async function createOrReuseAccount(user: TestUser): Promise<Account> {
   const accounts = dataSource.getRepository(Account);
   const supertokensUserId = await findOrCreateSupertokensUserId(
@@ -306,6 +434,7 @@ async function createOrReuseAccount(user: TestUser): Promise<Account> {
     Object.assign(account, user.personal);
 
     account = await accounts.save(account);
+    await applyAccountState(account, user);
     console.log(`Conta reutilizada: ${account.email} (${account.role})`);
     return account;
   }
@@ -321,6 +450,7 @@ async function createOrReuseAccount(user: TestUser): Promise<Account> {
     }),
   );
 
+  await applyAccountState(account, user);
   console.log(`Conta criada: ${account.email} (${account.role})`);
   return account;
 }
@@ -408,7 +538,7 @@ async function createTestUsers(): Promise<void> {
     const patientIds = new Map<string, string>();
     const professionals = new Map<string, Professional>();
 
-    for (const user of TEST_USERS) {
+    for (const user of [...TEST_USERS, ...ACCOUNTS_WITHOUT_PROFILE]) {
       const account = await createOrReuseAccount(user);
 
       if (user.professional) {

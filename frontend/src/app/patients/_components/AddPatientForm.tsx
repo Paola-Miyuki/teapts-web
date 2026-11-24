@@ -20,17 +20,20 @@ import SupportContactList from './SupportContactList';
 const SUBMIT_ERROR = 'Não foi possível adicionar o paciente.';
 
 type AddPatientFormProps = {
+  // Conta já escolhida (vinda de "Tornar paciente" em Contas).
+  initialAccount?: AccountOption | null;
   onCancel: () => void;
   onAdded: (name: string) => void;
 };
 
 export default function AddPatientForm({
+  initialAccount = null,
   onCancel,
   onAdded,
 }: AddPatientFormProps) {
   const router = useRouter();
 
-  const [account, setAccount] = useState<AccountOption | null>(null);
+  const [account, setAccount] = useState<AccountOption | null>(initialAccount);
   const [accountError, setAccountError] = useState('');
   const [contacts, setContacts] = useState<SupportContactInput[]>([]);
   const [isContactOpen, setIsContactOpen] = useState(false);

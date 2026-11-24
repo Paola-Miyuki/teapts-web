@@ -1045,13 +1045,16 @@ dialog {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 26px;
-  border-bottom: 1px solid var(--ux-line);
+  /* A linha da base é interna (não borda) e as abas não a sobrepõem com margem
+     negativa: o pixel a mais fazia o overflow-x: auto da barra ligar o scroll
+     vertical. */
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--ux-line);
   background: none;
 }
 
 .ux-ptabs a {
   min-height: 46px;
-  margin-bottom: -1px;
   padding: 0 2px;
   display: inline-flex;
   align-items: center;

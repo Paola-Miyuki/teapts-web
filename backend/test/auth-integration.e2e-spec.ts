@@ -141,6 +141,8 @@ describe('authentication integration', () => {
     findById: jest.Mock<() => Promise<Payload>>;
     createAccount: jest.Mock<(input: Payload) => Promise<Payload>>;
     isCpfTaken: jest.Mock<(cpf: string) => Promise<boolean>>;
+    isActive: jest.Mock<(accountId: string) => Promise<boolean>>;
+    isEmailDeactivated: jest.Mock<(email: string) => Promise<boolean>>;
   };
   let createNewSession: jest.Mock<Fn>;
   let originalSignUp: jest.Mock<Fn>;
@@ -186,6 +188,10 @@ describe('authentication integration', () => {
         ...input,
       })),
       isCpfTaken: jest.fn(async () => false),
+      isActive: jest.fn(async () => true),
+      isEmailDeactivated: jest.fn(
+        async (email: string) => email === 'inactive@example.com',
+      ),
     };
 
     supertokensInit.mockImplementation((config) => {
@@ -373,6 +379,22 @@ describe('authentication integration', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ status: 'WRONG_CREDENTIALS_ERROR' });
+    });
+
+    it('refuses a deactivated account like wrong credentials, without a session', async () => {
+      const response = await request(app)
+        .post('/auth/signin')
+        .set('st-auth-mode', 'cookie')
+        .send({
+          formFields: [
+            { id: 'email', value: 'inactive@example.com' },
+            { id: 'password', value: 'correct-password' },
+          ],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: 'WRONG_CREDENTIALS_ERROR' });
+      expect(createNewSession).not.toHaveBeenCalled();
     });
 
     it('relays a SuperTokens error without converting it to a generic error', async () => {

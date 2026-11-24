@@ -41,6 +41,7 @@ jest.unstable_mockModule(
 let PtsController: (typeof import('../src/pts/controllers/pts.controller.js'))['PtsController'];
 let PtsService: (typeof import('../src/pts/services/pts.service.js'))['PtsService'];
 let PtsRepository: (typeof import('../src/pts/repositories/pts.repository.js'))['PtsRepository'];
+let AccountsService: (typeof import('../src/accounts/services/accounts.service.js'))['AccountsService'];
 let AuthGuard: (typeof import('../src/auth/guards/auth.guard.js'))['AuthGuard'];
 
 beforeAll(async () => {
@@ -49,6 +50,8 @@ beforeAll(async () => {
   ({ PtsService } = await import('../src/pts/services/pts.service.js'));
   ({ PtsRepository } =
     await import('../src/pts/repositories/pts.repository.js'));
+  ({ AccountsService } =
+    await import('../src/accounts/services/accounts.service.js'));
   ({ AuthGuard } = await import('../src/auth/guards/auth.guard.js'));
 });
 
@@ -245,6 +248,8 @@ describe('equipe do PTS (e2e - RFEM001/RFEM002)', () => {
       providers: [
         PtsService,
         AuthGuard,
+        // O AuthGuard consulta a situação da conta (RFAUT005).
+        { provide: AccountsService, useValue: { isActive: async () => true } },
         { provide: PtsRepository, useValue: ptsRepository },
       ],
     }).compile();

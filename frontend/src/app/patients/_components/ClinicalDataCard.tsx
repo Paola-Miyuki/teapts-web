@@ -119,8 +119,7 @@ export default function ClinicalDataCard({
         }
 
         setError(
-          reason.apiMessage ||
-            'Não foi possível atualizar os dados clínicos.',
+          reason.apiMessage || 'Não foi possível atualizar os dados clínicos.',
         );
       } else {
         setError('Não foi possível atualizar os dados clínicos.');
@@ -138,11 +137,7 @@ export default function ClinicalDataCard({
         </div>
 
         {editable && !editing && (
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={startEditing}
-          >
+          <button type="button" className="btn btn-sm" onClick={startEditing}>
             Editar
           </button>
         )}
@@ -154,19 +149,13 @@ export default function ClinicalDataCard({
         </p>
       )}
 
-      {error && (
-        <p role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p role="alert">{error}</p>}
 
       {!editing ? (
         <ul className="mini-list">
           <li>
             <span className="grow">
-              <span className="badge rejected">
-                Alergias e restrições
-              </span>
+              <span className="badge rejected">Alergias e restrições</span>
               <small className="ux-sub">
                 {data.noKnownAllergies ? (
                   'Nenhuma alergia conhecida'
@@ -234,9 +223,7 @@ export default function ClinicalDataCard({
                   setForm((current) => ({
                     ...current,
                     noKnownAllergies: event.target.checked,
-                    allergies: event.target.checked
-                      ? ''
-                      : current.allergies,
+                    allergies: event.target.checked ? '' : current.allergies,
                   }))
                 }
               />
@@ -245,24 +232,18 @@ export default function ClinicalDataCard({
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="clinical-allergies">
-              Alergias e restrições
-            </label>
+            <label htmlFor="clinical-allergies">Alergias e restrições</label>
             <textarea
               id="clinical-allergies"
               className={`${ui.input} ${styles.textarea}`}
               value={form.allergies}
               disabled={saving || form.noKnownAllergies}
-              onChange={(event) =>
-                setField('allergies', event.target.value)
-              }
+              onChange={(event) => setField('allergies', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="clinical-history">
-              Antecedentes clínicos
-            </label>
+            <label htmlFor="clinical-history">Antecedentes clínicos</label>
             <textarea
               id="clinical-history"
               className={`${ui.input} ${styles.textarea}`}
@@ -275,9 +256,7 @@ export default function ClinicalDataCard({
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="surgical-history">
-              Antecedentes cirúrgicos
-            </label>
+            <label htmlFor="surgical-history">Antecedentes cirúrgicos</label>
             <textarea
               id="surgical-history"
               className={`${ui.input} ${styles.textarea}`}
@@ -290,9 +269,7 @@ export default function ClinicalDataCard({
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="family-history">
-              Antecedentes familiares
-            </label>
+            <label htmlFor="family-history">Antecedentes familiares</label>
             <textarea
               id="family-history"
               className={`${ui.input} ${styles.textarea}`}
@@ -305,17 +282,13 @@ export default function ClinicalDataCard({
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="habits">
-              Hábitos
-            </label>
+            <label htmlFor="habits">Hábitos</label>
             <textarea
               id="habits"
               className={`${ui.input} ${styles.textarea}`}
               value={form.habits}
               disabled={saving}
-              onChange={(event) =>
-                setField('habits', event.target.value)
-              }
+              onChange={(event) => setField('habits', event.target.value)}
             />
           </div>
 
@@ -329,10 +302,7 @@ export default function ClinicalDataCard({
               value={form.developmentalMilestones}
               disabled={saving}
               onChange={(event) =>
-                setField(
-                  'developmentalMilestones',
-                  event.target.value,
-                )
+                setField('developmentalMilestones', event.target.value)
               }
             />
           </div>
@@ -347,11 +317,7 @@ export default function ClinicalDataCard({
               Cancelar
             </button>
 
-            <button
-              type="submit"
-              className="btn btn-sm"
-              disabled={saving}
-            >
+            <button type="submit" className="btn btn-sm" disabled={saving}>
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

@@ -85,6 +85,7 @@ describe('patient profile (e2e)', () => {
   let app: INestApplication;
   let accountRepository: {
     findOne: jest.Mock<(options: unknown) => Promise<unknown>>;
+    exists: jest.Mock<(options: unknown) => Promise<boolean>>;
   };
   let patientsRepository: {
     insert: jest.Mock<(patient: unknown) => Promise<void>>;
@@ -126,7 +127,11 @@ describe('patient profile (e2e)', () => {
   }
 
   beforeEach(async () => {
-    accountRepository = { findOne: jest.fn() };
+    accountRepository = {
+      findOne: jest.fn(),
+      // O AuthGuard consulta a situação da conta (RFAUT005).
+      exists: jest.fn(async () => true),
+    };
     patientsRepository = {
       insert: jest.fn(),
       patientExists: jest.fn(),
@@ -170,7 +175,14 @@ describe('patient profile (e2e)', () => {
         {
           account_id: accountId,
           account_name: 'João Martins',
+          account_social_name: null,
           account_email: 'joao@exemplo.com',
+          account_cpf: '52998224725',
+          account_role: 'user',
+          account_status: 'active',
+          account_created_at: new Date('2026-11-01T12:00:00.000Z'),
+          account_profile: 'none',
+          account_specialisms: [],
         },
       ],
       total: 1,
@@ -183,7 +195,18 @@ describe('patient profile (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       data: [
-        { id: accountId, name: 'João Martins', email: 'joao@exemplo.com' },
+        {
+          id: accountId,
+          name: 'João Martins',
+          socialName: null,
+          email: 'joao@exemplo.com',
+          cpf: '52998224725',
+          role: 'user',
+          profile: 'none',
+          specialisms: [],
+          status: 'active',
+          createdAt: '2026-11-01T12:00:00.000Z',
+        },
       ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });

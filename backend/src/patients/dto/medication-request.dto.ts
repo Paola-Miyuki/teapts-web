@@ -1,6 +1,10 @@
 ﻿// Corpo usado para cadastrar e editar medicação do paciente (RFPAC007).
 
-import { ApiHideProperty, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiHideProperty,
+  ApiProperty,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
@@ -11,10 +15,7 @@ import {
   ValidatorConstraint,
   type ValidatorConstraintInterface,
 } from 'class-validator';
-import {
-  trimOptionalText,
-  trimText,
-} from './support-contact.dto';
+import { trimOptionalText, trimText } from './support-contact.dto';
 
 /** Valida uma data real no formato YYYY-MM-DD. */
 function isValidMedicationDate(value: string): boolean {

@@ -47,7 +47,14 @@ describe('PatientsRepository list and detail', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'postgres',
-      entities: [Account, Patient, Medication, SupportContact, Professional, PtsEntity],
+      entities: [
+        Account,
+        Patient,
+        Medication,
+        SupportContact,
+        Professional,
+        PtsEntity,
+      ],
     });
     await (
       dataSource as unknown as { buildMetadatas(): Promise<void> }
@@ -103,6 +110,18 @@ describe('PatientsRepository list and detail', () => {
       activeStates: ACTIVE_PTS_STATES,
       rejectedState: PtsStateEnum.REJECTED,
     });
+  });
+
+  it('leaves the patients of deactivated accounts out of the list', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      { page: 1, limit: 10 },
+    );
+
+    expect(captured[0].sql).toContain('"account"."status" = :activeStatus');
+    expect(captured[0].parameters).toMatchObject({ activeStatus: 'active' });
   });
 
   it('limits the professional to the PTS of their account in the access states', async () => {
@@ -250,7 +269,14 @@ describe('PatientsRepository.findEligibleForProposalPaginated', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'postgres',
-      entities: [Account, Patient, Medication, SupportContact, Professional, PtsEntity],
+      entities: [
+        Account,
+        Patient,
+        Medication,
+        SupportContact,
+        Professional,
+        PtsEntity,
+      ],
     });
     await (
       dataSource as unknown as { buildMetadatas(): Promise<void> }

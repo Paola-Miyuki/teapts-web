@@ -161,7 +161,6 @@ function supportContactNotFound(): NotFoundException {
   });
 }
 
-
 function medicationNotFound(): NotFoundException {
   return new NotFoundException({
     status: 'MEDICATION_NOT_FOUND',
@@ -176,9 +175,7 @@ function invalidMedication(message: string): BadRequestException {
   });
 }
 
-function toMedicationResponse(
-  medication: Medication,
-): MedicationResponseDto {
+function toMedicationResponse(medication: Medication): MedicationResponseDto {
   return {
     id: medication.id,
     patientId: medication.patientId,
@@ -192,17 +189,13 @@ function toMedicationResponse(
   };
 }
 
-function toMedicationValues(
-  request: MedicationRequestDto,
-): MedicationValues {
+function toMedicationValues(request: MedicationRequestDto): MedicationValues {
   const drugName = request.drugName.trim();
   const dose = request.dose.trim();
   const frequency = request.frequency.trim();
 
   if (!drugName || !dose || !frequency) {
-    throw invalidMedication(
-      'Medicamento, dose e frequ�ncia s�o obrigat�rios.',
-    );
+    throw invalidMedication('Medicamento, dose e frequ�ncia s�o obrigat�rios.');
   }
 
   if (request.endDate && request.endDate < request.startDate) {
@@ -340,6 +333,7 @@ export class PatientsService {
 
     return {
       ...toAuthorizedPatient(row),
+      phone: row.phone,
       cpf: row.cpf,
       clinicalHistory: row.clinical_history,
       surgicalHistory: row.surgical_history,
@@ -351,7 +345,6 @@ export class PatientsService {
       supportContacts: contacts.map(toSupportContactResponse),
     };
   }
-
 
   /**
    * Atualiza historico clinico e alergias do paciente (RFPAC007).

@@ -24,6 +24,7 @@ import {
   initials,
 } from '@/lib/format';
 import { getProfessionals } from '@/lib/professionals';
+import DeleteAccountDialog from './DeleteAccountDialog';
 import OwnSupportContacts from './OwnSupportContacts';
 
 function Empty() {
@@ -94,6 +95,7 @@ function ProfileContent({
     kind === 'professional' ? account.professionalProfileIds[0] : undefined,
   );
   const updated = searchParams.get('updated') === '1';
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
     <>
@@ -196,14 +198,35 @@ function ProfileContent({
               </dl>
             </section>
           )}
+
+          <section className="ux-card ux-danger" aria-labelledby="delete-title">
+            <div className="ux-card-head">
+              <div>
+                <h2 id="delete-title">Excluir conta</h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Icon name="trash" className="icon-sm" />
+                Excluir minha conta
+              </button>
+            </div>
+          </section>
         </div>
       </div>
+
+      <DeleteAccountDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+      />
     </>
   );
 }
 
-// Meu perfil de `meu-perfil.html`. Foto, dados do paciente, registro no
-// conselho e exclusão da conta ainda não existem na API e ficam de fora; os
+// Meu perfil de `meu-perfil.html`. Foto, dados do paciente e registro no
+// conselho ainda não existem na API e ficam de fora; os
 // contatos de suporte do paciente são só leitura (RFPAC003).
 export default function ProfilePage() {
   return (

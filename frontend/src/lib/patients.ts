@@ -175,7 +175,6 @@ export function getPatients({ signal, ...query }: PatientsQuery) {
   );
 }
 
-
 export type Medication = {
   id: string;
   patientId: string;
@@ -223,6 +222,7 @@ export type ClinicalDataPatch = {
 
 export type PatientDetail = PatientListItem &
   ClinicalData & {
+    phone: string | null;
     cpf: string | null;
     supportContacts: SupportContact[];
   };
@@ -311,10 +311,7 @@ export function deleteSupportContact(patientId: string, contactId: string) {
 }
 
 // GET /patients/:id/medications: consulta as medicações do paciente.
-export function getMedications(
-  patientId: string,
-  signal?: AbortSignal,
-) {
+export function getMedications(patientId: string, signal?: AbortSignal) {
   return request<MedicationsResponse>(
     `/patients/${encodeURIComponent(patientId)}/medications`,
     { signal },
@@ -347,10 +344,7 @@ export function updateMedication(
 }
 
 // POST /patients/:id/medications/:medicationId/stop: suspende sem excluir.
-export function stopMedication(
-  patientId: string,
-  medicationId: string,
-) {
+export function stopMedication(patientId: string, medicationId: string) {
   return request<Medication>(
     `/patients/${encodeURIComponent(patientId)}/medications/${encodeURIComponent(
       medicationId,

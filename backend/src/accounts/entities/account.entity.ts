@@ -9,6 +9,7 @@ import {
   Unique,
 } from 'typeorm';
 import { AccountRole } from '../enums/account-role.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 import { Gender } from '../enums/gender.enum';
 import { Sex } from '../enums/sex.enum';
 import { Patient } from '../../patients/entities/patient.entity';
@@ -79,6 +80,28 @@ export class Account {
     default: AccountRole.User,
   })
   role!: AccountRole;
+
+  // Exclusão lógica (RFAUT005, RN021): conta inativa não autentica. Os perfis
+  // de paciente e de profissional seguem esta situação.
+  @Column({
+    type: 'enum',
+    enum: AccountStatus,
+    enumName: 'account_status_e',
+    default: AccountStatus.Active,
+  })
+  status!: AccountStatus;
+
+  @Column({
+    name: 'deactivated_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
+  deactivatedAt!: Date | null;
+
+  // Quem desativou a conta: o titular ou o administrador.
+  @Column('uuid', { name: 'deactivated_by_account_id', nullable: true })
+  deactivatedByAccountId!: string | null;
 
   // Relation<> evita a referencia circular entre entidades sob ESM.
   @OneToOne(() => Patient, (patient) => patient.account)

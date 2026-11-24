@@ -62,12 +62,20 @@ src/
     signup/                cadastro de conta no layout do login, com os campos da Conta (nome,
                            nome social, nascimento, sexo, gênero, CPF, e-mail, telefone e senha;
                            EmailPassword.signUp); volta para /login?registered=true
+    accounts/              Contas (admin, `contas.html`; GET /accounts): tabela com busca, filtros
+                           (Perfil, Situação, Data de criação), ordenação e paginação na URL;
+                           _components/ Accounts (lista e menu ⋮), AccountViewDialog ("Dados da
+                           conta", GET /accounts/:id) e DeactivateAccountDialog (DELETE
+                           /accounts/:id; 409 mostra a `message`); "Tornar paciente" abre
+                           /patients?account=<id>; "Tornar profissional" fica desabilitado (#53)
     home/                  início por perfil: blocos com as contagens das listas (pacientes,
                            profissionais, contas sem perfil, propostas), "Para fazer" do
                            profissional, proposta aguardando o paciente e "Aguardando aprovação"
     profile/               meu perfil (GET /me): dados da conta, pessoais, a profissão e, no paciente, os contatos de
                            suporte só para leitura (GET /patients/:patientId/support-contacts); edit/
-                           edita os dados (PATCH /me) e abre a troca de senha (POST /me/password)
+                           edita os dados (PATCH /me) e abre a troca de senha (POST /me/password); o cartão "Excluir conta"
+                           abre o DeleteAccountDialog (DELETE /me): ao concluir vai para /login; 401
+                           também; 409 (ex.: `ACCOUNT_IS_PTS_RESPONSIBLE`) mostra a mensagem no diálogo
     professionals/         profissionais (GET /professionals) na tabela de `profissionais.html`:
                            busca por nome, filtro de especialidade e paginação; registro (com
                            copiar) e instituição; para o admin, situação e menu ⋮ com Visualizar
@@ -96,9 +104,12 @@ src/
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
                            todos na URL; modal "Adicionar paciente" (só admin)
-      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
-                           contatos de suporte editados contato a contato
-      _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar"),
+      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente: cartão
+                           com e-mail, telefone e data de cadastro, "Excluir paciente" só para o
+                           admin e contatos de suporte editados contato a contato
+      _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar" e, só para o
+                           admin, "Excluir"), DeletePatientDialog ("Excluir paciente" = desativa a
+                           conta, DELETE /accounts/:id),
                            AddPatientModal/AddPatientForm, AccountCombobox (combobox ARIA da conta:
                            GET /accounts?isPatient=false&isProfessional=false&q=; POST /patients) e
                            SupportContactFields/SupportContactList (contatos do cadastro),
@@ -125,7 +136,8 @@ src/
   lib/
     supertokens.ts         initSuperTokens(): configura o SDK uma vez
     api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
-    account.ts             GET /me, PATCH /me, POST /me/password e menu por perfil
+    accounts.ts            GET /accounts (lista com filtros), GET /accounts/:id e DELETE /accounts/:id (admin)
+    account.ts             GET /me, PATCH /me, DELETE /me, POST /me/password e menu por perfil
     permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
     professionals.ts       GET /professionals (o e-mail vem `null` para quem não é admin nem profissional)
                            e formatRegistration ("CRP-PR 12345")
@@ -168,8 +180,9 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/home` | Início (por perfil) ou Aguardando aprovação | conta da sessão | `inicio.html`, `inicio-paciente.html`, `aguardando-perfil.html` |
 | `/profile` | Meu perfil | conta da sessão | `meu-perfil.html` |
 | `/profile/edit` | Editar perfil e Redefinir senha | conta da sessão | `meu-perfil-editar.html` |
-| `/patients` | Pacientes cadastrados (admin) ou vinculados (profissional) e "Adicionar paciente" | admin e profissional (`viewAuthorizedPatients`) | `pacientes.html`, `criar-paciente.html` |
-| `/patients/:id` | Detalhe do paciente (Dados do paciente); contatos de suporte editáveis pelo admin e pelo membro de PTS ativo (`manageSupportContacts`, RN024) | admin e profissional com acesso (RN016) | `paciente.html` |
+| `/accounts` | Contas: lista, Visualizar, Tornar paciente e Desativar | admin (`manageAccounts`) | `contas.html` |
+| `/patients` | Pacientes cadastrados (admin) ou vinculados (profissional) e "Adicionar paciente" (com `?account=<id>`, abre o modal com a conta escolhida) | admin e profissional (`viewAuthorizedPatients`) | `pacientes.html`, `criar-paciente.html` |
+| `/patients/:id` | Detalhe do paciente (Dados do paciente); contatos de suporte editáveis pelo admin e pelo membro de PTS ativo (`manageSupportContacts`, RN024); o admin exclui o paciente (desativa a conta) | admin e profissional com acesso (RN016) | `paciente.html` |
 | `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | `profissionais.html` |
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |

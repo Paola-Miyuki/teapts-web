@@ -90,7 +90,11 @@ export class ProfessionalsService {
     let page: ProfessionalsPage;
 
     try {
-      page = await this.professionalsRepository.findPaginated(request);
+      // O profissional de conta desativada só aparece para o admin (RFAUT005).
+      page = await this.professionalsRepository.findPaginated({
+        ...request,
+        includeInactive: isAdmin(account),
+      });
     } catch (error) {
       this.logger.error('Professionals query failed', error);
       throw new InternalServerErrorException({
@@ -218,6 +222,7 @@ export class ProfessionalsService {
       ),
       institution: row.professional_institution,
       cnes: row.professional_cnes,
+      status: row.account_status,
     };
   }
 }

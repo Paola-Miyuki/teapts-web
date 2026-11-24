@@ -291,7 +291,6 @@ export class PatientsController {
     return this.patientsService.create(body);
   }
 
-
   /**
    * Atualiza historico clinico e alergias do paciente (RFPAC007).
    */
@@ -324,11 +323,7 @@ export class PatientsController {
     @Param('patientId', parsePatientId) patientId: string,
     @Body() body: UpdateClinicalDataRequestDto,
   ): Promise<ClinicalDataResponseDto> {
-    return this.patientsService.updateClinicalData(
-      account,
-      patientId,
-      body,
-    );
+    return this.patientsService.updateClinicalData(account, patientId, body);
   }
 
   /**
@@ -390,11 +385,7 @@ export class PatientsController {
     @Param('patientId', parsePatientId) patientId: string,
     @Body() body: MedicationRequestDto,
   ): Promise<MedicationResponseDto> {
-    return this.patientsService.createMedication(
-      account,
-      patientId,
-      body,
-    );
+    return this.patientsService.createMedication(account, patientId, body);
   }
 
   /**
@@ -665,5 +656,3 @@ export class PatientsController {
     );
   }
 }
-
-

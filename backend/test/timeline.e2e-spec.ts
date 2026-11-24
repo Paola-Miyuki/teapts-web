@@ -32,6 +32,7 @@ jest.unstable_mockModule(
 let TimelineController: (typeof import('../src/timeline/controllers/timeline.controller.js'))['TimelineController'];
 let TimelineService: (typeof import('../src/timeline/services/timeline.service.js'))['TimelineService'];
 let TimelineRepository: (typeof import('../src/timeline/repositories/timeline.repository.js'))['TimelineRepository'];
+let AccountsService: (typeof import('../src/accounts/services/accounts.service.js'))['AccountsService'];
 let AuthGuard: (typeof import('../src/auth/guards/auth.guard.js'))['AuthGuard'];
 
 beforeAll(async () => {
@@ -41,6 +42,8 @@ beforeAll(async () => {
     await import('../src/timeline/services/timeline.service.js'));
   ({ TimelineRepository } =
     await import('../src/timeline/repositories/timeline.repository.js'));
+  ({ AccountsService } =
+    await import('../src/accounts/services/accounts.service.js'));
   ({ AuthGuard } = await import('../src/auth/guards/auth.guard.js'));
 });
 
@@ -122,6 +125,8 @@ describe('consultar timeline do PTS (e2e)', () => {
       providers: [
         TimelineService,
         AuthGuard,
+        // O AuthGuard consulta a situação da conta (RFAUT005).
+        { provide: AccountsService, useValue: { isActive: async () => true } },
         { provide: TimelineRepository, useValue: timelineRepository },
       ],
     }).compile();

@@ -31,10 +31,7 @@ type MedicationForm = {
   endDate: string;
 };
 
-type Editor =
-  | { kind: 'add' }
-  | { kind: 'edit'; medication: Medication }
-  | null;
+type Editor = { kind: 'add' } | { kind: 'edit'; medication: Medication } | null;
 
 type Filter = 'active' | 'stopped' | 'all';
 
@@ -109,9 +106,6 @@ export default function MedicationsCard({
 
   useEffect(() => {
     const controller = new AbortController();
-
-    setLoading(true);
-    setLoadError('');
 
     getMedications(patientId, controller.signal)
       .then((response) => {
@@ -222,16 +216,12 @@ export default function MedicationsCard({
       !form.frequency.trim() ||
       !form.startDate
     ) {
-      setActionError(
-        'Informe medicamento, dose, frequência e data de início.',
-      );
+      setActionError('Informe medicamento, dose, frequência e data de início.');
       return;
     }
 
     if (form.endDate && form.endDate < form.startDate) {
-      setActionError(
-        'A data de fim não pode ser anterior à data de início.',
-      );
+      setActionError('A data de fim não pode ser anterior à data de início.');
       return;
     }
 
@@ -284,17 +274,12 @@ export default function MedicationsCard({
       const saved = await stopMedication(patientId, medication.id);
 
       setMedications((current) =>
-        current.map((item) =>
-          item.id === saved.id ? saved : item,
-        ),
+        current.map((item) => (item.id === saved.id ? saved : item)),
       );
 
       setSuccess('Medicação suspensa com sucesso.');
     } catch (reason: unknown) {
-      handleApiError(
-        reason,
-        'Não foi possível suspender a medicação.',
-      );
+      handleApiError(reason, 'Não foi possível suspender a medicação.');
     } finally {
       setStoppingId(null);
     }
@@ -308,11 +293,7 @@ export default function MedicationsCard({
         </div>
 
         {canWrite && !editor && (
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={startAdd}
-          >
+          <button type="button" className="btn btn-sm" onClick={startAdd}>
             Adicionar medicação
           </button>
         )}
@@ -324,11 +305,7 @@ export default function MedicationsCard({
         </p>
       )}
 
-      {actionError && (
-        <p role="alert">
-          {actionError}
-        </p>
-      )}
+      {actionError && <p role="alert">{actionError}</p>}
 
       {loading ? (
         <div role="status" aria-live="polite">
@@ -341,7 +318,11 @@ export default function MedicationsCard({
           <button
             type="button"
             className={`btn btn-sm ${styles.retry}`}
-            onClick={() => setRetryKey((current) => current + 1)}
+            onClick={() => {
+              setLoading(true);
+              setLoadError('');
+              setRetryKey((current) => current + 1);
+            }}
           >
             Tentar novamente
           </button>
@@ -349,16 +330,12 @@ export default function MedicationsCard({
       ) : (
         <>
           <div className={styles.field}>
-            <label htmlFor="medication-filter">
-              Mostrar
-            </label>
+            <label htmlFor="medication-filter">Mostrar</label>
             <select
               id="medication-filter"
               className={ui.input}
               value={filter}
-              onChange={(event) =>
-                setFilter(event.target.value as Filter)
-              }
+              onChange={(event) => setFilter(event.target.value as Filter)}
             >
               <option value="all">Todas</option>
               <option value="active">Em uso</option>
@@ -367,9 +344,7 @@ export default function MedicationsCard({
           </div>
 
           {visibleMedications.length === 0 ? (
-            <p className="hint">
-              Nenhuma medicação encontrada.
-            </p>
+            <p className="hint">Nenhuma medicação encontrada.</p>
           ) : (
             <ul className="mini-list">
               {visibleMedications.map((medication) => (
@@ -379,17 +354,13 @@ export default function MedicationsCard({
 
                     <span
                       className={
-                        medication.endDate
-                          ? 'badge rejected'
-                          : 'badge'
+                        medication.endDate ? 'badge rejected' : 'badge'
                       }
                     >
                       {medication.endDate ? 'Suspensa' : 'Em uso'}
                     </span>
 
-                    <small className="ux-sub">
-                      Dose: {medication.dose}
-                    </small>
+                    <small className="ux-sub">Dose: {medication.dose}</small>
 
                     <small className="ux-sub">
                       Frequência: {medication.frequency}
@@ -454,9 +425,7 @@ export default function MedicationsCard({
       {editor && (
         <form onSubmit={saveMedication}>
           <div className={styles.field}>
-            <label htmlFor="medication-drug-name">
-              Medicamento
-            </label>
+            <label htmlFor="medication-drug-name">Medicamento</label>
             <input
               id="medication-drug-name"
               className={ui.input}
@@ -464,16 +433,12 @@ export default function MedicationsCard({
               value={form.drugName}
               required
               disabled={saving}
-              onChange={(event) =>
-                setField('drugName', event.target.value)
-              }
+              onChange={(event) => setField('drugName', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-dose">
-              Dose
-            </label>
+            <label htmlFor="medication-dose">Dose</label>
             <input
               id="medication-dose"
               className={ui.input}
@@ -481,16 +446,12 @@ export default function MedicationsCard({
               value={form.dose}
               required
               disabled={saving}
-              onChange={(event) =>
-                setField('dose', event.target.value)
-              }
+              onChange={(event) => setField('dose', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-frequency">
-              Frequência
-            </label>
+            <label htmlFor="medication-frequency">Frequência</label>
             <input
               id="medication-frequency"
               className={ui.input}
@@ -498,46 +459,34 @@ export default function MedicationsCard({
               value={form.frequency}
               required
               disabled={saving}
-              onChange={(event) =>
-                setField('frequency', event.target.value)
-              }
+              onChange={(event) => setField('frequency', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-prescriber">
-              Prescritor
-            </label>
+            <label htmlFor="medication-prescriber">Prescritor</label>
             <input
               id="medication-prescriber"
               className={ui.input}
               value={form.prescriber}
               disabled={saving}
-              onChange={(event) =>
-                setField('prescriber', event.target.value)
-              }
+              onChange={(event) => setField('prescriber', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-reason">
-              Motivo
-            </label>
+            <label htmlFor="medication-reason">Motivo</label>
             <textarea
               id="medication-reason"
               className={`${ui.input} ${styles.textarea}`}
               value={form.reason}
               disabled={saving}
-              onChange={(event) =>
-                setField('reason', event.target.value)
-              }
+              onChange={(event) => setField('reason', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-start-date">
-              Início
-            </label>
+            <label htmlFor="medication-start-date">Início</label>
             <input
               id="medication-start-date"
               className={ui.input}
@@ -545,16 +494,12 @@ export default function MedicationsCard({
               value={form.startDate}
               required
               disabled={saving}
-              onChange={(event) =>
-                setField('startDate', event.target.value)
-              }
+              onChange={(event) => setField('startDate', event.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label htmlFor="medication-end-date">
-              Fim
-            </label>
+            <label htmlFor="medication-end-date">Fim</label>
             <input
               id="medication-end-date"
               className={ui.input}
@@ -562,9 +507,7 @@ export default function MedicationsCard({
               min={form.startDate || undefined}
               value={form.endDate}
               disabled={saving}
-              onChange={(event) =>
-                setField('endDate', event.target.value)
-              }
+              onChange={(event) => setField('endDate', event.target.value)}
             />
           </div>
 
@@ -578,11 +521,7 @@ export default function MedicationsCard({
               Cancelar
             </button>
 
-            <button
-              type="submit"
-              className="btn btn-sm"
-              disabled={saving}
-            >
+            <button type="submit" className="btn btn-sm" disabled={saving}>
               {saving
                 ? 'Salvando...'
                 : editor.kind === 'edit'

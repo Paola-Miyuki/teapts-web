@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
+import type { AccountOption } from '@/lib/patients';
 import AddPatientForm from './AddPatientForm';
 
 type AddPatientModalProps = {
@@ -11,6 +12,7 @@ type AddPatientModalProps = {
   onClose: () => void;
   onAdded: (name: string) => void;
   canCreate: boolean;
+  initialAccount?: AccountOption | null;
 };
 
 // <dialog> nativo: showModal() prende o foco e o Esc fecha (evento close).
@@ -21,6 +23,7 @@ export default function AddPatientModal({
   onClose,
   onAdded,
   canCreate,
+  initialAccount = null,
 }: AddPatientModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -69,7 +72,11 @@ export default function AddPatientModal({
             parte da rede de apoio.
           </p>
 
-          <AddPatientForm onCancel={onClose} onAdded={onAdded} />
+          <AddPatientForm
+            initialAccount={initialAccount}
+            onCancel={onClose}
+            onAdded={onAdded}
+          />
         </>
       )}
     </dialog>

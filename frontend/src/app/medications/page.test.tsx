@@ -72,9 +72,7 @@ describe('MedicationsPage', () => {
   it('mostra as próprias medicações somente para leitura', async () => {
     render(<MedicationsPage />);
 
-    expect(
-      await screen.findByText('Risperidona'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Risperidona')).toBeInTheDocument();
 
     expect(screen.getByText('Dose: 0,5 mg')).toBeInTheDocument();
 
@@ -89,9 +87,10 @@ describe('MedicationsPage', () => {
       }),
     );
 
-    expect(
-      screen.getByRole('link', { name: 'Medicações' }),
-    ).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Medicações' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
 
     expect(
       screen.queryByRole('button', {

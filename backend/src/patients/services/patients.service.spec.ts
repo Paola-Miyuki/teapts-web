@@ -106,6 +106,7 @@ const row: PatientRow = {
   account_name: 'Maria Silva',
   social_name: null,
   email: 'maria@exemplo.com',
+  phone: '41991002030',
   cpf: '11144477735',
   cns: '700000000000005',
   guardian_name: 'Ana Silva',
@@ -329,6 +330,7 @@ describe('PatientsService.findOne', () => {
       service.findOne(professionalAccount, 'patient-1'),
     ).resolves.toEqual({
       ...listed,
+      phone: '41991002030',
       cpf: '11144477735',
       supportContacts: [
         {

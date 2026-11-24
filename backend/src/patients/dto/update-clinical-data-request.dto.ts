@@ -2,12 +2,7 @@
 
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsBoolean,
-  IsOptional,
-  IsString,
-  ValidateIf,
-} from 'class-validator';
+import { IsBoolean, IsOptional, IsString, ValidateIf } from 'class-validator';
 import { trimText } from './support-contact.dto';
 
 /** Corpo do `PATCH /patients/:id/clinical-data`. */
