@@ -14,7 +14,7 @@ import {
 } from '@/lib/patients';
 import styles from '../patients.module.css';
 
-const LOAD_ERROR = 'Não foi possível carregar as contas.';
+const LOAD_ERROR = 'Não foi possível carregar as contas';
 
 type AccountComboboxProps = {
   id: string;
@@ -22,6 +22,7 @@ type AccountComboboxProps = {
   onChange: (account: AccountOption | null) => void;
   disabled?: boolean;
   invalid?: boolean;
+  required?: boolean;
   describedBy?: string;
 };
 
@@ -33,6 +34,7 @@ export default function AccountCombobox({
   onChange,
   disabled,
   invalid,
+  required,
   describedBy,
 }: AccountComboboxProps) {
   const router = useRouter();
@@ -204,6 +206,7 @@ export default function AccountCombobox({
           aria-activedescendant={
             open && active >= 0 ? optionId(active) : undefined
           }
+          aria-required={required ? true : undefined}
           aria-invalid={invalid ? true : undefined}
           aria-describedby={
             [describedBy, search.isTooShort ? `${id}-hint` : '']

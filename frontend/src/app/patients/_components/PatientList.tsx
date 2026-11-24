@@ -25,7 +25,7 @@ import { PTS_STATUS_LABELS } from '@/lib/pts-status';
 import styles from '../patients.module.css';
 import DeletePatientDialog from './DeletePatientDialog';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 const DEFAULT_LIMIT = PER_PAGE_OPTIONS[0];
 
 // Opções do filtro Status do PTS por papel (telas-listagem, RN016).
@@ -245,7 +245,7 @@ export default function PatientList({
 
   function handleDeleted(_id: string, name: string) {
     setDeleting(null);
-    setSuccess(`Paciente ${name} excluído.`);
+    setSuccess(`Paciente ${name} excluído`);
     setRetryKey((current) => current + 1);
   }
 

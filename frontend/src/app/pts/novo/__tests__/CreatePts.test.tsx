@@ -173,13 +173,13 @@ describe('CreatePts', () => {
     await renderScreen();
 
     await next(user);
-    expect(screen.getByText('Selecione o paciente.')).toBeInTheDocument();
+    expect(screen.getByText('Selecione o paciente')).toBeInTheDocument();
 
     await choosePatient(user);
     await next(user);
     await next(user);
     expect(
-      screen.getByText('Descreva a situação social do paciente.'),
+      screen.getByText('Descreva a situação social do paciente'),
     ).toBeInTheDocument();
     expect(api.createPts).not.toHaveBeenCalled();
   });
@@ -342,7 +342,7 @@ describe('CreatePts com administrador (RN022)', () => {
 
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
     expect(
-      screen.getByText('Selecione o profissional responsável.'),
+      screen.getByText('Selecione o profissional responsável'),
     ).toBeInTheDocument();
     expect(api.createPts).not.toHaveBeenCalled();
 

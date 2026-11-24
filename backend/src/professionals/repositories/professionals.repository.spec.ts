@@ -71,7 +71,7 @@ const filters: FindProfessionalsQuery = {
   limit: 10,
   q: 'Maria',
   specialism: [Specialism.Psychologist],
-  councilState: 'PR',
+  councilState: 'pr',
   ids: ['550e8400-e29b-41d4-a716-446655440000'],
 };
 
@@ -79,7 +79,7 @@ const row: ProfessionalRow = {
   professional_id: '550e8400-e29b-41d4-a716-446655440000',
   professional_specialism: Specialism.Psychologist,
   professional_council_number: '12345',
-  professional_council_state: 'PR',
+  professional_council_state: 'pr',
   professional_institution: 'IMA',
   professional_cnes: null,
   account_name: 'Maria Silva',
@@ -131,7 +131,7 @@ describe('ProfessionalsRepository.findPaginated', () => {
     );
     expect(query.andWhere).toHaveBeenCalledWith(
       'professional.councilState = :councilState',
-      { councilState: 'PR' },
+      { councilState: 'pr' },
     );
     expect(query.andWhere).toHaveBeenCalledWith(
       'professional.id IN (:...ids)',
@@ -220,7 +220,7 @@ describe('ProfessionalsRepository.findPaginated', () => {
     });
 
     expect(query.orderBy).toHaveBeenCalledWith(
-      expect.stringContaining("WHEN 'doctor' THEN 'Medicina'"),
+      expect.stringContaining("WHEN 'doctor' THEN 'Médico'"),
       'DESC',
     );
     expect(query.addOrderBy).toHaveBeenCalledWith('account.name', 'ASC');
@@ -302,23 +302,25 @@ describe('ProfessionalsRepository.insert', () => {
     return { typeormRepository, repository };
   }
 
+  const newProfile = {
+    accountId: 'account-1',
+    specialism: Specialism.Doctor,
+    councilNumber: '6789',
+    councilState: 'pr' as const,
+    institution: 'CAPSi Boa Vista',
+    cnes: '1234567',
+    createdByAccountId: 'admin-1',
+  };
+
   it('saves the profile linked to the account and returns the generated id', async () => {
     const { typeormRepository, repository } = createInsertRepository();
     typeormRepository.insert.mockResolvedValue({
       identifiers: [{ id: 'professional-1' }],
     });
 
-    await expect(
-      repository.insert({
-        accountId: 'account-1',
-        specialism: Specialism.Doctor,
-      }),
-    ).resolves.toBe('professional-1');
+    await expect(repository.insert(newProfile)).resolves.toBe('professional-1');
 
-    expect(typeormRepository.insert).toHaveBeenCalledWith({
-      accountId: 'account-1',
-      specialism: Specialism.Doctor,
-    });
+    expect(typeormRepository.insert).toHaveBeenCalledWith(newProfile);
   });
 
   it('propagates database errors to the caller', async () => {
@@ -326,11 +328,6 @@ describe('ProfessionalsRepository.insert', () => {
     const failure = new Error('duplicate key value');
     typeormRepository.insert.mockRejectedValue(failure);
 
-    await expect(
-      repository.insert({
-        accountId: 'account-1',
-        specialism: Specialism.Doctor,
-      }),
-    ).rejects.toBe(failure);
+    await expect(repository.insert(newProfile)).rejects.toBe(failure);
   });
 });

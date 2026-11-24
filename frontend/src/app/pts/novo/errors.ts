@@ -26,7 +26,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
       kind: 'active-exists',
       title: 'Este paciente já tem um PTS ativo',
       message:
-        'O paciente já possui um PTS aprovado e ativo. Selecione outro paciente.',
+        'O paciente já possui um PTS aprovado e ativo. Selecione outro paciente',
     };
   }
 
@@ -35,7 +35,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
       kind: 'generic',
       title: 'Paciente não encontrado',
       message:
-        'Não foi possível localizar o paciente selecionado. Atualize a lista e tente novamente.',
+        'Não foi possível localizar o paciente selecionado. Atualize a lista e tente novamente',
     };
   }
 
@@ -44,7 +44,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
       kind: 'generic',
       title: 'Profissional da equipe inválido',
       message:
-        'Um ou mais profissionais selecionados não foram encontrados. Atualize a lista da equipe e tente novamente.',
+        'Um ou mais profissionais selecionados não foram encontrados. Atualize a lista da equipe e tente novamente',
     };
   }
 
@@ -57,7 +57,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
       kind: 'unauthorized-profile',
       title: 'Perfil sem autorização',
       message:
-        'Você não tem autorização para criar propostas com este perfil profissional. Entre com o perfil correto ou procure o administrador.',
+        'Você não tem autorização para criar propostas com este perfil profissional. Entre com o perfil correto ou procure o administrador',
     };
   }
 
@@ -65,7 +65,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
     return {
       kind: 'session-expired',
       title: 'Sessão expirada',
-      message: 'Sua sessão expirou. Entre novamente para criar a proposta.',
+      message: 'Sua sessão expirou. Entre novamente para criar a proposta',
     };
   }
 
@@ -74,7 +74,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
       kind: 'network',
       title: 'Sem conexão',
       message:
-        'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+        'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente',
     };
   }
 
@@ -83,6 +83,6 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
     title: 'Não foi possível criar a proposta',
     message:
       api?.apiMessage ||
-      'Ocorreu um erro inesperado. Tente novamente em instantes.',
+      'Ocorreu um erro inesperado. Tente novamente em instantes',
   };
 }

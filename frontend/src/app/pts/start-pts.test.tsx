@@ -284,7 +284,7 @@ describe('iniciar execução do PTS (RFPTS006)', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Iniciar execução' }));
 
     expect(await dialog.findByRole('alert')).toHaveTextContent(
-      'Não foi possível iniciar a execução do PTS.',
+      'Não foi possível iniciar a execução do PTS',
     );
   });
 

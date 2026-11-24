@@ -336,7 +336,7 @@ describe('PatientsPage', () => {
         ),
       );
       expect(
-        await screen.findByText('Paciente Maria Sílvia excluído.'),
+        await screen.findByText('Paciente Maria Sílvia excluído'),
       ).toBeInTheDocument();
       await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
     });
@@ -369,7 +369,7 @@ describe('PatientsPage', () => {
         await screen.findByText('A conta já está desativada.'),
       ).toBeInTheDocument();
       expect(
-        screen.queryByText('Paciente Maria Sílvia excluído.'),
+        screen.queryByText('Paciente Maria Sílvia excluído'),
       ).not.toBeInTheDocument();
     });
 
@@ -516,7 +516,7 @@ describe('PatientsPage', () => {
       const { dialog, select } = await openAddPatient(user);
 
       expect(
-        await dialog.findByText('Não foi possível carregar as contas.'),
+        await dialog.findByText('Não foi possível carregar as contas'),
       ).toBeInTheDocument();
 
       await user.click(
@@ -836,7 +836,7 @@ describe('PatientsPage', () => {
         }),
       );
       expect(
-        await screen.findByText('Paciente Ana Souza adicionado.'),
+        await screen.findByText('Paciente Ana Souza adicionado'),
       ).toBeInTheDocument();
     });
 
@@ -1032,7 +1032,7 @@ describe('PatientsPage', () => {
       );
 
       expect(fields.getByRole('alert')).toHaveTextContent(
-        'Informe o nome do contato.',
+        'Informe o nome do contato',
       );
       expect(fields.getByLabelText('Nome do contato')).toHaveAttribute(
         'aria-invalid',
@@ -1053,7 +1053,7 @@ describe('PatientsPage', () => {
         within(
           screen.getByRole('group', { name: 'Novo contato de suporte' }),
         ).getByRole('alert'),
-      ).toHaveTextContent('Informe o e-mail ou o telefone do contato.');
+      ).toHaveTextContent('Informe o e-mail ou o telefone do contato');
     });
 
     it('exige o telefone no contato de emergência', async () => {
@@ -1075,7 +1075,7 @@ describe('PatientsPage', () => {
         within(
           screen.getByRole('group', { name: 'Novo contato de suporte' }),
         ).getByRole('alert'),
-      ).toHaveTextContent('Informe o telefone do contato de emergência.');
+      ).toHaveTextContent('Informe o telefone do contato de emergência');
     });
 
     it('exige um e-mail válido quando informado', async () => {
@@ -1091,7 +1091,7 @@ describe('PatientsPage', () => {
         within(
           screen.getByRole('group', { name: 'Novo contato de suporte' }),
         ).getByRole('alert'),
-      ).toHaveTextContent('Informe um e-mail válido para o contato.');
+      ).toHaveTextContent('Informe um e-mail válido para o contato');
     });
 
     it('exige um telefone válido quando informado', async () => {
@@ -1108,7 +1108,7 @@ describe('PatientsPage', () => {
       );
 
       expect(fields.getByRole('alert')).toHaveTextContent(
-        'Informe um telefone válido para o contato.',
+        'Informe um telefone válido para o contato',
       );
       expect(fields.getByLabelText(/Telefone/)).toHaveAttribute(
         'aria-invalid',
@@ -1233,7 +1233,7 @@ describe('PatientsPage', () => {
         dialog.getByRole('button', { name: 'Adicionar paciente' }),
       );
 
-      expect(dialog.getByText('Selecione a conta.')).toBeInTheDocument();
+      expect(dialog.getByText('Selecione a conta')).toBeInTheDocument();
       expect(select).toHaveAttribute('aria-invalid', 'true');
       expect(patients).not.toHaveBeenCalled();
     });
@@ -1285,7 +1285,7 @@ describe('PatientsPage', () => {
       resolvePost(mockResponse({ status: 201, data: {} }));
 
       expect(
-        await screen.findByText('Paciente João Martins adicionado.'),
+        await screen.findByText('Paciente João Martins adicionado'),
       ).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
@@ -1308,7 +1308,7 @@ describe('PatientsPage', () => {
       );
 
       expect(
-        await screen.findByText('Paciente João Martins adicionado.'),
+        await screen.findByText('Paciente João Martins adicionado'),
       ).toBeInTheDocument();
       expect(patients).toHaveBeenCalledWith(
         `${API}/patients`,
@@ -1364,7 +1364,7 @@ describe('PatientsPage', () => {
       );
 
       expect(await dialog.findByRole('alert')).toHaveTextContent(
-        'Não foi possível adicionar o paciente.',
+        'Não foi possível adicionar o paciente',
       );
     });
 

@@ -213,7 +213,7 @@ describe('EditPtsProposalForm', () => {
     await user.click(screen.getByRole('button', { name: /Próximo/ }));
 
     expect(
-      await screen.findByText('Descreva a situação social do paciente.'),
+      await screen.findByText('Descreva a situação social do paciente'),
     ).toBeInTheDocument();
     expect(updatePtsProposal).not.toHaveBeenCalled();
   });
@@ -223,7 +223,7 @@ describe('EditPtsProposalForm', () => {
     (updatePtsProposal as jest.Mock).mockRejectedValue(
       new PtsProposalApiError(
         409,
-        'Somente propostas aguardando decisão podem ser editadas.',
+        'Somente propostas aguardando decisão podem ser editadas',
         'PTS_NOT_DRAFT',
       ),
     );
@@ -236,7 +236,7 @@ describe('EditPtsProposalForm', () => {
 
     expect(
       await screen.findByText(
-        'Somente propostas aguardando decisão podem ser editadas.',
+        'Somente propostas aguardando decisão podem ser editadas',
       ),
     ).toBeInTheDocument();
   });
@@ -266,7 +266,7 @@ describe('EditPtsProposalForm', () => {
 
     expect(
       await screen.findByText(
-        'Somente o profissional responsável pode editar esta proposta.',
+        'Somente o profissional responsável pode editar esta proposta',
       ),
     ).toBeInTheDocument();
   });

@@ -23,10 +23,10 @@ type PasswordErrors = {
 };
 
 const GENERIC_ERROR =
-  'Não foi possível redefinir sua senha. Tente novamente mais tarde.';
+  'Não foi possível redefinir sua senha. Tente novamente mais tarde';
 const PASSWORD_REQUIREMENTS_ERROR =
-  'A senha precisa ter pelo menos 8 caracteres e conter um número.';
-const SAME_PASSWORD_ERROR = 'A nova senha não pode ser igual à senha atual.';
+  'A senha precisa ter pelo menos 8 caracteres e conter um número';
+const SAME_PASSWORD_ERROR = 'A nova senha não pode ser igual à senha atual';
 
 export default function ChangePasswordForm({
   onCancel,
@@ -52,14 +52,14 @@ export default function ChangePasswordForm({
 
   function validate() {
     const nextErrors: PasswordErrors = {
-      current: currentPassword ? '' : 'Informe sua senha atual.',
-      next: newPassword ? '' : 'Informe sua nova senha.',
-      confirmation: confirmation ? '' : 'Confirme sua nova senha.',
+      current: currentPassword ? '' : 'Informe sua senha atual',
+      next: newPassword ? '' : 'Informe sua nova senha',
+      confirmation: confirmation ? '' : 'Confirme sua nova senha',
       form: '',
     };
 
     if (!nextErrors.confirmation && newPassword !== confirmation) {
-      nextErrors.confirmation = 'A confirmação deve ser igual à nova senha.';
+      nextErrors.confirmation = 'A confirmação deve ser igual à nova senha';
     }
 
     if (!nextErrors.next && (!passwordHasMinLength || !passwordHasNumber)) {

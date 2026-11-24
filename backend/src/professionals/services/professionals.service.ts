@@ -17,7 +17,6 @@ import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
-import { Specialism } from '../enums/specialism.enum';
 import type { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
 import type { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
 import type {
@@ -25,18 +24,16 @@ import type {
   ProfessionalSummaryResponseDto,
 } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
-import { toProfessionalRegistration } from '../professional-registration';
+import {
+  SPECIALISM_COUNCILS,
+  SPECIALISM_NAMES,
+  toProfessionalRegistration,
+} from '../professional-registration';
 import {
   type ProfessionalRow,
   type ProfessionalsPage,
   ProfessionalsRepository,
 } from '../repositories/professionals.repository';
-
-const SPECIALISM_NAMES: Record<Specialism, string> = {
-  [Specialism.Psychologist]: 'Psicologia',
-  [Specialism.Doctor]: 'Medicina',
-  [Specialism.Physiotherapist]: 'Fisioterapia',
-};
 
 /** Código do Postgres para violação de chave única (`unique_violation`). */
 const UNIQUE_VIOLATION = '23505';
@@ -131,6 +128,7 @@ export class ProfessionalsService {
    * perfil profissional.
    *
    * @param request corpo já validado pelo ValidationPipe global
+   * @param createdByAccountId conta do admin da sessão (RFPRO002)
    * @returns perfil criado, com os dados públicos da conta
    * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
    * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta é de
@@ -142,6 +140,7 @@ export class ProfessionalsService {
    */
   async create(
     request: CreateProfessionalRequestDto,
+    createdByAccountId: string,
   ): Promise<ProfessionalProfileResponseDto> {
     const account = await this.accountRepository.findOne({
       where: { id: request.accountId },
@@ -173,12 +172,22 @@ export class ProfessionalsService {
       throw professionalProfileAlreadyExists();
     }
 
+    const councilNumber = request.councilNumber.trim();
+    // Opcional vazio não é gravado (vira null).
+    const institution = request.institution?.trim() || null;
+    const cnes = request.cnes ?? null;
+
     let id: string;
 
     try {
       id = await this.professionalsRepository.insert({
         accountId: account.id,
         specialism: request.specialism,
+        councilNumber,
+        councilState: request.councilState,
+        institution,
+        cnes,
+        createdByAccountId,
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -201,6 +210,13 @@ export class ProfessionalsService {
         id: request.specialism,
         name: SPECIALISM_NAMES[request.specialism],
       },
+      registration: {
+        council: SPECIALISM_COUNCILS[request.specialism],
+        number: councilNumber,
+        state: request.councilState,
+      },
+      institution,
+      cnes,
       deactivatedAt: null,
     };
   }

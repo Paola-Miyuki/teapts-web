@@ -20,27 +20,27 @@ import login from '../login/login.module.css';
 import styles from './signup.module.css';
 
 const REQUIRED_MESSAGE =
-  'Preencha todos os campos obrigatórios antes de continuar.';
+  'Preencha todos os campos obrigatórios antes de continuar';
 
 function translateSignupError(message: string) {
   if (/at least 8 characters.*including a number/i.test(message)) {
-    return 'A senha precisa ter pelo menos 8 caracteres e conter um número.';
+    return 'A senha precisa ter pelo menos 8 caracteres e conter um número';
   }
 
   if (/at least 8 characters/i.test(message)) {
-    return 'A senha deve ter pelo menos 8 caracteres.';
+    return 'A senha deve ter pelo menos 8 caracteres';
   }
 
   if (/including a number|contain.*number|number/i.test(message)) {
-    return 'A senha deve conter pelo menos um número.';
+    return 'A senha deve conter pelo menos um número';
   }
 
   if (/email.*already exists|email.*already registered/i.test(message)) {
-    return 'Este e-mail já está cadastrado.';
+    return 'Este e-mail já está cadastrado';
   }
 
   if (/invalid email|valid email/i.test(message)) {
-    return 'Informe um e-mail válido.';
+    return 'Informe um e-mail válido';
   }
 
   if (/not optional/i.test(message)) {
@@ -52,7 +52,7 @@ function translateSignupError(message: string) {
     return message.endsWith('.') ? message : `${message}.`;
   }
 
-  return 'Verifique os dados informados e tente novamente.';
+  return 'Verifique os dados informados e tente novamente';
 }
 
 function requirementClass(met: boolean, typing: boolean) {
@@ -136,29 +136,29 @@ export default function SignupPage() {
     }
 
     if (birthDate > todayIso()) {
-      setError('Informe uma data de nascimento válida.');
+      setError('Informe uma data de nascimento válida');
       return;
     }
 
     if (!isValidCpf(cpf)) {
-      setError('Informe um CPF válido.');
+      setError('Informe um CPF válido');
       return;
     }
 
     if (phoneDigits.length > 0 && phoneDigits.length < 10) {
-      setError('Informe o telefone com DDD.');
+      setError('Informe o telefone com DDD');
       return;
     }
 
     if (!passwordHasMinLength || !passwordHasNumber) {
       setError(
-        'A senha precisa ter pelo menos 8 caracteres e conter um número.',
+        'A senha precisa ter pelo menos 8 caracteres e conter um número',
       );
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem.');
+      setError('As senhas não coincidem');
       return;
     }
 
@@ -197,12 +197,12 @@ export default function SignupPage() {
         return;
       }
 
-      setError('Verifique os dados informados e tente novamente.');
+      setError('Verifique os dados informados e tente novamente');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(translateSignupError(err.message));
       } else {
-        setError('Erro ao conectar com o servidor.');
+        setError('Erro ao conectar com o servidor');
       }
     } finally {
       setIsLoading(false);

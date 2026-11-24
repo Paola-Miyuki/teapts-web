@@ -86,7 +86,7 @@ export default function EditPtsProposalForm({
 
         if (loadedProposal.status.toUpperCase() !== 'DRAFT') {
           setLoadError(
-            'Somente propostas aguardando decisão podem ser editadas.',
+            'Somente propostas aguardando decisão podem ser editadas',
           );
 
           setLoadStatus('error');
@@ -103,7 +103,7 @@ export default function EditPtsProposalForm({
 
         if (!canEdit) {
           setLoadError(
-            'Somente o profissional responsável pode editar esta proposta.',
+            'Somente o profissional responsável pode editar esta proposta',
           );
 
           setLoadStatus('error');
@@ -147,7 +147,7 @@ export default function EditPtsProposalForm({
         if (error instanceof PtsProposalApiError) {
           setLoadError(error.message);
         } else {
-          setLoadError('Não foi possível carregar os dados da proposta.');
+          setLoadError('Não foi possível carregar os dados da proposta');
         }
 
         setLoadStatus('error');
@@ -190,7 +190,7 @@ export default function EditPtsProposalForm({
     setSubmitError('');
 
     if (step >= 1 && !trimmedSocialSituation) {
-      setSocialError('Descreva a situação social do paciente.');
+      setSocialError('Descreva a situação social do paciente');
       setStep(1);
 
       document.getElementById('edit-social-situation')?.focus();
@@ -231,7 +231,7 @@ export default function EditPtsProposalForm({
         return;
       }
 
-      setSubmitError('Não foi possível atualizar a proposta de PTS.');
+      setSubmitError('Não foi possível atualizar a proposta de PTS');
     } finally {
       setIsSaving(false);
     }
@@ -273,7 +273,7 @@ export default function EditPtsProposalForm({
           </div>
           <h2>Não foi possível editar a proposta</h2>
 
-          <p>{loadError || 'Não foi possível carregar a proposta.'}</p>
+          <p>{loadError || 'Não foi possível carregar a proposta'}</p>
 
           <button
             type="button"

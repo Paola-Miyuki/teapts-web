@@ -57,7 +57,7 @@ export function useProposalDecision(onDecided: (proposalId: string) => void) {
       setError(
         caught instanceof ApiError && caught.apiMessage
           ? caught.apiMessage
-          : 'Não foi possível registrar a decisão. Tente de novo.',
+          : 'Não foi possível registrar a decisão. Tente de novo',
       );
     } finally {
       setSubmitting(false);

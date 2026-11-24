@@ -82,7 +82,7 @@ function PatientsContent({ account }: { account: Account }) {
 
   function handleAdded(name: string) {
     closeAdd();
-    setSuccess(`Paciente ${name} adicionado.`);
+    setSuccess(`Paciente ${name} adicionado`);
     setListKey((current) => current + 1);
   }
 

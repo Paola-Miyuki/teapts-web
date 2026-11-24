@@ -150,9 +150,9 @@ const ACCOUNTS_WITHOUT_PROFILE: TestUser[] = [
   {
     // Segunda conta de administrador: sem CPF nem perfil (RN001, RN002).
     key: 'admin2',
-    email: 'kaio.admin@teapts.local',
+    email: 'maria.admin@teapts.local',
     password: 'teapts123',
-    name: 'Kaio Segunda Conta',
+    name: 'Maria Santos',
     role: AccountRole.Admin,
     personal: NO_PERSONAL_DATA,
     createdAt: '2026-01-05T13:00:00.000Z',
@@ -186,7 +186,7 @@ const TEST_USERS: TestUser[] = [
     professional: {
       specialism: Specialism.Psychologist,
       councilNumber: '12345',
-      councilState: 'PR',
+      councilState: 'pr',
       institution: 'IMA',
       cnes: '2771112',
     },
@@ -208,7 +208,7 @@ const TEST_USERS: TestUser[] = [
     professional: {
       specialism: Specialism.Physiotherapist,
       councilNumber: '54321',
-      councilState: 'PR',
+      councilState: 'pr',
       institution: 'CER Curitiba',
       cnes: null,
     },

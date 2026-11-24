@@ -16,7 +16,7 @@ type StartPtsDialogProps = {
   onStarted: (started: PtsStartResponse) => void;
 };
 
-const START_ERROR = 'Não foi possível iniciar a execução do PTS.';
+const START_ERROR = 'Não foi possível iniciar a execução do PTS';
 
 // Confirmação "Iniciar a execução do PTS de ...?" (RFPTS006) de
 // `pts-planejamento.html`.

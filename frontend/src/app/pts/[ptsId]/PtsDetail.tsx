@@ -29,7 +29,7 @@ import {
 } from '../_components/AddTeamMembersModal';
 import StartPtsDialog from '../_components/StartPtsDialog';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
 type Tab = 'visao' | 'equipe' | 'timeline';
 
@@ -541,7 +541,7 @@ function TeamTable({
           excludedIds={excludedIds}
           onSuccess={(updatedPts) => {
             onTeamUpdated(updatedPts);
-            setSuccessFeedback('Equipe atualizada.');
+            setSuccessFeedback('Equipe atualizada');
           }}
         />
       )}

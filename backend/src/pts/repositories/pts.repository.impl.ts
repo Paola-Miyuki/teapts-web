@@ -1,5 +1,8 @@
 import { escapeLike } from '../../common/search/escape-like';
-import { toProfessionalRegistration } from '../../professionals/professional-registration';
+import {
+  SPECIALISM_NAMES,
+  toProfessionalRegistration,
+} from '../../professionals/professional-registration';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -40,7 +43,6 @@ import { PtsEntity } from '../entities/pts.entity';
 import { Account } from '../../accounts/entities/account.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
-import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../../timeline/enums/timeline-record-type.enum';
@@ -1187,19 +1189,13 @@ export class PtsRepositoryImpl extends PtsRepository {
   }
 
   private mapProfessional(professional: Professional) {
-    const specialismNames: Record<Specialism, string> = {
-      [Specialism.Psychologist]: 'Psicologia',
-      [Specialism.Doctor]: 'Medicina',
-      [Specialism.Physiotherapist]: 'Fisioterapia',
-    };
-
     return {
       id: professional.id,
       name: professional.account?.name ?? '',
       specialism: {
         id: String(professional.specialism),
         name:
-          specialismNames[professional.specialism] ??
+          SPECIALISM_NAMES[professional.specialism] ??
           String(professional.specialism),
       },
       registration: toProfessionalRegistration(

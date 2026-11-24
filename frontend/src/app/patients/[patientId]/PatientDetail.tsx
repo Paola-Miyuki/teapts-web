@@ -23,7 +23,7 @@ import MedicationsCard from '../_components/MedicationsCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import styles from '../patients.module.css';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);

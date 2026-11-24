@@ -24,7 +24,7 @@ import {
   profileLabel,
 } from './AccountProfile';
 
-const LOAD_ERROR = 'Não foi possível carregar a conta.';
+const LOAD_ERROR = 'Não foi possível carregar a conta';
 
 function EmptyCell() {
   return (

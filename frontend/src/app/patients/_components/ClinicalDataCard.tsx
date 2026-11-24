@@ -110,7 +110,7 @@ export default function ClinicalDataCard({
       onSaved(saved);
       setForm(toForm(saved));
       setEditing(false);
-      setSuccess('Dados clínicos atualizados com sucesso.');
+      setSuccess('Dados clínicos atualizados com sucesso');
     } catch (reason: unknown) {
       if (reason instanceof ApiError) {
         if (reason.status === 403) {
@@ -119,10 +119,10 @@ export default function ClinicalDataCard({
         }
 
         setError(
-          reason.apiMessage || 'Não foi possível atualizar os dados clínicos.',
+          reason.apiMessage || 'Não foi possível atualizar os dados clínicos',
         );
       } else {
-        setError('Não foi possível atualizar os dados clínicos.');
+        setError('Não foi possível atualizar os dados clínicos');
       }
     } finally {
       setSaving(false);

@@ -14,6 +14,7 @@ export type PermissionAction =
   | 'viewAuthorizedPatients'
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
+  | 'createProfessional'
   | 'manageAccounts'
   | 'viewPtsProposals'
   | 'viewPts'
@@ -150,6 +151,9 @@ export function can(
       return admin;
     case 'manageAccounts':
       // RN032 – só o administrador lista, consulta e desativa contas.
+      return admin;
+    case 'createProfessional':
+      // RFPRO002 – só o administrador cria o perfil profissional.
       return admin;
     case 'viewProfessionalDirectory':
       // RFPRO001 – profissional; administrador só para seleção.

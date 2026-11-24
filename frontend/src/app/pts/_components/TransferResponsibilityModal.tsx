@@ -21,7 +21,7 @@ type TransferResponsibilityModalProps = {
   onTransferred: (pts: PtsTeamResponse) => void;
 };
 
-const TRANSFER_ERROR = 'Não foi possível transferir a responsabilidade.';
+const TRANSFER_ERROR = 'Não foi possível transferir a responsabilidade';
 
 export default function TransferResponsibilityModal({
   open,
@@ -80,7 +80,7 @@ export default function TransferResponsibilityModal({
         setError(
           caught instanceof ApiError && caught.apiMessage
             ? caught.apiMessage
-            : 'Não foi possível buscar profissionais.',
+            : 'Não foi possível buscar profissionais',
         );
       })
       .finally(() => {
