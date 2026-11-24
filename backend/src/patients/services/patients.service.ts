@@ -1,4 +1,4 @@
-﻿// Este arquivo concentra as regras de pacientes: a consulta de pacientes
+// Este arquivo concentra as regras de pacientes: a consulta de pacientes
 // autorizados e o cadastro do perfil de paciente.
 // A query da consulta fica no PatientsRepository; aqui ficam o erro seguro, a
 // conversÃ£o para o contrato pÃºblico e os metadados da paginaÃ§Ã£o.
@@ -376,11 +376,28 @@ export class PatientsService {
       const noKnownAllergies =
         request.noKnownAllergies ?? current.no_known_allergies;
 
+      const requestedAllergies =
+        request.allergies === undefined
+          ? undefined
+          : textOrNull(request.allergies);
+
+      if (
+        noKnownAllergies &&
+        requestedAllergies !== undefined &&
+        requestedAllergies !== null
+      ) {
+        throw new BadRequestException({
+          status: 'VALIDATION_ERROR',
+          message:
+            'Não informe alergias quando "Nenhuma alergia conhecida" estiver marcada.',
+        });
+      }
+
       const allergies = noKnownAllergies
         ? null
-        : request.allergies === undefined
+        : requestedAllergies === undefined
           ? current.allergies
-          : textOrNull(request.allergies);
+          : requestedAllergies;
 
       const values: ClinicalDataValues = {
         clinicalHistory:
@@ -900,11 +917,3 @@ export class PatientsService {
     return patient;
   }
 }
-
-
-
-
-
-
-
-
