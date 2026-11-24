@@ -6,6 +6,12 @@ import { personalData } from '@/test-utils/account';
 
 import PtsOverview from './_components/PtsOverview';
 
+// A Timeline tem os próprios testes; aqui o fetch simulado é só o da equipe.
+jest.mock('@/components/pts/TimelineTab', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
 const mockReplace = jest.fn();
 // Mesmo objeto em todo render, como o useRouter do Next.
 const mockRouter = { replace: mockReplace, push: jest.fn() };
