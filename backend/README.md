@@ -75,10 +75,10 @@ src/
     pagination/pagination-query.dto.ts     page/limit da query (padrão 1 e 20, máximo 50)
     pagination/pagination.ts               bloco pagination da resposta (toPagination)
   accounts/
-    controllers/accounts.controller.ts     GET /accounts e DELETE /accounts/:id, só admin
+    controllers/accounts.controller.ts     GET /accounts, GET /accounts/:id e DELETE /accounts/:id, só admin
     services/accounts.service.ts           cria a conta no signup, monta o contexto da sessão,
-                                           lista as contas e desativa a conta (revoga as sessões)
-    repositories/accounts.repository.ts    query da listagem (só contas user) com busca, filtros e paginação;
+                                           lista as contas, detalha uma conta e desativa a conta (revoga as sessões)
+    repositories/accounts.repository.ts    query da listagem (perfil, situação, data, ordenação) com busca e paginação;
                                            transação da desativação
     dto/                                   contratos e validação da listagem
     entities/account.entity.ts
@@ -174,6 +174,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | POST | `/me/password` | conta da sessão | [POST /me/password](#post-mepassword) |
 | POST | `/auth/logout` | conta da sessão | README da raiz, 6.3 |
 | GET | `/accounts` | admin | [GET /accounts](#get-accounts) |
+| GET | `/accounts/:id` | admin | [GET /accounts/:id](#get-accountsid) |
 | DELETE | `/accounts/:id` | admin | [DELETE /me e DELETE /accounts/:id](#delete-me-e-delete-accountsid) |
 | DELETE | `/me` | conta da sessão | [DELETE /me e DELETE /accounts/:id](#delete-me-e-delete-accountsid) |
 | GET | `/patients/authorized` | profissional (admin vê todos os pacientes) | [GET /patients/authorized](#get-patientsauthorized) |
@@ -294,31 +295,46 @@ state }`, com o conselho vindo da especialidade, ou `null`), como no `GET
 
 ## GET /accounts
 
-Exige sessão autenticada com papel `admin` e lista as contas de usuário para
-escolher a conta (ex.: no cadastro de perfil de paciente ou profissional),
-ordenadas por nome. Contas de admin nunca aparecem, porque não recebem perfil
-de paciente nem profissional (RN002).
+Exige sessão autenticada com papel `admin` e lista as contas (tela Contas do
+administrador e escolha da conta no cadastro de perfil de paciente ou
+profissional). Sem filtros, traz todas as contas, inclusive as de admin e as
+desativadas.
 
-Parâmetros de query:
+Parâmetros de query (todos opcionais):
 
-- `q`: busca parcial por nome ou e-mail, sem diferenciar maiúsculas; os espaços
-  externos são removidos, `%`, `_` e `\` valem como texto e vazio equivale a
-  sem busca; opcional;
-- `isPatient`: `true` só contas com perfil de paciente, `false` só contas sem;
-  opcional;
-- `isProfessional`: `true` só contas com perfil profissional, `false` só
-  contas sem; opcional;
-- `page`: página, padrão `1`, mínimo `1`;
-- `limit`: quantidade por página, padrão `20`, mínimo `1` e máximo `50`.
+- `q`: busca parcial por nome, nome social, e-mail ou CPF (com ou sem
+  pontuação), sem diferenciar maiúsculas; os espaços externos são removidos,
+  `%`, `_` e `\` valem como texto e vazio equivale a sem busca;
+- `profile`: `none` (conta sem perfil de paciente nem profissional e que não é
+  admin), `patient`, `professional` e `admin`; lista separada por vírgula ou
+  repetida; a conta entra se bater com qualquer valor;
+- `status`: `active` ou `inactive`; omitido traz as duas;
+- `createdFrom` e `createdTo`: data de criação, `AAAA-MM-DD`, inclusivas;
+- `sort`: `name` (padrão, nome exibido: o social, se houver) ou `createdAt`;
+  `order`: `asc` (padrão) ou `desc`;
+- `isPatient` e `isProfessional`: `true` ou `false`; filtros do combobox de
+  perfis, que mantêm só contas de usuário (RN002) sem/com o perfil;
+- `page` (padrão `1`) e `limit` (padrão `20`, máximo `50`).
 
-A busca e os filtros se combinam e entram antes da paginação, então o `total`
-já vem filtrado. Sem busca nem filtros, lista todas as contas de usuário,
-inclusive as desativadas (`status: 'inactive'`). A
-resposta contém `{ data: [{ id, name, email, status }], pagination: { page, limit,
-total, totalPages } }`. Os erros possíveis são
-`400` (`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem
-sessão), `403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
+Os filtros se combinam e entram antes da paginação, então o `total` já vem
+filtrado. A resposta é `{ data: [{ id, name, socialName, email, cpf, role,
+profile, specialisms, status, createdAt }], pagination: { page, limit, total,
+totalPages } }`: `name` é o nome exibido, `cpf` é `null` no admin, `role` é
+`user` ou `admin`, `profile` é `none`, `patient`, `professional` ou `admin`,
+`specialisms` traz as do perfil profissional (vazio nos demais) e `status` é
+`active` ou `inactive`. Os erros possíveis são `400`
+(`{ status: 'ERROR', message: 'Parâmetro inválido: X' }`), `401` (sem sessão),
+`403` (`FORBIDDEN`, conta sem papel `admin`) e `500`
 (`Não foi possível consultar as contas.`).
+
+## GET /accounts/:id
+
+Só `admin`. Devolve os dados do modal "Dados da conta": `id`, `fullName`,
+`socialName`, `birthDate`, `sex`, `gender`, `cpf`, `email`, `phone`, `role`,
+`status`, `createdAt`, `updatedAt` (`null` se nunca atualizada) e `profile`
+(`{ type: 'none' | 'patient' | 'professional' | 'admin', specialisms: string[] }`).
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID), `401`,
+`403` (`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`) e `500`.
 
 ## PATCH /me
 

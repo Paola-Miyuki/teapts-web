@@ -47,6 +47,7 @@ describe('getNavigation', () => {
   it('mantém os itens compartilhados no menu do admin', () => {
     expect(labels(account({ role: 'admin' }))).toEqual([
       'Início',
+      'Contas',
       'Profissionais',
       'PTS',
       'Pacientes',
@@ -82,6 +83,7 @@ describe('getNavigation', () => {
   it('mantém o menu alinhado aos acessos de cada perfil', () => {
     expect(labels(account({ role: 'admin' }))).toEqual([
       'Início',
+      'Contas',
       'Profissionais',
       'PTS',
       'Pacientes',

@@ -17,6 +17,7 @@ import type { ChangePasswordRequestDto } from '../../auth/dto/change-password-re
 import type { MeResponseDto } from '../../auth/dto/me-response.dto';
 import type { UpdateMeRequestDto } from '../../auth/dto/update-me-request.dto';
 import type { DeactivateAccountResponseDto } from '../dto/deactivate-account-response.dto';
+import type { GetAccountResponseDto } from '../dto/get-account-response.dto';
 import type { GetAccountsRequestDto } from '../dto/get-accounts-request.dto';
 import type { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import { Account } from '../entities/account.entity';
@@ -306,11 +307,72 @@ export class AccountsService {
     return {
       data: page.rows.map((row) => ({
         id: row.account_id,
-        name: row.account_name,
+        name: row.account_social_name?.trim() || row.account_name,
+        socialName: row.account_social_name,
         email: row.account_email,
+        cpf: row.account_cpf,
+        role: row.account_role,
+        profile: row.account_profile,
+        specialisms: row.account_specialisms ?? [],
         status: row.account_status,
+        createdAt: new Date(row.account_created_at).toISOString(),
       })),
       pagination: toPagination(request, page.total),
+    };
+  }
+
+  /**
+   * Detalhe da conta para o administrador (modal "Dados da conta").
+   *
+   * @param id conta consultada
+   * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
+   */
+  async findDetail(id: string): Promise<GetAccountResponseDto> {
+    const account = await this.accountRepository.findOne({
+      where: { id },
+      relations: { patientProfile: true, professionalProfiles: true },
+    });
+
+    if (!account) {
+      throw new NotFoundException({
+        status: 'ACCOUNT_NOT_FOUND',
+        message: 'Conta não encontrada.',
+      });
+    }
+
+    const patientProfile = account.patientProfile
+      ? await account.patientProfile
+      : null;
+    const professionalProfiles = account.professionalProfiles
+      ? await account.professionalProfiles
+      : [];
+    const type =
+      account.role === AccountRole.Admin
+        ? 'admin'
+        : patientProfile
+          ? 'patient'
+          : professionalProfiles.length > 0
+            ? 'professional'
+            : 'none';
+
+    return {
+      id: account.id,
+      fullName: account.name,
+      socialName: account.socialName,
+      birthDate: account.birthDate,
+      sex: account.sex,
+      gender: account.gender,
+      cpf: account.cpf,
+      email: account.email,
+      phone: account.phone,
+      role: account.role,
+      status: account.status,
+      createdAt: account.createdAt.toISOString(),
+      updatedAt: account.lastUpdatedAt?.toISOString() ?? null,
+      profile: {
+        type,
+        specialisms: professionalProfiles.map((profile) => profile.specialism),
+      },
     };
   }
 

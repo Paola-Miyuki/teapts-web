@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
+import { getAccount } from '@/lib/accounts';
+import type { AccountOption } from '@/lib/patients';
 import { can } from '@/lib/permissions';
 import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
@@ -32,9 +35,53 @@ function PatientsContent({ account }: { account: Account }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [success, setSuccess] = useState('');
   const [listKey, setListKey] = useState(0);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // "Tornar paciente" em Contas chega com `?account=<id>`: abre o modal com a
+  // conta escolhida e tira o parâmetro da URL.
+  const accountParam = canCreate ? searchParams.get('account') : null;
+  const [initialAccount, setInitialAccount] = useState<AccountOption | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!accountParam) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    getAccount(accountParam, controller.signal)
+      .then((detail) => {
+        setInitialAccount({
+          id: detail.id,
+          name: detail.fullName,
+          email: detail.email,
+        });
+        setIsAddOpen(true);
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [accountParam]);
+
+  function closeAdd() {
+    setIsAddOpen(false);
+    setInitialAccount(null);
+
+    if (searchParams.get('account')) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('account');
+      const query = params.toString();
+      router.replace(query ? `/patients?${query}` : '/patients', {
+        scroll: false,
+      });
+    }
+  }
 
   function handleAdded(name: string) {
-    setIsAddOpen(false);
+    closeAdd();
     setSuccess(`Paciente ${name} adicionado.`);
     setListKey((current) => current + 1);
   }
@@ -88,9 +135,10 @@ function PatientsContent({ account }: { account: Account }) {
       {canCreate && (
         <AddPatientModal
           open={isAddOpen}
-          onClose={() => setIsAddOpen(false)}
+          onClose={closeAdd}
           onAdded={handleAdded}
           canCreate={canCreate}
+          initialAccount={initialAccount}
         />
       )}
     </>

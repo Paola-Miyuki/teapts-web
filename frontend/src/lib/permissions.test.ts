@@ -47,6 +47,13 @@ describe('can', () => {
     }
   });
 
+  it('restringe a administração de contas ao admin', () => {
+    expect(can(admin, 'manageAccounts')).toBe(true);
+    expect(can(professional, 'manageAccounts')).toBe(false);
+    expect(can(patient, 'manageAccounts')).toBe(false);
+    expect(can(waiting, 'manageAccounts')).toBe(false);
+  });
+
   it('libera pacientes autorizados e criação de PTS ao profissional e ao admin', () => {
     for (const action of ['viewAuthorizedPatients', 'createPts'] as const) {
       expect(can(professional, action)).toBe(true);

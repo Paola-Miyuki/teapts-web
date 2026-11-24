@@ -126,6 +126,10 @@ export function getNavigation(account: Account, currentHref: string) {
     },
   ];
 
+  if (can(account, 'manageAccounts')) {
+    items.push({ href: '/accounts', icon: 'accounts', label: 'Contas' });
+  }
+
   if (can(account, 'viewProfessionalDirectory')) {
     items.push({
       href: '/professionals',

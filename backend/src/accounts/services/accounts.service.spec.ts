@@ -372,6 +372,100 @@ describe('AccountsService', () => {
     });
   });
 
+  describe('findDetail', () => {
+    const id = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+    const baseAccount = {
+      id,
+      name: 'Lucas Ferreira Alves',
+      socialName: 'Luna Ferreira',
+      birthDate: '2008-03-14',
+      sex: Sex.Male,
+      gender: null,
+      cpf: '45678912345',
+      email: 'luna@exemplo.com',
+      phone: null,
+      role: AccountRole.User,
+      status: AccountStatus.Active,
+      createdAt: new Date('2026-10-28T12:00:00.000Z'),
+      lastUpdatedAt: null,
+      patientProfile: null,
+      professionalProfiles: [],
+    };
+
+    it('returns the account data without a profile', async () => {
+      accountRepository.findOne.mockResolvedValue(baseAccount as never);
+
+      await expect(service.findDetail(id)).resolves.toEqual({
+        id,
+        fullName: 'Lucas Ferreira Alves',
+        socialName: 'Luna Ferreira',
+        birthDate: '2008-03-14',
+        sex: Sex.Male,
+        gender: null,
+        cpf: '45678912345',
+        email: 'luna@exemplo.com',
+        phone: null,
+        role: AccountRole.User,
+        status: AccountStatus.Active,
+        createdAt: '2026-10-28T12:00:00.000Z',
+        updatedAt: null,
+        profile: { type: 'none', specialisms: [] },
+      });
+      expect(accountRepository.findOne).toHaveBeenCalledWith({
+        where: { id },
+        relations: { patientProfile: true, professionalProfiles: true },
+      });
+    });
+
+    it('returns the patient profile and the update date', async () => {
+      accountRepository.findOne.mockResolvedValue({
+        ...baseAccount,
+        patientProfile: { accountId: id },
+        lastUpdatedAt: new Date('2026-11-01T09:00:00.000Z'),
+      } as never);
+
+      const detail = await service.findDetail(id);
+
+      expect(detail.profile).toEqual({ type: 'patient', specialisms: [] });
+      expect(detail.updatedAt).toBe('2026-11-01T09:00:00.000Z');
+    });
+
+    it('returns the professional specialisms', async () => {
+      accountRepository.findOne.mockResolvedValue({
+        ...baseAccount,
+        professionalProfiles: [{ specialism: 'psychologist' }],
+      } as never);
+
+      await expect(service.findDetail(id)).resolves.toMatchObject({
+        profile: { type: 'professional', specialisms: ['psychologist'] },
+      });
+    });
+
+    it('returns the admin profile', async () => {
+      accountRepository.findOne.mockResolvedValue({
+        ...baseAccount,
+        role: AccountRole.Admin,
+        cpf: null,
+      } as never);
+
+      await expect(service.findDetail(id)).resolves.toMatchObject({
+        cpf: null,
+        profile: { type: 'admin', specialisms: [] },
+      });
+    });
+
+    it('throws ACCOUNT_NOT_FOUND when the account does not exist', async () => {
+      accountRepository.findOne.mockResolvedValue(null as never);
+
+      await expect(service.findDetail(id)).rejects.toMatchObject({
+        response: {
+          status: 'ACCOUNT_NOT_FOUND',
+          message: 'Conta não encontrada.',
+        },
+      });
+    });
+  });
+
   describe('findAll', () => {
     it('passes the filters and returns only the public summary', async () => {
       const request = { page: 2, limit: 20, isPatient: false, q: 'mari' };
@@ -379,9 +473,27 @@ describe('AccountsService', () => {
         rows: [
           {
             account_id: 'account-1',
-            account_name: 'Maria Silva',
+            account_name: 'Lucas Ferreira',
+            account_social_name: 'Luna Ferreira',
             account_email: 'maria@exemplo.com',
+            account_cpf: '52998224725',
+            account_role: AccountRole.User,
             account_status: AccountStatus.Inactive,
+            account_created_at: new Date('2026-11-10T15:00:00.000Z'),
+            account_profile: 'professional',
+            account_specialisms: ['psychologist'],
+          },
+          {
+            account_id: 'account-2',
+            account_name: 'Kaio Admin',
+            account_social_name: null,
+            account_email: 'kaio@exemplo.com',
+            account_cpf: null,
+            account_role: AccountRole.Admin,
+            account_status: AccountStatus.Active,
+            account_created_at: new Date('2026-01-05T10:00:00.000Z'),
+            account_profile: 'admin',
+            account_specialisms: null,
           },
         ],
         total: 21,
@@ -391,9 +503,27 @@ describe('AccountsService', () => {
         data: [
           {
             id: 'account-1',
-            name: 'Maria Silva',
+            name: 'Luna Ferreira',
+            socialName: 'Luna Ferreira',
             email: 'maria@exemplo.com',
+            cpf: '52998224725',
+            role: AccountRole.User,
+            profile: 'professional',
+            specialisms: ['psychologist'],
             status: AccountStatus.Inactive,
+            createdAt: '2026-11-10T15:00:00.000Z',
+          },
+          {
+            id: 'account-2',
+            name: 'Kaio Admin',
+            socialName: null,
+            email: 'kaio@exemplo.com',
+            cpf: null,
+            role: AccountRole.Admin,
+            profile: 'admin',
+            specialisms: [],
+            status: AccountStatus.Active,
+            createdAt: '2026-01-05T10:00:00.000Z',
           },
         ],
         pagination: { page: 2, limit: 20, total: 21, totalPages: 2 },

@@ -338,6 +338,8 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | PATCH | `/me` | access token; `{ name?, email?, socialName?, birthDate?, sex?, gender?, phone? }` | dados da conta atualizados |
 | POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
 | DELETE | `/me` | access token | `200 { id, status: "inactive", deactivatedAt }`; desativa a própria conta e revoga as sessões |
+| GET | `/accounts` | access token de admin; `q`, `profile`, `status`, `createdFrom`, `createdTo`, `sort`, `order`, `page`, `limit` | contas paginadas, com perfil, especialidades e situação |
+| GET | `/accounts/:id` | access token de admin | dados da conta e o perfil |
 | DELETE | `/accounts/:id` | access token de admin | mesma resposta, para qualquer conta |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |

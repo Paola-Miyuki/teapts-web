@@ -626,6 +626,40 @@ describe('PatientsPage', () => {
     });
   });
 
+  describe('conta pré-selecionada (Tornar paciente em Contas)', () => {
+    it('abre o modal com a conta da URL e tira o parâmetro ao fechar', async () => {
+      const user = userEvent.setup();
+      mockedUseSearchParams.mockReturnValue(
+        new URLSearchParams(`account=${ACCOUNT_ID}&q=ana`),
+      );
+      mockApi({
+        accounts: jest.fn().mockResolvedValue(
+          mockResponse({
+            data: {
+              id: ACCOUNT_ID,
+              fullName: 'João Martins',
+              email: 'joao@exemplo.com',
+            },
+          }),
+        ),
+      });
+
+      render(<PatientsPage />);
+
+      const dialog = within(await screen.findByRole('dialog'));
+
+      expect(
+        await dialog.findByRole('combobox', { name: 'Conta' }),
+      ).toHaveValue(JOAO);
+
+      await user.click(dialog.getByRole('button', { name: 'Cancelar' }));
+
+      expect(replace).toHaveBeenCalledWith('/patients?q=ana', {
+        scroll: false,
+      });
+    });
+  });
+
   describe('combobox "Conta" do modal', () => {
     // O `q` do modal escolhe a resposta; sem `q`, as contas da 1ª página.
     function accountsByTerm(byTerm: Record<string, AccountSeed[]>) {

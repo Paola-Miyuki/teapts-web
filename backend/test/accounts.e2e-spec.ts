@@ -68,11 +68,13 @@ describe('account deactivation (e2e)', () => {
   let app: INestApplication;
   let accountRepository: {
     exists: jest.Mock<(options: unknown) => Promise<boolean>>;
+    findOne: jest.Mock<(options: unknown) => Promise<unknown>>;
   };
   let accountsRepository: {
     deactivate: jest.Mock<
       (accountId: string, executedBy: string) => Promise<unknown>
     >;
+    findPaginated: jest.Mock<(filters: unknown) => Promise<unknown>>;
   };
   let revokeAllSessions: jest.SpiedFunction<
     (typeof Session)['revokeAllSessionsForUser']
@@ -90,8 +92,11 @@ describe('account deactivation (e2e)', () => {
   }
 
   beforeEach(async () => {
-    accountRepository = { exists: jest.fn(async () => true) };
-    accountsRepository = { deactivate: jest.fn() };
+    accountRepository = {
+      exists: jest.fn(async () => true),
+      findOne: jest.fn(),
+    };
+    accountsRepository = { deactivate: jest.fn(), findPaginated: jest.fn() };
     revokeAllSessions = jest
       .spyOn(Session, 'revokeAllSessionsForUser')
       .mockResolvedValue([]);
@@ -249,5 +254,139 @@ describe('account deactivation (e2e)', () => {
         'A conta tem perfil responsável por um PTS ativo. Transfira a responsabilidade antes de desativar.',
     });
     expect(revokeAllSessions).not.toHaveBeenCalled();
+  });
+
+  it('lists the accounts with the filters for an admin', async () => {
+    signIn(adminId, 'admin');
+    accountsRepository.findPaginated.mockResolvedValue({
+      rows: [
+        {
+          account_id: targetId,
+          account_name: 'Lucas Ferreira Alves',
+          account_social_name: 'Luna Ferreira',
+          account_email: 'luna@exemplo.com',
+          account_cpf: '45678912345',
+          account_role: 'user',
+          account_status: 'active',
+          account_created_at: new Date('2026-10-28T12:00:00.000Z'),
+          account_profile: 'professional',
+          account_specialisms: ['psychologist'],
+        },
+      ],
+      total: 1,
+    });
+
+    const response = await request(app.getHttpServer()).get(
+      '/accounts?profile=none,professional&status=active&sort=createdAt&order=desc&q=%20luna%20',
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      data: [
+        {
+          id: targetId,
+          name: 'Luna Ferreira',
+          socialName: 'Luna Ferreira',
+          email: 'luna@exemplo.com',
+          cpf: '45678912345',
+          role: 'user',
+          profile: 'professional',
+          specialisms: ['psychologist'],
+          status: 'active',
+          createdAt: '2026-10-28T12:00:00.000Z',
+        },
+      ],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+    expect(accountsRepository.findPaginated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        q: 'luna',
+        profile: ['none', 'professional'],
+        status: 'active',
+        sort: 'createdAt',
+        order: 'desc',
+      }),
+    );
+  });
+
+  it('answers 400 for an invalid GET /accounts parameter', async () => {
+    signIn(adminId, 'admin');
+
+    const response = await request(app.getHttpServer()).get(
+      '/accounts?profile=guest',
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'ERROR',
+      message: 'Parâmetro inválido: profile',
+    });
+  });
+
+  it('answers 403 to a user on GET /accounts and GET /accounts/:id', async () => {
+    signIn(targetId, 'user');
+
+    await request(app.getHttpServer()).get('/accounts').expect(403);
+    await request(app.getHttpServer()).get(`/accounts/${targetId}`).expect(403);
+    expect(accountsRepository.findPaginated).not.toHaveBeenCalled();
+  });
+
+  it('returns the account data on GET /accounts/:id', async () => {
+    signIn(adminId, 'admin');
+    accountRepository.findOne.mockResolvedValue({
+      id: targetId,
+      name: 'Ana Souza',
+      socialName: null,
+      birthDate: '1988-06-12',
+      sex: 'female',
+      gender: 'cis_woman',
+      cpf: '12345678909',
+      email: 'ana@exemplo.com',
+      phone: '41991002030',
+      role: 'user',
+      status: 'active',
+      createdAt: new Date('2026-03-12T12:00:00.000Z'),
+      lastUpdatedAt: new Date('2026-10-02T12:00:00.000Z'),
+      patientProfile: null,
+      professionalProfiles: [{ specialism: 'psychologist' }],
+    });
+
+    const response = await request(app.getHttpServer()).get(
+      `/accounts/${targetId}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: targetId,
+      fullName: 'Ana Souza',
+      socialName: null,
+      birthDate: '1988-06-12',
+      sex: 'female',
+      gender: 'cis_woman',
+      cpf: '12345678909',
+      email: 'ana@exemplo.com',
+      phone: '41991002030',
+      role: 'user',
+      status: 'active',
+      createdAt: '2026-03-12T12:00:00.000Z',
+      updatedAt: '2026-10-02T12:00:00.000Z',
+      profile: { type: 'professional', specialisms: ['psychologist'] },
+    });
+  });
+
+  it('answers 404 ACCOUNT_NOT_FOUND and 400 on GET /accounts/:id', async () => {
+    signIn(adminId, 'admin');
+    accountRepository.findOne.mockResolvedValue(null);
+
+    const missing = await request(app.getHttpServer()).get(
+      `/accounts/${targetId}`,
+    );
+
+    expect(missing.status).toBe(404);
+    expect(missing.body).toEqual({
+      status: 'ACCOUNT_NOT_FOUND',
+      message: 'Conta não encontrada.',
+    });
+    await request(app.getHttpServer()).get('/accounts/not-a-uuid').expect(400);
   });
 });

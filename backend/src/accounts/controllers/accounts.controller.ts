@@ -33,6 +33,7 @@ import {
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { DeactivateAccountResponseDto } from '../dto/deactivate-account-response.dto';
+import { GetAccountResponseDto } from '../dto/get-account-response.dto';
 import { GetAccountsRequestDto } from '../dto/get-accounts-request.dto';
 import { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import {
@@ -57,9 +58,9 @@ export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
   /**
-   * Retorna as contas de usuário (id, nome e e-mail) paginadas, com a busca
-   * `q` por nome ou e-mail e os filtros opcionais de perfil de paciente e de
-   * perfil profissional. Contas de admin nunca aparecem.
+   * Retorna as contas paginadas (tela de Contas do administrador), com a busca
+   * `q`, os filtros de perfil, situação e data de criação e a ordenação. Os
+   * filtros antigos `isPatient`/`isProfessional` mantêm só contas de usuário.
    *
    * @param query parâmetros já normalizados
    * @returns contas e dados de paginação
@@ -68,10 +69,11 @@ export class AccountsController {
   @UseGuards(AuthGuard, AdminGuard)
   @ApiCookieAuth()
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lista as contas (administrador)' })
   @ApiOkResponse({ type: GetAccountsResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    example: { status: 'ERROR', message: 'Parâmetro inválido: isPatient' },
+    example: { status: 'ERROR', message: 'Parâmetro inválido: profile' },
   })
   @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
   @ApiForbiddenResponse({
@@ -92,6 +94,47 @@ export class AccountsController {
     @Query() query: GetAccountsRequestDto,
   ): Promise<GetAccountsResponseDto> {
     return this.accountsService.findAll(query);
+  }
+
+  /**
+   * Retorna os dados de uma conta (modal "Dados da conta").
+   *
+   * @param id conta consultada
+   * @returns dados da conta e o perfil
+   */
+  @Get('accounts/:id')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Consulta os dados de uma conta (administrador)' })
+  @ApiOkResponse({ type: GetAccountResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: { status: 'VALIDATION_ERROR', message: 'Parâmetro inválido: id' },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: { status: 'ACCOUNT_NOT_FOUND', message: 'Conta não encontrada.' },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar a conta.',
+    },
+  })
+  async findOne(
+    @Param('id', parseAccountId) id: string,
+  ): Promise<GetAccountResponseDto> {
+    return this.accountsService.findDetail(id);
   }
 
   /**
