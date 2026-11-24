@@ -16,7 +16,6 @@ Testes, lint e `typecheck` rodam sempre **na máquina**, então Node e pnpm são
 
 **Primeira vez?** [Pré-requisitos](#1-pré-requisitos) → [Setup](#2-setup) → suba a stack (local ou Docker) → `make seed` para as contas de teste → teste a API pelo [Swagger](#6-api-e-swagger).
 
-
 ---
 
 ## 1. Pré-requisitos

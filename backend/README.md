@@ -76,16 +76,44 @@ Nunca edite migration já aplicada. No Docker, migration nova só vale depois do
 
 **Regras do modelo:** uma conta tem no máximo um perfil profissional e um de paciente (RN002), e admin, paciente e profissional usam contas separadas. Excluir é lógico: `account.status = 'inactive'` (RN021) e `deleted_at` na proposta de PTS. O conselho e o nome da especialidade vêm do código (`professionals/professional-registration.ts`); a UF do registro é `uf_e`, em minúsculas.
 
-**Contas de teste** (`make seed`; só para desenvolvimento):
+**O que o seed cria** (`make seed`, ou `pnpm --dir backend run seed:test-user`; precisa do PostgreSQL e do SuperTokens no ar e das migrations aplicadas). Só para desenvolvimento. As contas são criadas ou reaproveitadas a cada execução; a senha de quem já existe no SuperTokens não é redefinida.
 
-| Conta         | E-mail / senha                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| Admin         | `teste@teapts.local` / `teapts123`                                                           |
-| Profissionais | `profissional@teapts.local`, `fisioterapeuta@teapts.local` / `profissional123`               |
-| Pacientes     | `paciente@`, `luna@`, `diego@teapts.local` / `paciente123`                                   |
-| Sem perfil    | `bruno@`, `priscila@`, `sofia@`, `marcela@`, `helena@` (inativa) `teapts.local` / `conta123` |
+**Administradores**
 
-O seed cria um PTS de cada status e não duplica ao rodar de novo.
+- `teste@teapts.local` / `teapts123`: papel `admin`; sem CPF nem dados pessoais (RN001)
+- `kaio.admin@teapts.local` / `teapts123`: Kaio Segunda Conta, segundo admin, sem CPF nem perfil
+
+**Profissionais** (senha `profissional123`)
+
+- `profissional@teapts.local`: Profissional de Teste, psicólogo, `CRP-PR 12345`, IMA, CNES `2771112`; CPF `123.456.789-09`, 12/06/1988, feminino
+- `fisioterapeuta@teapts.local`: Beatriz Lopes, fisioterapeuta, `Crefito-PR 54321`, CER Curitiba; CPF `222.333.444-05`, 03/09/1985, feminino
+
+**Pacientes** (senha `paciente123`)
+
+- `paciente@teapts.local`: Paciente de Teste, CNS `700 0012 3456 7894`; CPF `987.654.321-00`, 18/04/2000, masculino
+- `luna@teapts.local`: Luna Ferreira, CNS `700 0022 2333 4444`; CPF `111.444.777-35`, 15/03/2007, feminino
+- `diego@teapts.local`: Diego Alves, menor de idade, responsável tutelar Paula Alves, CNS `700 0055 5666 7777`; CPF `321.654.987-91`, 22/08/2015, masculino
+
+**Contas sem perfil** (senha `conta123`, para a tela Contas; a situação volta ao valor abaixo a cada seed)
+
+- `bruno@teapts.local`: Bruno Takeda, ativa; CPF `390.533.447-05`, criada em 10/11/2026
+- `priscila@teapts.local`: Priscila Martins, ativa; CPF `529.982.247-25`, criada em 14/11/2026
+- `sofia@teapts.local`: Sofia Andrade, ativa, sem telefone; CPF `168.995.350-09`, criada em 30/08/2026
+- `marcela@teapts.local`: Marcelo Duarte, ativa, nome social "Marcela Duarte" (a lista mostra e busca por ele); CPF `135.792.468-28`, criada em 02/10/2026
+- `helena@teapts.local`: Helena Rocha, **inativa** (desativada em 01/09/2026); CPF `246.813.579-28`, criada em 17/04/2026
+
+**PTS** (um de cada status; só para o paciente que ainda não tem PTS, então rodar de novo não duplica)
+
+| Paciente          | Status                                   | Responsável           | Equipe                |
+| ----------------- | ---------------------------------------- | --------------------- | --------------------- |
+| Paciente de Teste | `draft` (proposta aguardando o paciente) | Profissional de Teste | Beatriz Lopes         |
+| Luna Ferreira     | `concluded`                              | Profissional de Teste | —                     |
+| Luna Ferreira     | `rejected`                               | Beatriz Lopes         | —                     |
+| Luna Ferreira     | `running`                                | Profissional de Teste | Beatriz Lopes         |
+| Diego Alves       | `cancelled`                              | Profissional de Teste | —                     |
+| Diego Alves       | `planning`                               | Beatriz Lopes         | Profissional de Teste |
+
+O seed não cria medicações, contatos de suporte, dados clínicos nem eventos de timeline.
 
 **Conferir e zerar:** `make db-tables`, `db-account`, `db-patients`, `db-professionals`, `db-pts`, `db-query SQL="..."`, `make psql` e `make health`. Zerar: `make clean`, `make up-d`, `make seed` (apaga também usuários e sessões do SuperTokens).
 
