@@ -9,6 +9,17 @@ export type PtsDecisionResponse = {
   rejectedAt: string | null;
 };
 
+export type DeleteProposalResponse = {
+  status: 'OK';
+};
+
+export function deleteProposal(id: string) {
+  return request<DeleteProposalResponse>(
+    `/pts/proposals/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  );
+}
+
 export function decideProposal(id: string, decision: ProposalDecision) {
   return request<PtsDecisionResponse>(`/pts/proposals/${id}/${decision}`, {
     method: 'POST',

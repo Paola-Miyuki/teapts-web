@@ -7,6 +7,7 @@ import {
   JoinTable,
   JoinColumn,
   CreateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -24,20 +25,56 @@ export class PtsEntity {
   })
   status: PtsStateEnum;
 
-  @Column()
+  @Column('text', { name: 'social_situation' })
   socialSituation: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 3 })
   createdAt: Date;
 
-  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  // Exclusão lógica (RN021): as consultas do TypeORM ignoram linhas com
+  // deleted_at preenchido, a menos que usem withDeleted.
+  @DeleteDateColumn({
+    name: 'deleted_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
+  deletedAt: Date | null;
+
+  @Column({
+    name: 'accepted_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
   acceptedAt: Date | null;
 
-  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  @Column({
+    name: 'rejected_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
   rejectedAt: Date | null;
 
-  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  @Column({ name: 'began_at', type: 'timestamp', precision: 3, nullable: true })
   beganAt: Date | null;
+
+  @Column({
+    name: 'concluded_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
+  concludedAt: Date | null;
+
+  @Column({
+    name: 'cancelled_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
+  cancelledAt: Date | null;
 
   @Column({ name: 'patient_id' })
   patientId: string;

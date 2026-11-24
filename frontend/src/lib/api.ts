@@ -45,6 +45,7 @@ export function apiFetch(path: string, init?: RequestInit) {
 }
 
 // Chama a API e devolve o JSON tipado; lança ApiError quando !response.ok.
+// Resposta 204 (sem corpo) devolve `undefined`.
 export async function request<T>(path: string, init?: RequestInit) {
   const response = await apiFetch(path, init);
 
@@ -52,6 +53,10 @@ export async function request<T>(path: string, init?: RequestInit) {
     const { code, message } = await readErrorBody(response);
 
     throw new ApiError(response.status, code, message);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   return (await response.json()) as T;

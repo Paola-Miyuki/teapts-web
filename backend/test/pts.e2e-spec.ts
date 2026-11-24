@@ -148,6 +148,7 @@ describe('remover profissional da equipe (e2e)', () => {
       ptsId,
       professionalId: memberId,
       authorProfessionalId: responsibleId,
+      executedByAccountId: expect.any(String),
       description: 'Remoção de Ana Souza da equipe.',
     });
   });

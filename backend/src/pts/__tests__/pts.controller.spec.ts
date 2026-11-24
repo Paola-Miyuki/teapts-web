@@ -53,6 +53,7 @@ describe('PtsController GET /pts/active', () => {
         id: 'prof-10',
         name: 'Profissional responsável',
         specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
       },
       team: [],
     });
@@ -246,6 +247,50 @@ describe('PtsController POST /pts/proposals/:id/approve|reject', () => {
   });
 });
 
+describe('PtsController DELETE /pts/proposals/:id', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  it('exclui a proposta pela rota e responde { status: OK }', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expect(
+      controller.deleteProposal(proposal.id, responsibleAccount),
+    ).resolves.toEqual({ status: 'OK' });
+    await expectApiError(
+      () => controller.findDraftProposalById(proposal.id, responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('nega a exclusão a quem não é o responsável', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga o 409 para proposta fora de DRAFT', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, responsibleAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+  });
+});
+
 describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
   let repo: InMemoryPtsRepository;
   let controller: PtsController;
@@ -260,12 +305,14 @@ describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
         id: 'prof-10',
         name: 'Kaio Segunda Conta',
         specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
       },
       team: [
         {
           id: 'prof-11',
           name: 'Ana Souza',
           specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
         },
       ],
     });

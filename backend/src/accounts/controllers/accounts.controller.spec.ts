@@ -161,4 +161,24 @@ describe('GET /accounts', () => {
     });
     expect(accountsService.findAll).not.toHaveBeenCalled();
   });
+
+  // Só o admin lista e consulta as contas (RN032).
+  it.each([
+    [
+      'professional',
+      { patientProfileId: null, professionalProfileIds: ['p-1'] },
+    ],
+    ['patient', { patientProfileId: 'user-1', professionalProfileIds: [] }],
+  ])('returns 403 FORBIDDEN to a %s', async (_, profiles) => {
+    accountContext = {
+      accountId: 'user-1',
+      role: AccountRole.User,
+      ...profiles,
+    };
+
+    const response = await request(app.getHttpServer()).get('/accounts');
+
+    expect(response.status).toBe(403);
+    expect(accountsService.findAll).not.toHaveBeenCalled();
+  });
 });

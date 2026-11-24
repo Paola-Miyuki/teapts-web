@@ -1,3 +1,6 @@
+import { escapeLike } from '../../common/search/escape-like';
+import { toProfessionalRegistration } from '../../professionals/professional-registration';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -39,6 +42,8 @@ import {
   ptsNotActive,
   ptsNotFound,
   ptsProposalNotDraft,
+  ptsProposalNotDraftForDelete,
+  ptsProposalNotFound,
   ptsProposalNotPending,
   teamEditForbidden,
   teamMemberNotFound,
@@ -159,22 +164,10 @@ export class PtsRepositoryImpl extends PtsRepository {
           id: fullPts.patient.accountId,
           name: fullPts.patient.account?.name ?? '',
         },
-        responsible: {
-          id: fullPts.responsible.id,
-          name: fullPts.responsible.account?.name ?? '',
-          specialism: {
-            id: String(fullPts.responsible.specialism),
-            name: String(fullPts.responsible.specialism),
-          },
-        },
-        team: (fullPts.team ?? []).map((professional) => ({
-          id: professional.id,
-          name: professional.account?.name ?? '',
-          specialism: {
-            id: String(professional.specialism),
-            name: String(professional.specialism),
-          },
-        })),
+        responsible: this.mapProfessional(fullPts.responsible),
+        team: (fullPts.team ?? []).map((professional) =>
+          this.mapProfessional(professional),
+        ),
       };
 
       await queryRunner.commitTransaction();
@@ -196,6 +189,7 @@ export class PtsRepositoryImpl extends PtsRepository {
   ): Promise<FindPtsProposalsResult> {
     const {
       patientId,
+      q,
       isPatient,
       isAdmin,
       professionalProfileIds,
@@ -211,10 +205,23 @@ export class PtsRepositoryImpl extends PtsRepository {
       .leftJoinAndSelect('responsible.account', 'responsibleAccount')
       .leftJoinAndSelect('proposal.team', 'team')
       .leftJoinAndSelect('team.account', 'teamAccount')
-      .where('proposal.patientId = :patientId', { patientId })
-      .andWhere('proposal.status = :status', {
+      .where('proposal.status = :status', {
         status: PtsStateEnum.DRAFT,
       });
+
+    if (patientId) {
+      query.andWhere('proposal.patientId = :patientId', { patientId });
+    }
+
+    if (q) {
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where('patientAccount.name ILIKE :term', {
+            term: `%${escapeLike(q)}%`,
+          }).orWhere('patientAccount.socialName ILIKE :term');
+        }),
+      );
+    }
 
     if (!isPatient && !isAdmin) {
       this.restrictToProfessionals(query, 'proposal', professionalProfileIds);
@@ -327,6 +334,21 @@ export class PtsRepositoryImpl extends PtsRepository {
       .getOne();
 
     return proposal ? this.toProposalResponse(proposal) : null;
+  }
+
+  async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
+    const pts = await this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.patient', 'patient')
+      .leftJoinAndSelect('patient.account', 'patientAccount')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.id = :id', { id })
+      .getOne();
+
+    return pts ? this.toDetailResponse(pts) : null;
   }
 
   async updateDraftProposal(
@@ -568,6 +590,45 @@ export class PtsRepositoryImpl extends PtsRepository {
     }
   }
 
+  async softDeleteProposal(id: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava a proposta e refaz as checagens: uma aprovação ou outra
+      // exclusão simultânea não passam despercebidas. O query builder já
+      // ignora propostas com deletedAt preenchido.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id })
+        .getOne();
+
+      if (!locked) {
+        throw ptsProposalNotFound();
+      }
+
+      if (locked.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotDraftForDelete();
+      }
+
+      // Só deletedAt muda: a linha e a equipe continuam no banco.
+      await queryRunner.manager.softDelete(PtsEntity, id);
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async findPtsTeam(id: string): Promise<PtsTeamResponseDto | null> {
     const pts = await this.ptsRepository.findOne({
       where: { id },
@@ -636,12 +697,13 @@ export class PtsRepositoryImpl extends PtsRepository {
 
       // Só o vínculo sai: registros feitos pelo profissional mantêm a autoria.
       await queryRunner.manager.insert(TimelineRecordEntity, {
-        type: TimelineRecordType.Removed,
+        type: TimelineRecordType.MemberRemoved,
         description: input.description,
-        targetId: input.ptsId,
-        targetType: TimelineRecordTarget.Pts,
-        projetoTerapeuticoSingularId: input.ptsId,
+        targetId: input.professionalId,
+        targetType: TimelineRecordTarget.TeamMember,
+        ptsId: input.ptsId,
         authorProfessionalId: input.authorProfessionalId,
+        executedByAccountId: input.executedByAccountId,
       });
 
       const pts = await queryRunner.manager.findOne(PtsEntity, {
@@ -716,6 +778,16 @@ export class PtsRepositoryImpl extends PtsRepository {
     };
   }
 
+  private toDetailResponse(pts: PtsEntity): PtsDetailResponseDto {
+    return {
+      ...this.toActiveResponse(pts),
+      status: pts.status,
+      rejectedAt: pts.rejectedAt?.toISOString() ?? null,
+      concludedAt: pts.concludedAt?.toISOString() ?? null,
+      cancelledAt: pts.cancelledAt?.toISOString() ?? null,
+    };
+  }
+
   private mapProfessional(professional: Professional) {
     const specialismNames: Record<Specialism, string> = {
       [Specialism.Psychologist]: 'Psicologia',
@@ -732,6 +804,11 @@ export class PtsRepositoryImpl extends PtsRepository {
           specialismNames[professional.specialism] ??
           String(professional.specialism),
       },
+      registration: toProfessionalRegistration(
+        professional.specialism,
+        professional.councilNumber,
+        professional.councilState,
+      ),
     };
   }
 }

@@ -149,3 +149,65 @@ describe('editPtsProposal', () => {
     );
   });
 });
+
+describe('manageSupportContacts', () => {
+  it('libera ao admin sempre', () => {
+    expect(can(admin, 'manageSupportContacts')).toBe(true);
+  });
+
+  it('libera ao profissional só com PTS ativo, e nega com PTS encerrado (RN024)', () => {
+    expect(
+      can(professional, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(true);
+    expect(
+      can(professional, 'manageSupportContacts', { patientReadOnly: true }),
+    ).toBe(false);
+    expect(can(professional, 'manageSupportContacts')).toBe(false);
+  });
+
+  it('nega ao paciente, que só vê os próprios contatos, e à conta sem perfil', () => {
+    expect(
+      can(patient, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(false);
+    expect(
+      can(waiting, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(false);
+  });
+});
+
+describe('deletePtsProposal (RFPTS008)', () => {
+  const pts = (status: string, responsibleProfessionalId: string) => ({
+    pts: { status, responsibleProfessionalId },
+  });
+  const prof = {
+    accountId: 'a',
+    role: 'user' as const,
+    patientProfileId: null,
+    professionalProfileIds: ['p1'],
+  };
+
+  it('libera ao responsável só em draft', () => {
+    expect(can(prof, 'deletePtsProposal', pts('draft', 'p1'))).toBe(true);
+    expect(can(prof, 'deletePtsProposal', pts('draft', 'p2'))).toBe(false);
+    expect(can(prof, 'deletePtsProposal', pts('planning', 'p1'))).toBe(false);
+  });
+
+  it('não libera ao paciente', () => {
+    const patient = {
+      ...prof,
+      patientProfileId: 'patient-id',
+      professionalProfileIds: [],
+    };
+    expect(can(patient, 'deletePtsProposal', pts('draft', 'p1'))).toBe(false);
+  });
+
+  it('libera ao admin em draft, como a API', () => {
+    const admin = {
+      ...prof,
+      role: 'admin' as const,
+      professionalProfileIds: [],
+    };
+    expect(can(admin, 'deletePtsProposal', pts('draft', 'p2'))).toBe(true);
+    expect(can(admin, 'deletePtsProposal', pts('running', 'p2'))).toBe(false);
+  });
+});

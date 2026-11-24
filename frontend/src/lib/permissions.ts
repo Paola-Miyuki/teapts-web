@@ -8,6 +8,7 @@ export type PermissionAction =
   | 'viewWaitingHome'
   | 'viewOwnCare'
   | 'createPatientProfile'
+  | 'manageSupportContacts'
   | 'viewAuthorizedPatients'
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
@@ -16,7 +17,8 @@ export type PermissionAction =
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
-  | 'editPtsProposal';
+  | 'editPtsProposal'
+  | 'deletePtsProposal';
 
 // Mesmos valores do PtsStateEnum da API.
 export type PtsStatus =
@@ -30,6 +32,8 @@ export type PtsPermissionData = {
 
 export type PermissionContext = {
   pts?: PtsPermissionData;
+  // O profissional só tem PTS encerrado com o paciente (`readOnly` da API).
+  patientReadOnly?: boolean;
 };
 
 export type PermissionUser = {
@@ -86,6 +90,7 @@ export function can(
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
       case 'editPtsProposal':
+      case 'deletePtsProposal':
         return pts?.status === 'draft';
       default:
         return true;
@@ -102,6 +107,11 @@ export function can(
     case 'createPatientProfile':
       // RFPAC001 – administrador.
       return admin;
+    case 'manageSupportContacts':
+      // RFPAC003, RN024 – administrador (RN022) ou profissional membro de PTS
+      // ativo do paciente; o paciente só vê os próprios contatos. Contato de
+      // suporte não concede acesso (RN017).
+      return professional && context.patientReadOnly === false;
     case 'viewAuthorizedPatients':
       // RFPAC002 – profissional (a API filtra os vinculados).
       return professional;
@@ -122,10 +132,11 @@ export function can(
       return professional;
     case 'approvePtsProposal':
     case 'rejectPtsProposal':
-      // RFPTS003 – paciente titular, só em DRAFT.
-      // TODO(DP002): liberar o responsável tutelar depois de modelar o vínculo.
+      // RFPTS003 – paciente titular, só em DRAFT. O responsável tutelar não
+      // é ator do sistema (RN025).
       return patient && pts?.status === 'draft';
     case 'editPtsProposal':
+    case 'deletePtsProposal':
       // RFPTS005 – profissional responsável, só em DRAFT.
       return (
         professional &&

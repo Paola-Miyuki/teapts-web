@@ -6,25 +6,16 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
-  Max,
-  Min,
-  type ValidationOptions,
 } from 'class-validator';
+import {
+  invalidParameter,
+  PaginationQueryDto,
+} from '../../common/pagination/pagination-query.dto';
 import { Specialism } from '../enums/specialism.enum';
-
-/** Página usada quando a consulta não informa paginação. */
-export const DEFAULT_PROFESSIONALS_PAGE = 1;
-
-/** Quantidade de profissionais retornada por página por padrão. */
-export const DEFAULT_PROFESSIONALS_LIMIT = 10;
-
-/** Maior quantidade de profissionais permitida em uma página. */
-export const MAX_PROFESSIONALS_LIMIT = 100;
 
 /** Identificador UUID de um perfil profissional. */
 export type ProfessionalId = string;
@@ -34,20 +25,6 @@ export type ProfessionalSpecialism = Specialism;
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/** Mensagem e status do erro de um parâmetro de consulta inválido. */
-function invalidParameter(parameter: string): ValidationOptions {
-  return {
-    message: `Parâmetro inválido: ${parameter}`,
-    context: { status: 'ERROR' },
-  };
-}
-
-/** Converte a paginação da query, usando o padrão quando vier vazia. */
-function toPageNumber(defaultValue: number) {
-  return ({ value }: { value: unknown }): unknown =>
-    value === undefined || value === '' ? defaultValue : Number(value);
-}
 
 /** Remove espaços externos do nome; só espaços viram texto vazio (inválido). */
 function trimName({ value }: { value: unknown }): unknown {
@@ -86,31 +63,7 @@ function toIdList({ value }: { value: unknown }): unknown {
  * A ordem das propriedades define a ordem da validação: o primeiro
  * parâmetro inválido é o reportado no erro.
  */
-export class GetProfessionalsRequestDto {
-  // page e limit têm valor padrão, então são opcionais na query; o plugin
-  // os marcaria como obrigatórios por não terem `?`.
-  @ApiPropertyOptional({
-    type: 'integer',
-    default: DEFAULT_PROFESSIONALS_PAGE,
-    minimum: 1,
-  })
-  @Transform(toPageNumber(DEFAULT_PROFESSIONALS_PAGE))
-  @IsInt(invalidParameter('page'))
-  @Min(1, invalidParameter('page'))
-  page: number = DEFAULT_PROFESSIONALS_PAGE;
-
-  @ApiPropertyOptional({
-    type: 'integer',
-    default: DEFAULT_PROFESSIONALS_LIMIT,
-    minimum: 1,
-    maximum: MAX_PROFESSIONALS_LIMIT,
-  })
-  @Transform(toPageNumber(DEFAULT_PROFESSIONALS_LIMIT))
-  @IsInt(invalidParameter('limit'))
-  @Min(1, invalidParameter('limit'))
-  @Max(MAX_PROFESSIONALS_LIMIT, invalidParameter('limit'))
-  limit: number = DEFAULT_PROFESSIONALS_LIMIT;
-
+export class GetProfessionalsRequestDto extends PaginationQueryDto {
   @Transform(trimName)
   @IsOptional()
   @IsString(invalidParameter('name'))

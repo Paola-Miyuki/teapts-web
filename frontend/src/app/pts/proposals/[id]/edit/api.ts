@@ -62,7 +62,8 @@ export async function getProfessionalsForTeam(
 ): Promise<Professional[]> {
   const params = new URLSearchParams({
     page: '1',
-    limit: '100',
+    // 50 é o máximo da paginação compartilhada (NF).
+    limit: '50',
   });
 
   const response = await apiFetch(`/professionals?${params.toString()}`, {

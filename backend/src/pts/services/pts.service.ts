@@ -9,12 +9,14 @@ import type {
 } from '../dto/pts-proposal-response.dto';
 import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
-import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
@@ -32,13 +34,16 @@ import {
   activePtsForbidden,
   activePtsNotFound,
   ptsNotActive,
+  ptsForbidden,
   ptsNotFound,
-  socialSituationForbidden,
-  teamProfessionalNotFound,
-  validationError,
   cannotRemoveResponsible,
   teamEditForbidden,
   teamMemberNotFound,
+  socialSituationForbidden,
+  teamProfessionalNotFound,
+  validationError,
+  ptsProposalDeleteForbidden,
+  ptsProposalNotDraftForDelete,
 } from '../pts.errors';
 
 @Injectable()
@@ -94,8 +99,14 @@ export class PtsService {
     account: AccountContext,
   ): Promise<GetPtsProposalsResponseDto> {
     const admin = isAdmin(account);
-    const isPatient = account.patientProfileId === query.patientId;
     const profileIds = account.professionalProfileIds;
+    // Sem paciente na consulta, o paciente vê só as próprias propostas.
+    const patientId =
+      query.patientId ??
+      (!admin && profileIds.length === 0 ? account.patientProfileId : null);
+    const isPatient =
+      account.patientProfileId !== null &&
+      account.patientProfileId === patientId;
 
     if (!admin && !isPatient && profileIds.length === 0) {
       throw ptsProposalForbidden();
@@ -103,7 +114,8 @@ export class PtsService {
 
     const result = await this.ptsRepository.findDraftProposals({
       accountId: account.accountId,
-      patientId: query.patientId,
+      patientId,
+      q: query.q ?? null,
       isPatient,
       isAdmin: admin,
       professionalProfileIds: profileIds,
@@ -112,19 +124,26 @@ export class PtsService {
     });
 
     if (
+      patientId &&
       !admin &&
       !isPatient &&
       result.total === 0 &&
-      !(await this.ptsRepository.hasProposalRelation(
-        query.patientId,
-        profileIds,
-      ))
+      !(await this.ptsRepository.hasProposalRelation(patientId, profileIds))
     ) {
       throw ptsProposalForbidden();
     }
 
+    // O paciente não vê a situação social (RN028).
+    const rows = isPatient
+      ? result.rows.map((row) => {
+          const patientRow: Partial<typeof row> = { ...row };
+          delete patientRow.socialSituation;
+          return patientRow as typeof row;
+        })
+      : result.rows;
+
     return {
-      data: result.rows,
+      data: rows,
       pagination: {
         page: query.page,
         limit: query.limit,
@@ -204,6 +223,44 @@ export class PtsService {
     }
 
     return activePts;
+  }
+
+  /**
+   * Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
+   * paciente, os próprios, sem a situação social (RN028); o profissional, os
+   * de cuja equipe faz parte, menos o rejeitado (RN016).
+   */
+  async findPtsById(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDetailResponseDto> {
+    const pts = await this.ptsRepository.findPtsById(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    if (isAdmin(account)) {
+      return pts;
+    }
+
+    const profileIds = account.professionalProfileIds;
+    const isProfessionalOnPts =
+      pts.status !== PtsStateEnum.REJECTED &&
+      (profileIds.includes(pts.responsible.id) ||
+        pts.team.some((member) => profileIds.includes(member.id)));
+
+    if (isProfessionalOnPts) {
+      return pts;
+    }
+
+    if (account.patientProfileId === pts.patient.id) {
+      const patientResponse = { ...pts };
+      delete patientResponse.socialSituation;
+      return patientResponse;
+    }
+
+    throw ptsForbidden();
   }
 
   async updatePtsProposal(
@@ -334,6 +391,34 @@ export class PtsService {
     return this.ptsRepository.rejectProposal(id);
   }
 
+  async deleteProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<DeletePtsProposalResponseDto> {
+    // Proposta já excluída não é encontrada: responde 404.
+    const proposal = await this.ptsRepository.findProposalById(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(proposal.responsible.id)
+    ) {
+      throw ptsProposalDeleteForbidden();
+    }
+
+    // PTS aprovado não é excluído: é cancelado no encerramento (RFPTS010).
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotDraftForDelete();
+    }
+
+    await this.ptsRepository.softDeleteProposal(id);
+
+    return { status: 'OK' };
+  }
+
   async removeTeamMember(
     id: string,
     professionalId: string,
@@ -379,6 +464,7 @@ export class PtsService {
       ptsId: id,
       professionalId,
       authorProfessionalId: admin ? null : pts.responsible.id,
+      executedByAccountId: account.accountId,
       description: `Remoção de ${member.name} da equipe.`,
     });
   }

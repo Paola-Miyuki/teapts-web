@@ -188,6 +188,55 @@ describe('PtsRepositoryImpl.rejectProposal', () => {
   });
 });
 
+describe('PtsRepositoryImpl.softDeleteProposal', () => {
+  function withSoftDelete(rows: Partial<PtsEntity>[]) {
+    const created = createRepository(rows);
+    const softDelete = jest.fn(async () => ({ affected: 1 }));
+    Object.assign(created.queryRunner.manager, { softDelete });
+    return { ...created, softDelete };
+  }
+
+  it('trava a proposta e preenche só o deletedAt, em uma transação', async () => {
+    const { repository, query, queryRunner, softDelete } = withSoftDelete([
+      draft('a'),
+    ]);
+
+    await repository.softDeleteProposal('a');
+
+    expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(softDelete).toHaveBeenCalledWith(PtsEntity, 'a');
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it('não exclui proposta aprovada antes do lock', async () => {
+    const { repository, queryRunner, softDelete } = withSoftDelete([
+      { id: 'a', status: PtsStateEnum.PLANNING, patientId: 'patient-1' },
+    ]);
+
+    await expectApiError(
+      () => repository.softDeleteProposal('a'),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+
+    expect(softDelete).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  it('responde 404 quando a proposta sumiu (ou já foi excluída) antes do lock', async () => {
+    const { repository, softDelete } = withSoftDelete([]);
+
+    await expectApiError(
+      () => repository.softDeleteProposal('a'),
+      404,
+      'PTS_NOT_FOUND',
+    );
+    expect(softDelete).not.toHaveBeenCalled();
+  });
+});
+
 // Dublê do QueryRunner da remoção: o lock usa createQueryBuilder(PtsEntity),
 // o DELETE do vínculo usa createQueryBuilder() sem argumentos.
 function createTeamRepository(locked: Partial<PtsEntity> | null, affected = 1) {
@@ -263,6 +312,7 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
     ptsId: 'pts-1',
     professionalId: 'prof-11',
     authorProfessionalId: 'prof-10',
+    executedByAccountId: 'account-10',
     description: 'Remoção de Ana Souza da equipe.',
   };
   const running: Partial<PtsEntity> = {
@@ -292,12 +342,13 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
     expect(queryRunner.manager.insert).toHaveBeenCalledWith(
       TimelineRecordEntity,
       {
-        type: TimelineRecordType.Removed,
+        type: TimelineRecordType.MemberRemoved,
         description: 'Remoção de Ana Souza da equipe.',
-        targetId: 'pts-1',
-        targetType: TimelineRecordTarget.Pts,
-        projetoTerapeuticoSingularId: 'pts-1',
+        targetId: 'prof-11',
+        targetType: TimelineRecordTarget.TeamMember,
+        ptsId: 'pts-1',
         authorProfessionalId: 'prof-10',
+        executedByAccountId: 'account-10',
       },
     );
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
@@ -309,6 +360,7 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
         id: 'prof-10',
         name: 'Kaio Segunda Conta',
         specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
       },
       team: [],
     });

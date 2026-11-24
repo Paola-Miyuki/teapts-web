@@ -1,7 +1,36 @@
 /**
- * Tipo do evento gravado na timeline (TimelineRecordType).
- * Valores novos entram com `ALTER TYPE timeline_record_type_e ADD VALUE`.
+ * Tipo do evento gravado na timeline (`timeline_record_type_e`): os eventos
+ * que as telas mostram.
  */
 export enum TimelineRecordType {
-  Removed = 'removed',
+  PtsCreated = 'pts_created',
+  PtsUpdated = 'pts_updated',
+  PtsApproved = 'pts_approved',
+  PtsRejected = 'pts_rejected',
+  PtsStarted = 'pts_started',
+  PtsConcluded = 'pts_concluded',
+  PtsCancelled = 'pts_cancelled',
+  PtsReassessed = 'pts_reassessed',
+  NextVersionCreated = 'next_version_created',
+  GoalAdded = 'goal_added',
+  GoalUpdated = 'goal_updated',
+  GoalRemoved = 'goal_removed',
+  MemberAdded = 'member_added',
+  MemberRemoved = 'member_removed',
+  ResponsibilityTransferred = 'responsibility_transferred',
+  ActivitySuggested = 'activity_suggested',
+  ActivityApproved = 'activity_approved',
+  ActivityRejected = 'activity_rejected',
+  ActivityUpdated = 'activity_updated',
+  ActivitySuspended = 'activity_suspended',
+  ActivityResumed = 'activity_resumed',
+  ActivityConcluded = 'activity_concluded',
+  ActivityArchived = 'activity_archived',
+  ActivityGoalUnlinked = 'activity_goal_unlinked',
+  AppointmentRegistered = 'appointment_registered',
+  AppointmentRectified = 'appointment_rectified',
+  DocumentUploaded = 'document_uploaded',
+  DocumentUpdated = 'document_updated',
+  DocumentReplaced = 'document_replaced',
+  DocumentDeleted = 'document_deleted',
 }

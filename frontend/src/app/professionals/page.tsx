@@ -1,5 +1,6 @@
+'use client';
+
 import AuthenticatedPage from '@/components/AuthenticatedPage';
-import ui from '@/components/ui.module.css';
 import Professionals from './_components/Professionals';
 
 export default function ProfessionalsPage() {
@@ -9,16 +10,17 @@ export default function ProfessionalsPage() {
       breadcrumb="Profissionais"
       requiredAction="viewProfessionalDirectory"
     >
-      <div className={ui.heading}>
-        <h1>Profissionais</h1>
+      {(account) => (
+        <>
+          <div className="heading">
+            <div>
+              <h1>Profissionais</h1>
+            </div>
+          </div>
 
-        <p>
-          Consulte os profissionais cadastrados e encontre integrantes para
-          compor a equipe multidisciplinar.
-        </p>
-      </div>
-
-      <Professionals />
+          <Professionals isAdmin={account.role === 'admin'} />
+        </>
+      )}
     </AuthenticatedPage>
   );
 }
