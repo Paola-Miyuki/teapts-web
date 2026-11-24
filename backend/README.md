@@ -92,7 +92,8 @@ src/
                                                do perfil
     dto/                                       contratos e validação da consulta e do cadastro
     entities/professional.entity.ts            unique (account_id): um perfil por conta
-    enums/specialism.enum.ts                   specialism_e
+    enums/specialism.enum.ts                   specialism_e (20 especialidades)
+    professional-registration.ts               conselho e nome de cada especialidade
   patients/
     controllers/patients.controller.ts         GET /patients/authorized,
                                                GET /patients/available-for-pts e
@@ -203,7 +204,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | POST | `/patients/:patientId/support-contacts` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
 | PATCH | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
 | DELETE | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
-| GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger; cada item traz `registration` (`{ council, number, state }`, com o conselho vindo da especialidade, ou `null`), `institution` e `cnes` |
+| GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger; cada item traz `registration` (`{ council, number, state }`, com o conselho vindo da especialidade, ou `null`; a UF em minúsculas), `institution` e `cnes` |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
 | GET | `/pts/proposals` | paciente titular, profissional da proposta ou admin | [GET /pts/proposals](#get-ptsproposals) |
@@ -519,14 +520,28 @@ profissional (RN002).
 Corpo:
 
 ```json
-{ "accountId": "0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b", "specialism": "psychologist" }
+{
+  "accountId": "0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b",
+  "specialism": "speech_therapist",
+  "councilNumber": "6789",
+  "councilState": "pr",
+  "institution": "CAPSi Boa Vista",
+  "cnes": "1234567"
+}
 ```
 
-`accountId` é um UUID, e `specialism` é `psychologist`, `doctor` ou
-`physiotherapist` (`specialism_e`).
+`accountId` é um UUID; `specialism` é um dos 20 valores da lista fixa
+(`specialism_e`: `doctor`, `family_doctor`, `psychologist`, `speech_therapist`
+etc.), e o conselho regional e o nome exibido saem dele (`CRM`, `Coren`,
+`CRP`, `CRESS`, `CRN`, `Crefito`, `CRF`, `CRFa`, `CRO`, `CREF`). `councilNumber`
+(texto não vazio) e `councilState` (UF em minúsculas, `ac` … `to`, `uf_e`) são
+obrigatórios (RN026); `institution` (texto livre) e `cnes` (7 dígitos) são
+opcionais, e o vazio vira `null`. O `created_by_account_id` é a conta do admin
+da sessão.
 
 Responde `201` com `{ id, accountId, name, email, specialism: { id, name },
-deactivatedAt }`; `specialism` tem o mesmo formato do `GET /professionals`, e
+registration: { council, number, state }, institution, cnes, deactivatedAt }`;
+`specialism` e `registration` têm o mesmo formato do `GET /professionals`, e
 `deactivatedAt` é sempre `null` até a desativação (RFPRO004) existir. Os erros
 possíveis são `400` (`VALIDATION_ERROR`, com a mensagem do campo), `401` (sem
 sessão), `403` (`FORBIDDEN`), `404` (`ACCOUNT_NOT_FOUND`), `409` e `500`
@@ -661,7 +676,7 @@ A resposta `200` retorna o PTS com o responsável e a equipe atualizada:
   "responsible": {
     "id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
     "name": "Kaio Segunda Conta",
-    "specialism": { "id": "psychologist", "name": "Psicologia" },
+    "specialism": { "id": "psychologist", "name": "Psicólogo" },
     "registration": null
   },
   "team": []

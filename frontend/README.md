@@ -78,7 +78,7 @@ src/
                            também; 409 (ex.: `ACCOUNT_IS_PTS_RESPONSIBLE`) mostra a mensagem no diálogo
     professionals/         profissionais (GET /professionals) na tabela de `profissionais.html`:
                            busca por nome, filtro de especialidade e paginação; registro (com
-                           copiar) e instituição; para o admin, situação e menu ⋮ com Visualizar
+                           copiar; a UF vem em minúsculas da API e aparece em maiúsculas) e instituição; para o admin, situação e menu ⋮ com Visualizar
     pts/
       novo/                criar proposta de PTS em passos (Paciente, Diagnóstico, Equipe e
                            prazos): paciente buscado pelo nome (GET /patients/available-for-pts?name=,

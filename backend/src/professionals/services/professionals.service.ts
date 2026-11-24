@@ -25,6 +25,7 @@ import type {
 } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
 import {
+  SPECIALISM_COUNCILS,
   SPECIALISM_NAMES,
   toProfessionalRegistration,
 } from '../professional-registration';
@@ -125,6 +126,7 @@ export class ProfessionalsService {
    * perfil profissional.
    *
    * @param request corpo já validado pelo ValidationPipe global
+   * @param createdByAccountId conta do admin da sessão (RFPRO002)
    * @returns perfil criado, com os dados públicos da conta
    * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
    * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta é de
@@ -136,6 +138,7 @@ export class ProfessionalsService {
    */
   async create(
     request: CreateProfessionalRequestDto,
+    createdByAccountId: string,
   ): Promise<ProfessionalProfileResponseDto> {
     const account = await this.accountRepository.findOne({
       where: { id: request.accountId },
@@ -167,12 +170,22 @@ export class ProfessionalsService {
       throw professionalProfileAlreadyExists();
     }
 
+    const councilNumber = request.councilNumber.trim();
+    // Opcional vazio não é gravado (vira null).
+    const institution = request.institution?.trim() || null;
+    const cnes = request.cnes ?? null;
+
     let id: string;
 
     try {
       id = await this.professionalsRepository.insert({
         accountId: account.id,
         specialism: request.specialism,
+        councilNumber,
+        councilState: request.councilState,
+        institution,
+        cnes,
+        createdByAccountId,
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -195,6 +208,13 @@ export class ProfessionalsService {
         id: request.specialism,
         name: SPECIALISM_NAMES[request.specialism],
       },
+      registration: {
+        council: SPECIALISM_COUNCILS[request.specialism],
+        number: councilNumber,
+        state: request.councilState,
+      },
+      institution,
+      cnes,
       deactivatedAt: null,
     };
   }

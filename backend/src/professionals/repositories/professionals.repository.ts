@@ -172,11 +172,25 @@ export class ProfessionalsRepository {
    *   `UQ_professional_account`)
    */
   async insert(
-    professional: Pick<Professional, 'accountId' | 'specialism'>,
+    professional: Pick<
+      Professional,
+      | 'accountId'
+      | 'specialism'
+      | 'councilNumber'
+      | 'councilState'
+      | 'institution'
+      | 'cnes'
+      | 'createdByAccountId'
+    >,
   ): Promise<string> {
     const result = await this.professionalRepository.insert({
       accountId: professional.accountId,
       specialism: professional.specialism,
+      councilNumber: professional.councilNumber,
+      councilState: professional.councilState,
+      institution: professional.institution,
+      cnes: professional.cnes,
+      createdByAccountId: professional.createdByAccountId,
     });
 
     return (result.identifiers[0] as { id: string }).id;

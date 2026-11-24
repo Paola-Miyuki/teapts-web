@@ -1,7 +1,11 @@
 // Este arquivo define o contrato público do perfil profissional criado.
 // É classe, e não interface, para aparecer no OpenAPI.
 
-import { ProfessionalSpecialismResponseDto } from './get-professionals-response.dto';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  ProfessionalRegistrationResponseDto,
+  ProfessionalSpecialismResponseDto,
+} from './get-professionals-response.dto';
 
 /** Perfil profissional criado, com os dados públicos da conta. */
 export class ProfessionalProfileResponseDto {
@@ -12,6 +16,15 @@ export class ProfessionalProfileResponseDto {
   name: string;
   email: string;
   specialism: ProfessionalSpecialismResponseDto;
+  /** Registro no conselho; o conselho vem da especialidade. */
+  @ApiProperty({ type: ProfessionalRegistrationResponseDto })
+  registration: ProfessionalRegistrationResponseDto;
+  /** Instituição ou serviço de vínculo. */
+  @ApiProperty({ type: String, nullable: true, example: 'CAPSi Boa Vista' })
+  institution: string | null;
+  /** CNES, 7 dígitos. */
+  @ApiProperty({ type: String, nullable: true, example: '1234567' })
+  cnes: string | null;
   /** Data da desativação (RFPRO004); `null` enquanto ativo. */
   deactivatedAt: string | null;
 }

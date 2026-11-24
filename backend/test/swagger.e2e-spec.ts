@@ -635,6 +635,8 @@ describe('Swagger (e2e)', () => {
     expect(components.schemas.CreateProfessionalRequestDto.required).toEqual([
       'accountId',
       'specialism',
+      'councilNumber',
+      'councilState',
     ]);
   });
 
