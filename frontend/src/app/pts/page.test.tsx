@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { Account } from '@/lib/account';
+import { personalData } from '@/test-utils/account';
 
 import PtsOverview from './_components/PtsOverview';
 
@@ -32,6 +33,7 @@ function patientAccount(): Account {
     name: 'Priscila Martins',
     email: 'paciente@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: PATIENT_ID,
     professionalProfileIds: [],
   };
@@ -43,6 +45,7 @@ function professionalAccount(): Account {
     name: 'Kaio Segunda Conta',
     email: 'profissional@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: null,
     professionalProfileIds: [PROFESSIONAL_ID],
   };
