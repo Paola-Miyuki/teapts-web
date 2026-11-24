@@ -24,7 +24,9 @@ import {
   type ProfessionalStatus,
   type ProfessionalSpecialism,
   type ProfessionalsResponse,
+  type UpdatedProfessional,
 } from '@/lib/professionals';
+import EditSpecialismDialog from './EditSpecialismDialog';
 import LoadingState from './LoadingState';
 
 const SPECIALISM_OPTIONS = SPECIALISMS.map(({ value, label }) => ({
@@ -70,14 +72,16 @@ function EmptyCell() {
   );
 }
 
-// "Visualizar" do admin: perfil profissional e conta. Telefone, PTS ativos,
-// editar e desativar entram com a #54, a #55 e a #108.
+// "Visualizar" do admin: perfil profissional e conta, com "Editar
+// especialidade". Telefone, PTS ativos e desativar entram com a #55 e a #108.
 function ProfessionalViewDialog({
   professional,
   onClose,
+  onEdit,
 }: {
   professional: Professional | null;
   onClose: () => void;
+  onEdit: (professional: Professional) => void;
 }) {
   const item = (label: string, value: ReactNode) => (
     <div>
@@ -93,9 +97,19 @@ function ProfessionalViewDialog({
       title={professional?.name ?? ''}
       onClose={onClose}
       footer={
-        <button type="button" className="btn" onClick={onClose}>
-          Fechar
-        </button>
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Fechar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => professional && onEdit(professional)}
+          >
+            <Icon name="edit" className="icon-sm" />
+            Editar especialidade
+          </button>
+        </>
       }
     >
       {professional && (
@@ -176,6 +190,8 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const [result, setResult] = useState<ProfessionalsResponse | null>(null);
   const [error, setError] = useState('');
   const [viewing, setViewing] = useState<Professional | null>(null);
+  const [editing, setEditing] = useState<Professional | null>(null);
+  const [savedNotice, setSavedNotice] = useState(false);
 
   const term = search.term;
   const specialismKey = specialism.join(',');
@@ -256,6 +272,28 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
     term,
     uf,
   ]);
+
+  // Troca a profissão e o registro da linha sem recarregar a lista.
+  function handleSaved(updated: UpdatedProfessional) {
+    setResult((current) =>
+      current
+        ? {
+            ...current,
+            data: current.data.map((item) =>
+              item.id === updated.id
+                ? {
+                    ...item,
+                    specialism: updated.specialism,
+                    registration: updated.registration,
+                  }
+                : item,
+            ),
+          }
+        : current,
+    );
+    setEditing(null);
+    setSavedNotice(true);
+  }
 
   const hasFilters = Boolean(specialismKey || councilKey || uf || statusKey);
   const filtered = Boolean(term || hasFilters);
@@ -402,6 +440,15 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         </label>
       </div>
 
+      {savedNotice && (
+        <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
+          </div>
+          <span>Especialidade atualizada.</span>
+        </div>
+      )}
+
       {error ? (
         <div className={ui.empty} role="alert">
           <h2>Não foi possível carregar os profissionais</h2>
@@ -493,6 +540,19 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
                                 Visualizar
                               </button>
                             </li>
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setSavedNotice(false);
+                                  setEditing(professional);
+                                }}
+                              >
+                                <Icon name="edit" className="icon-sm" />
+                                Editar especialidade
+                              </button>
+                            </li>
                           </KebabMenu>
                         </td>
                       </>
@@ -521,6 +581,18 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
       <ProfessionalViewDialog
         professional={viewing}
         onClose={() => setViewing(null)}
+        onEdit={(professional) => {
+          setViewing(null);
+          setSavedNotice(false);
+          setEditing(professional);
+        }}
+      />
+
+      <EditSpecialismDialog
+        professional={editing}
+        onClose={() => setEditing(null)}
+        onSaved={handleSaved}
+        onUnauthorized={() => router.replace('/login')}
       />
     </div>
   );

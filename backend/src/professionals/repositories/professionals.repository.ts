@@ -170,6 +170,42 @@ export class ProfessionalsRepository {
   }
 
   /**
+   * Busca um perfil profissional com a conta dele.
+   *
+   * @param id id do perfil
+   * @returns o perfil, ou `null` quando não existe
+   * @throws erro do banco, sem tratamento (o service decide a resposta)
+   */
+  async findById(id: string): Promise<Professional | null> {
+    return this.professionalRepository.findOne({
+      where: { id },
+      relations: { account: true },
+    });
+  }
+
+  /**
+   * Troca a especialidade e o registro do perfil e grava `updated_at`.
+   *
+   * @param id id do perfil
+   * @param changes especialidade e registro já decididos pelo service
+   * @throws erro do banco, sem tratamento (o service decide a resposta)
+   */
+  async update(
+    id: string,
+    changes: Pick<
+      Professional,
+      'specialism' | 'councilNumber' | 'councilState'
+    >,
+  ): Promise<void> {
+    await this.professionalRepository.update(id, {
+      specialism: changes.specialism,
+      councilNumber: changes.councilNumber,
+      councilState: changes.councilState,
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
    * Grava o perfil profissional.
    *
    * @param professional conta e especialidade já validadas pelo service

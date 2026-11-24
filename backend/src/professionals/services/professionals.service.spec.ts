@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import {
+  BadRequestException,
   ConflictException,
   InternalServerErrorException,
   Logger,
@@ -28,6 +29,17 @@ function createService() {
     findPaginated:
       jest.fn<
         (filters: FindProfessionalsQuery) => Promise<ProfessionalsPage>
+      >(),
+    findById: jest.fn<(id: string) => Promise<Professional | null>>(),
+    update:
+      jest.fn<
+        (
+          id: string,
+          changes: Pick<
+            Professional,
+            'specialism' | 'councilNumber' | 'councilState'
+          >,
+        ) => Promise<void>
       >(),
     insert:
       jest.fn<
@@ -467,6 +479,134 @@ describe('ProfessionalsService.create', () => {
     expect((error as InternalServerErrorException).getResponse()).toEqual({
       status: 'ERROR',
       message: 'Não foi possível cadastrar o perfil profissional.',
+    });
+  });
+});
+
+describe('ProfessionalsService.update', () => {
+  const id = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+  const current = {
+    id,
+    accountId: 'account-1',
+    specialism: Specialism.Physiotherapist,
+    councilNumber: '1234',
+    councilState: 'pr',
+    institution: 'CAPSi',
+    cnes: '1234567',
+    account: {
+      name: 'Kaio Felipe',
+      email: 'kaio@exemplo.com',
+      deactivatedAt: null,
+    },
+  } as unknown as Professional;
+
+  it('keeps the registration when the council stays the same', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(current);
+
+    await expect(
+      service.update(id, {
+        specialism: Specialism.OccupationalTherapist,
+        councilNumber: '9999',
+        councilState: 'sp',
+      }),
+    ).resolves.toEqual({
+      id,
+      accountId: 'account-1',
+      name: 'Kaio Felipe',
+      email: 'kaio@exemplo.com',
+      specialism: {
+        id: Specialism.OccupationalTherapist,
+        name: 'Terapeuta ocupacional',
+      },
+      registration: { council: 'Crefito', number: '1234', state: 'pr' },
+      institution: 'CAPSi',
+      cnes: '1234567',
+      deactivatedAt: null,
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(id, {
+      specialism: Specialism.OccupationalTherapist,
+      councilNumber: '1234',
+      councilState: 'pr',
+    });
+  });
+
+  it('replaces the registration when the council changes', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(current);
+
+    const result = await service.update(id, {
+      specialism: Specialism.Psychologist,
+      councilNumber: ' 5678 ',
+      councilState: 'sp',
+    });
+
+    expect(result.registration).toEqual({
+      council: 'CRP',
+      number: '5678',
+      state: 'sp',
+    });
+    expect(repository.update).toHaveBeenCalledWith(id, {
+      specialism: Specialism.Psychologist,
+      councilNumber: '5678',
+      councilState: 'sp',
+    });
+  });
+
+  it.each([
+    ['both', {}],
+    ['the state', { councilNumber: '5678' }],
+    ['the number', { councilState: 'sp' as const }],
+  ])(
+    'returns 400 VALIDATION_ERROR when the council changes without %s',
+    async (_name, registration) => {
+      const { repository, service } = createService();
+      repository.findById.mockResolvedValue(current);
+
+      const error: unknown = await service
+        .update(id, { specialism: Specialism.Psychologist, ...registration })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o número e a UF do registro no novo conselho.',
+      });
+      expect(repository.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns 404 PROFESSIONAL_NOT_FOUND when the profile does not exist', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(null);
+
+    const error: unknown = await service
+      .update(id, { specialism: Specialism.Nurse })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toEqual({
+      status: 'PROFESSIONAL_NOT_FOUND',
+      message: 'Profissional não encontrado.',
+    });
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe internal error when the save fails', async () => {
+    const { repository, service } = createService();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    repository.findById.mockResolvedValue(current);
+    repository.update.mockRejectedValue(new Error('connection lost'));
+
+    const error: unknown = await service
+      .update(id, { specialism: Specialism.OccupationalTherapist })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(InternalServerErrorException);
+    expect((error as InternalServerErrorException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: 'Não foi possível atualizar o perfil profissional.',
     });
   });
 });
