@@ -326,3 +326,48 @@ describe('deletePtsProposal', () => {
     expect(can(admin, 'deletePtsProposal', pts('running', 'p2'))).toBe(false);
   });
 });
+
+describe.each([
+  ['startPts', 'planning'],
+  ['registerPtsReassessment', 'running'],
+] as const)('%s', (action, allowedStatus) => {
+  const pts = (
+    status: string,
+    responsibleProfessionalId = 'professional-id',
+  ) => ({
+    pts: { status, responsibleProfessionalId },
+  });
+
+  it(`libera ao responsável e ao admin com o PTS em ${allowedStatus}`, () => {
+    expect(can(professional, action, pts(allowedStatus))).toBe(true);
+    expect(can(admin, action, pts(allowedStatus, 'other-id'))).toBe(true);
+  });
+
+  it('nega a membro da equipe, paciente e conta sem perfil', () => {
+    expect(
+      can(professional, action, {
+        pts: {
+          status: allowedStatus,
+          responsibleProfessionalId: 'other-id',
+          teamProfessionalIds: ['professional-id'],
+        },
+      }),
+    ).toBe(false);
+    expect(can(patient, action, pts(allowedStatus))).toBe(false);
+    expect(can(waiting, action, pts(allowedStatus))).toBe(false);
+  });
+
+  it('nega em outro estado, inclusive ao admin', () => {
+    for (const status of [
+      'draft',
+      'planning',
+      'running',
+      'concluded',
+      'cancelled',
+      'rejected',
+    ].filter((item) => item !== allowedStatus)) {
+      expect(can(professional, action, pts(status))).toBe(false);
+      expect(can(admin, action, pts(status))).toBe(false);
+    }
+  });
+});

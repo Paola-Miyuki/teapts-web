@@ -1,6 +1,6 @@
 import { request } from '@/lib/api';
 import type { ProfessionalRegistration } from '@/lib/professionals';
-import type { PtsStatus } from '@/lib/pts-status';
+import { PTS_STATUS_LABELS, type PtsStatus } from '@/lib/pts-status';
 
 export type ActivePtsStatus = 'planning' | 'running';
 
@@ -41,13 +41,8 @@ export type ActivePts = {
   team: PtsProfessional[];
 };
 
-export const PTS_STATUS_LABELS: Record<ActivePtsStatus, string> = {
-  planning: 'Em planejamento',
-  running: 'Em execução',
-};
-
 export function getPtsStatusLabel(status: string) {
-  const key = status.toLowerCase() as ActivePtsStatus;
+  const key = status.toLowerCase() as PtsStatus;
 
   return PTS_STATUS_LABELS[key] ?? status;
 }
@@ -151,4 +146,16 @@ export type PtsDetail = {
 
 export function getPts(id: string, signal?: AbortSignal) {
   return request<PtsDetail>(`/pts/${encodeURIComponent(id)}`, { signal });
+}
+
+export type PtsStartResponse = {
+  id: string;
+  status: 'running';
+  beganAt: string;
+};
+
+export function startPts(id: string) {
+  return request<PtsStartResponse>(`/pts/${encodeURIComponent(id)}/start`, {
+    method: 'POST',
+  });
 }

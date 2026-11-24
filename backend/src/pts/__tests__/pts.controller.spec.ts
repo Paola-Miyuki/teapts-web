@@ -514,3 +514,65 @@ describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
     );
   });
 });
+
+describe('PtsController POST /pts/:id/start', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  const seedPts = (status: PtsStateEnum) => {
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    seedPts(PtsStateEnum.PLANNING);
+  });
+
+  it('inicia a execução pela rota e devolve id, status e beganAt', async () => {
+    const result = await controller.startPts('pts-100', responsibleAccount);
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      beganAt: '2026-12-01T13:00:00.000Z',
+    });
+    expect(repo.startedRecords).toHaveLength(1);
+  });
+
+  it('nega o início a quem não é o responsável', async () => {
+    await expectApiError(
+      () => controller.startPts('pts-100', teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.startedRecords).toHaveLength(0);
+  });
+
+  it('propaga o 409 para PTS fora de planning', async () => {
+    seedPts(PtsStateEnum.RUNNING);
+
+    await expectApiError(
+      () => controller.startPts('pts-100', responsibleAccount),
+      409,
+      'PTS_NOT_PLANNING',
+    );
+  });
+});

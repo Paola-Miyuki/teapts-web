@@ -111,10 +111,10 @@ src/
   pts/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
                                                GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
-                                               PATCH /pts/:id/social-situation, POST
+                                               PATCH /pts/:id/sheet, POST
                                                /pts/proposals/:id/approve e /reject,
                                                DELETE /pts/proposals/:id,
-                                               POST /pts/:id/team,
+                                               POST /pts/:id/start, POST /pts/:id/team,
                                                DELETE /pts/:id/team/:professionalId e
                                                POST /pts/:id/team/transfer-responsibility, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
@@ -122,7 +122,7 @@ src/
     repositories/pts.repository.ts             contrato do repositório (implementação em
                                                pts.repository.impl.ts)
     dto/                                       contratos e validação de criação, consulta,
-                                               edição, situação social e decisão
+                                               edição, ficha e decisão
     entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e);
                                                deleted_at é a exclusão lógica da proposta
     pts.errors.ts                              erros { status, message } do módulo
@@ -212,11 +212,12 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
+| POST | `/pts/:id/start` | responsável ou admin, PTS em `planning` | [POST /pts/:id/start](#post-ptsidstart) |
 | POST | `/pts/:id/team` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team](#post-ptsidteam) |
 | DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
 | POST | `/pts/:id/team/transfer-responsibility` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team/transfer-responsibility](#post-ptsidteamtransfer-responsibility) |
 | GET | `/pts/:id/timeline` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id/timeline](#get-ptsidtimeline) |
-| PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
+| PATCH | `/pts/:id/sheet` | responsável, membro da equipe ou admin, PTS em `planning` ou `running` | [PATCH /pts/:id/sheet](#patch-ptsidsheet) |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 | POST | `/pts/proposals/:id/reject` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 
@@ -283,15 +284,16 @@ Os erros possíveis são `400` (`Parâmetro inválido: X`), `401` (sem sessão),
 ## GET /pts/active
 
 Exige sessão autenticada e consulta o PTS ativo do paciente informado. O
-paciente titular recebe os dados sem `socialSituation`; o profissional
+paciente titular recebe da ficha só `nextReviewAt` (RN028); o profissional
 responsável, integrante da equipe ou admin recebe o PTS completo.
 
 Parâmetros de query:
 
 - `patientId`: UUID da conta do paciente.
 
-A resposta contém `{ id, status, socialSituation?, createdAt, acceptedAt,
-beganAt, patient, responsible, team }`; `acceptedAt` e `beganAt` podem ser
+A resposta contém `{ id, status, createdAt, acceptedAt, beganAt, patient,
+responsible, team }` e os campos da ficha (os de
+[PATCH /pts/:id/sheet](#patch-ptsidsheet)); `acceptedAt` e `beganAt` podem ser
 `null`. Os erros possíveis são `400` (`Parâmetro inválido: patientId`), `401`
 (sem sessão), `403` (`FORBIDDEN`) e, para o próprio paciente e para o admin,
 `404` (`ACTIVE_PTS_NOT_FOUND`).
@@ -302,7 +304,7 @@ Exige sessão autenticada e devolve o PTS em qualquer estado (RFPTS009), com
 `rejectedAt`, `concludedAt` e `cancelledAt` além dos campos de `GET
 /pts/active`. O admin abre qualquer PTS; o profissional responsável ou membro
 da equipe, menos o PTS rejeitado (RN016); o paciente titular, os próprios PTS,
-sem `socialSituation` (RN028). Os erros possíveis são `400` (`Parâmetro
+sem a ficha, fora `nextReviewAt` (RN028). Os erros possíveis são `400` (`Parâmetro
 inválido: id`), `401`, `403` (`FORBIDDEN`) e `404` (`PTS_NOT_FOUND`).
 
 Em todas as respostas de PTS (criação, propostas, ativo e por id), o
@@ -602,6 +604,56 @@ Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
 para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
 proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
 simultânea não deixa excluir um PTS que acabou de ser aprovado.
+
+## PATCH /pts/:id/sheet
+
+Exige sessão autenticada; o responsável, os membros da equipe e o admin (RN022)
+atualizam a ficha de um PTS em `planning` ou `running` (RFPTS005). O corpo
+substitui a ficha inteira: opcional vazio ou ausente vira `null` (em
+`priorityNeeds`, lista vazia).
+
+| Campo | Formato | Obrigatório |
+| --- | --- | --- |
+| `caseStudyDate`, `nextReviewAt` | `AAAA-MM-DD` | sim |
+| `diagnosisSummary`, `socialSituation` | texto | sim |
+| `supportLevel` | 1 a 3 | não |
+| `priorityNeeds` | lista de textos | não |
+| `cid`, `strengths`, `vulnerabilities`, `comorbidities`, `sensoryProfile`, `communicationMethod` | texto | não |
+
+Na mesma transação (com o PTS travado por `pessimistic_write`), a ficha é
+gravada e um `timeline_record` é registrado: `type: pts_updated`,
+`target_type: pts`, `author_professional_id` = profissional que alterou (nulo
+quando o admin altera) e `executed_by_account_id` = conta que executou (RN029).
+
+A resposta `200` retorna o `id` e a ficha gravada. Os erros possíveis são `400`
+(`VALIDATION_ERROR`), `401` (sem sessão), `403` (`FORBIDDEN`), `404`
+(`PTS_NOT_FOUND`) e `409` (`PTS_NOT_ACTIVE`).
+
+## POST /pts/:id/start
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN022)
+iniciam a execução de um PTS em `planning` (RFPTS006). Não há corpo.
+
+Na mesma transação (com o PTS travado por `pessimistic_write` e as checagens
+refeitas), o PTS passa para `running` com `began_at`, e um `timeline_record` é
+gravado: `type: pts_started`, `target_type: pts`, `target_id` = id do PTS,
+`author_professional_id` = responsável (nulo quando o admin inicia) e
+`executed_by_account_id` = conta que executou (RN029). A descrição é "<quem
+executou> iniciou a execução do PTS".
+
+A resposta `200` retorna o novo estado:
+
+```json
+{
+  "id": "3f2c9a1e-7b4d-4c8e-9f1a-2b3c4d5e6f70",
+  "status": "running",
+  "beganAt": "2026-12-01T13:00:00.000Z"
+}
+```
+
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID), `401`
+(sem sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_PLANNING`). Em qualquer erro, o PTS não muda.
 
 ## POST /pts/:id/team
 

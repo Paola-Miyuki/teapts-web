@@ -2168,3 +2168,130 @@ describe('PtsService.removeTeamMember', () => {
     );
   });
 });
+
+describe('PtsService.startPts (RFPTS006)', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const seedPts = (status: PtsStateEnum) => {
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+    seedPts(PtsStateEnum.PLANNING);
+  });
+
+  it('o responsável inicia o PTS em planning e o evento leva o nome exibido dele', async () => {
+    repo.accountNames.set('acc-1', 'Kaio Felipe');
+
+    const result = await service.startPts('pts-100', responsibleAccount);
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      beganAt: '2026-12-01T13:00:00.000Z',
+    });
+    expect(repo.startedRecords).toEqual([
+      {
+        ptsId: 'pts-100',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'acc-1',
+        description: 'Kaio Felipe iniciou a execução do PTS',
+      },
+    ]);
+  });
+
+  it('usa o nome do responsável quando a conta não tem nome cadastrado', async () => {
+    await service.startPts('pts-100', responsibleAccount);
+
+    expect(repo.startedRecords[0].description).toBe(
+      'Kaio Segunda Conta iniciou a execução do PTS',
+    );
+  });
+
+  it('o admin inicia sem profissional atribuído (RN022, RN029)', async () => {
+    const result = await service.startPts('pts-100', adminAccount);
+
+    expect(result.status).toBe(PtsStateEnum.RUNNING);
+    expect(repo.startedRecords).toEqual([
+      {
+        ptsId: 'pts-100',
+        authorProfessionalId: null,
+        executedByAccountId: 'acc-admin',
+        description: 'Administrador iniciou a execução do PTS',
+      },
+    ]);
+  });
+
+  it('retorna 404 PTS_NOT_FOUND para PTS inexistente', async () => {
+    await expectApiError(
+      () => service.startPts('pts-999', responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it.each([
+    ['membro da equipe', teamAccount],
+    ['outro profissional', otherProfessionalAccount],
+    ['paciente', patientAccount],
+    ['conta sem perfil', noProfileAccount],
+  ])('retorna 403 para %s e não altera o PTS', async (_label, account) => {
+    await expectApiError(
+      () => service.startPts('pts-100', account),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.ptsTeams.get('pts-100')?.status).toBe(PtsStateEnum.PLANNING);
+    expect(repo.startedRecords).toHaveLength(0);
+  });
+
+  it.each(
+    [
+      PtsStateEnum.DRAFT,
+      PtsStateEnum.RUNNING,
+      PtsStateEnum.CONCLUDED,
+      PtsStateEnum.CANCELLED,
+      PtsStateEnum.REJECTED,
+    ].flatMap((status) => [
+      [status, 'responsável', responsibleAccount] as const,
+      [status, 'admin', adminAccount] as const,
+    ]),
+  )(
+    'retorna 409 PTS_NOT_PLANNING para PTS em %s (%s) e não altera o PTS',
+    async (status, _label, account) => {
+      seedPts(status);
+
+      const error = await expectApiError(
+        () => service.startPts('pts-100', account),
+        409,
+        'PTS_NOT_PLANNING',
+      );
+
+      expect(error.message).toBe(
+        'Só um PTS em planejamento pode ter a execução iniciada.',
+      );
+      expect(repo.ptsTeams.get('pts-100')?.status).toBe(status);
+      expect(repo.startedRecords).toHaveLength(0);
+    },
+  );
+});

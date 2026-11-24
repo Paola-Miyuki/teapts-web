@@ -233,6 +233,8 @@ PTS de teste (um de cada status):
 
 O seed cria ou reutiliza as contas (e grava de novo os dados pessoais e os perfis delas). Os PTS só são criados para o paciente que ainda não tem nenhum PTS, então rodar o seed de novo não duplica nada. Ele não redefine a senha de usuários já existentes no SuperTokens. Para conferir: `make db-pts`.
 
+Para testar "Iniciar execução", use o PTS em `planning` do Diego Alves com a Beatriz Lopes (responsável) ou o admin. Depois de iniciado ele fica em `running`; o seed não o volta para `planning`.
+
 Essas credenciais são exclusivas para desenvolvimento e testes locais. Não as utilize em produção.
 
 

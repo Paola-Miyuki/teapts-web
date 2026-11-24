@@ -160,7 +160,7 @@ describe('PtsOverview', () => {
       'href',
       '/pts/3f2e1d0c-9b8a-4765-a432-10fedcba9876/edit',
     );
-    expect(screen.getAllByText('Em execução')).not.toHaveLength(0);
+    expect(screen.getAllByText('Em andamento')).not.toHaveLength(0);
     expect(screen.getByText(/· responsável/)).toBeInTheDocument();
   });
 
