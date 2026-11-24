@@ -27,7 +27,8 @@ export type Professional = {
 
 /** Registro como nas telas, ex.: "CRP-PR 12345". */
 export function formatRegistration(registration: ProfessionalRegistration) {
-  return `${registration.council}-${registration.state} ${registration.number}`;
+  // A API devolve a UF em minúsculas (`uf_e`); as telas mostram em maiúsculas.
+  return `${registration.council}-${registration.state.toUpperCase()} ${registration.number}`;
 }
 
 export type PaginationData = {
@@ -127,7 +128,8 @@ export function getProfessionals(
   }
 
   if (councilState) {
-    params.set('councilState', councilState);
+    // As telas usam a sigla em maiúsculas; a API recebe em minúsculas.
+    params.set('councilState', councilState.toLowerCase());
   }
 
   if (sort) {

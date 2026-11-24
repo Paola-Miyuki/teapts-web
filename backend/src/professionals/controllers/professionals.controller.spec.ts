@@ -56,7 +56,7 @@ describe('GET /professionals', () => {
             email: 'maria@example.com',
             specialism: {
               id: Specialism.Psychologist,
-              name: 'Psicologia',
+              name: 'Psicólogo',
             },
             registration: null,
             institution: null,
@@ -116,7 +116,7 @@ describe('GET /professionals', () => {
           email: 'maria@example.com',
           specialism: {
             id: Specialism.Psychologist,
-            name: 'Psicologia',
+            name: 'Psicólogo',
           },
           registration: null,
           institution: null,
@@ -149,7 +149,7 @@ describe('GET /professionals', () => {
         q: '  Maria ',
         specialism: 'psychologist,doctor',
         council: 'CRP',
-        councilState: 'PR',
+        councilState: 'pr',
         sort: 'specialism',
         order: 'desc',
         ids: '550e8400-e29b-41d4-a716-446655440000',
@@ -162,7 +162,7 @@ describe('GET /professionals', () => {
       q: 'Maria',
       specialism: ['psychologist', 'doctor'],
       council: ['CRP'],
-      councilState: 'PR',
+      councilState: 'pr',
       sort: 'specialism',
       order: 'desc',
       ids: ['550e8400-e29b-41d4-a716-446655440000'],
@@ -200,7 +200,7 @@ describe('POST /professionals', () => {
     accountId,
     name: 'Kaio Felipe',
     email: 'kaio@exemplo.com',
-    specialism: { id: Specialism.Psychologist, name: 'Psicologia' },
+    specialism: { id: Specialism.Psychologist, name: 'Psicólogo' },
     deactivatedAt: null,
   };
   let app: INestApplication;
@@ -266,7 +266,7 @@ describe('POST /professionals', () => {
   it('returns 400 VALIDATION_ERROR for an invalid specialism', async () => {
     const response = await request(app.getHttpServer())
       .post('/professionals')
-      .send({ accountId, specialism: 'nurse' });
+      .send({ accountId, specialism: 'astronaut' });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({

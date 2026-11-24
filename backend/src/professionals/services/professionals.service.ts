@@ -17,7 +17,6 @@ import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
-import { Specialism } from '../enums/specialism.enum';
 import type { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
 import type { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
 import type {
@@ -25,18 +24,15 @@ import type {
   ProfessionalSummaryResponseDto,
 } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
-import { toProfessionalRegistration } from '../professional-registration';
+import {
+  SPECIALISM_NAMES,
+  toProfessionalRegistration,
+} from '../professional-registration';
 import {
   type ProfessionalRow,
   type ProfessionalsPage,
   ProfessionalsRepository,
 } from '../repositories/professionals.repository';
-
-const SPECIALISM_NAMES: Record<Specialism, string> = {
-  [Specialism.Psychologist]: 'Psicologia',
-  [Specialism.Doctor]: 'Medicina',
-  [Specialism.Physiotherapist]: 'Fisioterapia',
-};
 
 /** Código do Postgres para violação de chave única (`unique_violation`). */
 const UNIQUE_VIOLATION = '23505';

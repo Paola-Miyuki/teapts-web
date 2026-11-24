@@ -374,7 +374,7 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
       responsible: {
         id: 'prof-10',
         name: 'Kaio Segunda Conta',
-        specialism: { id: 'psychologist', name: 'Psicologia' },
+        specialism: { id: 'psychologist', name: 'Psicólogo' },
         registration: null,
       },
       team: [],

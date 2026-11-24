@@ -57,7 +57,7 @@ describe('CreateProfessionalRequestDto', () => {
     ],
     [
       'a specialism outside the enum',
-      { accountId, specialism: 'nurse' },
+      { accountId, specialism: 'astronaut' },
       'Informe uma especialidade válida.',
     ],
   ])('rejects %s with VALIDATION_ERROR', async (_case, body, message) => {

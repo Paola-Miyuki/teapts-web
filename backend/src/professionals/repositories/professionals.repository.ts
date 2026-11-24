@@ -10,6 +10,7 @@ import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
 import type { Uf } from '../enums/uf.enum';
+import { SPECIALISM_NAMES } from '../professional-registration';
 import { escapeLike } from '../../common/search/escape-like';
 import {
   type Council,
@@ -17,7 +18,12 @@ import {
 } from '../professional-registration';
 
 /** Nome da especialidade, para ordenar pelo texto mostrado na tela. */
-const SPECIALISM_ORDER_SQL = `CASE professional.specialism WHEN 'doctor' THEN 'Medicina' WHEN 'physiotherapist' THEN 'Fisioterapia' WHEN 'psychologist' THEN 'Psicologia' END`;
+// Ordena pelo nome exibido da especialidade, o mesmo do mapa do código.
+const SPECIALISM_ORDER_SQL = `CASE professional.specialism ${Object.entries(
+  SPECIALISM_NAMES,
+)
+  .map(([specialism, name]) => `WHEN '${specialism}' THEN '${name}'`)
+  .join(' ')} END`;
 
 /** Filtros e paginação já validados da consulta de profissionais. */
 export type FindProfessionalsQuery = {

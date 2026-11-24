@@ -137,7 +137,7 @@ describe('professional profile (e2e)', () => {
       accountId,
       name: 'Kaio Felipe',
       email: 'kaio@exemplo.com',
-      specialism: { id: 'psychologist', name: 'Psicologia' },
+      specialism: { id: 'psychologist', name: 'Psicólogo' },
       deactivatedAt: null,
     });
     expect(professionalsRepository.insert).toHaveBeenCalledWith(body);
@@ -172,7 +172,7 @@ describe('professional profile (e2e)', () => {
 
     const response = await request(app.getHttpServer())
       .post('/professionals')
-      .send({ accountId, specialism: 'nurse' });
+      .send({ accountId, specialism: 'astronaut' });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({

@@ -95,7 +95,10 @@ function ProfessionalViewDialog({
               {item('Profissão', professional.specialism.name)}
               {item('Conselho regional', professional.registration?.council)}
               {item('Nº de registro', professional.registration?.number)}
-              {item('UF do registro', professional.registration?.state)}
+              {item(
+                'UF do registro',
+                professional.registration?.state.toUpperCase(),
+              )}
               {item('Instituição', professional.institution)}
               {item('CNES', professional.cnes)}
               {item(

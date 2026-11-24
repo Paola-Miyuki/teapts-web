@@ -166,7 +166,7 @@ describe('ProfessionalsPage', () => {
                   registration: {
                     council: 'CRP',
                     number: '12345',
-                    state: 'PR',
+                    state: 'pr',
                   },
                   institution: 'IMA',
                   cnes: '2771112',
@@ -319,7 +319,7 @@ describe('ProfessionalsPage', () => {
     await screen.findByText('Nenhum profissional encontrado');
 
     expect(global.fetch).toHaveBeenLastCalledWith(
-      'http://localhost:3000/professionals?page=1&limit=10&q=Maria&specialism=doctor%2Cpsychologist&council=CRP&councilState=PR&sort=specialism&order=desc',
+      'http://localhost:3000/professionals?page=1&limit=10&q=Maria&specialism=doctor%2Cpsychologist&council=CRP&councilState=pr&sort=specialism&order=desc',
       { credentials: 'include', signal: expect.any(AbortSignal) },
     );
     expect(screen.getByRole('searchbox')).toHaveValue('Maria');
