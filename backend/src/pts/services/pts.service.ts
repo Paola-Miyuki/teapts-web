@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
 import type { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
+import type { TransferPtsResponsibilityRequestDto } from '../dto/transfer-pts-responsibility.dto';
 import type { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import type {
   GetPtsProposalsResponseDto,
@@ -46,6 +47,8 @@ import {
   ptsProposalDeleteForbidden,
   ptsProposalNotDraftForDelete,
   teamDuplicateAccount,
+  newResponsibleNotFound,
+  newResponsibleInvalid,
 } from '../pts.errors';
 
 @Injectable()
@@ -568,6 +571,71 @@ export class PtsService {
       authorProfessionalId: admin ? null : pts.responsible.id,
       executedByAccountId: account.accountId,
       description: `${executorName} removeu ${member.name} da equipe`,
+    });
+  }
+
+  async transferResponsibility(
+    id: string,
+    dto: TransferPtsResponsibilityRequestDto,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    const [newResponsible] =
+      await this.ptsRepository.findProfessionalsWithAccountByIds([
+        dto.newResponsibleId,
+      ]);
+
+    if (!newResponsible) {
+      throw newResponsibleNotFound();
+    }
+
+    if (
+      !newResponsible.accountId ||
+      newResponsible.id === pts.responsibleProfessionalId
+    ) {
+      throw newResponsibleInvalid();
+    }
+
+    const hasDuplicateAccountInTeam = pts.teamMembers.some(
+      (member) =>
+        member.professionalId !== newResponsible.id &&
+        member.accountId === newResponsible.accountId,
+    );
+
+    if (hasDuplicateAccountInTeam) {
+      throw teamDuplicateAccount([newResponsible.id]);
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.transferResponsibility({
+      ptsId: id,
+      newResponsibleId: newResponsible.id,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} transferiu a responsabilidade do PTS para ${newResponsible.name}`,
     });
   }
 

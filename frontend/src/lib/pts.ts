@@ -80,6 +80,20 @@ export function removeTeamMember(id: string, professionalId: string) {
   );
 }
 
+export function transferPtsResponsibility(
+  id: string,
+  newResponsibleId: string,
+) {
+  return request<PtsTeamResponse>(
+    `/pts/${encodeURIComponent(id)}/team/transfer-responsibility`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newResponsibleId }),
+    },
+  );
+}
+
 export type PtsDetail = {
   id: string;
   status: PtsStatus;

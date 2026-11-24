@@ -24,6 +24,7 @@ import styles from '../pts.module.css';
 import PtsTeamList from './PtsTeamList';
 import RemoveTeamMemberDialog from './RemoveTeamMemberDialog';
 import SocialSituationDialog from './SocialSituationDialog';
+import TransferResponsibilityModal from './TransferResponsibilityModal';
 
 type PtsOverviewProps = {
   account: Account;
@@ -91,6 +92,7 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   const [removingMember, setRemovingMember] = useState<PtsProfessional | null>(
     null,
   );
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const validPatientId = Boolean(patientId && UUID_PATTERN.test(patientId));
   const isOwnPts =
@@ -170,6 +172,23 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
     );
     setRemovingMember(null);
     setFeedback('Profissional removido da equipe.');
+  }
+
+  function handleResponsibilityTransferred(team: PtsTeamResponse) {
+    setState((current) =>
+      current.kind === 'loaded'
+        ? {
+            kind: 'loaded',
+            pts: {
+              ...current.pts,
+              responsible: team.responsible,
+              team: team.team,
+            },
+          }
+        : current,
+    );
+    setIsTransferModalOpen(false);
+    setFeedback('Responsabilidade transferida.');
   }
 
   if (!patientId) {
@@ -259,6 +278,10 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
       responsibleProfessionalId: pts.responsible.id,
     },
   });
+  const canTransferResponsibility =
+    account.role === 'admin' &&
+    account.professionalProfileIds.includes(pts.responsible.id) &&
+    ['planning', 'running'].includes(pts.status.toLowerCase());
   const acceptedAt = formatDate(pts.acceptedAt);
   const beganAt = formatDate(pts.beganAt);
 
@@ -307,6 +330,14 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
                 ? (member) => {
                     setFeedback('');
                     setRemovingMember(member);
+                  }
+                : undefined
+            }
+            onTransferResponsibility={
+              canTransferResponsibility
+                ? () => {
+                    setFeedback('');
+                    setIsTransferModalOpen(true);
                   }
                 : undefined
             }
@@ -409,11 +440,23 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
 
       {canRemoveTeamMember && (
         <RemoveTeamMemberDialog
-          key={removingMember?.id ?? 'closed'}
+          key={
+            removingMember?.id ? `remove-${removingMember.id}` : 'remove-closed'
+          }
           ptsId={pts.id}
           member={removingMember}
           onClose={() => setRemovingMember(null)}
           onRemoved={handleMemberRemoved}
+        />
+      )}
+
+      {canTransferResponsibility && isTransferModalOpen && (
+        <TransferResponsibilityModal
+          open
+          ptsId={pts.id}
+          currentResponsibleId={pts.responsible.id}
+          onClose={() => setIsTransferModalOpen(false)}
+          onTransferred={handleResponsibilityTransferred}
         />
       )}
     </>
