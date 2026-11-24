@@ -17,7 +17,7 @@ import AccountCombobox from './AccountCombobox';
 import SupportContactFields from './SupportContactFields';
 import SupportContactList from './SupportContactList';
 
-const SUBMIT_ERROR = 'Não foi possível adicionar o paciente.';
+const SUBMIT_ERROR = 'Não foi possível adicionar o paciente';
 
 type AddPatientFormProps = {
   // Conta já escolhida (vinda de "Tornar paciente" em Contas).
@@ -56,7 +56,7 @@ export default function AddPatientForm({
     setSubmitError('');
 
     if (!account) {
-      setAccountError('Selecione a conta.');
+      setAccountError('Selecione a conta');
       document.getElementById('account')?.focus();
       return;
     }

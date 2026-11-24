@@ -22,6 +22,7 @@ import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-Cr
 import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1791148990000-AddPatientClinicalDataAndMedication';
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
+import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -109,6 +110,7 @@ describe('getDatabaseOptions', () => {
         AddPatientClinicalDataAndMedication1791148990000,
         AddAccountStatus1791149000000,
         AddPtsSheetColumns1791149010000,
+        AddProfessionalRegistrationFields1791149020000,
       ],
     });
   });

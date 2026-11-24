@@ -71,12 +71,12 @@ export default function LogoutButton({
         return;
       }
 
-      setErrorMessage('Não foi possível encerrar a sessão. Tente novamente.');
+      setErrorMessage('Não foi possível encerrar a sessão. Tente novamente');
     } catch (error) {
       console.error('Erro ao realizar logout:', error);
 
       setErrorMessage(
-        'Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente.',
+        'Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente',
       );
     } finally {
       setLoading(false);

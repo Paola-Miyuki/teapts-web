@@ -57,7 +57,7 @@ export default function PatientProposals() {
           <Icon name="alertCircle" />
         </div>
         <h2>Não foi possível carregar as propostas</h2>
-        <p>Verifique sua conexão e tente novamente.</p>
+        <p>Verifique sua conexão e tente novamente</p>
         <button
           type="button"
           className={`${ui.btn} ${ui.btnSecondary}`}

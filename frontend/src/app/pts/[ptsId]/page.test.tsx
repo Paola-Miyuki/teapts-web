@@ -43,7 +43,7 @@ const PTS = {
     id: 'prof-1',
     name: 'Ana Souza',
     specialism: { id: 'psychologist', name: 'Psicologia' },
-    registration: { council: 'CRP', number: '12345', state: 'PR' },
+    registration: { council: 'CRP', number: '12345', state: 'pr' },
   },
   team: [
     {

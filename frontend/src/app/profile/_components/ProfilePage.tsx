@@ -110,7 +110,7 @@ function ProfileContent({
           <div className={ui.alertIcon}>
             <Icon name="checkCircle" />
           </div>
-          <span>Seus dados foram atualizados com sucesso.</span>
+          <span>Seus dados foram atualizados com sucesso</span>
         </div>
       )}
 

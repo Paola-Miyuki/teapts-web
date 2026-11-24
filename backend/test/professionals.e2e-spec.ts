@@ -65,7 +65,14 @@ beforeAll(async () => {
 describe('professional profile (e2e)', () => {
   const accountId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
   const professionalId = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
-  const body = { accountId, specialism: 'psychologist' };
+  const body = {
+    accountId,
+    specialism: 'speech_therapist',
+    councilNumber: '6789',
+    councilState: 'pr',
+    institution: 'CAPSi Boa Vista',
+    cnes: '1234567',
+  };
   const userAccount = {
     id: accountId,
     name: 'Kaio Felipe',
@@ -81,6 +88,7 @@ describe('professional profile (e2e)', () => {
   };
   let professionalsRepository: {
     insert: jest.Mock<(professional: unknown) => Promise<string>>;
+    findPaginated: jest.Mock<(filters: unknown) => Promise<unknown>>;
   };
 
   function signIn(role: 'admin' | 'user') {
@@ -96,7 +104,7 @@ describe('professional profile (e2e)', () => {
 
   beforeEach(async () => {
     accountRepository = { findOne: jest.fn() };
-    professionalsRepository = { insert: jest.fn() };
+    professionalsRepository = { insert: jest.fn(), findPaginated: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ProfessionalsController],
@@ -137,10 +145,17 @@ describe('professional profile (e2e)', () => {
       accountId,
       name: 'Kaio Felipe',
       email: 'kaio@exemplo.com',
-      specialism: { id: 'psychologist', name: 'Psicologia' },
+      specialism: { id: 'speech_therapist', name: 'Fonoaudiólogo' },
+      registration: { council: 'CRFa', number: '6789', state: 'pr' },
+      institution: 'CAPSi Boa Vista',
+      cnes: '1234567',
       deactivatedAt: null,
     });
-    expect(professionalsRepository.insert).toHaveBeenCalledWith(body);
+    // O criador é o admin da sessão.
+    expect(professionalsRepository.insert).toHaveBeenCalledWith({
+      ...body,
+      createdByAccountId: 'admin-account',
+    });
   });
 
   it('answers 401 without a session', async () => {
@@ -167,19 +182,67 @@ describe('professional profile (e2e)', () => {
     expect(accountRepository.findOne).not.toHaveBeenCalled();
   });
 
-  it('answers 400 VALIDATION_ERROR for an invalid specialism', async () => {
+  it.each([
+    [
+      'an invalid specialism',
+      { specialism: 'astronaut' },
+      'Informe uma especialidade válida.',
+    ],
+    [
+      'a missing council number',
+      { councilNumber: undefined },
+      'Informe o número do registro.',
+    ],
+    [
+      'a blank council number',
+      { councilNumber: '  ' },
+      'Informe o número do registro.',
+    ],
+    [
+      'a missing council state',
+      { councilState: undefined },
+      'Informe uma UF válida.',
+    ],
+    [
+      'an invalid council state',
+      { councilState: 'xx' },
+      'Informe uma UF válida.',
+    ],
+    [
+      'a CNES outside 7 digits',
+      { cnes: '12345' },
+      'O CNES deve ter 7 dígitos.',
+    ],
+  ])(
+    'answers 400 VALIDATION_ERROR for %s, without creating the profile',
+    async (_case, change, message) => {
+      signIn('admin');
+
+      const response = await request(app.getHttpServer())
+        .post('/professionals')
+        .send({ ...body, ...change });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ status: 'VALIDATION_ERROR', message });
+      expect(accountRepository.findOne).not.toHaveBeenCalled();
+      expect(professionalsRepository.insert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('creates the profile without the optional institution and CNES', async () => {
     signIn('admin');
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    professionalsRepository.insert.mockResolvedValue(professionalId);
+    const { institution, cnes, ...required } = body;
+    void institution;
+    void cnes;
 
     const response = await request(app.getHttpServer())
       .post('/professionals')
-      .send({ accountId, specialism: 'nurse' });
+      .send(required);
 
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({
-      status: 'VALIDATION_ERROR',
-      message: 'Informe uma especialidade válida.',
-    });
-    expect(accountRepository.findOne).not.toHaveBeenCalled();
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ institution: null, cnes: null });
   });
 
   it('answers 404 ACCOUNT_NOT_FOUND for a missing account', async () => {
@@ -253,5 +316,41 @@ describe('professional profile (e2e)', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.status).toBe('PROFESSIONAL_PROFILE_ALREADY_EXISTS');
+  });
+
+  it('returns the council registration, institution and CNES in GET /professionals', async () => {
+    signIn('admin');
+    professionalsRepository.findPaginated.mockResolvedValue({
+      total: 1,
+      rows: [
+        {
+          professional_id: professionalId,
+          account_name: 'João Lima',
+          account_email: 'joao.lima@exemplo.com',
+          account_status: 'active',
+          professional_specialism: 'speech_therapist',
+          professional_council_number: '6789',
+          professional_council_state: 'pr',
+          professional_institution: 'CAPSi Boa Vista',
+          professional_cnes: '1234567',
+        },
+      ],
+    });
+
+    const response = await request(app.getHttpServer()).get('/professionals');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([
+      {
+        id: professionalId,
+        name: 'João Lima',
+        email: 'joao.lima@exemplo.com',
+        specialism: { id: 'speech_therapist', name: 'Fonoaudiólogo' },
+        registration: { council: 'CRFa', number: '6789', state: 'pr' },
+        institution: 'CAPSi Boa Vista',
+        cnes: '1234567',
+        status: 'active',
+      },
+    ]);
   });
 });

@@ -22,7 +22,7 @@ export class ProfessionalRegistrationResponseDto {
   council: string;
   /** @example 12345 */
   number: string;
-  @ApiProperty({ enum: UFS, example: 'PR' })
+  @ApiProperty({ enum: UFS, example: 'pr' })
   state: Uf;
 }
 

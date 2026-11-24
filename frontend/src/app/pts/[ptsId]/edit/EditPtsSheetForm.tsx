@@ -42,8 +42,8 @@ type FieldErrors = Partial<
   >
 >;
 
-const LOAD_ERROR = 'Não foi possível carregar os dados do PTS.';
-const SAVE_ERROR = 'Não foi possível atualizar o PTS.';
+const LOAD_ERROR = 'Não foi possível carregar os dados do PTS';
+const SAVE_ERROR = 'Não foi possível atualizar o PTS';
 
 function toForm(pts: PtsDetail): FormState {
   return {
@@ -139,7 +139,7 @@ export default function EditPtsSheetForm({
 
         if (!['planning', 'running'].includes(loaded.status)) {
           setLoadError(
-            'Somente o PTS em planejamento ou execução pode ser editado.',
+            'Somente o PTS em planejamento ou execução pode ser editado',
           );
           setLoadStatus('error');
           return;
@@ -155,7 +155,7 @@ export default function EditPtsSheetForm({
 
         if (!allowed) {
           setLoadError(
-            'Somente a equipe do PTS e o administrador podem editar a ficha.',
+            'Somente a equipe do PTS e o administrador podem editar a ficha',
           );
           setLoadStatus('error');
           return;
@@ -230,20 +230,20 @@ export default function EditPtsSheetForm({
 
     if (current === 0) {
       if (!values.caseStudyDate) {
-        found.caseStudyDate = 'Informe a data do estudo de caso.';
+        found.caseStudyDate = 'Informe a data do estudo de caso';
       }
 
       if (!values.diagnosisSummary.trim()) {
-        found.diagnosisSummary = 'Descreva a síntese do diagnóstico.';
+        found.diagnosisSummary = 'Descreva a síntese do diagnóstico';
       }
     }
 
     if (current === 1 && !values.socialSituation.trim()) {
-      found.socialSituation = 'Descreva a situação social do paciente.';
+      found.socialSituation = 'Descreva a situação social do paciente';
     }
 
     if (current === 2 && !values.nextReviewAt) {
-      found.nextReviewAt = 'Informe a próxima revisão.';
+      found.nextReviewAt = 'Informe a próxima revisão';
     }
 
     return found;

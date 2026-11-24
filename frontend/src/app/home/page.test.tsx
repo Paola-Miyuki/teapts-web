@@ -254,7 +254,7 @@ describe('HomePage', () => {
     render(<HomePage />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível carregar os dados da sua conta.',
+      'Não foi possível carregar os dados da sua conta',
     );
 
     mockMe(200, account());

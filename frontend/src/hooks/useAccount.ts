@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getMe, type Account } from '@/lib/account';
 import { ApiError } from '@/lib/api';
 
-const LOAD_ERROR = 'Não foi possível carregar os dados da sua conta.';
+const LOAD_ERROR = 'Não foi possível carregar os dados da sua conta';
 
 // Consulta /me; sessão inválida volta para o login.
 export function useAccount() {

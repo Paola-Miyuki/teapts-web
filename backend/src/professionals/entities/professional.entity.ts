@@ -1,5 +1,6 @@
 import {
   Column,
+  CreateDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -43,6 +44,21 @@ export class Professional {
 
   @Column('text', { nullable: true })
   cnes!: string | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 3 })
+  createdAt!: Date;
+
+  // O admin que criou e validou o perfil (RFPRO002); nulo nos perfis antigos.
+  @Column('uuid', { name: 'created_by_account_id', nullable: true })
+  createdByAccountId!: string | null;
+
+  @Column({
+    name: 'updated_at',
+    type: 'timestamp',
+    precision: 3,
+    nullable: true,
+  })
+  updatedAt!: Date | null;
 
   @Index('IDX_professional_account_id')
   @Column('uuid', { name: 'account_id' })

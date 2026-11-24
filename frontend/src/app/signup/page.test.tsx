@@ -78,7 +78,7 @@ describe('SignupPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Informe um CPF válido.',
+      'Informe um CPF válido',
     );
     expect(signUp).not.toHaveBeenCalled();
   });
@@ -89,7 +89,7 @@ describe('SignupPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'As senhas não coincidem.',
+      'As senhas não coincidem',
     );
     expect(screen.getByLabelText('Repita a senha')).toHaveAttribute(
       'aria-invalid',

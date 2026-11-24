@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api';
 import type { PtsProposal } from '@/lib/proposals';
 import { deleteProposal } from '../api';
 
-const DELETE_ERROR = 'Não foi possível excluir a proposta. Tente de novo.';
+const DELETE_ERROR = 'Não foi possível excluir a proposta. Tente de novo';
 
 // Excluir proposta em `draft` (RFPTS008): exclusão lógica; depois dela a
 // proposta sai da lista.
@@ -38,7 +38,7 @@ export function useDeleteProposal(onDeleted: () => void) {
     try {
       await deleteProposal(pending.id);
       setPending(null);
-      setFeedback('Proposta excluída.');
+      setFeedback('Proposta excluída');
       onDeleted();
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 401) {

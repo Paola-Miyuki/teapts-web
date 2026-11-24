@@ -281,7 +281,7 @@ describe('Transferir responsabilidade (RFEM002)', () => {
     );
 
     expect(
-      await screen.findByText('Responsabilidade transferida.'),
+      await screen.findByText('Responsabilidade transferida'),
     ).toBeInTheDocument();
     expect(screen.getByText('Novo Responsável')).toBeInTheDocument();
     expect(screen.getByText('Integrante Teste')).toBeInTheDocument();

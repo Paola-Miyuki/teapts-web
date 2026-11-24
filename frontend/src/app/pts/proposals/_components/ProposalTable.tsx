@@ -26,7 +26,7 @@ import { useDeleteProposal } from './useDeleteProposal';
 import { useProposalDecision } from './useProposalDecision';
 
 const DEFAULT_LIMIT = 10;
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
 function canEdit(account: Account, proposal: PtsProposal) {
   return can(account, 'editPtsProposal', {
@@ -152,7 +152,7 @@ export default function ProposalTable({ account }: { account: Account }) {
             <Icon name="checkCircle" />
           </div>
           <span>
-            {decision.feedback || removal.feedback || 'Proposta atualizada.'}
+            {decision.feedback || removal.feedback || 'Proposta atualizada'}
           </span>
         </div>
       )}

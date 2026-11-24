@@ -178,7 +178,7 @@ describe('Remover profissional da equipe (RFEM003)', () => {
     );
 
     expect(
-      await screen.findByText('Profissional removido da equipe.'),
+      await screen.findByText('Profissional removido da equipe'),
     ).toBeInTheDocument();
     expect(screen.queryByText('Integrante Teste')).not.toBeInTheDocument();
     expect(

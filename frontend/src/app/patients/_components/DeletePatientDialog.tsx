@@ -25,7 +25,7 @@ export default function DeletePatientDialog({
       description="A conta fica inativa e as sessões abertas são encerradas. O prontuário do paciente é mantido."
       confirmLabel="Excluir paciente"
       confirmingLabel="Excluindo..."
-      errorMessage="Não foi possível excluir o paciente."
+      errorMessage="Não foi possível excluir o paciente"
       icon="trash"
     />
   );

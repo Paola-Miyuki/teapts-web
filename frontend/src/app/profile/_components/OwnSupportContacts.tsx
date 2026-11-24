@@ -8,7 +8,7 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { getSupportContacts, type SupportContact } from '@/lib/patients';
 
-const LOAD_ERROR = 'Não foi possível carregar seus contatos de suporte.';
+const LOAD_ERROR = 'Não foi possível carregar seus contatos de suporte';
 
 // Contatos de suporte do próprio paciente em Meu perfil, só leitura
 // (RFPAC003): quem edita é o admin ou a equipe do PTS ativo.

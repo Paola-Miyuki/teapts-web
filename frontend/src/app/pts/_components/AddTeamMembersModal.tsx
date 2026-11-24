@@ -115,7 +115,7 @@ export function AddTeamMembersModal({
 
         if (!response) {
           throw new Error(
-            'Resposta inválida do servidor ao buscar profissionais.',
+            'Resposta inválida do servidor ao buscar profissionais',
           );
         }
 
@@ -131,7 +131,7 @@ export function AddTeamMembersModal({
                   message?: string;
                 } | null)
               : null;
-          throw new Error(errData?.message || 'Erro ao buscar profissionais.');
+          throw new Error(errData?.message || 'Erro ao buscar profissionais');
         }
 
         const data =
@@ -147,7 +147,7 @@ export function AddTeamMembersModal({
       } catch (err) {
         if (!cancelled && err instanceof Error && err.name !== 'AbortError') {
           setErrorMessage(
-            err.message || 'Falha ao carregar lista de profissionais.',
+            err.message || 'Falha ao carregar lista de profissionais',
           );
         }
       } finally {
@@ -189,7 +189,7 @@ export function AddTeamMembersModal({
 
     if (selectedIds.length === 0) {
       setErrorMessage(
-        'Selecione ao menos um profissional para adicionar à equipe.',
+        'Selecione ao menos um profissional para adicionar à equipe',
       );
       return;
     }
@@ -207,7 +207,7 @@ export function AddTeamMembersModal({
       });
 
       if (!response) {
-        setErrorMessage('Resposta inválida do servidor ao salvar a equipe.');
+        setErrorMessage('Resposta inválida do servidor ao salvar a equipe');
         return;
       }
 
@@ -234,13 +234,13 @@ export function AddTeamMembersModal({
           );
           setErrorMessage(
             data.message ||
-              'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+              'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável',
           );
           return;
         }
 
         setErrorMessage(
-          data.message || 'Não foi possível adicionar os profissionais.',
+          data.message || 'Não foi possível adicionar os profissionais',
         );
         return;
       }
@@ -248,7 +248,7 @@ export function AddTeamMembersModal({
       onSuccess(data as PtsData);
       onClose();
     } catch {
-      setErrorMessage('Erro de conexão ao salvar a equipe.');
+      setErrorMessage('Erro de conexão ao salvar a equipe');
     } finally {
       setIsSubmitting(false);
     }

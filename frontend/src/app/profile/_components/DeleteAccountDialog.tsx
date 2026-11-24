@@ -14,7 +14,7 @@ type DeleteAccountDialogProps = {
   onClose: () => void;
 };
 
-const DELETE_ERROR = 'Não foi possível excluir a conta.';
+const DELETE_ERROR = 'Não foi possível excluir a conta';
 
 // Confirmação "Excluir sua conta?" (RFAUT005) de `meu-perfil.html`. Sucesso
 // deixa o botão em carregamento enquanto vai para /login; a API já encerrou

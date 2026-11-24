@@ -78,7 +78,8 @@ export class ProfessionalsController {
   /**
    * Cria um perfil profissional para uma conta de usuário comum (RFPRO002).
    *
-   * @param body conta e especialidade já validadas
+   * @param body conta, especialidade e registro já validados
+   * @param account admin da sessão, gravado como criador do perfil
    * @returns perfil criado
    */
   @Post('professionals')
@@ -123,11 +124,10 @@ export class ProfessionalsController {
         },
       },
       PROFESSIONAL_PROFILE_ALREADY_EXISTS: {
-        summary: 'Especialidade repetida na conta',
+        summary: 'Conta com perfil profissional',
         value: {
           status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-          message:
-            'A conta já possui um perfil profissional com essa especialidade.',
+          message: 'A conta já possui um perfil profissional.',
         },
       },
     },
@@ -141,7 +141,8 @@ export class ProfessionalsController {
   })
   async create(
     @Body() body: CreateProfessionalRequestDto,
+    @CurrentAccount() account: AccountContext,
   ): Promise<ProfessionalProfileResponseDto> {
-    return this.professionalsService.create(body);
+    return this.professionalsService.create(body, account.accountId);
   }
 }

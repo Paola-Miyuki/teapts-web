@@ -78,7 +78,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
-          professional_council_state: 'PR',
+          professional_council_state: 'pr',
           professional_institution: 'IMA',
           professional_cnes: null,
           account_name: 'Maria Silva',
@@ -99,9 +99,9 @@ describe('ProfessionalsService.findAll', () => {
           email: 'maria@example.com',
           specialism: {
             id: Specialism.Psychologist,
-            name: 'Psicologia',
+            name: 'Psicólogo',
           },
-          registration: { council: 'CRP', number: '12345', state: 'PR' },
+          registration: { council: 'CRP', number: '12345', state: 'pr' },
           institution: 'IMA',
           cnes: null,
           status: AccountStatus.Active,
@@ -150,7 +150,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
-          professional_council_state: 'PR',
+          professional_council_state: 'pr',
           professional_institution: 'IMA',
           professional_cnes: null,
           account_name: 'Maria Silva',
@@ -174,7 +174,7 @@ describe('ProfessionalsService.findAll', () => {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
-          professional_council_state: 'PR',
+          professional_council_state: 'pr',
           professional_institution: 'IMA',
           professional_cnes: null,
           account_name: 'Maria Silva',
@@ -247,13 +247,16 @@ describe('ProfessionalsService.create', () => {
     );
   }
 
-  async function createError(
-    service: ProfessionalsService,
-    specialism = Specialism.Psychologist,
-  ) {
-    return service
-      .create({ accountId, specialism })
-      .catch((error: unknown) => error);
+  const adminId = 'admin-account-1';
+  const createBody = {
+    accountId,
+    specialism: Specialism.Psychologist,
+    councilNumber: '12345',
+    councilState: 'pr' as const,
+  };
+
+  async function createError(service: ProfessionalsService) {
+    return service.create(createBody, adminId).catch((error: unknown) => error);
   }
 
   it('persists the profile linked to the account and returns it', async () => {
@@ -262,13 +265,24 @@ describe('ProfessionalsService.create', () => {
     repository.insert.mockResolvedValue(professionalId);
 
     await expect(
-      service.create({ accountId, specialism: Specialism.Psychologist }),
+      service.create(
+        {
+          ...createBody,
+          councilNumber: ' 12345 ',
+          institution: ' CAPSi ',
+          cnes: '1234567',
+        },
+        adminId,
+      ),
     ).resolves.toEqual({
       id: professionalId,
       accountId,
       name: 'Kaio Felipe',
       email: 'kaio@exemplo.com',
-      specialism: { id: Specialism.Psychologist, name: 'Psicologia' },
+      specialism: { id: Specialism.Psychologist, name: 'Psicólogo' },
+      registration: { council: 'CRP', number: '12345', state: 'pr' },
+      institution: 'CAPSi',
+      cnes: '1234567',
       deactivatedAt: null,
     });
 
@@ -279,6 +293,45 @@ describe('ProfessionalsService.create', () => {
     expect(repository.insert).toHaveBeenCalledWith({
       accountId,
       specialism: Specialism.Psychologist,
+      councilNumber: '12345',
+      councilState: 'pr',
+      institution: 'CAPSi',
+      cnes: '1234567',
+      createdByAccountId: adminId,
+    });
+  });
+
+  it('saves null for the optional fields left out or blank', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockResolvedValue(professionalId);
+
+    await expect(
+      service.create({ ...createBody, institution: '   ' }, adminId),
+    ).resolves.toMatchObject({
+      registration: { council: 'CRP', number: '12345', state: 'pr' },
+      institution: null,
+      cnes: null,
+    });
+
+    expect(repository.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ institution: null, cnes: null }),
+    );
+  });
+
+  it('takes the council from the specialism', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockResolvedValue(professionalId);
+
+    await expect(
+      service.create(
+        { ...createBody, specialism: Specialism.SpeechTherapist },
+        adminId,
+      ),
+    ).resolves.toMatchObject({
+      specialism: { id: 'speech_therapist', name: 'Fonoaudiólogo' },
+      registration: { council: 'CRFa' },
     });
   });
 
@@ -356,9 +409,7 @@ describe('ProfessionalsService.create', () => {
     accountRepository.findOne.mockResolvedValue(userAccount);
     repository.insert.mockRejectedValue(uniqueViolation());
 
-    await expect(
-      service.create({ accountId, specialism: Specialism.Psychologist }),
-    ).rejects.toMatchObject({
+    await expect(service.create(createBody, adminId)).rejects.toMatchObject({
       response: {
         status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
         message: 'A conta já possui um perfil profissional.',

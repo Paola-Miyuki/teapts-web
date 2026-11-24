@@ -12,8 +12,8 @@ import { ApiError } from '../api/http';
 import type { EligiblePatient } from '../types';
 import styles from './PatientSelect.module.css';
 
-const LOAD_ERROR = 'Não foi possível carregar os pacientes.';
-const FORBIDDEN_ERROR = 'Acesso restrito a profissionais.';
+const LOAD_ERROR = 'Não foi possível carregar os pacientes';
+const FORBIDDEN_ERROR = 'Acesso restrito a profissionais';
 
 type PatientSelectProps = {
   id: string;
