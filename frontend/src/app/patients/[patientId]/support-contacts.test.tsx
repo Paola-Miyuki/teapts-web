@@ -103,7 +103,7 @@ function bodyOf(call: [string, RequestInit]) {
   return JSON.parse(call[1].body as string);
 }
 
-describe('contatos de suporte em /patients/[id]', () => {
+describe('contatos de suporte em /patients/[patientId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue({ replace: jest.fn() });

@@ -82,8 +82,8 @@ src/
                            (POST /pts/proposals/:id/approve e /reject); o responsável e o admin
                            excluem a proposta em `draft` pelo menu ⋮, com confirmação
                            (DELETE /pts/proposals/:id)
-        [id]/edit/         editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
-      [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin
+        [proposalId]/edit/ editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
+      [ptsId]/             detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin
                            e de `pts.html` para o paciente (sem a ficha nem o prontuário): cabeçalho,
                            Visão geral (situação social, só a equipe), Equipe (registro e papel) e
                            Timeline; `/pts/:id#timeline` abre direto na Timeline (atalho de `historico.html`)
@@ -91,7 +91,7 @@ src/
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
                            todos na URL; modal "Adicionar paciente" (só admin)
-      [id]/                detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
+      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
                            contatos de suporte editados contato a contato
       _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar"),
                            AddPatientModal/AddPatientForm, AccountCombobox (combobox ARIA da conta:
