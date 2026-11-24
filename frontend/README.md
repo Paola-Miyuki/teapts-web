@@ -28,23 +28,24 @@ design/           mockups HTML de referência (abra design/index.html)
 
 Toda tela autenticada usa `AuthenticatedPage`: sem sessão vai para `/login`; sem a permissão de `requiredAction` (`src/lib/permissions.ts`) mostra "Acesso restrito". O admin tem todas (RN022), menos as de escolha do início.
 
-| Rota                        | Tela                                            | Acesso                                         | Layout (`design/`)                               |
-| --------------------------- | ----------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
-| `/login`, `/signup`         | Entrar, Criar conta                             | pública                                        | `teapts-login`, `cadastro`                       |
-| `/home`                     | Início por perfil ou Aguardando aprovação       | conta da sessão                                | `inicio`, `inicio-paciente`, `aguardando-perfil` |
-| `/profile`, `/profile/edit` | Meu perfil, Editar perfil e senha               | conta da sessão                                | `meu-perfil`, `meu-perfil-editar`                |
-| `/accounts`                 | Contas: ver, tornar paciente, desativar         | admin                                          | `contas`                                         |
-| `/patients`                 | Pacientes e "Adicionar paciente"                | admin e profissional                           | `pacientes`, `criar-paciente`                    |
-| `/patients/:id`             | Dados, Medicações e contatos de suporte         | admin e profissional com acesso                | `paciente`                                       |
-| `/patients/:id/pts`         | PTS ativo do paciente                           | equipe e admin                                 | `pts-detalhe`                                    |
-| `/medications`              | Minhas medicações                               | paciente                                       | `paciente`                                       |
-| `/professionals`            | Profissionais                                   | admin e profissional                           | `profissionais`                                  |
-| `/pts`                      | Meu PTS: PTS ativo, equipe e Timeline           | paciente titular e equipe                      | `pts`                                            |
-| `/pts/:id`                  | Detalhe: Visão geral (ficha), Equipe e Timeline | admin, equipe e paciente titular (sem a ficha) | `pts-detalhe`, `pts`                             |
-| `/pts/:id/edit`             | Editar PTS em 3 passos                          | equipe e admin, PTS ativo                      | `editar-pts`                                     |
-| `/pts/novo`                 | Criar proposta                                  | profissional e admin                           | `criar-pts`                                      |
-| `/pts/proposals`            | Propostas                                       | paciente, profissional da proposta e admin     | `propostas-pts`                                  |
-| `/pts/proposals/:id/edit`   | Editar proposta                                 | responsável ou admin, `draft`                  | `editar-proposta`                                |
+| Rota                        | Tela                                                                                   | Acesso                                         | Layout (`design/`)                               |
+| --------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
+| `/login`, `/signup`         | Entrar, Criar conta                                                                    | pública                                        | `teapts-login`, `cadastro`                       |
+| `/home`                     | Início por perfil ou Aguardando aprovação                                              | conta da sessão                                | `inicio`, `inicio-paciente`, `aguardando-perfil` |
+| `/profile`, `/profile/edit` | Meu perfil, Editar perfil e senha                                                      | conta da sessão                                | `meu-perfil`, `meu-perfil-editar`                |
+| `/accounts`                 | Contas: ver, tornar paciente, desativar                                                | admin                                          | `contas`                                         |
+| `/patients`                 | Pacientes e "Adicionar paciente"                                                       | admin e profissional                           | `pacientes`, `criar-paciente`                    |
+| `/patients/:id`             | Dados, Medicações e contatos de suporte                                                | admin e profissional com acesso                | `paciente`                                       |
+| `/patients/:id/pts`         | PTS ativo do paciente                                                                  | equipe e admin                                 | `pts-detalhe`                                    |
+| `/medications`              | Minhas medicações                                                                      | paciente                                       | `paciente`                                       |
+| `/professionals`            | Profissionais (botão "Adicionar profissional" só para o admin)                         | admin e profissional                           | `profissionais`                                  |
+| `/professionals/new`        | Adicionar profissional: conta sem perfil, profissão (20), registro, instituição e CNES | admin                                          | `criar-profissional`                             |
+| `/pts`                      | Meu PTS: PTS ativo, equipe e Timeline                                                  | paciente titular e equipe                      | `pts`                                            |
+| `/pts/:id`                  | Detalhe: Visão geral (ficha), Equipe e Timeline                                        | admin, equipe e paciente titular (sem a ficha) | `pts-detalhe`, `pts`                             |
+| `/pts/:id/edit`             | Editar PTS em 3 passos                                                                 | equipe e admin, PTS ativo                      | `editar-pts`                                     |
+| `/pts/novo`                 | Criar proposta                                                                         | profissional e admin                           | `criar-pts`                                      |
+| `/pts/proposals`            | Propostas                                                                              | paciente, profissional da proposta e admin     | `propostas-pts`                                  |
+| `/pts/proposals/:id/edit`   | Editar proposta                                                                        | responsável ou admin, `draft`                  | `editar-proposta`                                |
 
 ## Convenções
 

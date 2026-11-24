@@ -15,7 +15,9 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { ApiError } from '@/lib/api';
 import {
   COUNCIL_STATES,
+  COUNCILS,
   getProfessionals,
+  SPECIALISMS,
   type Professional,
   type ProfessionalCouncil,
   type ProfessionalSort,
@@ -24,17 +26,12 @@ import {
 } from '@/lib/professionals';
 import LoadingState from './LoadingState';
 
-const SPECIALISMS: { value: ProfessionalSpecialism; label: string }[] = [
-  { value: 'doctor', label: 'Medicina' },
-  { value: 'physiotherapist', label: 'Fisioterapia' },
-  { value: 'psychologist', label: 'Psicologia' },
-];
+const SPECIALISM_OPTIONS = SPECIALISMS.map(({ value, label }) => ({
+  value,
+  label,
+}));
 
-const COUNCILS: { value: ProfessionalCouncil; label: string }[] = [
-  { value: 'CRM', label: 'CRM' },
-  { value: 'Crefito', label: 'Crefito' },
-  { value: 'CRP', label: 'CRP' },
-];
+const COUNCIL_OPTIONS = COUNCILS.map((value) => ({ value, label: value }));
 
 function listParam<T extends string>(
   raw: string | null,
@@ -124,8 +121,11 @@ function ProfessionalViewDialog({
 export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const specialism = listParam(searchParams.get('specialism'), SPECIALISMS);
-  const council = listParam(searchParams.get('council'), COUNCILS);
+  const specialism = listParam(
+    searchParams.get('specialism'),
+    SPECIALISM_OPTIONS,
+  );
+  const council = listParam(searchParams.get('council'), COUNCIL_OPTIONS);
   const ufParam = searchParams.get('uf') ?? '';
   const uf = COUNCIL_STATES.some((item) => item === ufParam) ? ufParam : '';
   const sort: ProfessionalSort =
@@ -336,14 +336,14 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         <MultiSelect
           label="Profissão"
           placeholder="Todas as profissões"
-          options={SPECIALISMS}
+          options={SPECIALISM_OPTIONS}
           value={specialism}
           onChange={(value) => update({ specialism: value.join(',') })}
         />
 
         <MultiSelect
           label="Conselho regional"
-          options={COUNCILS}
+          options={COUNCIL_OPTIONS}
           value={council}
           onChange={(value) => update({ council: value.join(',') })}
         />

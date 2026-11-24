@@ -14,6 +14,8 @@ import ui from './ui.module.css';
 type AuthenticatedPageProps = {
   currentHref: string;
   requiredAction?: PermissionAction;
+  // Título da tela de acesso negado (padrão: "Acesso restrito").
+  deniedTitle?: string;
   breadcrumb?:
     string | Crumb[] | ((kind: ProfileKind) => string | Crumb[] | undefined);
   children:
@@ -29,6 +31,7 @@ type AuthenticatedPageProps = {
 export default function AuthenticatedPage({
   currentHref,
   requiredAction,
+  deniedTitle = 'Acesso restrito',
   breadcrumb,
   children,
 }: AuthenticatedPageProps) {
@@ -66,7 +69,7 @@ export default function AuthenticatedPage({
   if (requiredAction && !can(account, requiredAction)) {
     return (
       <div className={styles.status} role="alert">
-        <h1>Acesso restrito</h1>
+        <h1>{deniedTitle}</h1>
         <p>Você não tem permissão para acessar esta área.</p>
         <Link href="/home" className={`${ui.btn} ${ui.btnSecondary}`}>
           Voltar para o início

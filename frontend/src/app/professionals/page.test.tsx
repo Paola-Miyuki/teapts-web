@@ -341,7 +341,7 @@ describe('ProfessionalsPage', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Psicologia' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Psicólogo' }));
     expect(replace).toHaveBeenLastCalledWith(
       '/professionals?specialism=psychologist',
       { scroll: false },
@@ -524,5 +524,62 @@ describe('ProfessionalsPage', () => {
       'http://localhost:3000/professionals?page=2&limit=10',
       { credentials: 'include', signal: expect.any(AbortSignal) },
     );
+  });
+});
+
+describe('ProfessionalsPage: adicionar profissional', () => {
+  const replace = jest.fn();
+  const ADMIN = { ...ACCOUNT, role: 'admin', professionalProfileIds: [] };
+  const EMPTY = {
+    data: [],
+    pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseRouter.mockReturnValue({ replace });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
+    global.fetch = jest.fn();
+  });
+
+  it('mostra o botão só para o admin', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY })), ADMIN);
+
+    const { unmount } = render(<ProfessionalsPage />);
+
+    expect(
+      await screen.findByRole('link', { name: 'Adicionar profissional' }),
+    ).toHaveAttribute('href', '/professionals/new');
+    unmount();
+
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY })));
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Nenhum profissional cadastrado');
+    expect(
+      screen.queryByRole('link', { name: 'Adicionar profissional' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mostra o aviso depois de adicionar', async () => {
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams('added=1'));
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY })), ADMIN);
+
+    render(<ProfessionalsPage />);
+
+    expect(
+      await screen.findByText('Profissional adicionado.'),
+    ).toBeInTheDocument();
+  });
+
+  it('não mostra o aviso sem o parâmetro', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY })), ADMIN);
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Nenhum profissional cadastrado');
+    expect(
+      screen.queryByText('Profissional adicionado.'),
+    ).not.toBeInTheDocument();
   });
 });
