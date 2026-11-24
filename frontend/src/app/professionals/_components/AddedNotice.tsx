@@ -18,7 +18,7 @@ export default function AddedNotice() {
       <div className={ui.alertIcon}>
         <Icon name="checkCircle" />
       </div>
-      <span>Profissional adicionado.</span>
+      <span>Profissional adicionado</span>
     </div>
   );
 }

@@ -161,7 +161,7 @@ describe('MedicationsCard', () => {
     expect(await screen.findByText('Melatonina')).toBeInTheDocument();
 
     expect(
-      screen.getByText('Medicação adicionada com sucesso.'),
+      screen.getByText('Medicação adicionada com sucesso'),
     ).toBeInTheDocument();
   });
 
@@ -238,7 +238,7 @@ describe('MedicationsCard', () => {
     expect(await screen.findByText('Dose: 1 mg')).toBeInTheDocument();
 
     expect(
-      screen.getByText('Medicação atualizada com sucesso.'),
+      screen.getByText('Medicação atualizada com sucesso'),
     ).toBeInTheDocument();
   });
 

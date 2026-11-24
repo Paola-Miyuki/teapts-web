@@ -22,7 +22,7 @@ import {
   type PtsData,
 } from '../_components/AddTeamMembersModal';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
 type Tab = 'visao' | 'equipe' | 'timeline';
 
@@ -493,7 +493,7 @@ function TeamTable({
           excludedIds={excludedIds}
           onSuccess={(updatedPts) => {
             onTeamUpdated(updatedPts);
-            setSuccessFeedback('Equipe atualizada.');
+            setSuccessFeedback('Equipe atualizada');
           }}
         />
       )}

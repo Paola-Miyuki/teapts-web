@@ -8,7 +8,7 @@ import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { deleteSupportContact, type SupportContact } from '@/lib/patients';
 
-const REMOVE_ERROR = 'Não foi possível remover o contato.';
+const REMOVE_ERROR = 'Não foi possível remover o contato';
 
 type RemoveSupportContactDialogProps = {
   patientId: string;

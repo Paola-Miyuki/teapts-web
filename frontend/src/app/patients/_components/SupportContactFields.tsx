@@ -75,27 +75,27 @@ export default function SupportContactFields({
 
   function handleSave() {
     if (!values.name.trim()) {
-      fail('name', 'Informe o nome do contato.');
+      fail('name', 'Informe o nome do contato');
       return;
     }
 
     if (values.email.trim() && !emailRef.current?.checkValidity()) {
-      fail('email', 'Informe um e-mail válido para o contato.');
+      fail('email', 'Informe um e-mail válido para o contato');
       return;
     }
 
     if (values.phone.trim() && !isValidPhone(values.phone.trim())) {
-      fail('phone', 'Informe um telefone válido para o contato.');
+      fail('phone', 'Informe um telefone válido para o contato');
       return;
     }
 
     if (!values.email.trim() && !values.phone.trim()) {
-      fail('email', 'Informe o e-mail ou o telefone do contato.');
+      fail('email', 'Informe o e-mail ou o telefone do contato');
       return;
     }
 
     if (values.isEmergency && !values.phone.trim()) {
-      fail('phone', 'Informe o telefone do contato de emergência.');
+      fail('phone', 'Informe o telefone do contato de emergência');
       return;
     }
 

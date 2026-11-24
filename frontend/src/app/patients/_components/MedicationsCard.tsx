@@ -125,7 +125,7 @@ export default function MedicationsCard({
         setLoadError(
           reason instanceof ApiError && reason.apiMessage
             ? reason.apiMessage
-            : 'Não foi possível carregar as medicações.',
+            : 'Não foi possível carregar as medicações',
         );
         setLoading(false);
       });
@@ -216,12 +216,12 @@ export default function MedicationsCard({
       !form.frequency.trim() ||
       !form.startDate
     ) {
-      setActionError('Informe medicamento, dose, frequência e data de início.');
+      setActionError('Informe medicamento, dose, frequência e data de início');
       return;
     }
 
     if (form.endDate && form.endDate < form.startDate) {
-      setActionError('A data de fim não pode ser anterior à data de início.');
+      setActionError('A data de fim não pode ser anterior à data de início');
       return;
     }
 
@@ -243,12 +243,12 @@ export default function MedicationsCard({
           ),
         );
 
-        setSuccess('Medicação atualizada com sucesso.');
+        setSuccess('Medicação atualizada com sucesso');
       } else {
         const saved = await createMedication(patientId, input);
 
         setMedications((current) => [...current, saved]);
-        setSuccess('Medicação adicionada com sucesso.');
+        setSuccess('Medicação adicionada com sucesso');
       }
 
       setEditor(null);
@@ -257,7 +257,7 @@ export default function MedicationsCard({
       handleApiError(
         reason,
         editor?.kind === 'edit'
-          ? 'Não foi possível atualizar a medicação.'
+          ? 'Não foi possível atualizar a medicação'
           : 'Não foi possível adicionar a medicação.',
       );
     } finally {
@@ -277,9 +277,9 @@ export default function MedicationsCard({
         current.map((item) => (item.id === saved.id ? saved : item)),
       );
 
-      setSuccess('Medicação suspensa com sucesso.');
+      setSuccess('Medicação suspensa com sucesso');
     } catch (reason: unknown) {
-      handleApiError(reason, 'Não foi possível suspender a medicação.');
+      handleApiError(reason, 'Não foi possível suspender a medicação');
     } finally {
       setStoppingId(null);
     }

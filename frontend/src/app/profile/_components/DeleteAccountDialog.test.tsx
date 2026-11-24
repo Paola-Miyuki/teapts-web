@@ -128,7 +128,7 @@ describe('DeleteAccountDialog', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível excluir a conta.',
+      'Não foi possível excluir a conta',
     );
   });
 

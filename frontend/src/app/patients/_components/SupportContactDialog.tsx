@@ -15,7 +15,7 @@ import {
   type SupportContact,
 } from '@/lib/patients';
 
-const SAVE_ERROR = 'Não foi possível salvar o contato.';
+const SAVE_ERROR = 'Não foi possível salvar o contato';
 
 type SupportContactDialogProps = {
   // accountId do perfil de paciente.
@@ -59,21 +59,21 @@ export default function SupportContactDialog({
     const found: Errors = {};
 
     if (!name.trim()) {
-      found.name = 'Informe o nome do contato.';
+      found.name = 'Informe o nome do contato';
     }
 
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) {
-      found.email = 'Informe um e-mail válido para o contato.';
+      found.email = 'Informe um e-mail válido para o contato';
     }
 
     if (phone.trim() && !isValidPhone(phone.trim())) {
-      found.phone = 'Informe um telefone válido para o contato.';
+      found.phone = 'Informe um telefone válido para o contato';
     } else if (isEmergency && !phone.trim()) {
-      found.phone = 'Informe o telefone do contato de emergência.';
+      found.phone = 'Informe o telefone do contato de emergência';
     }
 
     if (!found.email && !found.phone && !email.trim() && !phone.trim()) {
-      found.email = 'Informe o e-mail ou o telefone do contato.';
+      found.email = 'Informe o e-mail ou o telefone do contato';
     }
 
     return found;

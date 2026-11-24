@@ -38,7 +38,7 @@ type LoadState =
   | { kind: 'notFound' }
   | { kind: 'error'; message: string };
 
-const LOAD_ERROR = 'Não foi possível carregar o PTS ativo.';
+const LOAD_ERROR = 'Não foi possível carregar o PTS ativo';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -159,7 +159,7 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
         : current,
     );
     setRemovingMember(null);
-    setFeedback('Profissional removido da equipe.');
+    setFeedback('Profissional removido da equipe');
   }
 
   function handleResponsibilityTransferred(team: PtsTeamResponse) {
@@ -176,7 +176,7 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
         : current,
     );
     setIsTransferModalOpen(false);
-    setFeedback('Responsabilidade transferida.');
+    setFeedback('Responsabilidade transferida');
   }
 
   if (!patientId) {
@@ -193,7 +193,7 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
       <StateCard
         error
         title="Paciente inválido"
-        message="O identificador do paciente informado não é válido."
+        message="O identificador do paciente informado não é válido"
       />
     );
   }

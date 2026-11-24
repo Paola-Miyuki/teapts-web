@@ -276,7 +276,7 @@ describe('ProfessionalsPage', () => {
     render(<ProfessionalsPage />);
 
     expect(
-      await screen.findByText('Não foi possível consultar os profissionais.'),
+      await screen.findByText('Não foi possível consultar os profissionais'),
     ).toBeInTheDocument();
 
     expect(
@@ -568,7 +568,7 @@ describe('ProfessionalsPage: adicionar profissional', () => {
     render(<ProfessionalsPage />);
 
     expect(
-      await screen.findByText('Profissional adicionado.'),
+      await screen.findByText('Profissional adicionado'),
     ).toBeInTheDocument();
   });
 
@@ -579,7 +579,7 @@ describe('ProfessionalsPage: adicionar profissional', () => {
 
     await screen.findByText('Nenhum profissional cadastrado');
     expect(
-      screen.queryByText('Profissional adicionado.'),
+      screen.queryByText('Profissional adicionado'),
     ).not.toBeInTheDocument();
   });
 });

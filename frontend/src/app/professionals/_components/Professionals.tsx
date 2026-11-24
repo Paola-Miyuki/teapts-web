@@ -212,7 +212,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         setError(
           reason instanceof ApiError && reason.apiMessage
             ? reason.apiMessage
-            : 'Não foi possível consultar os profissionais.',
+            : 'Não foi possível consultar os profissionais',
         );
       });
 

@@ -117,20 +117,6 @@ curl -s "$API/me" -H "Authorization: Bearer $ACCESS"
 
 ---
 
-## 7. Testes e qualidade
-
-Tudo roda **na máquina**, sem container nem banco (a conexão é substituída por mock).
-
-```bash
-make test        # unitários dos dois projetos
-make test-e2e    # e2e do backend, pelas rotas HTTP
-make check       # format + lint + typecheck + test: rode antes do commit
-```
-
-Ou num projeto só: `pnpm --dir backend test`, `pnpm --dir frontend lint`.
-
----
-
 ## 8. Comandos make
 
 `make help` lista todos. Os alvos de banco e de logs usam o Docker; os de teste e qualidade rodam na máquina.

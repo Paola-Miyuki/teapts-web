@@ -30,7 +30,7 @@ import TimelineFilters, {
 } from './TimelineFilters';
 import styles from './timeline.module.css';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 const DEFAULT_LIMIT = PER_PAGE_OPTIONS[0];
 const TYPES = Object.keys(TIMELINE_TYPE_LABELS) as TimelineTargetType[];
 const PERIODS: TimelinePeriod[] = ['30', '90', 'custom'];

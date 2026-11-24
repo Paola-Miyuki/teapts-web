@@ -34,7 +34,7 @@ export default function RegistrationCell({
         type="button"
         className="copy-btn"
         aria-label={copied ? 'Registro copiado' : `Copiar Registro ${label}`}
-        title={copied ? 'Registro copiado.' : undefined}
+        title={copied ? 'Registro copiado' : undefined}
         onClick={() => {
           void navigator.clipboard
             ?.writeText(label)

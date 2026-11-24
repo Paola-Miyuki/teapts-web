@@ -14,7 +14,7 @@ import {
 } from '@/lib/patients';
 import styles from '../patients.module.css';
 
-const LOAD_ERROR = 'Não foi possível carregar as contas.';
+const LOAD_ERROR = 'Não foi possível carregar as contas';
 
 type AccountComboboxProps = {
   id: string;

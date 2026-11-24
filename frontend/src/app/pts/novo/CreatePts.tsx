@@ -127,9 +127,9 @@ export function CreatePts({ account }: CreatePtsProps) {
     if (next > step) {
       const errors: FieldErrors = {};
 
-      if (step === 0 && !patient) errors.patient = 'Selecione o paciente.';
+      if (step === 0 && !patient) errors.patient = 'Selecione o paciente';
       if (step === 1 && !social.trim()) {
-        errors.social = 'Descreva a situação social do paciente.';
+        errors.social = 'Descreva a situação social do paciente';
       }
 
       setFieldErrors(errors);
@@ -168,7 +168,7 @@ export function CreatePts({ account }: CreatePtsProps) {
     }
 
     if (!responsible) {
-      setFieldErrors({ professional: 'Selecione o profissional responsável.' });
+      setFieldErrors({ professional: 'Selecione o profissional responsável' });
       document.getElementById('professional')?.focus();
       return;
     }
@@ -387,7 +387,7 @@ export function CreatePts({ account }: CreatePtsProps) {
       {loadStatus === 'error' && (
         <ErrorMessage
           title="Não foi possível carregar os dados"
-          message="Verifique sua conexão e tente novamente."
+          message="Verifique sua conexão e tente novamente"
           onRetry={() => {
             setLoadStatus('loading');
             setReloadKey((key) => key + 1);
@@ -398,7 +398,7 @@ export function CreatePts({ account }: CreatePtsProps) {
       {hasNoProfessionalProfile && (
         <ErrorMessage
           title="Sem perfil profissional"
-          message="Esta conta não possui perfil profissional. Procure o administrador para cadastrar um."
+          message="Esta conta não possui perfil profissional. Procure o administrador para cadastrar um"
         />
       )}
 

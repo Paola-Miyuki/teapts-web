@@ -50,7 +50,7 @@ export async function getPtsProposal(
   if (!response.ok) {
     throw await createApiError(
       response,
-      'Não foi possível carregar a proposta de PTS.',
+      'Não foi possível carregar a proposta de PTS',
     );
   }
 
@@ -74,7 +74,7 @@ export async function getProfessionalsForTeam(
   if (!response.ok) {
     throw await createApiError(
       response,
-      'Não foi possível carregar os profissionais.',
+      'Não foi possível carregar os profissionais',
     );
   }
 
@@ -98,7 +98,7 @@ export async function updatePtsProposal(
   if (!response.ok) {
     throw await createApiError(
       response,
-      'Não foi possível atualizar a proposta de PTS.',
+      'Não foi possível atualizar a proposta de PTS',
     );
   }
 

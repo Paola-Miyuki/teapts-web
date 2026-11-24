@@ -22,7 +22,7 @@ type RemoveTeamMemberDialogProps = {
   onRemoved: (team: PtsTeamResponse) => void;
 };
 
-const REMOVE_ERROR = 'Não foi possível remover o profissional da equipe.';
+const REMOVE_ERROR = 'Não foi possível remover o profissional da equipe';
 
 // Confirmação "Remover da equipe?" (RFEM003), no padrão do "Rejeitar
 // proposta?" de frontend/design/propostas-pts.html. <dialog> nativo:

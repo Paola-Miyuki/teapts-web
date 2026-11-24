@@ -139,7 +139,7 @@ describe('Excluir proposta de PTS (RFPTS008)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('confirma, exclui, recarrega a lista e mostra "Proposta excluída."', async () => {
+  it('confirma, exclui, recarrega a lista e mostra "Proposta excluída"', async () => {
     mockApi(responsible, [[proposal()], []]);
 
     const { user, dialog } = await openDeleteDialog();
@@ -157,7 +157,7 @@ describe('Excluir proposta de PTS (RFPTS008)', () => {
 
     await user.click(dialog.getByRole('button', { name: 'Excluir proposta' }));
 
-    expect(await screen.findByText('Proposta excluída.')).toBeInTheDocument();
+    expect(await screen.findByText('Proposta excluída')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.queryByText('Luna Ferreira')).not.toBeInTheDocument(),
     );

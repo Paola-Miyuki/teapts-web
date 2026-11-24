@@ -19,7 +19,7 @@ import {
   type ProfessionalSpecialism,
 } from '@/lib/professionals';
 
-const SAVE_ERROR = 'Não foi possível adicionar o profissional.';
+const SAVE_ERROR = 'Não foi possível adicionar o profissional';
 
 type FieldName = 'account' | 'specialism' | 'number' | 'state' | 'cnes';
 
@@ -112,23 +112,23 @@ export default function CreateProfessionalForm() {
     const found: Partial<Record<FieldName, string>> = {};
 
     if (!account) {
-      found.account = 'Escolha a conta.';
+      found.account = 'Escolha a conta';
     }
 
     if (!specialism) {
-      found.specialism = 'Escolha a profissão.';
+      found.specialism = 'Escolha a profissão';
     }
 
     if (!number.trim()) {
-      found.number = 'Informe o número de registro.';
+      found.number = 'Informe o número de registro';
     }
 
     if (!state) {
-      found.state = 'Escolha a UF do registro.';
+      found.state = 'Escolha a UF do registro';
     }
 
     if (cnes.trim() && !/^\d{7}$/.test(cnes.trim())) {
-      found.cnes = 'O CNES deve ter 7 dígitos.';
+      found.cnes = 'O CNES deve ter 7 dígitos';
     }
 
     return found;

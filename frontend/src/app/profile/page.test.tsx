@@ -208,7 +208,7 @@ describe('ProfilePage', () => {
     await renderProfile();
 
     expect(
-      screen.getByText('Seus dados foram atualizados com sucesso.'),
+      screen.getByText('Seus dados foram atualizados com sucesso'),
     ).toBeInTheDocument();
   });
 
@@ -260,8 +260,8 @@ describe('ProfilePage', () => {
     await user.clear(screen.getByLabelText(/^E-mail/));
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
-    expect(screen.getByText('Informe seu nome completo.')).toBeInTheDocument();
-    expect(screen.getByText('Informe seu e-mail.')).toBeInTheDocument();
+    expect(screen.getByText('Informe seu nome completo')).toBeInTheDocument();
+    expect(screen.getByText('Informe seu e-mail')).toBeInTheDocument();
     expect(patch).not.toHaveBeenCalled();
   });
 
@@ -272,7 +272,7 @@ describe('ProfilePage', () => {
         response(
           {
             status: 'EMAIL_ALREADY_EXISTS',
-            message: 'Este e-mail já está cadastrado.',
+            message: 'Este e-mail já está cadastrado',
           },
           409,
         ),
@@ -285,7 +285,7 @@ describe('ProfilePage', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar' }));
 
     expect(
-      await screen.findByText('Este e-mail já está cadastrado.'),
+      await screen.findByText('Este e-mail já está cadastrado'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/^E-mail/)).toHaveValue('outra@example.com');
   });
@@ -308,7 +308,7 @@ describe('ProfilePage', () => {
       expect(screen.queryByLabelText('Senha atual')).not.toBeInTheDocument();
     });
     expect(
-      screen.getByText('Sua senha foi redefinida com sucesso.'),
+      screen.getByText('Sua senha foi redefinida com sucesso'),
     ).toBeInTheDocument();
     expect(password).toHaveBeenCalledWith(
       `${API}/me/password`,
@@ -337,7 +337,7 @@ describe('ProfilePage', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
     expect(
-      screen.getByText('A confirmação deve ser igual à nova senha.'),
+      screen.getByText('A confirmação deve ser igual à nova senha'),
     ).toBeInTheDocument();
     expect(password).not.toHaveBeenCalled();
   });
@@ -357,7 +357,7 @@ describe('ProfilePage', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
 
     expect(
-      screen.getByText('A nova senha não pode ser igual à senha atual.'),
+      screen.getByText('A nova senha não pode ser igual à senha atual'),
     ).toBeInTheDocument();
     expect(password).not.toHaveBeenCalled();
   });

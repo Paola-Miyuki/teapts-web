@@ -23,7 +23,7 @@ type DeactivateAccountDialogProps = {
   icon?: 'lock' | 'trash';
 };
 
-const DEACTIVATE_ERROR = 'Não foi possível desativar a conta.';
+const DEACTIVATE_ERROR = 'Não foi possível desativar a conta';
 
 // Confirmação "Desativar a conta de ...?" de `contas.html` (RFAUT005). 401 vai
 // para /login; os demais erros (ex.: 409 `ACCOUNT_IS_PTS_RESPONSIBLE` e

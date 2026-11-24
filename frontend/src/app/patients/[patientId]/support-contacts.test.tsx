@@ -203,19 +203,19 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     const save = dialog.getByRole('button', { name: 'Adicionar contato' });
 
     await user.click(save);
-    expect(dialog.getByText('Informe o nome do contato.')).toBeInTheDocument();
+    expect(dialog.getByText('Informe o nome do contato')).toBeInTheDocument();
 
     await user.type(dialog.getByLabelText(/Nome do contato/), 'Lia');
     await user.click(save);
     expect(
-      dialog.getByText('Informe o e-mail ou o telefone do contato.'),
+      dialog.getByText('Informe o e-mail ou o telefone do contato'),
     ).toBeInTheDocument();
 
     await user.type(dialog.getByLabelText('E-mail'), 'lia@example.com');
     await user.click(dialog.getByLabelText('Contato de emergência'));
     await user.click(save);
     expect(
-      dialog.getByText('Informe o telefone do contato de emergência.'),
+      dialog.getByText('Informe o telefone do contato de emergência'),
     ).toBeInTheDocument();
 
     expect(

@@ -17,7 +17,7 @@ export default function MedicationsPage() {
             canEdit={false}
           />
         ) : (
-          <p>Perfil de paciente não encontrado.</p>
+          <p>Perfil de paciente não encontrado</p>
         )
       }
     </AuthenticatedPage>

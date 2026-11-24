@@ -33,7 +33,7 @@ import {
 } from './AccountProfile';
 import DeactivateAccountDialog from './DeactivateAccountDialog';
 
-const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
+const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 const DEFAULT_LIMIT = PER_PAGE_OPTIONS[0];
 const RANGE_DAYS: Record<string, number> = { '30': 30, '90': 90 };
 
@@ -209,7 +209,7 @@ function AccountsContent({ account }: { account: Account }) {
   function handleDeactivated(id: string, name: string) {
     setDeactivatedIds((current) => [...current, id]);
     setDeactivating(null);
-    setSuccess(`Conta de ${name} desativada.`);
+    setSuccess(`Conta de ${name} desativada`);
   }
 
   const loading = last?.key !== key;

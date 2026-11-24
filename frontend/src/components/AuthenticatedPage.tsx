@@ -70,7 +70,7 @@ export default function AuthenticatedPage({
     return (
       <div className={styles.status} role="alert">
         <h1>{deniedTitle}</h1>
-        <p>Você não tem permissão para acessar esta área.</p>
+        <p>Você não tem permissão para acessar esta área</p>
         <Link href="/home" className={`${ui.btn} ${ui.btnSecondary}`}>
           Voltar para o início
         </Link>

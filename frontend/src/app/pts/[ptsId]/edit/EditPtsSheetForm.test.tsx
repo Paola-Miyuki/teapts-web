@@ -145,7 +145,7 @@ describe('Editar PTS (RFPTS005)', () => {
     await next();
 
     expect(
-      screen.getByText('Descreva a síntese do diagnóstico.'),
+      screen.getByText('Descreva a síntese do diagnóstico'),
     ).toBeInTheDocument();
     expect(summary).toHaveAttribute('aria-invalid', 'true');
     expect(
@@ -163,7 +163,7 @@ describe('Editar PTS (RFPTS005)', () => {
     await userEvent.clear(social);
     await next();
     expect(
-      screen.getByText('Descreva a situação social do paciente.'),
+      screen.getByText('Descreva a situação social do paciente'),
     ).toBeInTheDocument();
 
     await userEvent.type(social, 'Mora com a mãe.');
@@ -173,7 +173,7 @@ describe('Editar PTS (RFPTS005)', () => {
     await userEvent.clear(review);
     await userEvent.click(screen.getByRole('button', { name: 'Salvar PTS' }));
 
-    expect(screen.getByText('Informe a próxima revisão.')).toBeInTheDocument();
+    expect(screen.getByText('Informe a próxima revisão')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -300,7 +300,7 @@ describe('Editar PTS (RFPTS005)', () => {
 
     expect(
       await screen.findByText(
-        'Somente a equipe do PTS e o administrador podem editar a ficha.',
+        'Somente a equipe do PTS e o administrador podem editar a ficha',
       ),
     ).toBeInTheDocument();
     expect(
@@ -313,7 +313,7 @@ describe('Editar PTS (RFPTS005)', () => {
 
     expect(
       await screen.findByText(
-        'Somente a equipe do PTS e o administrador podem editar a ficha.',
+        'Somente a equipe do PTS e o administrador podem editar a ficha',
       ),
     ).toBeInTheDocument();
   });
@@ -323,7 +323,7 @@ describe('Editar PTS (RFPTS005)', () => {
 
     expect(
       await screen.findByText(
-        'Somente o PTS em planejamento ou execução pode ser editado.',
+        'Somente o PTS em planejamento ou execução pode ser editado',
       ),
     ).toBeInTheDocument();
   });

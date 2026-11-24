@@ -528,7 +528,7 @@ describe('AccountsPage', () => {
       await user.click(dialog.getByRole('button', { name: 'Desativar conta' }));
 
       expect(
-        await screen.findByText('Conta de Bruno Takeda desativada.'),
+        await screen.findByText('Conta de Bruno Takeda desativada'),
       ).toBeInTheDocument();
       expect(global.fetch).toHaveBeenCalledWith(
         `${API}/accounts/b2`,
@@ -585,7 +585,7 @@ describe('AccountsPage', () => {
       );
 
       expect(
-        await screen.findByText('Conta de Bruno Takeda desativada.'),
+        await screen.findByText('Conta de Bruno Takeda desativada'),
       ).toBeInTheDocument();
     });
   });

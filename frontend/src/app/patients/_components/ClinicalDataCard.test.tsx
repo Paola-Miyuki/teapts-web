@@ -104,7 +104,7 @@ describe('ClinicalDataCard', () => {
     expect(onSaved).toHaveBeenCalledWith(saved);
 
     expect(
-      await screen.findByText('Dados clínicos atualizados com sucesso.'),
+      await screen.findByText('Dados clínicos atualizados com sucesso'),
     ).toBeInTheDocument();
   });
 

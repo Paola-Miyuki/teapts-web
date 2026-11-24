@@ -241,7 +241,7 @@ describe('PatientSelect', () => {
     await user.type(field(), 'mar');
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Acesso restrito a profissionais.',
+      'Acesso restrito a profissionais',
     );
   });
 

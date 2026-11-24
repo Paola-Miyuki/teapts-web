@@ -42,8 +42,8 @@ describe('LoginPage', () => {
   it('asks for e-mail and password without calling the API', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(screen.getByText('Informe seu e-mail.')).toBeInTheDocument();
-    expect(screen.getByText('Informe sua senha.')).toBeInTheDocument();
+    expect(screen.getByText('Informe seu e-mail')).toBeInTheDocument();
+    expect(screen.getByText('Informe sua senha')).toBeInTheDocument();
     expect(signIn).not.toHaveBeenCalled();
   });
 
@@ -53,7 +53,7 @@ describe('LoginPage', () => {
     fillAndSubmit('teste@teapts.local', 'senha-errada');
 
     expect(
-      await screen.findByText('E-mail ou senha inválidos.'),
+      await screen.findByText('E-mail ou senha inválidos'),
     ).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });

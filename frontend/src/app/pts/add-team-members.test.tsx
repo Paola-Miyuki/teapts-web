@@ -51,7 +51,7 @@ function Harness({
         excludedIds={[pts.responsible.id, ...pts.team.map((m) => m.id)]}
         onSuccess={(updated) => {
           onSuccess(updated);
-          setFeedback('Equipe atualizada.');
+          setFeedback('Equipe atualizada');
         }}
       />
     </>
@@ -93,7 +93,7 @@ describe('RFEM001 - AddTeamMembersModal', () => {
     global.fetch = jest.fn();
   });
 
-  it('filtra profissionais já na equipe e adiciona novo membro exibindo "Equipe atualizada."', async () => {
+  it('filtra profissionais já na equipe e adiciona novo membro exibindo "Equipe atualizada"', async () => {
     const handlePtsUpdated = jest.fn();
 
     (global.fetch as jest.Mock).mockImplementation(
@@ -141,7 +141,7 @@ describe('RFEM001 - AddTeamMembersModal', () => {
 
     await waitFor(() => {
       expect(handlePtsUpdated).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('Equipe atualizada.')).toBeInTheDocument();
+      expect(screen.getByText('Equipe atualizada')).toBeInTheDocument();
     });
   });
 
@@ -160,7 +160,7 @@ describe('RFEM001 - AddTeamMembersModal', () => {
             json: async () => ({
               status: 'TEAM_DUPLICATE_ACCOUNT',
               message:
-                'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+                'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável',
               professionalIds: ['prof-new-a'],
             }),
           });
@@ -193,7 +193,7 @@ describe('RFEM001 - AddTeamMembersModal', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+        'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável',
       );
     });
 
@@ -350,7 +350,7 @@ describe('RFEM001 - AddTeamMembersModal', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'Erro de conexão ao salvar a equipe.',
+        'Erro de conexão ao salvar a equipe',
       );
     });
   });

@@ -186,12 +186,12 @@ describe('Adicionar profissional (RFPRO002)', () => {
     await screen.findByLabelText(/^Profissão/);
     await submit();
 
-    expect(screen.getByText('Escolha a conta.')).toBeInTheDocument();
-    expect(screen.getByText('Escolha a profissão.')).toBeInTheDocument();
+    expect(screen.getByText('Escolha a conta')).toBeInTheDocument();
+    expect(screen.getByText('Escolha a profissão')).toBeInTheDocument();
     expect(
-      screen.getByText('Informe o número de registro.'),
+      screen.getByText('Informe o número de registro'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Escolha a UF do registro.')).toBeInTheDocument();
+    expect(screen.getByText('Escolha a UF do registro')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Nº de registro/)).toHaveAttribute(
       'aria-invalid',
       'true',
@@ -211,7 +211,7 @@ describe('Adicionar profissional (RFPRO002)', () => {
     await userEvent.type(screen.getByLabelText('CNES'), '12345');
     await submit();
 
-    expect(screen.getByText('O CNES deve ter 7 dígitos.')).toBeInTheDocument();
+    expect(screen.getByText('O CNES deve ter 7 dígitos')).toBeInTheDocument();
     expect(screen.getByLabelText('CNES')).toHaveFocus();
     expect(posts()).toHaveLength(0);
   });
@@ -291,10 +291,10 @@ describe('Adicionar profissional (RFPRO002)', () => {
     [
       409,
       'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
-      'A conta já possui um perfil profissional.',
+      'A conta já possui um perfil profissional',
     ],
-    [404, 'ACCOUNT_NOT_FOUND', 'Conta não encontrada.'],
-    [403, 'FORBIDDEN', 'Acesso restrito ao administrador.'],
+    [404, 'ACCOUNT_NOT_FOUND', 'Conta não encontrada'],
+    [403, 'FORBIDDEN', 'Acesso restrito ao administrador'],
   ])(
     'mostra a mensagem da API no formulário (%i)',
     async (status, code, message) => {
@@ -322,7 +322,7 @@ describe('Adicionar profissional (RFPRO002)', () => {
     await submit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível adicionar o profissional.',
+      'Não foi possível adicionar o profissional',
     );
   });
 

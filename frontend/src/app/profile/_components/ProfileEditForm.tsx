@@ -26,7 +26,7 @@ type Errors = Partial<Record<Field, string>>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUBMIT_ERROR =
-  'Não foi possível atualizar seus dados. Tente novamente mais tarde.';
+  'Não foi possível atualizar seus dados. Tente novamente mais tarde';
 
 function todayIso() {
   const today = new Date();
@@ -94,18 +94,18 @@ export default function ProfileEditForm({
     const next: Errors = {};
     const phoneDigits = onlyDigits(phone);
 
-    if (!name.trim()) next.name = 'Informe seu nome completo.';
+    if (!name.trim()) next.name = 'Informe seu nome completo';
     if (!birthDate || birthDate > todayIso()) {
-      next.birthDate = 'Informe uma data de nascimento válida.';
+      next.birthDate = 'Informe uma data de nascimento válida';
     }
-    if (!sex) next.sex = 'Selecione o sexo.';
+    if (!sex) next.sex = 'Selecione o sexo';
     if (!email.trim()) {
-      next.email = 'Informe seu e-mail.';
+      next.email = 'Informe seu e-mail';
     } else if (!EMAIL_PATTERN.test(email.trim())) {
-      next.email = 'Informe um e-mail válido, como nome@exemplo.com.';
+      next.email = 'Informe um e-mail válido, como nome@exemplo.com';
     }
     if (phoneDigits && phoneDigits.length < 10) {
-      next.phone = 'Informe o telefone com DDD.';
+      next.phone = 'Informe o telefone com DDD';
     }
 
     setErrors(next);
@@ -386,7 +386,7 @@ export default function ProfileEditForm({
           onCancel={() => setPasswordOpen(false)}
           onSuccess={() => {
             setPasswordOpen(false);
-            setFeedback('Sua senha foi redefinida com sucesso.');
+            setFeedback('Sua senha foi redefinida com sucesso');
           }}
         />
       )}
