@@ -6,15 +6,18 @@ export const metadata = {
 
 type PatientPtsPageProps = {
   params: Promise<{
-    id: string;
+    patientId: string;
   }>;
 };
 
 // RFPTS004 – o profissional da equipe vê o PTS ativo do paciente escolhido.
 export default async function PatientPtsPage({ params }: PatientPtsPageProps) {
-  const { id } = await params;
+  const { patientId } = await params;
 
   return (
-    <ActivePtsScreen currentHref={`/patients/${id}/pts`} routePatientId={id} />
+    <ActivePtsScreen
+      currentHref={`/patients/${patientId}/pts`}
+      routePatientId={patientId}
+    />
   );
 }

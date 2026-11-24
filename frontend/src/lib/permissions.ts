@@ -14,6 +14,7 @@ export type PermissionAction =
   | 'viewProfessionalDirectory'
   | 'manageAccounts'
   | 'viewPtsProposals'
+  | 'viewPts'
   | 'viewActivePts'
   | 'viewPtsSocialSituation'
   | 'editPtsSocialSituation'
@@ -131,6 +132,9 @@ export function can(
     case 'viewPtsProposals':
       // RFPTS002 – paciente titular ou profissional da proposta.
       return patient || (professional && (!pts || isProposalMember(user, pts)));
+    case 'viewPts':
+      // RFPTS009, RFTL001 – equipe ou paciente titular; a API confere o vínculo.
+      return professional || patient;
     case 'viewActivePts':
       // RFPTS004 – paciente titular ou profissional (a API confere a equipe).
       return patient || professional;

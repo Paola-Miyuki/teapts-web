@@ -76,6 +76,7 @@ describe('remover profissional da equipe (e2e)', () => {
   let app: INestApplication;
   let ptsRepository: {
     findPtsTeam: jest.Mock<(id: string) => Promise<unknown>>;
+    findAccountDisplayName: jest.Mock<(id: string) => Promise<string | null>>;
     removeTeamMember: jest.Mock<(input: unknown) => Promise<unknown>>;
   };
 
@@ -105,6 +106,7 @@ describe('remover profissional da equipe (e2e)', () => {
   beforeEach(async () => {
     ptsRepository = {
       findPtsTeam: jest.fn(),
+      findAccountDisplayName: jest.fn(async () => 'Kaio Segunda Conta'),
       removeTeamMember: jest.fn(),
     };
 
@@ -154,7 +156,7 @@ describe('remover profissional da equipe (e2e)', () => {
       professionalId: memberId,
       authorProfessionalId: responsibleId,
       executedByAccountId: expect.any(String),
-      description: 'Remoção de Ana Souza da equipe.',
+      description: 'Kaio Segunda Conta removeu Ana Souza da equipe',
     });
   });
 

@@ -13,12 +13,47 @@ import RegistrationCell from '@/components/table/RegistrationCell';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
 import { getPts, type PtsDetail, type PtsProfessional } from '@/lib/pts';
+import TimelineTab from '@/components/pts/TimelineTab';
+import {
+  AddTeamMembersModal,
+  type PtsData,
+} from '../_components/AddTeamMembersModal';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
-type Tab = 'visao' | 'equipe';
+type Tab = 'visao' | 'equipe' | 'timeline';
+
+// Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
+function currentHash() {
+  return typeof window === 'undefined' ? '' : window.location.hash.slice(1);
+}
+
+function useHashTab(tabs: Tab[]) {
+  const [hash, setHash] = useState(currentHash);
+
+  useEffect(() => {
+    const sync = () => setHash(currentHash());
+
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
+
+  function open(tab: Tab) {
+    const { pathname, search } = window.location;
+
+    window.history.pushState(
+      window.history.state,
+      '',
+      `${pathname}${search}#${tab}`,
+    );
+    setHash(tab);
+  }
+
+  return [tabs.includes(hash as Tab) ? (hash as Tab) : tabs[0], open] as const;
+}
 
 function EmptyCell() {
   return (
@@ -41,9 +76,8 @@ function professionalLabel(professional: PtsProfessional) {
   return `${professional.name}, ${professional.specialism.name}`;
 }
 
-// Detalhe do PTS de `pts-detalhe.html` para a equipe e o admin (GET /pts/:id,
-// RN016): cabeçalho, Visão geral e Equipe. Diagnóstico, metas, atividades,
-// atendimentos, timeline e as ações do PTS entram com as tasks deles.
+// Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
+// Metas, atividades, atendimentos e as ações do PTS entram com as tasks deles.
 export default function PtsDetailPage({ id }: { id: string }) {
   const [patientName, setPatientName] = useState('');
 
@@ -54,9 +88,18 @@ export default function PtsDetailPage({ id }: { id: string }) {
         { label: 'PTS', href: '/pts/proposals' },
         { label: patientName || 'Detalhe do PTS' },
       ]}
-      requiredAction="viewAuthorizedPatients"
+      requiredAction="viewPts"
     >
-      <PtsDetailContent id={id} onLoaded={setPatientName} />
+      {(account, kind) => (
+        <PtsDetailContent
+          id={id}
+          onLoaded={setPatientName}
+          isPatient={kind === 'patient'}
+          canOpenRecord={can(account, 'viewAuthorizedPatients')}
+          currentUserProfileIds={account.professionalProfileIds ?? []}
+          isAdmin={account.role === 'admin'}
+        />
+      )}
     </AuthenticatedPage>
   );
 }
@@ -64,15 +107,26 @@ export default function PtsDetailPage({ id }: { id: string }) {
 function PtsDetailContent({
   id,
   onLoaded,
+  isPatient,
+  canOpenRecord,
+  currentUserProfileIds,
+  isAdmin,
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
+  isPatient: boolean;
+  canOpenRecord: boolean;
+  currentUserProfileIds: string[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [pts, setPts] = useState<PtsDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
-  const [tab, setTab] = useState<Tab>('visao');
+  // O paciente não vê a ficha (RN028), então não tem a Visão geral.
+  const [tab, setTab] = useHashTab(
+    isPatient ? ['equipe', 'timeline'] : ['visao', 'equipe', 'timeline'],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -120,9 +174,15 @@ function PtsDetailContent({
             : LOAD_ERROR}
         </p>
         {status === 403 || status === 404 ? (
-          <Link href="/patients" className={`${ui.btn} ${ui.btnSecondary}`}>
-            Voltar para pacientes
-          </Link>
+          canOpenRecord ? (
+            <Link href="/patients" className={`${ui.btn} ${ui.btnSecondary}`}>
+              Voltar para pacientes
+            </Link>
+          ) : (
+            <Link href="/home" className={`${ui.btn} ${ui.btnSecondary}`}>
+              Voltar para o início
+            </Link>
+          )
         ) : (
           <button
             type="button"
@@ -145,6 +205,22 @@ function PtsDetailContent({
   }
 
   const members = [pts.responsible, ...pts.team];
+  // RFEM001 – só o responsável ou o admin, e só com o PTS em planejamento ou
+  // andamento (a API responde 409 PTS_NOT_ACTIVE fora disso).
+  const canManageTeam =
+    (isAdmin || currentUserProfileIds.includes(pts.responsible.id)) &&
+    ['planning', 'running'].includes(pts.status);
+
+  const handleTeamUpdated = (updatedPts: PtsData) => {
+    setPts((prev) =>
+      prev
+        ? {
+            ...prev,
+            team: updatedPts.team as PtsProfessional[],
+          }
+        : prev,
+    );
+  };
 
   return (
     <>
@@ -176,25 +252,29 @@ function PtsDetailContent({
           )}
         </dl>
 
-        <div className="heading-actions">
-          <Link className="btn" href={`/patients/${pts.patient.id}`}>
-            <Icon name="patient" className="icon-sm" />
-            Prontuário
-          </Link>
-        </div>
+        {canOpenRecord && (
+          <div className="heading-actions">
+            <Link className="btn" href={`/patients/${pts.patient.id}`}>
+              <Icon name="patient" className="icon-sm" />
+              Prontuário
+            </Link>
+          </div>
+        )}
       </section>
 
       <nav className="tabs ux-ptabs" aria-label="Seções do PTS">
-        <a
-          href="#visao"
-          aria-current={tab === 'visao' ? 'page' : undefined}
-          onClick={(event) => {
-            event.preventDefault();
-            setTab('visao');
-          }}
-        >
-          Visão geral
-        </a>
+        {!isPatient && (
+          <a
+            href="#visao"
+            aria-current={tab === 'visao' ? 'page' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              setTab('visao');
+            }}
+          >
+            Visão geral
+          </a>
+        )}
         <a
           href="#equipe"
           aria-current={tab === 'equipe' ? 'page' : undefined}
@@ -206,9 +286,31 @@ function PtsDetailContent({
           Equipe
           <span className="tab-count">{members.length}</span>
         </a>
+        <a
+          href="#timeline"
+          aria-current={tab === 'timeline' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setTab('timeline');
+          }}
+        >
+          Timeline
+        </a>
       </nav>
 
-      {tab === 'visao' ? (
+      {tab === 'timeline' ? (
+        <section data-panel="timeline" id="timeline">
+          <TimelineTab
+            ptsId={pts.id}
+            patientId={pts.patient.id}
+            team={members.map(({ id: memberId, name }) => ({
+              id: memberId,
+              name,
+            }))}
+            isPatient={isPatient}
+          />
+        </section>
+      ) : tab === 'visao' && !isPatient ? (
         <section data-panel="visao" id="visao">
           <div className="ux-stack">
             <section className="ux-card" aria-labelledby="pv-social">
@@ -232,7 +334,13 @@ function PtsDetailContent({
         </section>
       ) : (
         <section data-panel="equipe" id="equipe">
-          <TeamTable members={members} responsibleId={pts.responsible.id} />
+          <TeamTable
+            ptsId={pts.id}
+            members={members}
+            responsibleId={pts.responsible.id}
+            canManageTeam={canManageTeam}
+            onTeamUpdated={handleTeamUpdated}
+          />
         </section>
       )}
     </>
@@ -240,13 +348,22 @@ function PtsDetailContent({
 }
 
 function TeamTable({
+  ptsId,
   members,
   responsibleId,
+  canManageTeam,
+  onTeamUpdated,
 }: {
+  ptsId: string;
   members: PtsProfessional[];
   responsibleId: string;
+  canManageTeam: boolean;
+  onTeamUpdated: (updatedPts: PtsData) => void;
 }) {
   const [term, setTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [successFeedback, setSuccessFeedback] = useState<string | null>(null);
+
   const query = term.trim().toLocaleLowerCase('pt-BR');
   const shown = members.filter(
     (member) =>
@@ -260,6 +377,8 @@ function TeamTable({
         .includes(query),
   );
 
+  const excludedIds = members.map((member) => member.id);
+
   return (
     <div className="ux-tcard">
       <div className="ux-tcard-head">
@@ -270,7 +389,41 @@ function TeamTable({
             {members.length === 1 ? 'profissional' : 'profissionais'}
           </p>
         </div>
+
+        {canManageTeam && (
+          <div className="ux-tools">
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setSuccessFeedback(null);
+                setIsModalOpen(true);
+              }}
+            >
+              <Icon name="plus" className="icon-sm" />
+              Adicionar profissional
+            </button>
+          </div>
+        )}
       </div>
+
+      {successFeedback && (
+        <div
+          role="status"
+          style={{
+            margin: '0 1.25rem 1rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '0.5rem',
+            backgroundColor: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+          }}
+        >
+          {successFeedback}
+        </div>
+      )}
 
       <div className="ux-toolbar">
         <label className="field">
@@ -333,6 +486,19 @@ function TeamTable({
             </tbody>
           </table>
         </div>
+      )}
+
+      {canManageTeam && (
+        <AddTeamMembersModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          ptsId={ptsId}
+          excludedIds={excludedIds}
+          onSuccess={(updatedPts) => {
+            onTeamUpdated(updatedPts);
+            setSuccessFeedback('Equipe atualizada.');
+          }}
+        />
       )}
     </div>
   );

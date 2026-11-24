@@ -9,11 +9,13 @@ import { PtsRepositoryImpl } from './repositories/pts.repository.impl';
 import { PtsService } from './services/pts.service';
 import { Professional } from '../professionals/entities/professional.entity';
 import { Patient } from '../patients/entities/patient.entity';
+import { TimelineModule } from '../timeline/timeline.module';
 
 @Module({
   imports: [
     AccountsModule,
     TypeOrmModule.forFeature([PtsEntity, Professional, Patient]),
+    TimelineModule,
   ],
   controllers: [PtsController],
   providers: [

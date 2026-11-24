@@ -156,7 +156,7 @@ Estrutura em `backend/src/database/`: `entities/`, `enums/`, `migrations/`, `see
 
 | Schema | Tabelas | Quem cuida |
 | --- | --- | --- |
-| `public` | `account`, `patient`, `professional`, `migrations` | migrations do TypeORM |
+| `public` | `account`, `patient`, `support_contact`, `professional`, `projeto_terapeutico_singular`, `professional_participating_on_therapeutic_journey`, `timeline_record`, `migrations` | migrations do TypeORM |
 | `supertokens` | `emailpassword_users`, `session_info`, `all_auth_recipe_users`… | o próprio SuperTokens Core, ao subir |
 
 Não crie migration para as tabelas do schema `supertokens` nem as altere à mão.

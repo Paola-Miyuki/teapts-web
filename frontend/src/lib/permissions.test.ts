@@ -63,6 +63,13 @@ describe('can', () => {
     }
   });
 
+  it('abre o PTS e a timeline para a equipe, o paciente e o admin', () => {
+    expect(can(admin, 'viewPts')).toBe(true);
+    expect(can(professional, 'viewPts')).toBe(true);
+    expect(can(patient, 'viewPts')).toBe(true);
+    expect(can(waiting, 'viewPts')).toBe(false);
+  });
+
   it('esconde o diretório de profissionais do paciente e da conta sem perfil', () => {
     expect(can(admin, 'viewProfessionalDirectory')).toBe(true);
     expect(can(professional, 'viewProfessionalDirectory')).toBe(true);
@@ -143,6 +150,7 @@ describe('can', () => {
       'viewPatientRegistry',
       'viewProfessionalDirectory',
       'viewPtsProposals',
+      'viewPts',
       'viewPtsSocialSituation',
       'createPts',
     ] as const) {

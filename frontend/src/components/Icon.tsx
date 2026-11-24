@@ -127,6 +127,26 @@ const glyphs = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
+  team: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M2 20v-1a6 6 0 0 1 12 0v1M14 20v-1a4 4 0 0 1 8 0v1" />
+    </>
+  ),
+  activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
+  session: (
+    <>
+      <rect x="4" y="5" width="16" height="16" rx="2" />
+      <path d="M8 3v4m8-4v4M4 11h16m-8 3v4m-2-2h4" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M5 3h9l5 5v13H5Z" />
+      <path d="M14 3v6h5" />
+    </>
+  ),
   accounts: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />
