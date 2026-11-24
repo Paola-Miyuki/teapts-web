@@ -87,14 +87,6 @@ src/
                            e de `pts.html` para o paciente (sem a ficha nem o prontuário): cabeçalho,
                            Visão geral (situação social, só a equipe), Equipe (registro e papel) e
                            Timeline; `/pts/:id#timeline` abre direto na Timeline (atalho de `historico.html`)
-        _components/       TimelineTab (GET /pts/:id/timeline: eventos agrupados por dia, com hora,
-                           autor, "Atribuído a" (RN029), tipo e os links Ver atendimento/atividade/
-                           meta/documento; paginação, carregamento, lista vazia e erro) e
-                           TimelineFilters (busca, Tipo do evento, Autor, Período e "Ordenar por"
-                           Data do evento); Autor é autocomplete em GET /professionals (RFPRO001) para a
-                           equipe e o admin e a lista da equipe para o paciente; busca, filtros, ordem e
-                           página ficam na URL (NFUS003)
-        __tests__/         testes de TimelineTab e TimelineFilters
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
@@ -111,8 +103,12 @@ src/
   components/              AppShell (sidebar, cabeçalho e breadcrumb em níveis), AuthenticatedPage
                            (sessão, perfil e "Acesso restrito"), LogoutButton, HelpTooltip, Icon,
                            Logo, Modal (`dialog.modal` dos mockups) e Combobox (`pat-combobox`)
-    pts/                   peças das telas de proposta: WizardSteps (passos) e TeamMembers
-                           (membros da equipe com busca, adicionar e remover)
+    pts/                   peças das telas de PTS: WizardSteps (passos), TeamMembers (membros da
+                           equipe com busca, adicionar e remover) e a Timeline (RFTL001), usada em
+                           /pts/:id e no Meu PTS: TimelineTab (GET /pts/:id/timeline, eventos por dia
+                           com hora, autor, "Atribuído a", tipo e links; paginação, carregamento,
+                           lista vazia e erro) e TimelineFilters (busca, Tipo do evento, Autor,
+                           Período e "Ordenar por"); busca, filtros, ordem e página ficam na URL
     table/                 peças das tabelas dos mockups: KebabMenu (menu ⋮), MultiSelect,
                            Pagination (faixa, páginas e itens por página), PtsStatusBadge e RegistrationCell (registro com copiar)
   styles/                  teapts-mockups.css e teapts-ui.css: classes globais dos mockups
@@ -173,6 +169,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 | `/pts/proposals/:id/edit` | Editar proposta de PTS | responsável ou admin, proposta em `draft` | `editar-proposta.html` |
+| `/pts` | Meu PTS: PTS ativo com a equipe e a Timeline (sem link nos eventos de documento, RN028); o profissional abre por `/patients/:patientId/pts` | paciente titular e profissional da equipe | `pts.html` |
 | `/pts/:id` | Detalhe do PTS (Visão geral, Equipe e Timeline); aberto por "Abrir PTS" em Pacientes; `#timeline` abre a aba Timeline | admin, profissional da equipe (RN016) e paciente titular, sem a Visão geral e sem link nos eventos de documento (`viewPts`, RN028) | `pts-detalhe.html`, `pts.html`, `historico.html` |
 
 ## Layouts (`design/`)
