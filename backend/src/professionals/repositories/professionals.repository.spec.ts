@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
 import {
@@ -83,6 +84,7 @@ const row: ProfessionalRow = {
   professional_cnes: null,
   account_name: 'Maria Silva',
   account_email: 'maria@example.com',
+  account_status: AccountStatus.Active,
 };
 
 describe('ProfessionalsRepository.findPaginated', () => {
@@ -113,7 +115,12 @@ describe('ProfessionalsRepository.findPaginated', () => {
       'professional.cnes AS professional_cnes',
       'account.name AS account_name',
       'account.email AS account_email',
+      'account.status AS account_status',
     ]);
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'account.status = :activeStatus',
+      { activeStatus: AccountStatus.Active },
+    );
     expect(query.andWhere).toHaveBeenCalledWith(
       expect.stringContaining('account.email ILIKE :q'),
       { q: '%Maria%' },
@@ -144,7 +151,7 @@ describe('ProfessionalsRepository.findPaginated', () => {
 
     await repository.findPaginated({ page: 1, limit: 10, q: '50%_a\\' });
 
-    const [sql, params] = query.andWhere.mock.calls[0] as [string, object];
+    const [sql, params] = query.andWhere.mock.calls[1] as [string, object];
     expect(sql).toContain('account.name ILIKE :q');
     expect(sql).toContain('account.email ILIKE :q');
     expect(sql).toContain('professional.councilNumber ILIKE :q');
@@ -228,8 +235,26 @@ describe('ProfessionalsRepository.findPaginated', () => {
       repository.findPaginated({ page: 1, limit: 10 }),
     ).resolves.toEqual({ rows: [], total: 0 });
 
-    expect(query.andWhere).not.toHaveBeenCalled();
+    expect(query.andWhere).toHaveBeenCalledTimes(1);
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'account.status = :activeStatus',
+      { activeStatus: AccountStatus.Active },
+    );
     expect(query.offset).toHaveBeenCalledWith(0);
+  });
+
+  it('keeps the inactive accounts for the admin', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({
+      page: 1,
+      limit: 10,
+      includeInactive: true,
+    });
+
+    expect(query.andWhere).not.toHaveBeenCalled();
   });
 
   it('propagates database errors to the caller', async () => {

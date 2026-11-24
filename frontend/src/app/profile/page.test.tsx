@@ -440,3 +440,87 @@ describe('ProfilePage', () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 });
+
+describe('ProfilePage — excluir conta', () => {
+  const replace = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
+    mockedUseRouter.mockReturnValue({ replace, push: jest.fn() });
+    global.fetch = jest.fn();
+  });
+
+  function mockDelete(del: jest.Mock) {
+    const base = (global.fetch as jest.Mock).getMockImplementation()!;
+    (global.fetch as jest.Mock).mockImplementation(
+      (url: string, init?: RequestInit) =>
+        url === `${API}/me` && init?.method === 'DELETE'
+          ? del(url, init)
+          : base(url, init),
+    );
+  }
+
+  it('mostra o cartão e abre o diálogo de confirmação', async () => {
+    mockApi();
+    await renderProfile();
+
+    expect(
+      screen.getByRole('heading', { name: 'Excluir conta' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Excluir minha conta' }),
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: 'Excluir sua conta?' }),
+    ).toBeInTheDocument();
+  });
+
+  it('exclui a conta e vai para /login', async () => {
+    mockApi();
+    const del = jest
+      .fn()
+      .mockResolvedValue(
+        response({ id: 'a', status: 'inactive', deactivatedAt: 'x' }),
+      );
+    mockDelete(del);
+    await renderProfile();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Excluir minha conta' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Excluir conta' }),
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    expect(del).toHaveBeenCalledTimes(1);
+  });
+
+  it('mostra o 409 no diálogo e continua em /profile', async () => {
+    mockApi();
+    const message = 'Transfira a responsabilidade antes de desativar.';
+    mockDelete(
+      jest
+        .fn()
+        .mockResolvedValue(
+          response({ status: 'ACCOUNT_IS_PTS_RESPONSIBLE', message }, 409),
+        ),
+    );
+    await renderProfile();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Excluir minha conta' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Excluir conta' }),
+    );
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
+    expect(replace).not.toHaveBeenCalled();
+  });
+});

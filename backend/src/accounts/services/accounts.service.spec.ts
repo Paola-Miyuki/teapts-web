@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import Session from 'supertokens-node/recipe/session';
 import { RecipeUserId } from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
 import { AccountRole } from '../enums/account-role.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 import { Gender } from '../enums/gender.enum';
 import { Sex } from '../enums/sex.enum';
 import type {
   AccountsPage,
   AccountsQuery,
   AccountsRepository,
+  DeactivationResult,
 } from '../repositories/accounts.repository';
 import { AccountsService } from './accounts.service';
 
@@ -21,6 +24,10 @@ describe('AccountsService', () => {
   };
   const accountsRepository = {
     findPaginated: jest.fn<(filters: AccountsQuery) => Promise<AccountsPage>>(),
+    deactivate:
+      jest.fn<
+        (accountId: string, executedBy: string) => Promise<DeactivationResult>
+      >(),
   };
   let service: AccountsService;
 
@@ -374,6 +381,7 @@ describe('AccountsService', () => {
             account_id: 'account-1',
             account_name: 'Maria Silva',
             account_email: 'maria@exemplo.com',
+            account_status: AccountStatus.Inactive,
           },
         ],
         total: 21,
@@ -381,7 +389,12 @@ describe('AccountsService', () => {
 
       await expect(service.findAll(request)).resolves.toEqual({
         data: [
-          { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+          {
+            id: 'account-1',
+            name: 'Maria Silva',
+            email: 'maria@exemplo.com',
+            status: AccountStatus.Inactive,
+          },
         ],
         pagination: { page: 2, limit: 20, total: 21, totalPages: 2 },
       });
@@ -418,6 +431,128 @@ describe('AccountsService', () => {
         },
       });
       expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('isActive and isEmailDeactivated', () => {
+    it('looks up an active account by id', async () => {
+      accountRepository.exists.mockResolvedValue(true);
+
+      await expect(service.isActive('account-1')).resolves.toBe(true);
+      expect(accountRepository.exists).toHaveBeenCalledWith({
+        where: { id: 'account-1', status: AccountStatus.Active },
+      });
+    });
+
+    it('looks up an inactive account by the normalized e-mail', async () => {
+      accountRepository.exists.mockResolvedValue(true);
+
+      await expect(
+        service.isEmailDeactivated(' Maria@Exemplo.com '),
+      ).resolves.toBe(true);
+      expect(accountRepository.exists).toHaveBeenCalledWith({
+        where: { email: 'maria@exemplo.com', status: AccountStatus.Inactive },
+      });
+    });
+  });
+
+  describe('deactivate', () => {
+    const deactivatedAt = new Date('2026-11-10T15:00:00.000Z');
+
+    it('deactivates the account and revokes every session', async () => {
+      accountsRepository.deactivate.mockResolvedValue({
+        outcome: 'deactivated',
+        supertokensUserId: 'st-1',
+        deactivatedAt,
+      });
+      const revoke = jest
+        .spyOn(Session, 'revokeAllSessionsForUser')
+        .mockResolvedValue([]);
+
+      await expect(service.deactivate('account-1', 'admin-1')).resolves.toEqual(
+        {
+          id: 'account-1',
+          status: AccountStatus.Inactive,
+          deactivatedAt: '2026-11-10T15:00:00.000Z',
+        },
+      );
+      expect(accountsRepository.deactivate).toHaveBeenCalledWith(
+        'account-1',
+        'admin-1',
+      );
+      expect(revoke).toHaveBeenCalledWith('st-1');
+    });
+
+    it('still answers when the revocation fails, logging it', async () => {
+      accountsRepository.deactivate.mockResolvedValue({
+        outcome: 'deactivated',
+        supertokensUserId: 'st-1',
+        deactivatedAt,
+      });
+      jest
+        .spyOn(Session, 'revokeAllSessionsForUser')
+        .mockRejectedValue(new Error('core down'));
+      const logError = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      await expect(
+        service.deactivate('account-1', 'account-1'),
+      ).resolves.toMatchObject({ status: AccountStatus.Inactive });
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'not_found',
+        404,
+        { status: 'ACCOUNT_NOT_FOUND', message: 'Conta não encontrada.' },
+      ],
+      [
+        'already_deactivated',
+        409,
+        {
+          status: 'ACCOUNT_ALREADY_DEACTIVATED',
+          message: 'A conta já está desativada.',
+        },
+      ],
+      [
+        'pts_responsible',
+        409,
+        {
+          status: 'ACCOUNT_IS_PTS_RESPONSIBLE',
+          message:
+            'A conta tem perfil responsável por um PTS ativo. Transfira a responsabilidade antes de desativar.',
+        },
+      ],
+    ] as const)(
+      'maps %s to %i without revoking sessions',
+      async (outcome, httpStatus, body) => {
+        accountsRepository.deactivate.mockResolvedValue({ outcome });
+        const revoke = jest.spyOn(Session, 'revokeAllSessionsForUser');
+
+        await expect(
+          service.deactivate('account-1', 'admin-1'),
+        ).rejects.toMatchObject({ status: httpStatus, response: body });
+        expect(revoke).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns a safe internal error when the transaction fails', async () => {
+      accountsRepository.deactivate.mockRejectedValue(
+        new Error('database connection details'),
+      );
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+      await expect(
+        service.deactivate('account-1', 'admin-1'),
+      ).rejects.toMatchObject({
+        status: 500,
+        response: {
+          status: 'ERROR',
+          message: 'Não foi possível desativar a conta.',
+        },
+      });
     });
   });
 });

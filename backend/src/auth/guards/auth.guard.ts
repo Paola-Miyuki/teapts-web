@@ -3,12 +3,20 @@
 // Depois da validação, guarda o contexto da conta na requisição.
 // Assim o controller pode usar @CurrentAccount() sem repetir essa leitura.
 
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { verifySession } from 'supertokens-node/recipe/session/framework/express';
 import type { SessionRequest } from 'supertokens-node/framework/express';
 import { parseAccountContext } from '../account-context';
-import type { AccountContext } from '../../accounts/services/accounts.service';
+import {
+  type AccountContext,
+  AccountsService,
+} from '../../accounts/services/accounts.service';
 
 type AuthenticatedRequest = SessionRequest & {
   accountContext?: AccountContext;
@@ -30,12 +38,16 @@ export class AuthGuard implements CanActivate {
   // seja recusada na hora, e não só quando o access token expirar.
   private readonly verify = verifySession({ checkDatabase: true });
 
+  constructor(private readonly accountsService: AccountsService) {}
+
   /**
    * Valida a sessão antes de permitir a execução do controller.
    *
    * @param context contexto HTTP do NestJS
-   * @returns true quando a sessão e o contexto são válidos
+   * @returns true quando a sessão e o contexto são válidos e a conta está ativa
    * @throws erro de sessão ou UnauthorizedException quando a validação falha
+   *   ou a conta foi desativada (RFAUT005): a situação vem do banco, e não do
+   *   token, para a desativação valer na hora
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const http = context.switchToHttp();
@@ -51,7 +63,13 @@ export class AuthGuard implements CanActivate {
 
     const session = req.session;
     const payload = session?.getAccessTokenPayload();
-    req.accountContext = parseAccountContext(payload);
+    const accountContext = parseAccountContext(payload);
+
+    if (!(await this.accountsService.isActive(accountContext.accountId))) {
+      throw new UnauthorizedException('Conta desativada');
+    }
+
+    req.accountContext = accountContext;
 
     return true;
   }

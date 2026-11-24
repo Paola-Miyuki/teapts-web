@@ -1,4 +1,4 @@
-import { getNavigation, type Account } from './account';
+import { deleteMe, getNavigation, type Account } from './account';
 import { personalData } from '@/test-utils/account';
 
 function account(overrides: Partial<Account> = {}): Account {
@@ -98,5 +98,30 @@ describe('getNavigation', () => {
     ]);
 
     expect(labels(account())).toEqual(['Início']);
+  });
+});
+
+describe('deleteMe', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  it('chama DELETE /me com cookies e devolve a conta desativada', async () => {
+    const body = {
+      id: 'account',
+      status: 'inactive',
+      deactivatedAt: '2026-11-10T15:00:00.000Z',
+    };
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue(body),
+    });
+
+    await expect(deleteMe()).resolves.toEqual(body);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/me',
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+    );
   });
 });

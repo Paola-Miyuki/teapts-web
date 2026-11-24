@@ -7,9 +7,11 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import type { AccountContext } from '../services/accounts.service';
 import { AccountRole } from '../enums/account-role.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 import { AdminGuard } from '../../auth/guards/admin.guard';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
+import type { DeactivateAccountResponseDto } from '../dto/deactivate-account-response.dto';
 import type { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import { AccountsController } from './accounts.controller';
 import { AccountsService } from '../services/accounts.service';
@@ -18,6 +20,9 @@ describe('GET /accounts', () => {
   let app: INestApplication;
   let accountContext: AccountContext;
   let accountsService: {
+    deactivate: jest.Mock<
+      (id: string, executedBy: string) => Promise<DeactivateAccountResponseDto>
+    >;
     findAll: jest.Mock<
       (
         input: Parameters<AccountsService['findAll']>[0],
@@ -33,9 +38,19 @@ describe('GET /accounts', () => {
       professionalProfileIds: [],
     };
     accountsService = {
+      deactivate: jest.fn(async (id: string) => ({
+        id,
+        status: AccountStatus.Inactive as const,
+        deactivatedAt: '2026-11-10T15:00:00.000Z',
+      })),
       findAll: jest.fn(async () => ({
         data: [
-          { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+          {
+            id: 'account-1',
+            name: 'Maria Silva',
+            email: 'maria@exemplo.com',
+            status: AccountStatus.Active,
+          },
         ],
         pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
       })),
@@ -79,7 +94,12 @@ describe('GET /accounts', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       data: [
-        { id: 'account-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        {
+          id: 'account-1',
+          name: 'Maria Silva',
+          email: 'maria@exemplo.com',
+          status: AccountStatus.Active,
+        },
       ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });
@@ -180,5 +200,106 @@ describe('GET /accounts', () => {
 
     expect(response.status).toBe(403);
     expect(accountsService.findAll).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /accounts/:id', () => {
+  const targetId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+  let app: INestApplication;
+  let accountContext: AccountContext;
+  let accountsService: {
+    deactivate: jest.Mock<
+      (id: string, executedBy: string) => Promise<DeactivateAccountResponseDto>
+    >;
+  };
+
+  beforeEach(async () => {
+    accountContext = {
+      accountId: 'admin-1',
+      role: AccountRole.Admin,
+      patientProfileId: null,
+      professionalProfileIds: [],
+    };
+    accountsService = {
+      deactivate: jest.fn(async (id: string) => ({
+        id,
+        status: AccountStatus.Inactive as const,
+        deactivatedAt: '2026-11-10T15:00:00.000Z',
+      })),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AccountsController],
+      providers: [
+        { provide: AccountsService, useValue: accountsService },
+        AuthGuard,
+        AdminGuard,
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context
+            .switchToHttp()
+            .getRequest<{ accountContext?: AccountContext }>().accountContext =
+            accountContext;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('lets an admin deactivate any account', async () => {
+    const response = await request(app.getHttpServer()).delete(
+      `/accounts/${targetId}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: targetId,
+      status: 'inactive',
+      deactivatedAt: '2026-11-10T15:00:00.000Z',
+    });
+    expect(accountsService.deactivate).toHaveBeenCalledWith(
+      targetId,
+      'admin-1',
+    );
+  });
+
+  it('returns 403 FORBIDDEN to a user who is not an admin', async () => {
+    accountContext.role = AccountRole.User;
+
+    const response = await request(app.getHttpServer()).delete(
+      `/accounts/${targetId}`,
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador.',
+    });
+    expect(accountsService.deactivate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 VALIDATION_ERROR for an id that is not a UUID', async () => {
+    const response = await request(app.getHttpServer()).delete(
+      '/accounts/not-a-uuid',
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: id',
+    });
+    expect(accountsService.deactivate).not.toHaveBeenCalled();
   });
 });

@@ -76,6 +76,8 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
+  ['/accounts/{id}', 'delete'],
+  ['/me', 'delete'],
   ['/patients', 'post'],
   ['/patients/{patientId}/support-contacts', 'get'],
   ['/patients/{patientId}/support-contacts', 'post'],
@@ -280,6 +282,14 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/team/{professionalId}', 'delete', '409'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
+    ['/accounts/{id}', 'delete', '400'],
+    ['/accounts/{id}', 'delete', '403'],
+    ['/accounts/{id}', 'delete', '404'],
+    ['/accounts/{id}', 'delete', '409'],
+    ['/accounts/{id}', 'delete', '500'],
+    ['/me', 'delete', '404'],
+    ['/me', 'delete', '409'],
+    ['/me', 'delete', '500'],
     ['/patients', 'post', '400'],
     ['/patients', 'post', '403'],
     ['/patients', 'post', '404'],
@@ -392,11 +402,9 @@ describe('Swagger (e2e)', () => {
   it('returns the email of each GET /accounts item', async () => {
     const { components } = await getDocument();
 
-    expect(components.schemas.AccountSummaryResponseDto.required).toEqual([
-      'id',
-      'name',
-      'email',
-    ]);
+    expect(components.schemas.AccountSummaryResponseDto.required).toEqual(
+      expect.arrayContaining(['id', 'name', 'email', 'status']),
+    );
   });
 
   it('documents DELETE of a support contact with 204 and the session', async () => {

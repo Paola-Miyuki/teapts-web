@@ -43,6 +43,7 @@ jest.unstable_mockModule(
 let ProfessionalsController: (typeof import('../src/professionals/controllers/professionals.controller.js'))['ProfessionalsController'];
 let ProfessionalsService: (typeof import('../src/professionals/services/professionals.service.js'))['ProfessionalsService'];
 let ProfessionalsRepository: (typeof import('../src/professionals/repositories/professionals.repository.js'))['ProfessionalsRepository'];
+let AccountsService: (typeof import('../src/accounts/services/accounts.service.js'))['AccountsService'];
 let AuthGuard: (typeof import('../src/auth/guards/auth.guard.js'))['AuthGuard'];
 let AdminGuard: (typeof import('../src/auth/guards/admin.guard.js'))['AdminGuard'];
 let Account: (typeof import('../src/accounts/entities/account.entity.js'))['Account'];
@@ -54,6 +55,8 @@ beforeAll(async () => {
     await import('../src/professionals/services/professionals.service.js'));
   ({ ProfessionalsRepository } =
     await import('../src/professionals/repositories/professionals.repository.js'));
+  ({ AccountsService } =
+    await import('../src/accounts/services/accounts.service.js'));
   ({ AuthGuard } = await import('../src/auth/guards/auth.guard.js'));
   ({ AdminGuard } = await import('../src/auth/guards/admin.guard.js'));
   ({ Account } = await import('../src/accounts/entities/account.entity.js'));
@@ -100,6 +103,8 @@ describe('professional profile (e2e)', () => {
       providers: [
         ProfessionalsService,
         AuthGuard,
+        // O AuthGuard consulta a situação da conta (RFAUT005).
+        { provide: AccountsService, useValue: { isActive: async () => true } },
         AdminGuard,
         { provide: ProfessionalsRepository, useValue: professionalsRepository },
         { provide: getRepositoryToken(Account), useValue: accountRepository },

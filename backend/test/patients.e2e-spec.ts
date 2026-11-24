@@ -85,6 +85,7 @@ describe('patient profile (e2e)', () => {
   let app: INestApplication;
   let accountRepository: {
     findOne: jest.Mock<(options: unknown) => Promise<unknown>>;
+    exists: jest.Mock<(options: unknown) => Promise<boolean>>;
   };
   let patientsRepository: {
     insert: jest.Mock<(patient: unknown) => Promise<void>>;
@@ -126,7 +127,11 @@ describe('patient profile (e2e)', () => {
   }
 
   beforeEach(async () => {
-    accountRepository = { findOne: jest.fn() };
+    accountRepository = {
+      findOne: jest.fn(),
+      // O AuthGuard consulta a situação da conta (RFAUT005).
+      exists: jest.fn(async () => true),
+    };
     patientsRepository = {
       insert: jest.fn(),
       patientExists: jest.fn(),
@@ -171,6 +176,7 @@ describe('patient profile (e2e)', () => {
           account_id: accountId,
           account_name: 'João Martins',
           account_email: 'joao@exemplo.com',
+          account_status: 'active',
         },
       ],
       total: 1,
@@ -183,7 +189,12 @@ describe('patient profile (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       data: [
-        { id: accountId, name: 'João Martins', email: 'joao@exemplo.com' },
+        {
+          id: accountId,
+          name: 'João Martins',
+          email: 'joao@exemplo.com',
+          status: 'active',
+        },
       ],
       pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });

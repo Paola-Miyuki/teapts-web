@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import { DataSource, In, Repository } from 'typeorm';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -432,5 +433,27 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
 
     expect(queryRunner.manager.insert).not.toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.findExistingProfessionalIds', () => {
+  it('só considera profissionais de conta ativa (RFAUT005)', async () => {
+    const find = jest.fn(async () => [{ id: 'professional-1' }]);
+    const repository = new PtsRepositoryImpl(
+      {} as DataSource,
+      {} as Repository<PtsEntity>,
+      { find } as unknown as Repository<Professional>,
+      {} as Repository<Patient>,
+    );
+
+    await expect(
+      repository.findExistingProfessionalIds(['professional-1', 'p-2']),
+    ).resolves.toEqual(['professional-1']);
+    expect(find).toHaveBeenCalledWith({
+      where: {
+        id: In(['professional-1', 'p-2']),
+        account: { status: AccountStatus.Active },
+      },
+    });
   });
 });

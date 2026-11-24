@@ -283,9 +283,11 @@ A autenticação usa o [SuperTokens](https://supertokens.com/docs) com a receita
 | --- | --- | --- |
 | SuperTokens Core | container `supertokens`, porta 3567 | e-mail, senha (hash) e sessões, no schema `supertokens` do Postgres |
 | Backend (`supertokens-node`) | `backend/src/auth/` | expõe as rotas `/auth/*` do SDK e a rota protegida `GET /me` |
-| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) e o vínculo `supertokens_user_id` |
+| Tabela `account` | schema `public` | dados de negócio: `name`, `email`, `role`, os dados pessoais (`social_name`, `birth_date`, `sex`, `gender`, `cpf`, `phone`) a situação (`status`, `deactivated_at`, `deactivated_by_account_id`) e o vínculo `supertokens_user_id` |
 
 A aplicação **não guarda senha**. A conta liga-se ao SuperTokens pela coluna `account.supertokens_user_id`, que recebe o id primário do usuário (`user.id`). Os perfis da conta ficam em `patient` e `professional`, no máximo um de cada (RN002). Admin, paciente e profissional usam contas separadas: conta de admin não recebe perfil, e conta com perfil de paciente não recebe perfil profissional (e vice-versa).
+
+**Excluir conta é lógica (RFAUT005, RN021).** `DELETE /me` (o titular) e `DELETE /accounts/:id` (admin) gravam `account.status = 'inactive'` e revogam todas as sessões no SuperTokens; nada é apagado, e os perfis seguem a situação da conta. A conta inativa é recusada no login (resposta de credenciais erradas, sem revelar o motivo) e o `AuthGuard` lê `account.status` no banco a cada requisição, então um token ainda válido também recebe `401`. O perfil profissional sai das equipes de PTS em `planning` ou `running`; se for responsável por PTS ativo, a rota responde `409 ACCOUNT_IS_PTS_RESPONSIBLE` até a transferência. Inativos saem do `GET /patients/authorized` e da seleção de equipes; o admin continua vendo-os no `GET /accounts` e no `GET /professionals`, com `status`.
 
 ```text
 POST /auth/signup (email, password, name, birthDate, sex, cpf; socialName, gender, phone opcionais)
@@ -335,6 +337,8 @@ Tabelas completas em [`backend/README.md`](backend/README.md#variáveis-de-ambie
 | GET | `/me` | access token | dados da conta |
 | PATCH | `/me` | access token; `{ name?, email?, socialName?, birthDate?, sex?, gender?, phone? }` | dados da conta atualizados |
 | POST | `/me/password` | access token; `{ currentPassword, newPassword }` | `200 {"status":"OK"}` |
+| DELETE | `/me` | access token | `200 { id, status: "inactive", deactivatedAt }`; desativa a própria conta e revoga as sessões |
+| DELETE | `/accounts/:id` | access token de admin | mesma resposta, para qualquer conta |
 | GET | `/docs` | — | interface do Swagger com a documentação da API |
 | GET | `/docs-json` | — | documento OpenAPI (JSON) |
 

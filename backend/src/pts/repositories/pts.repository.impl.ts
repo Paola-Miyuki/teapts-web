@@ -28,6 +28,7 @@ import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -105,8 +106,9 @@ export class PtsRepositoryImpl extends PtsRepository {
       return [];
     }
 
+    // Profissional de conta desativada sai da seleção de equipes (RFAUT005).
     const found = await this.professionalRepository.find({
-      where: { id: In(ids) },
+      where: { id: In(ids), account: { status: AccountStatus.Active } },
     });
 
     return found.map((professional) => professional.id);

@@ -12,6 +12,7 @@ import { Specialism } from '../enums/specialism.enum';
 import type { GetProfessionalsResponseDto } from '../dto/get-professionals-response.dto';
 import type { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
 import { AdminGuard } from '../../auth/guards/admin.guard';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
 import { ProfessionalsController } from './professionals.controller';
@@ -60,6 +61,7 @@ describe('GET /professionals', () => {
             registration: null,
             institution: null,
             cnes: null,
+            status: AccountStatus.Active,
           },
         ],
         pagination: {
@@ -78,7 +80,6 @@ describe('GET /professionals', () => {
           provide: ProfessionalsService,
           useValue: professionalsService,
         },
-        AuthGuard,
       ],
     })
       .overrideGuard(AuthGuard)
@@ -120,6 +121,7 @@ describe('GET /professionals', () => {
           registration: null,
           institution: null,
           cnes: null,
+          status: 'active',
         },
       ],
       pagination: {
@@ -226,7 +228,6 @@ describe('POST /professionals', () => {
       controllers: [ProfessionalsController],
       providers: [
         { provide: ProfessionalsService, useValue: professionalsService },
-        AuthGuard,
         AdminGuard,
       ],
     })

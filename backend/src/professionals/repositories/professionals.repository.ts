@@ -6,6 +6,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
 import type { Uf } from '../enums/uf.enum';
@@ -29,6 +30,8 @@ export type FindProfessionalsQuery = {
   sort?: 'name' | 'specialism';
   order?: 'asc' | 'desc';
   ids?: string[];
+  /** Só o administrador vê o profissional de conta desativada (RFAUT005). */
+  includeInactive?: boolean;
 };
 
 /** Linha projetada pela consulta, só com os campos públicos. */
@@ -41,6 +44,7 @@ export type ProfessionalRow = {
   professional_cnes: string | null;
   account_name: string;
   account_email: string;
+  account_status: AccountStatus;
 };
 
 /** Página de linhas e total de profissionais compatíveis com os filtros. */
@@ -84,7 +88,16 @@ export class ProfessionalsRepository {
         'professional.cnes AS professional_cnes',
         'account.name AS account_name',
         'account.email AS account_email',
+        'account.status AS account_status',
       ]);
+
+    // O perfil segue a situação da conta: o de conta desativada sai da
+    // consulta e da seleção de equipes, e só o administrador o vê.
+    if (filters.includeInactive !== true) {
+      query.andWhere('account.status = :activeStatus', {
+        activeStatus: AccountStatus.Active,
+      });
+    }
 
     if (filters.q !== undefined) {
       query.andWhere(

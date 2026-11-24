@@ -104,6 +104,18 @@ describe('PatientsRepository list and detail', () => {
     });
   });
 
+  it('leaves the patients of deactivated accounts out of the list', async () => {
+    answer({ total: '0' });
+
+    await repository.findPatientsPaginated(
+      { kind: 'all' },
+      { page: 1, limit: 10 },
+    );
+
+    expect(captured[0].sql).toContain('"account"."status" = :activeStatus');
+    expect(captured[0].parameters).toMatchObject({ activeStatus: 'active' });
+  });
+
   it('limits the professional to the PTS of their account in the access states', async () => {
     answer({ total: '1' }, [row]);
 

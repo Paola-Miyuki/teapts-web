@@ -5,6 +5,7 @@ import { jest } from '@jest/globals';
 import { Repository } from 'typeorm';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import {
   type AccountRow,
@@ -76,6 +77,7 @@ describe('AccountsRepository.findPaginated', () => {
       account_id: 'account-1',
       account_name: 'Maria Silva',
       account_email: 'maria@exemplo.com',
+      account_status: AccountStatus.Active,
     };
     query.getCount.mockResolvedValue(21);
     query.getRawMany.mockResolvedValue([row]);
@@ -91,6 +93,7 @@ describe('AccountsRepository.findPaginated', () => {
       'account.id AS account_id',
       'account.name AS account_name',
       'account.email AS account_email',
+      'account.status AS account_status',
     ]);
     expect(query.orderBy).toHaveBeenCalledWith('account.name', 'ASC');
     expect(query.addOrderBy).toHaveBeenCalledWith('account.id', 'ASC');
@@ -212,5 +215,113 @@ describe('AccountsRepository.findPaginated', () => {
     query.getCount.mockRejectedValue(failure);
 
     await expect(repository.findPaginated(firstPage)).rejects.toBe(failure);
+  });
+});
+
+describe('AccountsRepository.deactivate', () => {
+  const accountId = 'account-1';
+  const adminId = 'admin-1';
+
+  function setup(account: Partial<Account> | null, responsibleRows: unknown[]) {
+    const lockQuery = {
+      setLock: jest.fn(),
+      where: jest.fn(),
+      getOne: jest.fn(async () => account),
+    };
+    lockQuery.setLock.mockReturnValue(lockQuery);
+    lockQuery.where.mockReturnValue(lockQuery);
+    const manager = {
+      createQueryBuilder: jest.fn(() => lockQuery),
+      query: jest.fn(async (sql: string) =>
+        sql.startsWith('SELECT') ? responsibleRows : undefined,
+      ),
+      update: jest.fn(async () => undefined),
+    };
+    const typeormRepository = {
+      manager: {
+        transaction: jest.fn(
+          async (work: (entityManager: unknown) => Promise<unknown>) =>
+            work(manager),
+        ),
+      },
+    };
+    const repository = new AccountsRepository(
+      typeormRepository as unknown as Repository<Account>,
+    );
+
+    return { manager, lockQuery, repository };
+  }
+
+  it('locks the account, records the deactivation and leaves the active teams', async () => {
+    const { manager, lockQuery, repository } = setup(
+      {
+        id: accountId,
+        status: AccountStatus.Active,
+        supertokensUserId: 'st-1',
+      },
+      [],
+    );
+
+    const result = await repository.deactivate(accountId, adminId);
+
+    expect(lockQuery.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(result).toEqual({
+      outcome: 'deactivated',
+      supertokensUserId: 'st-1',
+      deactivatedAt: expect.any(Date),
+    });
+    expect(manager.update).toHaveBeenCalledWith(
+      Account,
+      { id: accountId },
+      {
+        status: AccountStatus.Inactive,
+        deactivatedAt: (result as { deactivatedAt: Date }).deactivatedAt,
+        deactivatedByAccountId: adminId,
+      },
+    );
+    const [deleteSql, deleteParams] = manager.query.mock
+      .calls[1] as unknown as [string, unknown[]];
+    expect(deleteSql).toContain(
+      'DELETE FROM professional_participating_on_therapeutic_journey',
+    );
+    expect(deleteParams).toEqual([accountId, ['planning', 'running']]);
+  });
+
+  it('reports a missing account without writing', async () => {
+    const { manager, repository } = setup(null, []);
+
+    await expect(repository.deactivate(accountId, adminId)).resolves.toEqual({
+      outcome: 'not_found',
+    });
+    expect(manager.update).not.toHaveBeenCalled();
+  });
+
+  it('reports an account that is already inactive without writing', async () => {
+    const { manager, repository } = setup(
+      { id: accountId, status: AccountStatus.Inactive },
+      [],
+    );
+
+    await expect(repository.deactivate(accountId, adminId)).resolves.toEqual({
+      outcome: 'already_deactivated',
+    });
+    expect(manager.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks a profile that is responsible for an active PTS without writing', async () => {
+    const { manager, repository } = setup(
+      { id: accountId, status: AccountStatus.Active },
+      [{ '?column?': 1 }],
+    );
+
+    await expect(repository.deactivate(accountId, adminId)).resolves.toEqual({
+      outcome: 'pts_responsible',
+    });
+    expect(manager.update).not.toHaveBeenCalled();
+    expect(manager.query).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('SELECT'),
+      [accountId, ['planning', 'running']],
+    );
   });
 });

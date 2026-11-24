@@ -47,6 +47,9 @@ describe('AuthController account routes', () => {
       (account: AccountContext, body: unknown) => Promise<unknown>
     >;
     findById: jest.Mock<(id: string) => Promise<unknown>>;
+    deactivate: jest.Mock<
+      (accountId: string, executedBy: string) => Promise<unknown>
+    >;
   };
 
   beforeEach(async () => {
@@ -79,6 +82,11 @@ describe('AuthController account routes', () => {
         },
       ),
       changePassword: jest.fn(async () => ({ status: 'OK' })),
+      deactivate: jest.fn(async (accountId: string) => ({
+        id: accountId,
+        status: 'inactive',
+        deactivatedAt: '2026-11-10T15:00:00.000Z',
+      })),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -102,6 +110,38 @@ describe('AuthController account routes', () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  it('deactivates the own account on DELETE /me', async () => {
+    const response = await request(app.getHttpServer()).delete('/me');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: 'account-1',
+      status: 'inactive',
+      deactivatedAt: '2026-11-10T15:00:00.000Z',
+    });
+    expect(accountsService.deactivate).toHaveBeenCalledWith(
+      'account-1',
+      'account-1',
+    );
+  });
+
+  it('returns the PTS responsible error of DELETE /me as 409', async () => {
+    accountsService.deactivate.mockRejectedValue(
+      new ConflictException({
+        status: 'ACCOUNT_IS_PTS_RESPONSIBLE',
+        message: 'A conta tem perfil responsável por um PTS ativo.',
+      }),
+    );
+
+    const response = await request(app.getHttpServer()).delete('/me');
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      status: 'ACCOUNT_IS_PTS_RESPONSIBLE',
+      message: 'A conta tem perfil responsável por um PTS ativo.',
+    });
   });
 
   it('returns 401 when the session is missing', async () => {

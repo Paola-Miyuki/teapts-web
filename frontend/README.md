@@ -67,7 +67,9 @@ src/
                            profissional, proposta aguardando o paciente e "Aguardando aprovação"
     profile/               meu perfil (GET /me): dados da conta, pessoais, a profissão e, no paciente, os contatos de
                            suporte só para leitura (GET /patients/:patientId/support-contacts); edit/
-                           edita os dados (PATCH /me) e abre a troca de senha (POST /me/password)
+                           edita os dados (PATCH /me) e abre a troca de senha (POST /me/password); o cartão "Excluir conta"
+                           abre o DeleteAccountDialog (DELETE /me): ao concluir vai para /login; 401
+                           também; 409 (ex.: `ACCOUNT_IS_PTS_RESPONSIBLE`) mostra a mensagem no diálogo
     professionals/         profissionais (GET /professionals) na tabela de `profissionais.html`:
                            busca por nome, filtro de especialidade e paginação; registro (com
                            copiar) e instituição; para o admin, situação e menu ⋮ com Visualizar
@@ -114,7 +116,7 @@ src/
   lib/
     supertokens.ts         initSuperTokens(): configura o SDK uma vez
     api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
-    account.ts             GET /me, PATCH /me, POST /me/password e menu por perfil
+    account.ts             GET /me, PATCH /me, DELETE /me, POST /me/password e menu por perfil
     permissions.ts         matriz de permissões por perfil: can(account, ação, contexto)
     professionals.ts       GET /professionals (o e-mail vem `null` para quem não é admin nem profissional)
                            e formatRegistration ("CRP-PR 12345")

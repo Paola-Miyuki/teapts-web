@@ -88,6 +88,17 @@ export function changePassword(input: ChangePasswordInput) {
   });
 }
 
+export type DeleteAccountResponse = {
+  id: string;
+  status: string;
+  deactivatedAt: string;
+};
+
+// DELETE /me: desativa a conta da sessão atual e encerra as sessões (RFAUT005).
+export function deleteMe() {
+  return request<DeleteAccountResponse>('/me', { method: 'DELETE' });
+}
+
 export type NavItem = {
   href: string;
   icon: IconName;
@@ -124,7 +135,7 @@ export function getNavigation(account: Account, currentHref: string) {
   }
 
   // RFPTS004 – o paciente vê o próprio PTS ativo; o profissional chega a
-  // ele pela rota do paciente (/patients/[patientId]/pts).
+  // ele pela rota do paciente (/patients/[id]/pts).
   if (can(account, 'viewOwnCare') && can(account, 'viewActivePts')) {
     items.push({ href: '/pts', icon: 'check', label: 'Meu PTS' });
   }

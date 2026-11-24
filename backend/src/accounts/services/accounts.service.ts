@@ -10,20 +10,24 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { convertToRecipeUserId } from 'supertokens-node';
 import EmailPassword from 'supertokens-node/recipe/emailpassword';
+import Session from 'supertokens-node/recipe/session';
 import { Repository } from 'typeorm';
 import { toPagination } from '../../common/pagination/pagination';
 import type { ChangePasswordRequestDto } from '../../auth/dto/change-password-request.dto';
 import type { MeResponseDto } from '../../auth/dto/me-response.dto';
 import type { UpdateMeRequestDto } from '../../auth/dto/update-me-request.dto';
+import type { DeactivateAccountResponseDto } from '../dto/deactivate-account-response.dto';
 import type { GetAccountsRequestDto } from '../dto/get-accounts-request.dto';
 import type { GetAccountsResponseDto } from '../dto/get-accounts-response.dto';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
+import { AccountStatus } from '../enums/account-status.enum';
 import type { Gender } from '../enums/gender.enum';
 import type { Sex } from '../enums/sex.enum';
 import {
   type AccountsPage,
   AccountsRepository,
+  type DeactivationResult,
 } from '../repositories/accounts.repository';
 
 export class AccountIntegrityError extends Error {
@@ -304,8 +308,111 @@ export class AccountsService {
         id: row.account_id,
         name: row.account_name,
         email: row.account_email,
+        status: row.account_status,
       })),
       pagination: toPagination(request, page.total),
+    };
+  }
+
+  /**
+   * Diz se a conta existe e está ativa. As checagens de acesso usam o banco,
+   * para uma conta desativada perder o acesso mesmo com o token ainda válido.
+   *
+   * @param accountId conta da sessão
+   */
+  async isActive(accountId: string): Promise<boolean> {
+    return this.accountRepository.exists({
+      where: { id: accountId, status: AccountStatus.Active },
+    });
+  }
+
+  /**
+   * Diz se o e-mail pertence a uma conta desativada, para o login recusá-la.
+   *
+   * @param email e-mail informado no login
+   */
+  async isEmailDeactivated(email: string): Promise<boolean> {
+    return this.accountRepository.exists({
+      where: {
+        email: email.trim().toLowerCase(),
+        status: AccountStatus.Inactive,
+      },
+    });
+  }
+
+  /**
+   * Desativa a conta (exclusão lógica, RFAUT005, RN021): grava a situação,
+   * tira o perfil profissional das equipes de PTS ativos e revoga as sessões.
+   * Perfis e dados clínicos continuam no banco.
+   *
+   * A revogação das sessões roda depois da transação. Se ela falhar, a conta
+   * já está inativa e o AuthGuard recusa as sessões que sobraram; a falha só
+   * vai para o log.
+   *
+   * @param accountId conta a desativar
+   * @param executedByAccountId conta que pediu (o titular ou o administrador)
+   * @returns id, situação e momento da desativação
+   * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
+   * @throws ConflictException `ACCOUNT_ALREADY_DEACTIVATED` quando a conta já
+   *   está inativa e `ACCOUNT_IS_PTS_RESPONSIBLE` quando o perfil profissional
+   *   é responsável por PTS em `planning` ou `running`
+   * @throws InternalServerErrorException quando a gravação falha, sem expor o
+   *   erro original
+   */
+  async deactivate(
+    accountId: string,
+    executedByAccountId: string,
+  ): Promise<DeactivateAccountResponseDto> {
+    let result: DeactivationResult;
+
+    try {
+      result = await this.accountsRepository.deactivate(
+        accountId,
+        executedByAccountId,
+      );
+    } catch (error) {
+      this.logger.error('Account deactivation failed', error);
+      throw new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível desativar a conta.',
+      });
+    }
+
+    if (result.outcome === 'not_found') {
+      throw new NotFoundException({
+        status: 'ACCOUNT_NOT_FOUND',
+        message: 'Conta não encontrada.',
+      });
+    }
+
+    if (result.outcome === 'already_deactivated') {
+      throw new ConflictException({
+        status: 'ACCOUNT_ALREADY_DEACTIVATED',
+        message: 'A conta já está desativada.',
+      });
+    }
+
+    if (result.outcome === 'pts_responsible') {
+      throw new ConflictException({
+        status: 'ACCOUNT_IS_PTS_RESPONSIBLE',
+        message:
+          'A conta tem perfil responsável por um PTS ativo. Transfira a responsabilidade antes de desativar.',
+      });
+    }
+
+    try {
+      await Session.revokeAllSessionsForUser(result.supertokensUserId);
+    } catch (error) {
+      this.logger.error(
+        `Falha ao revogar as sessões da conta desativada. accountId=${accountId}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    return {
+      id: accountId,
+      status: AccountStatus.Inactive,
+      deactivatedAt: result.deactivatedAt.toISOString(),
     };
   }
 }

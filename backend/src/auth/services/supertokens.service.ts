@@ -199,6 +199,20 @@ export class SupertokensService {
                     );
                   }
 
+                  // Conta desativada (RFAUT005) não autentica; a resposta é a
+                  // mesma de credenciais erradas, sem revelar o motivo.
+                  const email = input.formFields.find(
+                    (field) => field.id === 'email',
+                  )?.value;
+
+                  if (
+                    typeof email === 'string' &&
+                    (await accountsServiceRef.isEmailDeactivated(email))
+                  ) {
+                    logger.warn('Login recusado: conta desativada');
+                    return { status: 'WRONG_CREDENTIALS_ERROR' };
+                  }
+
                   const response =
                     await originalImplementation.signInPOST(input);
 
