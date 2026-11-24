@@ -3,6 +3,7 @@
 
 import { jest } from '@jest/globals';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   InternalServerErrorException,
@@ -27,6 +28,7 @@ import type {
   PatientScope,
   PatientsPage,
   PatientsRepository,
+  SupportContactValues,
 } from '../repositories/patients.repository';
 import { PatientsService } from './patients.service';
 
@@ -47,6 +49,27 @@ function createService() {
     patientExists: jest.fn<(patientId: string) => Promise<boolean>>(),
     findSupportContacts:
       jest.fn<(patientId: string) => Promise<SupportContact[]>>(),
+    insertSupportContact:
+      jest.fn<
+        (
+          patientId: string,
+          values: SupportContactValues,
+        ) => Promise<SupportContact>
+      >(),
+    findSupportContact:
+      jest.fn<
+        (patientId: string, contactId: string) => Promise<SupportContact | null>
+      >(),
+    updateSupportContact:
+      jest.fn<
+        (
+          patientId: string,
+          contactId: string,
+          values: SupportContactValues,
+        ) => Promise<SupportContact | null>
+      >(),
+    deleteSupportContact:
+      jest.fn<(patientId: string, contactId: string) => Promise<boolean>>(),
     findAvailableForPtsPaginated:
       jest.fn<
         (
@@ -265,10 +288,12 @@ describe('PatientsService.findOne', () => {
     repository.findPatient.mockResolvedValue(row);
     repository.findSupportContacts.mockResolvedValue([
       {
+        id: 'contact-1',
         name: 'Ana Silva',
         description: 'Mãe',
         email: null,
         phone: '41999999999',
+        isEmergency: true,
       } as SupportContact,
     ]);
 
@@ -278,7 +303,14 @@ describe('PatientsService.findOne', () => {
       ...listed,
       cpf: '11144477735',
       supportContacts: [
-        { name: 'Ana Silva', description: 'Mãe', phone: '41999999999' },
+        {
+          id: 'contact-1',
+          name: 'Ana Silva',
+          description: 'Mãe',
+          email: null,
+          phone: '41999999999',
+          isEmergency: true,
+        },
       ],
     });
     expect(repository.findPatient).toHaveBeenCalledWith(
@@ -351,7 +383,10 @@ describe('PatientsService.create', () => {
 
     await expect(
       service.create({ accountId, supportContacts: [contact] }),
-    ).resolves.toEqual({ accountId, supportContacts: [contact] });
+    ).resolves.toEqual({
+      accountId,
+      supportContacts: [{ ...contact, isEmergency: false }],
+    });
 
     expect(accountRepository.findOne).toHaveBeenCalledWith({
       where: { id: accountId },
@@ -359,7 +394,7 @@ describe('PatientsService.create', () => {
     });
     expect(repository.insert).toHaveBeenCalledWith({
       accountId,
-      supportContacts: [contact],
+      supportContacts: [{ ...contact, isEmergency: false }],
     });
   });
 
@@ -397,7 +432,7 @@ describe('PatientsService.create', () => {
 
     expect(repository.insert).toHaveBeenCalledWith({
       accountId,
-      supportContacts: [{ name: 'Maria', phone: '1234' }],
+      supportContacts: [{ name: 'Maria', phone: '1234', isEmergency: false }],
     });
   });
 
@@ -515,6 +550,255 @@ describe('PatientsService.create', () => {
     expect((error as InternalServerErrorException).getResponse()).toEqual({
       status: 'ERROR',
       message: 'Não foi possível cadastrar o perfil de paciente.',
+    });
+  });
+});
+
+describe('PatientsService support contacts', () => {
+  const stored = {
+    id: 'contact-1',
+    patientId: 'patient-1',
+    name: 'Ana Silva',
+    description: 'Mãe',
+    email: null,
+    phone: '41999999999',
+    isEmergency: false,
+  } as SupportContact;
+  const response = {
+    id: 'contact-1',
+    name: 'Ana Silva',
+    description: 'Mãe',
+    email: null,
+    phone: '41999999999',
+    isEmergency: false,
+  };
+  const activeMember: PatientRow = { ...row, read_only: false };
+
+  function ready() {
+    const made = createService();
+    made.repository.patientExists.mockResolvedValue(true);
+    made.repository.findPatient.mockResolvedValue(activeMember);
+    return made;
+  }
+
+  async function errorOf(promise: Promise<unknown>) {
+    return promise.catch((e: unknown) => e);
+  }
+
+  it('lists the contacts to the own patient without scope lookup', async () => {
+    const { repository, service } = ready();
+    repository.findSupportContacts.mockResolvedValue([stored]);
+
+    await expect(
+      service.findSupportContacts(
+        { ...patientAccount, patientProfileId: 'patient-1' },
+        'patient-1',
+      ),
+    ).resolves.toEqual({ data: [response] });
+    expect(repository.findPatient).not.toHaveBeenCalled();
+  });
+
+  it('lists the contacts to a professional of a closed PTS (read only)', async () => {
+    const { repository, service } = ready();
+    repository.findPatient.mockResolvedValue(row);
+    repository.findSupportContacts.mockResolvedValue([stored]);
+
+    await expect(
+      service.findSupportContacts(professionalAccount, 'patient-1'),
+    ).resolves.toEqual({ data: [response] });
+  });
+
+  it('answers 403 when another patient lists the contacts', async () => {
+    const { service } = ready();
+
+    expect(
+      await errorOf(service.findSupportContacts(patientAccount, 'patient-1')),
+    ).toBeInstanceOf(ForbiddenException);
+  });
+
+  it('answers 404 PATIENT_NOT_FOUND for a missing patient', async () => {
+    const { repository, service } = ready();
+    repository.patientExists.mockResolvedValue(false);
+
+    expect(
+      await errorOf(service.findSupportContacts(adminAccount, 'patient-1')),
+    ).toBeInstanceOf(NotFoundException);
+  });
+
+  it('creates a contact for the admin, normalizing the text', async () => {
+    const { repository, service } = ready();
+    repository.insertSupportContact.mockResolvedValue(stored);
+
+    await expect(
+      service.createSupportContact(adminAccount, 'patient-1', {
+        name: ' Ana Silva ',
+        description: 'Mãe',
+        phone: '41999999999',
+      }),
+    ).resolves.toEqual(response);
+    expect(repository.insertSupportContact).toHaveBeenCalledWith('patient-1', {
+      name: 'Ana Silva',
+      description: 'Mãe',
+      email: null,
+      phone: '41999999999',
+      isEmergency: false,
+    });
+    expect(repository.findPatient).not.toHaveBeenCalled();
+  });
+
+  it('creates a contact for a member of an active PTS', async () => {
+    const { repository, service } = ready();
+    repository.insertSupportContact.mockResolvedValue(stored);
+
+    await service.createSupportContact(professionalAccount, 'patient-1', {
+      name: 'Ana',
+      email: 'ana@exemplo.com',
+    });
+
+    expect(repository.insertSupportContact).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a professional of a closed PTS', professionalAccount, true],
+    ['the own patient', patientAccount, false],
+  ])('answers 403 to create for %s', async (_case, account, readOnly) => {
+    const { repository, service } = ready();
+    repository.findPatient.mockResolvedValue({ ...row, read_only: readOnly });
+
+    expect(
+      await errorOf(
+        service.createSupportContact(
+          { ...account, patientProfileId: 'patient-1' },
+          'patient-1',
+          { name: 'Ana', phone: '41999999999' },
+        ),
+      ),
+    ).toBeInstanceOf(ForbiddenException);
+    expect(repository.insertSupportContact).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for a contact without e-mail and phone', async () => {
+    const { repository, service } = ready();
+
+    const error = await errorOf(
+      service.createSupportContact(adminAccount, 'patient-1', { name: 'Ana' }),
+    );
+
+    expect((error as BadRequestException).getResponse()).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o e-mail ou o telefone do contato.',
+    });
+    expect(repository.insertSupportContact).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for an emergency contact without phone', async () => {
+    const { service } = ready();
+
+    const error = await errorOf(
+      service.createSupportContact(adminAccount, 'patient-1', {
+        name: 'Ana',
+        email: 'ana@exemplo.com',
+        isEmergency: true,
+      }),
+    );
+
+    expect((error as BadRequestException).getResponse()).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o telefone do contato de emergência.',
+    });
+  });
+
+  it('keeps the fields that the patch does not send and clears with null', async () => {
+    const { repository, service } = ready();
+    repository.findSupportContact.mockResolvedValue({
+      ...stored,
+      email: 'ana@exemplo.com',
+    });
+    repository.updateSupportContact.mockResolvedValue(stored);
+
+    await service.updateSupportContact(adminAccount, 'patient-1', 'contact-1', {
+      email: null,
+      isEmergency: true,
+    });
+
+    expect(repository.updateSupportContact).toHaveBeenCalledWith(
+      'patient-1',
+      'contact-1',
+      {
+        name: 'Ana Silva',
+        description: 'Mãe',
+        email: null,
+        phone: '41999999999',
+        isEmergency: true,
+      },
+    );
+  });
+
+  it('checks the rule on the resulting contact of a patch', async () => {
+    const { repository, service } = ready();
+    repository.findSupportContact.mockResolvedValue(stored);
+
+    const error = await errorOf(
+      service.updateSupportContact(adminAccount, 'patient-1', 'contact-1', {
+        phone: null,
+      }),
+    );
+
+    expect((error as BadRequestException).getResponse()).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o e-mail ou o telefone do contato.',
+    });
+    expect(repository.updateSupportContact).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 SUPPORT_CONTACT_NOT_FOUND on patch and delete', async () => {
+    const { repository, service } = ready();
+    repository.findSupportContact.mockResolvedValue(null);
+    repository.deleteSupportContact.mockResolvedValue(false);
+
+    const patched = await errorOf(
+      service.updateSupportContact(adminAccount, 'patient-1', 'contact-1', {
+        name: 'Ana',
+      }),
+    );
+    const deleted = await errorOf(
+      service.deleteSupportContact(adminAccount, 'patient-1', 'contact-1'),
+    );
+
+    for (const error of [patched, deleted]) {
+      expect((error as NotFoundException).getResponse()).toEqual({
+        status: 'SUPPORT_CONTACT_NOT_FOUND',
+        message: 'Contato de suporte não encontrado.',
+      });
+    }
+  });
+
+  it('deletes the contact', async () => {
+    const { repository, service } = ready();
+    repository.deleteSupportContact.mockResolvedValue(true);
+
+    await expect(
+      service.deleteSupportContact(adminAccount, 'patient-1', 'contact-1'),
+    ).resolves.toBeUndefined();
+    expect(repository.deleteSupportContact).toHaveBeenCalledWith(
+      'patient-1',
+      'contact-1',
+    );
+  });
+
+  it('returns a safe internal error when the repository fails', async () => {
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const { repository, service } = ready();
+    repository.deleteSupportContact.mockRejectedValue(new Error('db down'));
+
+    const error = await errorOf(
+      service.deleteSupportContact(adminAccount, 'patient-1', 'contact-1'),
+    );
+
+    expect(error).toBeInstanceOf(InternalServerErrorException);
+    expect((error as InternalServerErrorException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: 'Não foi possível remover o contato de suporte.',
     });
   });
 });

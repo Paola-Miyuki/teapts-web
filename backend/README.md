@@ -96,13 +96,15 @@ src/
     controllers/patients.controller.ts         GET /patients/authorized,
                                                GET /patients/available-for-pts e
                                                GET /patients/:id protegidos por
-                                               sessão e POST /patients, só admin
+                                               sessão, POST /patients, só admin, e os
+                                               contatos de suporte contato a contato
+                                               (/patients/:patientId/support-contacts)
     services/patients.service.ts               escopo por papel (RN016, RN022), contrato,
                                                erro seguro e cadastro do perfil de paciente
     repositories/patients.repository.ts        lista com status do PTS, busca, filtros,
                                                ordenação e paginação; detalhe; gravação do
                                                perfil e dos contatos numa transação
-    dto/                                       contratos e validação da consulta e do cadastro
+    dto/                                       contratos e validação da consulta, do cadastro e dos contatos
     entities/patient.entity.ts                 FK para account com ON DELETE RESTRICT
     entities/support-contact.entity.ts         contatos de suporte (tabela support_contact)
   pts/
@@ -169,6 +171,14 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/patients/available-for-pts` | profissional ou admin | [GET /patients/available-for-pts](#get-patientsavailable-for-pts) |
 | GET | `/patients/:id` | admin ou profissional com acesso (RN016) | [GET /patients/:id](#get-patientsid) |
 | POST | `/patients` | admin | [POST /patients](#post-patients) |
+| GET | `/patients/:patientId/support-contacts` | admin, profissional com vínculo (RN016) ou o próprio paciente | [Contatos de suporte](#contatos-de-suporte) |
+| POST | `/patients/:patientId/support-contacts` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
+| PATCH | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente | [Contatos de suporte](#contatos-de-suporte) |
+| DELETE | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente | [Contatos de suporte](#contatos-de-suporte) |
+| GET | `/patients/:patientId/support-contacts` | admin, profissional com vínculo (RN016) ou o próprio paciente | [Contatos de suporte](#contatos-de-suporte) |
+| POST | `/patients/:patientId/support-contacts` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
+| PATCH | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
+| DELETE | `/patients/:patientId/support-contacts/:contactId` | admin ou membro de PTS ativo do paciente (RN024) | [Contatos de suporte](#contatos-de-suporte) |
 | GET | `/professionals` | conta da sessão (o e-mail só para admin e profissional) | Swagger; cada item traz `registration` (`{ council, number, state }`, com o conselho vindo da especialidade, ou `null`), `institution` e `cnes` |
 | POST | `/professionals` | admin | [POST /professionals](#post-professionals) |
 | POST | `/pts` | profissional (o perfil informado vira o responsável) ou admin (qualquer profissional) | Swagger |
@@ -364,9 +374,9 @@ Corpo:
 }
 ```
 
-`supportContacts` é opcional (ausente vira `[]`); em cada contato só `name` é
-obrigatório e `email`, quando informado, precisa ser válido. Os textos são
-salvos sem espaços externos, e campos opcionais vazios são descartados.
+`supportContacts` é opcional (ausente vira `[]`); cada contato segue as regras
+de [Contatos de suporte](#contatos-de-suporte). Os textos são salvos sem
+espaços externos, e campos opcionais vazios são descartados.
 
 Responde `201` com `{ accountId, supportContacts }`. Os erros possíveis são
 `400` (`VALIDATION_ERROR`, com a mensagem do campo), `401` (sem sessão), `403`
@@ -382,6 +392,51 @@ de checagem, com:
 
 O `patientProfileId` da sessão vem do access token: a conta que recebeu o
 perfil só aparece como paciente depois de um novo login.
+
+## Contatos de suporte
+
+Contato a contato, cada um com `id` próprio (RFPAC003). Não concede tutela nem
+acesso (RN017). Campos: `name` (obrigatório), `description`, `email`, `phone`
+(com DDD, 10 ou 11 dígitos, com ou sem máscara) e `isEmergency` (padrão
+`false`). Informe e-mail ou telefone; o contato de emergência exige telefone.
+
+- `GET`: `200` com `{ data: [{ id, name, description, email, phone, isEmergency }] }`
+  para o admin, o profissional com vínculo (inclusive de PTS encerrado, RN016) e
+  o próprio paciente.
+- `POST`: corpo com os campos acima; `201` com o contato.
+- `PATCH`: os campos ausentes ficam como estão e `null` limpa `description`,
+  `email` ou `phone`; a regra de e-mail ou telefone vale para o contato
+  resultante. `200` com o contato.
+- `DELETE`: `204`.
+
+Criar, editar e remover é só do admin e do profissional membro de PTS em
+planejamento ou em andamento do paciente (RN024); profissional de PTS encerrado
+e o próprio paciente só leem (`403`). Erros: `400 VALIDATION_ERROR`, `401`,
+`403 FORBIDDEN`, `404 PATIENT_NOT_FOUND`, `404 SUPPORT_CONTACT_NOT_FOUND` (contato
+inexistente ou de outro paciente) e `500`. `GET /patients/:id` passa a devolver
+os contatos neste mesmo formato.
+
+## Contatos de suporte
+
+Editados contato a contato, na tabela `support_contact` (RFPAC003). Contato de
+suporte não concede tutela nem acesso (RN017).
+
+- `GET /patients/:patientId/support-contacts`: `200 { data: [...] }`, na ordem
+  de cadastro. Admin, profissional com vínculo (RN016, inclusive de PTS
+  encerrado, só leitura) e o próprio paciente.
+- `POST`: `201` com o contato criado. `PATCH .../:contactId`: `200` com o
+  contato; o que não vem fica como está e `null` limpa `description`, `email`
+  ou `phone`. `DELETE .../:contactId`: `204`. Só o admin e o membro de PTS
+  `planning` ou `running` do paciente (RN024); o paciente e o profissional de
+  PTS encerrado recebem `403`.
+
+Cada contato é `{ id, name, description, email, phone, isEmergency }`. Regras
+(as mesmas do cadastro, RFPAC001): `name` obrigatório; e-mail ou telefone;
+telefone com DDD (10 ou 11 dígitos) e obrigatório quando `isEmergency` é
+`true` (padrão `false`). No `PATCH`, a regra vale para o contato resultante.
+
+Erros: `400 VALIDATION_ERROR`, `401`, `403 FORBIDDEN`, `404 PATIENT_NOT_FOUND`,
+`404 SUPPORT_CONTACT_NOT_FOUND` (inexistente ou de outro paciente) e `500`.
 
 ## POST /professionals
 

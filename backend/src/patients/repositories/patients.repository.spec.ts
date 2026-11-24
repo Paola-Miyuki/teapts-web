@@ -366,6 +366,7 @@ describe('PatientsRepository.insert', () => {
         description: null,
         email: 'maria@exemplo.com',
         phone: null,
+        isEmergency: false,
       },
       {
         patientId: 'account-1',
@@ -373,6 +374,7 @@ describe('PatientsRepository.insert', () => {
         description: 'Avô',
         email: null,
         phone: '41999999999',
+        isEmergency: false,
       },
     ]);
   });
@@ -393,5 +395,91 @@ describe('PatientsRepository.insert', () => {
     await expect(
       repository.insert({ accountId: 'account-1', supportContacts: [] }),
     ).rejects.toBe(failure);
+  });
+});
+
+describe('PatientsRepository support contact rows', () => {
+  const values = {
+    name: 'Ana',
+    description: null,
+    email: null,
+    phone: '41999999999',
+    isEmergency: true,
+  };
+
+  function createContactRepository() {
+    const manager = {
+      findOne: jest.fn<(...args: unknown[]) => Promise<unknown>>(),
+      create: jest.fn((_target: unknown, entity: unknown) => entity),
+      save: jest.fn(async (_target: unknown, entity: unknown) => entity),
+      update: jest.fn<(...args: unknown[]) => Promise<{ affected?: number }>>(),
+      delete: jest.fn<(...args: unknown[]) => Promise<{ affected?: number }>>(),
+    };
+    const repository = new PatientsRepository({
+      manager,
+    } as unknown as Repository<Patient>);
+
+    return { manager, repository };
+  }
+
+  it('finds a contact only inside the patient', async () => {
+    const { manager, repository } = createContactRepository();
+    manager.findOne.mockResolvedValue(null);
+
+    await expect(
+      repository.findSupportContact('patient-1', 'contact-1'),
+    ).resolves.toBeNull();
+    expect(manager.findOne).toHaveBeenCalledWith(SupportContact, {
+      where: { id: 'contact-1', patientId: 'patient-1' },
+    });
+  });
+
+  it('inserts the contact linked to the patient', async () => {
+    const { manager, repository } = createContactRepository();
+
+    await repository.insertSupportContact('patient-1', values);
+
+    expect(manager.save).toHaveBeenCalledWith(SupportContact, {
+      ...values,
+      patientId: 'patient-1',
+    });
+  });
+
+  it('updates with updated_at and reloads, or returns null when nothing matches', async () => {
+    const { manager, repository } = createContactRepository();
+    manager.update.mockResolvedValueOnce({ affected: 0 });
+
+    await expect(
+      repository.updateSupportContact('patient-1', 'contact-1', values),
+    ).resolves.toBeNull();
+
+    manager.update.mockResolvedValueOnce({ affected: 1 });
+    manager.findOne.mockResolvedValue({ id: 'contact-1' });
+
+    await expect(
+      repository.updateSupportContact('patient-1', 'contact-1', values),
+    ).resolves.toEqual({ id: 'contact-1' });
+    expect(manager.update).toHaveBeenLastCalledWith(
+      SupportContact,
+      { id: 'contact-1', patientId: 'patient-1' },
+      { ...values, updatedAt: expect.any(Function) },
+    );
+  });
+
+  it('deletes only inside the patient and tells if something was removed', async () => {
+    const { manager, repository } = createContactRepository();
+    manager.delete.mockResolvedValueOnce({ affected: 1 });
+    manager.delete.mockResolvedValueOnce({ affected: 0 });
+
+    await expect(
+      repository.deleteSupportContact('patient-1', 'contact-1'),
+    ).resolves.toBe(true);
+    await expect(
+      repository.deleteSupportContact('patient-1', 'contact-2'),
+    ).resolves.toBe(false);
+    expect(manager.delete).toHaveBeenCalledWith(SupportContact, {
+      id: 'contact-1',
+      patientId: 'patient-1',
+    });
   });
 });

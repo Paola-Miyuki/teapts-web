@@ -94,6 +94,15 @@ export type NewPatient = {
   supportContacts: SupportContactDto[];
 };
 
+/** Campos de um contato de suporte a gravar, já normalizados. */
+export type SupportContactValues = {
+  name: string;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  isEmergency: boolean;
+};
+
 const PROFESSIONAL_STATUS_FILTERS: PatientPtsStatusFilter[] =
   PROFESSIONAL_ACCESS_PTS_STATES;
 
@@ -443,9 +452,88 @@ export class PatientsRepository {
             description: contact.description ?? null,
             email: contact.email ?? null,
             phone: contact.phone ?? null,
+            isEmergency: contact.isEmergency ?? false,
           })),
         );
       }
     });
+  }
+
+  /**
+   * Busca um contato de suporte do paciente.
+   *
+   * @param patientId identificador do paciente (a conta)
+   * @param contactId identificador do contato
+   * @returns o contato, ou `null` se não existe ou é de outro paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async findSupportContact(
+    patientId: string,
+    contactId: string,
+  ): Promise<SupportContact | null> {
+    return this.patientRepository.manager.findOne(SupportContact, {
+      where: { id: contactId, patientId },
+    });
+  }
+
+  /**
+   * Cria um contato de suporte do paciente.
+   *
+   * @throws erro do banco, sem tratamento
+   */
+  async insertSupportContact(
+    patientId: string,
+    values: SupportContactValues,
+  ): Promise<SupportContact> {
+    const manager = this.patientRepository.manager;
+
+    return manager.save(
+      SupportContact,
+      manager.create(SupportContact, { ...values, patientId }),
+    );
+  }
+
+  /**
+   * Atualiza um contato de suporte e marca o `updated_at`.
+   *
+   * @returns o contato atualizado, ou `null` se não existe ou é de outro
+   *   paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async updateSupportContact(
+    patientId: string,
+    contactId: string,
+    values: SupportContactValues,
+  ): Promise<SupportContact | null> {
+    const manager = this.patientRepository.manager;
+    const result = await manager.update(
+      SupportContact,
+      { id: contactId, patientId },
+      { ...values, updatedAt: () => 'now()' },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findSupportContact(patientId, contactId);
+  }
+
+  /**
+   * Remove um contato de suporte do paciente.
+   *
+   * @returns `false` se o contato não existe ou é de outro paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async deleteSupportContact(
+    patientId: string,
+    contactId: string,
+  ): Promise<boolean> {
+    const result = await this.patientRepository.manager.delete(SupportContact, {
+      id: contactId,
+      patientId,
+    });
+
+    return (result.affected ?? 0) > 0;
   }
 }

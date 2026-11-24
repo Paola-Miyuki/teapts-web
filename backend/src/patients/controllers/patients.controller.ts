@@ -1,15 +1,19 @@
 // Este arquivo expõe as rotas autenticadas de pacientes: a consulta de
-// pacientes autorizados e o cadastro do perfil de paciente (só admin).
-// O ValidationPipe global valida a query e o corpo, e o controller delega ao
-// PatientsService.
+// pacientes autorizados, o cadastro do perfil de paciente (só admin) e os
+// contatos de suporte, contato a contato. O ValidationPipe global valida a
+// query e o corpo, e o controller delega ao PatientsService.
 
 import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -22,6 +26,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
@@ -42,11 +47,45 @@ import { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-re
 import { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
 import { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import { PatientResponseDto } from '../dto/patient-response.dto';
+import {
+  GetSupportContactsResponseDto,
+  SupportContactResponseDto,
+} from '../dto/support-contact-response.dto';
+import { SupportContactDto } from '../dto/support-contact.dto';
+import { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import { PatientsService } from '../services/patients.service';
 
+function invalidParam(name: string): ParseUUIDPipe {
+  return new ParseUUIDPipe({
+    exceptionFactory: () =>
+      new BadRequestException({
+        status: 'VALIDATION_ERROR',
+        message: `Parâmetro inválido: ${name}`,
+      }),
+  });
+}
+
+const parsePatientId = invalidParam('patientId');
+const parseContactId = invalidParam('contactId');
+
+const SUPPORT_CONTACT_FORBIDDEN = {
+  status: 'FORBIDDEN',
+  message: 'Acesso restrito ao administrador ou à equipe de um PTS ativo.',
+};
+
+const PATIENT_NOT_FOUND = {
+  status: 'PATIENT_NOT_FOUND',
+  message: 'Paciente não encontrado.',
+};
+
+const SUPPORT_CONTACT_NOT_FOUND = {
+  status: 'SUPPORT_CONTACT_NOT_FOUND',
+  message: 'Contato de suporte não encontrado.',
+};
+
 /**
- * Expõe a consulta de pacientes autorizados e o cadastro de perfil de
- * paciente.
+ * Expõe a consulta de pacientes autorizados, o cadastro de perfil de
+ * paciente e os contatos de suporte.
  */
 @ApiTags('patients')
 @ApiCookieAuth()
@@ -237,5 +276,169 @@ export class PatientsController {
     @Body() body: CreatePatientRequestDto,
   ): Promise<PatientResponseDto> {
     return this.patientsService.create(body);
+  }
+
+  /**
+   * Lista os contatos de suporte do paciente (RFPAC003): admin, profissional
+   * com vínculo (RN016) e o próprio paciente.
+   */
+  @Get('patients/:patientId/support-contacts')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: GetSupportContactsResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: patientId',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao profissional.',
+    },
+  })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, example: PATIENT_NOT_FOUND })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível consultar os contatos de suporte.',
+    },
+  })
+  async findSupportContacts(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+  ): Promise<GetSupportContactsResponseDto> {
+    return this.patientsService.findSupportContacts(account, patientId);
+  }
+
+  /**
+   * Cria um contato de suporte (RFPAC003): admin ou membro da equipe de um
+   * PTS ativo do paciente (RN024). Não concede acesso ao contato (RN017).
+   */
+  @Post('patients/:patientId/support-contacts')
+  @UseGuards(AuthGuard)
+  @ApiCreatedResponse({ type: SupportContactResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o telefone do contato de emergência.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: SUPPORT_CONTACT_FORBIDDEN,
+  })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, example: PATIENT_NOT_FOUND })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível cadastrar o contato de suporte.',
+    },
+  })
+  async createSupportContact(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Body() body: SupportContactDto,
+  ): Promise<SupportContactResponseDto> {
+    return this.patientsService.createSupportContact(account, patientId, body);
+  }
+
+  /**
+   * Atualiza um contato de suporte (RFPAC003): os campos ausentes ficam como
+   * estão e `null` limpa a descrição, o e-mail ou o telefone.
+   */
+  @Patch('patients/:patientId/support-contacts/:contactId')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: SupportContactResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe um e-mail válido para o contato.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: SUPPORT_CONTACT_FORBIDDEN,
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PATIENT_NOT_FOUND: { summary: 'Paciente', value: PATIENT_NOT_FOUND },
+      SUPPORT_CONTACT_NOT_FOUND: {
+        summary: 'Contato',
+        value: SUPPORT_CONTACT_NOT_FOUND,
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível atualizar o contato de suporte.',
+    },
+  })
+  async updateSupportContact(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Param('contactId', parseContactId) contactId: string,
+    @Body() body: UpdateSupportContactRequestDto,
+  ): Promise<SupportContactResponseDto> {
+    return this.patientsService.updateSupportContact(
+      account,
+      patientId,
+      contactId,
+      body,
+    );
+  }
+
+  /** Remove um contato de suporte (RFPAC003), com o mesmo acesso do `PATCH`. */
+  @Delete('patients/:patientId/support-contacts/:contactId')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: contactId',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: SUPPORT_CONTACT_FORBIDDEN,
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PATIENT_NOT_FOUND: { summary: 'Paciente', value: PATIENT_NOT_FOUND },
+      SUPPORT_CONTACT_NOT_FOUND: {
+        summary: 'Contato',
+        value: SUPPORT_CONTACT_NOT_FOUND,
+      },
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível remover o contato de suporte.',
+    },
+  })
+  async deleteSupportContact(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Param('contactId', parseContactId) contactId: string,
+  ): Promise<void> {
+    await this.patientsService.deleteSupportContact(
+      account,
+      patientId,
+      contactId,
+    );
   }
 }
