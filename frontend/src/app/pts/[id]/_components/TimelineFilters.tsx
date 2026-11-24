@@ -296,7 +296,7 @@ function AuthorFilter({
 
     let active = true;
     const timer = setTimeout(() => {
-      getProfessionals({ page: 1, limit: 10, name: term })
+      getProfessionals({ page: 1, limit: 10, q: term })
         .then((response) => {
           if (active) {
             setFound(response.data.map(({ id, name }) => ({ id, name })));

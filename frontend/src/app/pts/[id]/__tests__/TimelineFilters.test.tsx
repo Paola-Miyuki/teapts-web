@@ -159,7 +159,7 @@ describe('TimelineFilters', () => {
 
       const url = new URL(fetchMock.mock.calls[0][0]);
       expect(url.pathname).toBe('/professionals');
-      expect(url.searchParams.get('name')).toBe('Ma');
+      expect(url.searchParams.get('q')).toBe('Ma');
 
       fireEvent.change(input, { target: { value: 'Marcos Vieira' } });
 
