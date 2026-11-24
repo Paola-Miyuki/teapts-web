@@ -1,23 +1,18 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
   PtsProposalPatientResponseDto,
   PtsProposalProfessionalResponseDto,
 } from './pts-proposal-response.dto';
+import { PtsSheetViewDto } from './update-pts-sheet.dto';
 
 /** PTS em qualquer estado, com as datas de cada mudança (RFPTS001, RFPTS009). */
-export class PtsDetailResponseDto {
+export class PtsDetailResponseDto extends PtsSheetViewDto {
   @ApiProperty({ example: 'uuid-do-pts' })
   id!: string;
 
   @ApiProperty({ enum: PtsStateEnum, example: PtsStateEnum.CONCLUDED })
   status!: PtsStateEnum;
-
-  /** Não vai para o paciente (RN028). */
-  @ApiPropertyOptional({
-    example: 'Mora com a mãe e frequenta a escola municipal.',
-  })
-  socialSituation?: string;
 
   @ApiProperty({ example: '2026-10-15T12:00:00.000Z' })
   createdAt!: string;

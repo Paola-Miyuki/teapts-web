@@ -71,11 +71,11 @@ export const ptsProposalEditForbidden = () =>
     'Somente o responsável pode editar a proposta.',
   );
 
-export const socialSituationForbidden = () =>
+export const ptsSheetForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,
     'FORBIDDEN',
-    'Somente profissionais da equipe podem alterar a situação social.',
+    'Somente a equipe do PTS e o administrador podem alterar a ficha.',
   );
 
 export const ptsProposalNotFound = () =>

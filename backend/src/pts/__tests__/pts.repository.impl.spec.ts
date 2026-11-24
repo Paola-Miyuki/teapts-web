@@ -41,6 +41,7 @@ function createRepository(lockedRows: Partial<PtsEntity>[]) {
     manager: {
       createQueryBuilder: jest.fn(() => query),
       update: jest.fn(async () => ({ affected: 1 })),
+      insert: jest.fn(async () => undefined),
     },
     connect: jest.fn(async () => undefined),
     startTransaction: jest.fn(async () => {
@@ -445,6 +446,93 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
       'TEAM_MEMBER_NOT_FOUND',
     );
 
+    expect(queryRunner.manager.insert).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.updateSheet', () => {
+  const sheet = {
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum.',
+    cid: null,
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação'],
+    socialSituation: 'Mora com a mãe.',
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
+  };
+  const input = {
+    ptsId: 'pts-1',
+    sheet,
+    authorProfessionalId: 'prof-10',
+    executedByAccountId: 'account-10',
+    description: 'Ficha do PTS atualizada.',
+  };
+  const running: Partial<PtsEntity> = {
+    id: 'pts-1',
+    status: PtsStateEnum.RUNNING,
+  };
+
+  it('trava o PTS, atualiza a ficha e grava pts_updated na mesma transação', async () => {
+    const { repository, query, queryRunner } = createRepository([running]);
+
+    await expect(repository.updateSheet(input)).resolves.toEqual({
+      id: 'pts-1',
+      ...sheet,
+    });
+
+    expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(queryRunner.manager.update).toHaveBeenCalledWith(
+      PtsEntity,
+      'pts-1',
+      sheet,
+    );
+    expect(queryRunner.manager.insert).toHaveBeenCalledWith(
+      TimelineRecordEntity,
+      {
+        type: TimelineRecordType.PtsUpdated,
+        description: 'Ficha do PTS atualizada.',
+        targetId: 'pts-1',
+        targetType: TimelineRecordTarget.Pts,
+        ptsId: 'pts-1',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'account-10',
+      },
+    );
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it('desfaz a atualização quando a gravação da timeline falha', async () => {
+    const { repository, queryRunner } = createRepository([running]);
+    queryRunner.manager.insert.mockRejectedValueOnce(new Error('falha'));
+
+    await expect(repository.updateSheet(input)).rejects.toThrow('falha');
+
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PTS sumiu antes do lock', [], 404, 'PTS_NOT_FOUND'],
+    [
+      'PTS encerrado antes do lock',
+      [{ ...running, status: PtsStateEnum.CONCLUDED }],
+      409,
+      'PTS_NOT_ACTIVE',
+    ],
+  ])('não atualiza quando o %s', async (_label, rows, status, code) => {
+    const { repository, queryRunner } = createRepository(rows);
+
+    await expectApiError(() => repository.updateSheet(input), status, code);
+
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
     expect(queryRunner.manager.insert).not.toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });

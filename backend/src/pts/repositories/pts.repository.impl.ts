@@ -19,7 +19,8 @@ import {
   type CreateDraftInput,
   type ProfessionalRecord,
   type UpdatePtsProposalInput,
-  type SocialSituationTarget,
+  type PtsSheetTarget,
+  type UpdatePtsSheetInput,
   type ProposalDecisionTarget,
   type PtsTeamTarget,
   type ProfessionalAccountRecord,
@@ -32,7 +33,7 @@ import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
-import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsEntity } from '../entities/pts.entity';
@@ -440,9 +441,7 @@ export class PtsRepositoryImpl extends PtsRepository {
     }
   }
 
-  async findSocialSituationTarget(
-    id: string,
-  ): Promise<SocialSituationTarget | null> {
+  async findSheetTarget(id: string): Promise<PtsSheetTarget | null> {
     const pts = await this.ptsRepository.findOne({
       where: { id },
       relations: { team: true },
@@ -462,13 +461,60 @@ export class PtsRepositoryImpl extends PtsRepository {
     };
   }
 
-  async updateSocialSituation(
-    id: string,
-    socialSituation: string,
-  ): Promise<UpdateSocialSituationResponseDto> {
-    await this.ptsRepository.update(id, { socialSituation });
+  async updateSheet(
+    input: UpdatePtsSheetInput,
+  ): Promise<UpdatePtsSheetResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
 
-    return { id, socialSituation };
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava o PTS e refaz a checagem: um encerramento simultâneo não passa.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsNotActive();
+      }
+
+      await queryRunner.manager.update(PtsEntity, input.ptsId, input.sheet);
+
+      await this.timelineRecorder.record(
+        {
+          type: TimelineRecordType.PtsUpdated,
+          description: input.description,
+          targetId: input.ptsId,
+          targetType: TimelineRecordTarget.Pts,
+          ptsId: input.ptsId,
+          authorProfessionalId: input.authorProfessionalId,
+          executedByAccountId: input.executedByAccountId,
+        },
+        queryRunner.manager,
+      );
+
+      await queryRunner.commitTransaction();
+
+      return { id: input.ptsId, ...input.sheet };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async findProposalForDecision(
@@ -1105,6 +1151,17 @@ export class PtsRepositoryImpl extends PtsRepository {
       id: pts.id,
       status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
       socialSituation: pts.socialSituation,
+      caseStudyDate: pts.caseStudyDate,
+      diagnosisSummary: pts.diagnosisSummary,
+      cid: pts.cid,
+      supportLevel: pts.supportLevel,
+      strengths: pts.strengths,
+      priorityNeeds: pts.priorityNeeds,
+      vulnerabilities: pts.vulnerabilities,
+      comorbidities: pts.comorbidities,
+      sensoryProfile: pts.sensoryProfile,
+      communicationMethod: pts.communicationMethod,
+      nextReviewAt: pts.nextReviewAt,
       createdAt: pts.createdAt.toISOString(),
       acceptedAt: pts.acceptedAt?.toISOString() ?? null,
       beganAt: pts.beganAt?.toISOString() ?? null,

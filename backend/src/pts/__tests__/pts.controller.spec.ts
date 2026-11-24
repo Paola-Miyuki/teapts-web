@@ -45,6 +45,17 @@ describe('PtsController GET /pts/active', () => {
       id: 'active-100',
       status: PtsStateEnum.PLANNING,
       socialSituation: 'Situação social confidencial.',
+      caseStudyDate: '2026-10-01',
+      diagnosisSummary: 'Diagnóstico em comum confidencial.',
+      cid: 'F84.0',
+      supportLevel: 2,
+      strengths: null,
+      priorityNeeds: ['Comunicação'],
+      vulnerabilities: null,
+      comorbidities: null,
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2027-10-01',
       createdAt: '2026-10-15T12:00:00.000Z',
       acceptedAt: '2026-10-15T12:30:00.000Z',
       beganAt: null,
@@ -162,14 +173,14 @@ describe('PtsController PATCH /pts/proposals/:id', () => {
   });
 });
 
-describe('PtsController PATCH /pts/:id/social-situation', () => {
+describe('PtsController PATCH /pts/:id/sheet', () => {
   let repo: InMemoryPtsRepository;
   let controller: PtsController;
 
   beforeEach(() => {
     repo = seededRepo();
     controller = new PtsController(new PtsService(repo));
-    repo.socialSituationTargets.set('pts-100', {
+    repo.sheetTargets.set('pts-100', {
       id: 'pts-100',
       status: PtsStateEnum.RUNNING,
       responsibleProfessionalId: 'prof-10',
@@ -177,16 +188,25 @@ describe('PtsController PATCH /pts/:id/social-situation', () => {
     });
   });
 
-  it('atualiza a situação social pela rota', async () => {
+  it('atualiza a ficha pela rota', async () => {
     await expect(
-      controller.updateSocialSituation(
+      controller.updatePtsSheet(
         'pts-100',
-        { socialSituation: 'Mora com a mãe e a avó.' },
+        {
+          caseStudyDate: '2026-10-01',
+          diagnosisSummary: 'Diagnóstico em comum.',
+          socialSituation: 'Mora com a mãe e a avó.',
+          nextReviewAt: '2027-10-01',
+        },
         teamAccount,
       ),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       id: 'pts-100',
+      diagnosisSummary: 'Diagnóstico em comum.',
       socialSituation: 'Mora com a mãe e a avó.',
+      priorityNeeds: [],
+      cid: null,
+      nextReviewAt: '2027-10-01',
     });
   });
 });
@@ -302,6 +322,17 @@ describe('PtsController POST /pts/:id/team', () => {
       id: 'active-100',
       status: PtsStateEnum.PLANNING,
       socialSituation: 'Situação social confidencial.',
+      caseStudyDate: '2026-10-01',
+      diagnosisSummary: 'Diagnóstico em comum confidencial.',
+      cid: 'F84.0',
+      supportLevel: 2,
+      strengths: null,
+      priorityNeeds: ['Comunicação'],
+      vulnerabilities: null,
+      comorbidities: null,
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2027-10-01',
       createdAt: '2026-10-15T12:00:00.000Z',
       acceptedAt: '2026-10-15T12:30:00.000Z',
       beganAt: null,

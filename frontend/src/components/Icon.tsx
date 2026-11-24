@@ -34,6 +34,7 @@ const glyphs = {
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
+  up: <path d="m6 15 6-6 6 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
   clock: (
     <>

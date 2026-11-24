@@ -18,8 +18,8 @@ export type PermissionAction =
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
-  | 'viewPtsSocialSituation'
-  | 'editPtsSocialSituation'
+  | 'viewPtsSheet'
+  | 'editPts'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -68,6 +68,10 @@ export function getProfileKind(account: PermissionUser): ProfileKind {
   return 'waiting';
 }
 
+function isActivePts(pts?: PtsPermissionData) {
+  return ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '');
+}
+
 function isProposalMember(user: PermissionUser, pts: PtsPermissionData) {
   const memberIds = [
     pts.responsibleProfessionalId,
@@ -106,6 +110,8 @@ export function can(
         return pts?.status === 'planning';
       case 'registerPtsReassessment':
         return pts?.status === 'running';
+      case 'editPts':
+        return isActivePts(pts);
       default:
         return true;
     }
@@ -157,12 +163,19 @@ export function can(
     case 'viewActivePts':
       // RFPTS004 – paciente titular ou profissional (a API confere a equipe).
       return patient || professional;
-    case 'viewPtsSocialSituation':
-      // DP003 – oculta para o paciente até a decisão.
+    case 'viewPtsSheet':
+      // RN028 – a ficha (diagnóstico, perfil, vulnerabilidades e situação
+      // social) não aparece ao paciente.
       return professional;
-    case 'editPtsSocialSituation':
-      // RFPTS005 – profissional da equipe (responsável ou membro).
-      return professional && pts !== undefined && isProposalMember(user, pts);
+    case 'editPts':
+      // RFPTS005 – equipe do PTS (responsável ou membro) ou admin, com o PTS
+      // em planejamento ou execução; o paciente não edita.
+      return (
+        professional &&
+        pts !== undefined &&
+        isActivePts(pts) &&
+        isProposalMember(user, pts)
+      );
 
     case 'removePtsTeamMember':
       // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.
