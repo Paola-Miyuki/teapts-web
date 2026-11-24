@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 
-import Combobox from '@/components/Combobox';
 import HelpTooltip from '@/components/HelpTooltip';
 import Icon from '@/components/Icon';
 import TeamMembers from '@/components/pts/TeamMembers';
@@ -13,17 +12,12 @@ import WizardSteps, {
   type PtsStep,
 } from '@/components/pts/WizardSteps';
 import ui from '@/components/ui.module.css';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { Account } from '@/lib/account';
 import { initSuperTokens } from '@/lib/supertokens';
-import {
-  createPts,
-  listEligiblePatients,
-  listProfessionals,
-} from './api/ptsApi';
+import { createPts, listProfessionals } from './api/ptsApi';
 import { mapCreatePtsError, type CreatePtsError } from './errors';
-import { ErrorMessage } from './_components';
-import type { Patient, Professional, Pts } from './types';
+import { ErrorMessage, PatientSelect } from './_components';
+import type { EligiblePatient, Professional, Pts } from './types';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
@@ -70,10 +64,9 @@ export function CreatePts({ account }: CreatePtsProps) {
   const [step, setStep] = useState<Step>(0);
   const [responsibleId, setResponsibleId] = useState('');
   const [teamIds, setTeamIds] = useState<string[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
 
-  const [patient, setPatient] = useState<Patient | null>(null);
+  const [patient, setPatient] = useState<EligiblePatient | null>(null);
   const [social, setSocial] = useState('');
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -88,16 +81,12 @@ export function CreatePts({ account }: CreatePtsProps) {
   useEffect(() => {
     const controller = new AbortController();
 
-    Promise.all([
-      listEligiblePatients(controller.signal),
-      listProfessionals(controller.signal),
-    ])
-      .then(([loadedPatients, loadedProfessionals]) => {
+    listProfessionals(controller.signal)
+      .then((loadedProfessionals) => {
         const own = loadedProfessionals.filter((professional) =>
           accountProfileIds.includes(professional.id),
         );
 
-        setPatients(loadedPatients);
         setProfessionals(loadedProfessionals);
         // O admin (RN022) não tem perfil: escolhe o responsável.
         setResponsibleId(!isAdmin && own.length === 1 ? own[0].id : '');
@@ -112,30 +101,6 @@ export function CreatePts({ account }: CreatePtsProps) {
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.role, accountProfileIds.join(','), reloadKey]);
-
-  // Busca de pacientes pelo nome, com debounce (NFUS003).
-  const patientSearch = useDebouncedSearch();
-  const patientTerm = patientSearch.term;
-  const [searchedTerm, setSearchedTerm] = useState('');
-
-  useEffect(() => {
-    if (loadStatus !== 'ready' || patientTerm === searchedTerm) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    listEligiblePatients(controller.signal, patientTerm)
-      .then((loaded) => {
-        if (!controller.signal.aborted) {
-          setPatients(loaded);
-          setSearchedTerm(patientTerm);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => controller.abort();
-  }, [loadStatus, patientTerm, searchedTerm]);
 
   useEffect(() => {
     if (submitError) {
@@ -182,7 +147,6 @@ export function CreatePts({ account }: CreatePtsProps) {
     setCreated(null);
     setStep(0);
     setPatient(null);
-    patientSearch.clear();
     setSocial('');
     setTeamIds([]);
     setFieldErrors({});
@@ -288,32 +252,22 @@ export function CreatePts({ account }: CreatePtsProps) {
           Paciente
           <Required />
         </label>
-        <Combobox
+        <PatientSelect
           id="patient"
-          options={patients.map((item) => ({
-            value: item.id,
-            label: item.name,
-          }))}
-          input={patientSearch.input}
-          onInputChange={(text) => {
-            patientSearch.setInput(text);
-            setPatient(null);
-          }}
-          onSelect={(option) => {
-            patientSearch.setInput(option.label);
-            setPatient({ id: option.value, name: option.label });
-            setFieldErrors((fields) => ({ ...fields, patient: undefined }));
+          value={patient}
+          onChange={(selected) => {
+            setPatient(selected);
 
-            if (submitError?.kind === 'active-exists') {
-              setSubmitError(null);
+            if (selected) {
+              setFieldErrors((fields) => ({ ...fields, patient: undefined }));
+
+              if (submitError?.kind === 'active-exists') {
+                setSubmitError(null);
+              }
             }
           }}
-          placeholder="Nome do paciente"
-          emptyText="Nenhum paciente elegível encontrado. Pacientes com PTS ativo ou rascunho não aparecem aqui."
-          listLabel="Pacientes elegíveis"
           disabled={isLoading || loadStatus !== 'ready'}
           invalid={Boolean(fieldErrors.patient)}
-          required
           describedBy={fieldErrors.patient ? 'patient-error' : undefined}
         />
         <FieldError id="patient-error" message={fieldErrors.patient} />
@@ -411,6 +365,7 @@ export function CreatePts({ account }: CreatePtsProps) {
           selectedIds={teamIds}
           onChange={setTeamIds}
           disabled={isLoading}
+          addOnSelect
         />
       </>
     );

@@ -111,8 +111,10 @@ src/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
                                                GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
                                                PATCH /pts/:id/social-situation, POST
-                                               /pts/proposals/:id/approve e /reject e
-                                               DELETE /pts/proposals/:id, todos com sessão
+                                               /pts/proposals/:id/approve e /reject,
+                                               DELETE /pts/proposals/:id,
+                                               POST /pts/:id/team e
+                                               DELETE /pts/:id/team/:professionalId, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
                                                equipe e admin), estados do PTS e decisão das propostas
     repositories/pts.repository.ts             contrato do repositório (implementação em
@@ -122,6 +124,21 @@ src/
     entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e);
                                                deleted_at é a exclusão lógica da proposta
     pts.errors.ts                              erros { status, message } do módulo
+  timeline/
+    controllers/timeline.controller.ts         GET /pts/:id/timeline, com sessão
+    services/timeline.service.ts               acesso (admin, equipe, paciente titular),
+                                               período e recorte do paciente (RN028)
+    services/timeline-recorder.service.ts      grava eventos para os outros módulos, com a
+                                               conta que executou e o profissional atribuído
+                                               (RN029); aceita o EntityManager da transação
+    repositories/timeline.repository.ts        contrato do repositório (implementação em
+                                               timeline.repository.impl.ts)
+    dto/                                       query (busca, tipo, autor, período, página) e resposta
+    entities/timeline-record.entity.ts         timeline_record (eventos do PTS)
+    enums/                                     timeline_record_type_e e timeline_record_target_e
+    timeline.errors.ts                         erros { status, message } do módulo
+    timeline.module.ts                         exporta o TimelineRecorderService
+    __tests__/                                 specs e o repositório em memória
   auth/
     services/supertokens.service.ts        receitas EmailPassword e Session; campos da conta no
                                            signup; overrides de signUpPOST, signUp,
@@ -190,6 +207,9 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
+| POST | `/pts/:id/team` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team](#post-ptsidteam) |
+| DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
+| GET | `/pts/:id/timeline` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id/timeline](#get-ptsidtimeline) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 | POST | `/pts/proposals/:id/reject` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
@@ -533,6 +553,143 @@ Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
 para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
 proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
 simultânea não deixa excluir um PTS que acabou de ser aprovado.
+
+## POST /pts/:id/team
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN006 e
+RN022) adicionam profissionais à equipe de um PTS em `planning` ou `running`
+(RFEM001). Na proposta em `draft`, a equipe muda pela edição da proposta.
+
+```json
+{ "professionalIds": ["5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a"] }
+```
+
+`professionalIds` tem ao menos um UUID, sem repetidos. Cada conta entra uma
+vez na equipe, com um único perfil, contando o responsável (RN008).
+
+Na mesma transação, os vínculos em
+`professional_participating_on_therapeutic_journey` são criados e um
+`timeline_record` por profissional adicionado é gravado pelo
+`TimelineRecorderService` (com o `EntityManager` da transação):
+`type: member_added`, `target_type: team_member`, `target_id` = id do
+profissional adicionado, `pts_id`, `author_professional_id` = responsável
+(nulo quando o admin adiciona) e `executed_by_account_id` = conta que
+executou (RN029). A descrição segue o padrão da timeline: "<quem executou>
+adicionou <membro> à equipe".
+
+A resposta `200` retorna o PTS com o responsável e a equipe atualizada, no
+mesmo formato do `DELETE` abaixo. Os erros possíveis são `400`
+(`VALIDATION_ERROR`, `TEAM_PROFESSIONAL_NOT_FOUND` ou
+`TEAM_DUPLICATE_ACCOUNT`, os dois últimos com `professionalIds`), `401`
+(sem sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_ACTIVE`). Nenhum profissional é adicionado se algum falhar. A
+transação trava o PTS (`pessimistic_write`) e refaz as checagens de
+responsável e de estado.
+
+## DELETE /pts/:id/team/:professionalId
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN006 e
+RN022) removem um membro da equipe de um PTS em `planning` ou `running`. Não
+há corpo. O responsável não sai por esta rota (RN007): a saída dele é a
+transferência de responsabilidade (RFEM002).
+
+Na mesma transação, o vínculo em
+`professional_participating_on_therapeutic_journey` é apagado e um
+`timeline_record` é gravado pelo `TimelineRecorderService` (com o
+`EntityManager` da transação): `type: member_removed`, `target_type: team_member`,
+`target_id` = id do profissional removido, `pts_id`, `author_professional_id`
+= responsável (nulo quando o admin remove) e `executed_by_account_id` = conta
+que executou (RN029). A descrição segue o padrão da timeline: "<quem executou>
+removeu <membro> da equipe" (ex.: "Ana Souza removeu Marcos Vieira da equipe"),
+com o nome exibido da conta. Registros anteriores do removido mantêm a autoria.
+
+A resposta `200` retorna o PTS com o responsável e a equipe atualizada:
+
+```json
+{
+  "id": "3f2e1d0c-9b8a-4765-a432-10fedcba9876",
+  "status": "running",
+  "responsible": {
+    "id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+    "name": "Kaio Segunda Conta",
+    "specialism": { "id": "psychologist", "name": "Psicologia" },
+    "registration": null
+  },
+  "team": []
+}
+```
+
+Os erros possíveis são `400` (parâmetro que não é UUID), `401` (sem
+sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND` ou
+`TEAM_MEMBER_NOT_FOUND`) e `409` (`PTS_NOT_ACTIVE` ou
+`CANNOT_REMOVE_RESPONSIBLE`). A transação trava o PTS
+(`pessimistic_write`) e refaz as checagens, então uma transferência de
+responsabilidade ou um encerramento simultâneo não passam despercebidos.
+
+## GET /pts/:id/timeline
+
+Exige sessão autenticada. Retorna os eventos do PTS (RFTL001), paginados e
+ordenados por `happened_at`, por padrão do mais recente ao mais antigo. Veem a
+timeline o admin (RN022), o responsável e os membros da equipe (o PTS
+rejeitado não dá acesso ao profissional, RN016) e o paciente titular. Para o
+paciente, os eventos de documento vêm com `targetId: null` (RN028).
+
+| Query           | Formato                                                     | Filtro                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `q`             | texto                                                       | parte da descrição ou do nome do autor, sem diferenciar maiúsculas; `%` e `_` contam como texto                                                                     |
+| `type`          | `pts`, `activity`, `appointment`, `team_member`, `document` | tipo do evento (o alvo); aceita vários, por vírgula ou repetindo o parâmetro. Eventos de meta e da ficha são `pts`                                                  |
+| `authorId`      | UUID                                                        | autor, que é quem executou (`executed_by_account_id`): o id da conta (`author.id`) ou do perfil profissional dela; o profissional só atribuído pelo admin não conta |
+| `from`, `to`    | `AAAA-MM-DD`                                                | período, inclusive nas duas pontas                                                                                                                                  |
+| `order`         | `desc` ou `asc`                                             | ordem pela data do evento; padrão `desc` (do mais recente ao mais antigo)                                                                                           |
+| `page`, `limit` | inteiros                                                    | padrão 1 e 20; `limit` até 50                                                                                                                                       |
+
+Cada evento traz o autor (a conta que executou) e, quando o admin age em nome
+de um profissional, o profissional atribuído em `assignedTo` (RN029). Quando
+o próprio profissional age, `assignedTo` é `null`. Os nomes são o nome
+exibido: o nome social, se houver.
+
+```http
+GET /pts/3f2c9a1e-7b4d-4c8e-9f1a-2b3c4d5e6f70/timeline?type=activity&page=1&limit=20
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "1e2d3c4b-5a69-4788-9a0b-1c2d3e4f5a6b",
+      "type": "activity_approved",
+      "targetType": "activity",
+      "targetId": "9c8b7a65-4d3e-4f21-8a9b-0c1d2e3f4a5b",
+      "description": "João Lima aprovou a atividade Integração sensorial",
+      "happenedAt": "2026-11-12T14:45:00.000Z",
+      "author": { "id": "c3", "name": "João Lima" },
+      "assignedTo": null
+    }
+  ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+Os erros possíveis são `400` (`{ status: 'ERROR', message: 'Parâmetro inválido: <campo>' }`
+nos parâmetros de query, inclusive `from` depois de `to`, como nas outras
+listagens; `VALIDATION_ERROR` com `Parâmetro inválido: id` quando o `id` da
+rota não é UUID), `401` (sem sessão), `403` (`FORBIDDEN`,
+`"Você não tem acesso à timeline deste PTS."`) e `404` (`PTS_NOT_FOUND`,
+inclusive para proposta excluída).
+
+```json
+{
+  "status": "FORBIDDEN",
+  "message": "Você não tem acesso à timeline deste PTS."
+}
+```
+
+**Gravar eventos:** os módulos que alteram o PTS importam o `TimelineModule`
+e chamam `TimelineRecorderService.record(evento, manager?)`. Passe o
+`EntityManager` da transação da operação, para o evento ser desfeito junto
+com ela. O evento leva `executedByAccountId` (a conta da sessão) e
+`authorProfessionalId` (o profissional que age ou que o admin atribuiu; nulo
+quando o admin não atribui).
 
 ## POST /pts/proposals/:id/approve e /reject
 

@@ -1,9 +1,14 @@
 import { request } from './http';
-import { mockCreatePts, mockPatients, mockProfessionals } from './mocks';
+import {
+  mockCreatePts,
+  mockPatientEmail,
+  mockPatients,
+  mockProfessionals,
+} from './mocks';
 import type {
   CreatePtsPayload,
+  EligiblePatient,
   PaginatedResponse,
-  Patient,
   Professional,
   Pts,
 } from '../types';
@@ -37,32 +42,41 @@ export async function listProfessionals(
   return Array.isArray(response) ? response : (response.data ?? []);
 }
 
-// Pacientes sem PTS ativo, buscados pelo nome com a paginação padrão (20);
-// a busca completa (CPF, CNS) entra com a #80/#81.
-export async function listEligiblePatients(
-  signal?: AbortSignal,
-  name?: string,
-): Promise<Patient[]> {
-  const term = name?.trim() ?? '';
+// Pacientes elegíveis para uma proposta (RN011), buscados no servidor por
+// nome, nome social, e-mail ou CPF (NFUS003); o CPF não volta na resposta.
+export async function listEligiblePatients({
+  q,
+  signal,
+}: {
+  q?: string;
+  signal?: AbortSignal;
+} = {}): Promise<EligiblePatient[]> {
+  const term = q?.trim() ?? '';
 
   if (USE_MOCKS) {
-    return mockPatients.filter((patient) =>
-      patient.name.toLowerCase().includes(term.toLowerCase()),
-    );
+    return mockPatients
+      .filter((patient) =>
+        patient.name.toLowerCase().includes(term.toLowerCase()),
+      )
+      .map((patient) => ({ ...patient, email: mockPatientEmail(patient) }));
   }
 
-  const params = new URLSearchParams({ page: '1', limit: '20' });
+  const params = new URLSearchParams({
+    withActivePts: 'false',
+    page: '1',
+    limit: '20',
+  });
 
   if (term) {
-    params.set('name', term);
+    params.set('q', term);
   }
 
-  const response = await request<PaginatedResponse<Patient> | Patient[]>(
-    `/patients/available-for-pts?${params.toString()}`,
+  const response = await request<PaginatedResponse<EligiblePatient>>(
+    `/patients?${params.toString()}`,
     { signal },
   );
 
-  return Array.isArray(response) ? response : (response.data ?? []);
+  return response.data ?? [];
 }
 
 export async function createPts(payload: CreatePtsPayload): Promise<Pts> {

@@ -14,12 +14,10 @@ import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
-import type {
-  AddPtsTeamMembersRequestDto,
-  PtsTeamResponseDto,
-} from '../dto/add-pts-team-members.dto';
+import type { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
@@ -39,12 +37,14 @@ import {
   ptsNotActive,
   ptsForbidden,
   ptsNotFound,
+  cannotRemoveResponsible,
+  teamEditForbidden,
+  teamMemberNotFound,
   socialSituationForbidden,
   teamProfessionalNotFound,
   validationError,
   ptsProposalDeleteForbidden,
   ptsProposalNotDraftForDelete,
-  ptsTeamEditForbidden,
   teamDuplicateAccount,
 } from '../pts.errors';
 
@@ -451,7 +451,7 @@ export class PtsService {
       !isAdmin(account) &&
       !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
     ) {
-      throw ptsTeamEditForbidden();
+      throw teamEditForbidden();
     }
 
     if (
@@ -501,7 +501,74 @@ export class PtsService {
       throw teamDuplicateAccount(duplicateAccountProfessionalIds);
     }
 
-    return this.ptsRepository.addTeamMembers(id, uniqueIds);
+    const admin = isAdmin(account);
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.addTeamMembers({
+      ptsId: id,
+      members: uniqueIds.map((professionalId) => ({
+        professionalId,
+        description: `${executorName} adicionou ${professionalMap.get(professionalId)!.name} à equipe`,
+      })),
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+    });
+  }
+
+  async removeTeamMember(
+    id: string,
+    professionalId: string,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeam(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RN006: só o responsável (ou o admin, RN022) altera a equipe.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsible.id)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    // RN007: a saída do responsável é feita pela transferência (RFEM002).
+    if (professionalId === pts.responsible.id) {
+      throw cannotRemoveResponsible();
+    }
+
+    const member = pts.team.find(
+      (professional) => professional.id === professionalId,
+    );
+
+    if (!member) {
+      throw teamMemberNotFound();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsible.name);
+
+    return this.ptsRepository.removeTeamMember({
+      ptsId: id,
+      professionalId,
+      authorProfessionalId: admin ? null : pts.responsible.id,
+      executedByAccountId: account.accountId,
+      description: `${executorName} removeu ${member.name} da equipe`,
+    });
   }
 
   private async findDecidableProposal(id: string, account: AccountContext) {

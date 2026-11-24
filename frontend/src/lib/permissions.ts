@@ -13,11 +13,16 @@ export type PermissionAction =
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
   | 'viewPtsProposals'
+  | 'viewPts'
+  | 'viewActivePts'
   | 'viewPtsSocialSituation'
+  | 'editPtsSocialSituation'
+  | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
-  | 'editPtsProposal';
+  | 'editPtsProposal'
+  | 'deletePtsProposal';
 
 // Mesmos valores do PtsStateEnum da API.
 export type PtsStatus =
@@ -89,6 +94,7 @@ export function can(
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
       case 'editPtsProposal':
+      case 'deletePtsProposal':
         return pts?.status === 'draft';
       default:
         return true;
@@ -122,9 +128,28 @@ export function can(
     case 'viewPtsProposals':
       // RFPTS002 – paciente titular ou profissional da proposta.
       return patient || (professional && (!pts || isProposalMember(user, pts)));
+    case 'viewPts':
+      // RFPTS009, RFTL001 – equipe ou paciente titular; a API confere o vínculo.
+      return professional || patient;
+    case 'viewActivePts':
+      // RFPTS004 – paciente titular ou profissional (a API confere a equipe).
+      return patient || professional;
     case 'viewPtsSocialSituation':
       // DP003 – oculta para o paciente até a decisão.
       return professional;
+    case 'editPtsSocialSituation':
+      // RFPTS005 – profissional da equipe (responsável ou membro).
+      return professional && pts !== undefined && isProposalMember(user, pts);
+
+    case 'removePtsTeamMember':
+      // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.
+      return (
+        professional &&
+        ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '') &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
+        )
+      );
     case 'createPts':
       // RFPTS001 – profissional.
       return professional;
@@ -134,6 +159,7 @@ export function can(
       // é ator do sistema (RN025).
       return patient && pts?.status === 'draft';
     case 'editPtsProposal':
+    case 'deletePtsProposal':
       // RFPTS005 – profissional responsável, só em DRAFT.
       return (
         professional &&

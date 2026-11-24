@@ -10,6 +10,7 @@ import type { Request, Response } from 'express';
 import request from 'supertest';
 import { createValidationPipe } from '../src/common/validation/create-validation-pipe';
 import { PtsStateEnum } from '../src/database/enums/pts-state.enum';
+import type { AddTeamMembersInput } from '../src/pts/repositories/pts.repository';
 
 type SessionMiddleware = (
   request: Request,
@@ -65,11 +66,14 @@ describe('adicionar profissionais à equipe do PTS (e2e - RFEM001)', () => {
   let ptsRepository: {
     findPtsTeamTarget: jest.Mock<(id: string) => Promise<unknown>>;
     findProfessionalsWithAccountByIds: jest.Mock<
-      (ids: string[]) => Promise<Array<{ id: string; accountId: string }>>
+      (
+        ids: string[],
+      ) => Promise<Array<{ id: string; accountId: string; name: string }>>
     >;
-    addTeamMembers: jest.Mock<
-      (id: string, professionalIds: string[]) => Promise<unknown>
+    findAccountDisplayName: jest.Mock<
+      (accountId: string) => Promise<string | null>
     >;
+    addTeamMembers: jest.Mock<(input: AddTeamMembersInput) => Promise<unknown>>;
   };
 
   function signIn(
@@ -93,16 +97,41 @@ describe('adicionar profissionais à equipe do PTS (e2e - RFEM001)', () => {
       { professionalId: existingMemberId, accountId: 'account-member-1' },
     ];
 
-    const catalog = new Map<string, { id: string; accountId: string }>([
-      [responsibleId, { id: responsibleId, accountId: 'account-responsible' }],
+    const catalog = new Map<
+      string,
+      { id: string; accountId: string; name: string }
+    >([
+      [
+        responsibleId,
+        {
+          id: responsibleId,
+          accountId: 'account-responsible',
+          name: 'Kaio Segunda Conta',
+        },
+      ],
       [
         existingMemberId,
-        { id: existingMemberId, accountId: 'account-member-1' },
+        {
+          id: existingMemberId,
+          accountId: 'account-member-1',
+          name: 'Profissional Equipe',
+        },
       ],
-      [newMemberId, { id: newMemberId, accountId: 'account-new-member' }],
+      [
+        newMemberId,
+        {
+          id: newMemberId,
+          accountId: 'account-new-member',
+          name: 'Kaio Felipe',
+        },
+      ],
       [
         duplicateAccountMemberId,
-        { id: duplicateAccountMemberId, accountId: 'account-responsible' },
+        {
+          id: duplicateAccountMemberId,
+          accountId: 'account-responsible',
+          name: 'Outro Perfil',
+        },
       ],
     ]);
 
@@ -117,6 +146,7 @@ describe('adicionar profissionais à equipe do PTS (e2e - RFEM001)', () => {
           status,
           responsibleProfessionalId: responsibleId,
           responsibleAccountId: 'account-responsible',
+          responsibleName: 'Kaio Segunda Conta',
           teamMembers,
         };
       }),
@@ -124,41 +154,40 @@ describe('adicionar profissionais à equipe do PTS (e2e - RFEM001)', () => {
         ids
           .map((id) => catalog.get(id))
           .filter(
-            (item): item is { id: string; accountId: string } =>
+            (item): item is { id: string; accountId: string; name: string } =>
               item !== undefined,
           ),
       ),
-      addTeamMembers: jest.fn(
-        async (_id: string, professionalIds: string[]) => {
-          for (const profId of professionalIds) {
-            const item = catalog.get(profId)!;
-            teamMembers.push({
-              professionalId: item.id,
-              accountId: item.accountId,
-            });
-          }
+      findAccountDisplayName: jest.fn(async () => null),
+      addTeamMembers: jest.fn(async ({ members }: AddTeamMembersInput) => {
+        for (const { professionalId: profId } of members) {
+          const item = catalog.get(profId)!;
+          teamMembers.push({
+            professionalId: item.id,
+            accountId: item.accountId,
+          });
+        }
 
-          return {
-            id: ptsId,
-            status,
-            responsible: {
-              id: responsibleId,
-              name: 'Kaio Segunda Conta',
-              specialism: { id: 'psychologist', name: 'Psicologia' },
-              registration: null,
-            },
-            team: teamMembers.map((m) => ({
-              id: m.professionalId,
-              name:
-                m.professionalId === newMemberId
-                  ? 'Kaio Felipe'
-                  : 'Profissional Equipe',
-              specialism: { id: 'doctor', name: 'Medicina' },
-              registration: null,
-            })),
-          };
-        },
-      ),
+        return {
+          id: ptsId,
+          status,
+          responsible: {
+            id: responsibleId,
+            name: 'Kaio Segunda Conta',
+            specialism: { id: 'psychologist', name: 'Psicologia' },
+            registration: null,
+          },
+          team: teamMembers.map((m) => ({
+            id: m.professionalId,
+            name:
+              m.professionalId === newMemberId
+                ? 'Kaio Felipe'
+                : 'Profissional Equipe',
+            specialism: { id: 'doctor', name: 'Medicina' },
+            registration: null,
+          })),
+        };
+      }),
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -189,9 +218,17 @@ describe('adicionar profissionais à equipe do PTS (e2e - RFEM001)', () => {
       .send({ professionalIds: [newMemberId] });
 
     expect(response.status).toBe(200);
-    expect(ptsRepository.addTeamMembers).toHaveBeenCalledWith(ptsId, [
-      newMemberId,
-    ]);
+    expect(ptsRepository.addTeamMembers).toHaveBeenCalledWith({
+      ptsId,
+      members: [
+        {
+          professionalId: newMemberId,
+          description: 'Kaio Segunda Conta adicionou Kaio Felipe à equipe',
+        },
+      ],
+      authorProfessionalId: responsibleId,
+      executedByAccountId: 'account-responsible',
+    });
     expect(response.body).toMatchObject({
       id: ptsId,
       status: PtsStateEnum.PLANNING,

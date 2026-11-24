@@ -11,63 +11,9 @@ import { Patient } from '../entities/patient.entity';
 import { SupportContact } from '../entities/support-contact.entity';
 import {
   ACTIVE_PTS_STATES,
-  type AuthorizedPatientRow,
   PatientsRepository,
   PROFESSIONAL_ACCESS_PTS_STATES,
 } from './patients.repository';
-
-type QueryBuilderMock = {
-  innerJoin: jest.Mock;
-  select: jest.Mock;
-  where: jest.Mock;
-  andWhere: jest.Mock;
-  orderBy: jest.Mock;
-  addOrderBy: jest.Mock;
-  clone: jest.Mock;
-  offset: jest.Mock;
-  limit: jest.Mock;
-  getCount: jest.MockedFunction<() => Promise<number>>;
-  getRawMany: jest.MockedFunction<() => Promise<AuthorizedPatientRow[]>>;
-};
-
-function createRepository() {
-  const query: QueryBuilderMock = {
-    innerJoin: jest.fn(),
-    select: jest.fn(),
-    where: jest.fn(),
-    andWhere: jest.fn(),
-    orderBy: jest.fn(),
-    addOrderBy: jest.fn(),
-    clone: jest.fn(),
-    offset: jest.fn(),
-    limit: jest.fn(),
-    getCount: jest.fn<() => Promise<number>>(),
-    getRawMany: jest.fn<() => Promise<AuthorizedPatientRow[]>>(),
-  };
-
-  for (const method of [
-    query.innerJoin,
-    query.select,
-    query.where,
-    query.andWhere,
-    query.orderBy,
-    query.addOrderBy,
-    query.offset,
-    query.limit,
-  ]) {
-    method.mockReturnValue(query);
-  }
-
-  query.clone.mockReturnValue({ getCount: query.getCount });
-  const typeormRepository = {
-    createQueryBuilder: jest.fn(() => query),
-  };
-  const repository = new PatientsRepository(
-    typeormRepository as unknown as Repository<Patient>,
-  );
-
-  return { query, typeormRepository, repository };
-}
 
 describe('ACTIVE_PTS_STATES', () => {
   it('lists the planning and running PTS states', () => {
@@ -295,31 +241,110 @@ describe('PatientsRepository list and detail', () => {
   });
 });
 
-describe('PatientsRepository.findAvailableForPtsPaginated', () => {
-  it('returns patients without an active PTS', async () => {
-    const { query, typeormRepository, repository } = createRepository();
-    const row = { patient_id: 'patient-1', account_name: 'Maria Silva' };
-    query.getCount.mockResolvedValue(1);
-    query.getRawMany.mockResolvedValue([row]);
+describe('PatientsRepository.findEligibleForProposalPaginated', () => {
+  let dataSource: DataSource;
+  let repository: PatientsRepository;
+  let captured: { sql: string; parameters: Record<string, unknown> }[];
 
+  beforeAll(async () => {
+    dataSource = new DataSource({
+      type: 'postgres',
+      entities: [Account, Patient, SupportContact, Professional, PtsEntity],
+    });
+    await (
+      dataSource as unknown as { buildMetadatas(): Promise<void> }
+    ).buildMetadatas();
+  });
+
+  beforeEach(() => {
+    captured = [];
+    repository = new PatientsRepository(dataSource.getRepository(Patient));
+    jest
+      .spyOn(SelectQueryBuilder.prototype, 'getCount')
+      .mockImplementation(function (this: SelectQueryBuilder<Patient>) {
+        captured.push({
+          sql: this.getQuery(),
+          parameters: this.getParameters(),
+        });
+        return Promise.resolve(1);
+      });
+    jest
+      .spyOn(SelectQueryBuilder.prototype, 'getRawMany')
+      .mockImplementation(function (this: SelectQueryBuilder<Patient>) {
+        captured.push({
+          sql: this.getQuery(),
+          parameters: this.getParameters(),
+        });
+        return Promise.resolve([eligibleRow]);
+      });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const eligibleRow = {
+    patient_id: 'patient-1',
+    display_name: 'Maria Silva',
+    email: 'maria@exemplo.com',
+  };
+
+  it('excludes patients with an active PTS or a non-deleted draft (RN011)', async () => {
     await expect(
-      repository.findAvailableForPtsPaginated({ page: 1, limit: 10 }),
-    ).resolves.toEqual({ rows: [row], total: 1 });
+      repository.findEligibleForProposalPaginated({ page: 2, limit: 10 }),
+    ).resolves.toEqual({ rows: [eligibleRow], total: 1 });
 
-    expect(typeormRepository.createQueryBuilder).toHaveBeenCalledWith(
-      'patient',
+    const [count, page] = captured;
+    expect(count.sql).toContain('NOT EXISTS');
+    expect(page.sql).toContain('pts.status = :draftState');
+    expect(page.sql).toContain('pts.deleted_at IS NULL');
+    expect(page.parameters).toMatchObject({
+      activeStates: ACTIVE_PTS_STATES,
+      draftState: PtsStateEnum.DRAFT,
+    });
+    expect(page.sql).toContain('LIMIT 10 OFFSET 10');
+  });
+
+  it('projects the display name and e-mail, never the CPF (DP011)', async () => {
+    await repository.findEligibleForProposalPaginated({ page: 1, limit: 10 });
+
+    const { sql } = captured[1];
+    const select = sql.slice(0, sql.indexOf(' FROM '));
+    expect(select).toContain('COALESCE(');
+    expect(select).toContain('AS display_name');
+    expect(select).toContain('AS email');
+    expect(select).not.toContain('cpf');
+    expect(sql).toContain('ORDER BY COALESCE(');
+  });
+
+  it('searches by name, social name, e-mail and CPF, with escaped wildcards', async () => {
+    await repository.findEligibleForProposalPaginated({
+      page: 1,
+      limit: 10,
+      q: '100%_a',
+    });
+
+    const { sql, parameters } = captured[1];
+    expect(sql).toContain('ILIKE :term ESCAPE');
+    expect(sql).toContain('"account"."social_name" ILIKE');
+    expect(sql).toContain('"account"."cpf" ILIKE');
+    expect(sql).not.toContain('cns');
+    expect(parameters.term).toBe('%100\\%\\_a%');
+  });
+
+  it('also matches the CPF digits when the term is a masked CPF', async () => {
+    await repository.findEligibleForProposalPaginated({
+      page: 1,
+      limit: 10,
+      q: '123.456.789-09',
+    });
+
+    const { sql, parameters } = captured[1];
+    expect(sql).toContain(
+      `regexp_replace("account"."cpf", '\\D', '', 'g') LIKE`,
     );
-    expect(query.where).toHaveBeenCalledWith(
-      `NOT EXISTS (
-    SELECT 1
-    FROM projeto_terapeutico_singular pts
-    WHERE pts.patient_id = patient.account_id
-      AND pts.status IN (:...states)
-  )`,
-      { states: ACTIVE_PTS_STATES },
-    );
-    expect(query.offset).toHaveBeenCalledWith(0);
-    expect(query.limit).toHaveBeenCalledWith(10);
+    expect(sql).not.toContain('cns');
+    expect(parameters.digits).toBe('%12345678909%');
   });
 });
 

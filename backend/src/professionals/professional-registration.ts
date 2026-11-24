@@ -5,11 +5,22 @@
 import { Specialism } from './enums/specialism.enum';
 import type { Uf } from './enums/uf.enum';
 
-const SPECIALISM_COUNCILS: Record<Specialism, string> = {
+export const SPECIALISM_COUNCILS = {
   [Specialism.Psychologist]: 'CRP',
   [Specialism.Doctor]: 'CRM',
   [Specialism.Physiotherapist]: 'Crefito',
-};
+} as const satisfies Record<Specialism, string>;
+
+/** Conselhos regionais da lista fixa de especialidades. */
+export const COUNCILS = ['CRP', 'CRM', 'Crefito'] as const;
+export type Council = (typeof COUNCILS)[number];
+
+/** Especialidades cujo conselho regional está em `councils`. */
+export function specialismsOfCouncils(councils: Council[]): Specialism[] {
+  return (Object.keys(SPECIALISM_COUNCILS) as Specialism[]).filter(
+    (specialism) => councils.includes(SPECIALISM_COUNCILS[specialism]),
+  );
+}
 
 export type ProfessionalRegistration = {
   council: string;

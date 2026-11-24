@@ -42,35 +42,100 @@ export type ProfessionalsResponse = {
   pagination: PaginationData;
 };
 
+// Siglas das UFs do registro no conselho (mesma lista do backend).
+export const COUNCIL_STATES = [
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+] as const;
+
+export type ProfessionalCouncil = 'CRP' | 'CRM' | 'Crefito';
+
+export type ProfessionalSort = 'name' | 'specialism';
+
 export type ProfessionalsQuery = {
   page: number;
   limit: number;
+  q?: string;
+  // Alias de `q`, para quem ainda usa o nome antigo do parâmetro.
   name?: string;
-  specialism?: ProfessionalSpecialism;
+  specialism?: ProfessionalSpecialism[];
+  council?: ProfessionalCouncil[];
+  councilState?: string;
+  sort?: ProfessionalSort;
+  order?: 'asc' | 'desc';
   ids?: string[];
 };
 
 // GET /professionals; filtros vazios não entram na query string.
-export function getProfessionals({
-  page,
-  limit,
-  name,
-  specialism,
-  ids = [],
-}: ProfessionalsQuery) {
+export function getProfessionals(
+  {
+    page,
+    limit,
+    q,
+    name,
+    specialism = [],
+    council = [],
+    councilState,
+    sort,
+    order,
+    ids = [],
+  }: ProfessionalsQuery,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
 
-  const trimmedName = name?.trim();
+  const term = (q ?? name)?.trim();
 
-  if (trimmedName) {
-    params.set('name', trimmedName);
+  if (term) {
+    params.set('q', term);
   }
 
-  if (specialism) {
-    params.set('specialism', specialism);
+  if (specialism.length > 0) {
+    params.set('specialism', specialism.join(','));
+  }
+
+  if (council.length > 0) {
+    params.set('council', council.join(','));
+  }
+
+  if (councilState) {
+    params.set('councilState', councilState);
+  }
+
+  if (sort) {
+    params.set('sort', sort);
+  }
+
+  if (order) {
+    params.set('order', order);
   }
 
   const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
@@ -79,5 +144,8 @@ export function getProfessionals({
     params.set('ids', uniqueIds.join(','));
   }
 
-  return request<ProfessionalsResponse>(`/professionals?${params.toString()}`);
+  return request<ProfessionalsResponse>(
+    `/professionals?${params.toString()}`,
+    signal ? { signal } : undefined,
+  );
 }

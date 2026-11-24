@@ -47,21 +47,23 @@ import {
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
-import {
-  AddPtsTeamMembersRequestDto,
-  PtsTeamResponseDto,
-} from '../dto/add-pts-team-members.dto';
+import { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
 import { PtsService } from '../services/pts.service';
 
-const parseProposalId = new ParseUUIDPipe({
-  exceptionFactory: () =>
-    new BadRequestException({
-      status: 'VALIDATION_ERROR',
-      message: 'Parâmetro inválido: id',
-    }),
-});
+const parseUuidParam = (name: string) =>
+  new ParseUUIDPipe({
+    exceptionFactory: () =>
+      new BadRequestException({
+        status: 'VALIDATION_ERROR',
+        message: `Parâmetro inválido: ${name}`,
+      }),
+  });
+
+const parseProposalId = parseUuidParam('id');
+const parseProfessionalId = parseUuidParam('professionalId');
 
 @ApiTags('pts')
 @Controller('pts')
@@ -263,7 +265,8 @@ export class PtsController {
       'Adiciona profissionais à equipe multidisciplinar de um PTS ativo (RFEM001)',
     description:
       'Somente o profissional responsável adiciona perfis cadastrados a um PTS em PLANNING ou RUNNING. ' +
-      'Cada conta participa com no máximo um perfil, contando o responsável (RN008).',
+      'Cada conta participa com no máximo um perfil, contando o responsável (RN008). ' +
+      'Os vínculos e um evento member_added por profissional entram na mesma transação.',
   })
   @ApiOkResponse({ type: PtsTeamResponseDto })
   @ApiBadRequestResponse({
@@ -339,5 +342,64 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<PtsTeamResponseDto> {
     return this.ptsService.addTeamMembers(id, dto, account);
+  }
+
+  @Delete(':id/team/:professionalId')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Remove um profissional da equipe do PTS (RFEM003)',
+    description:
+      'Só o responsável (ou o admin) remove; o PTS deve estar em planning ou running. ' +
+      'O vínculo sai e o evento é gravado na timeline na mesma transação.',
+  })
+  @ApiOkResponse({ type: PtsTeamResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_FOUND: {
+        summary: 'PTS inexistente',
+        value: { status: 'PTS_NOT_FOUND', message: 'PTS não encontrado.' },
+      },
+      TEAM_MEMBER_NOT_FOUND: {
+        summary: 'Profissional fora da equipe',
+        value: {
+          status: 'TEAM_MEMBER_NOT_FOUND',
+          message: 'O profissional não faz parte da equipe deste PTS.',
+        },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_ACTIVE: {
+        summary: 'PTS fora de planning e running',
+        value: {
+          status: 'PTS_NOT_ACTIVE',
+          message: 'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
+        },
+      },
+      CANNOT_REMOVE_RESPONSIBLE: {
+        summary: 'Tentativa de remover o responsável',
+        value: {
+          status: 'CANNOT_REMOVE_RESPONSIBLE',
+          message:
+            'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async removeTeamMember(
+    @Param('id', parseProposalId) id: string,
+    @Param('professionalId', parseProfessionalId) professionalId: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    return this.ptsService.removeTeamMember(id, professionalId, account);
   }
 }

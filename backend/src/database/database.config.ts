@@ -5,6 +5,7 @@ import { Patient } from '../patients/entities/patient.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
+import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
 import { CreatePatientAndProfessional1791148860000 } from './migrations/1791148860000-CreatePatientAndProfessional';
@@ -17,11 +18,19 @@ import { AlignPatientAndProfessionalConstraints1791148940000 } from './migration
 import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
 import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
 import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
+import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-CreateTimelineRecord';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
 // precisa ser registrada aqui.
-const entities = [Account, Patient, SupportContact, Professional, Pts];
+const entities = [
+  Account,
+  Patient,
+  SupportContact,
+  Professional,
+  Pts,
+  TimelineRecord,
+];
 const migrations = [
   CreateAccount1791072000000,
   LinkAccountToSupertokens1791148800000,
@@ -35,6 +44,7 @@ const migrations = [
   AddAccountPersonalFields1791148950000,
   AddProfessionalCouncilFields1791148960000,
   AddDeletedAtToPts1791148970000,
+  CreateTimelineRecord1791148980000,
 ];
 
 export function getDatabaseOptions(

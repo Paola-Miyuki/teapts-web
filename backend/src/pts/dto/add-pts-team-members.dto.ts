@@ -6,8 +6,6 @@ import {
   IsUUID,
   type ValidationOptions,
 } from 'class-validator';
-import { PtsStateEnum } from '../../database/enums/pts-state.enum';
-import { type PtsProfessionalDto } from './create-pts.dto';
 
 function validationContext(message: string): ValidationOptions {
   return {
@@ -39,41 +37,4 @@ export class AddPtsTeamMembersRequestDto {
     ),
   })
   professionalIds!: string[];
-}
-
-export class PtsTeamResponseDto {
-  @ApiProperty({
-    example: '3f2e1d0c-9b8a-4765-a432-10fedcba9876',
-    format: 'uuid',
-  })
-  id!: string;
-
-  @ApiProperty({
-    enum: [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING],
-    example: PtsStateEnum.PLANNING,
-  })
-  status!: PtsStateEnum.PLANNING | PtsStateEnum.RUNNING;
-
-  @ApiProperty({
-    example: {
-      id: '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f',
-      name: 'Kaio Segunda Conta',
-      specialism: { id: 'psychologist', name: 'Psicologia' },
-      registration: null,
-    },
-  })
-  responsible!: PtsProfessionalDto;
-
-  @ApiProperty({
-    isArray: true,
-    example: [
-      {
-        id: '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a',
-        name: 'Kaio Felipe',
-        specialism: { id: 'doctor', name: 'Medicina' },
-        registration: null,
-      },
-    ],
-  })
-  team!: PtsProfessionalDto[];
 }

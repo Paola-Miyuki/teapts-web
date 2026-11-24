@@ -151,11 +151,25 @@ export const ptsProposalNotDraftForDelete = () =>
     'Somente propostas aguardando decisão podem ser excluídas.',
   );
 
-export const ptsTeamEditForbidden = () =>
+export const teamEditForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,
     'FORBIDDEN',
     'Somente o responsável pode alterar a equipe do PTS.',
+  );
+
+export const teamMemberNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'TEAM_MEMBER_NOT_FOUND',
+    'O profissional não faz parte da equipe deste PTS.',
+  );
+
+export const cannotRemoveResponsible = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'CANNOT_REMOVE_RESPONSIBLE',
+    'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
   );
 
 export const teamDuplicateAccount = (ids: string[]) =>

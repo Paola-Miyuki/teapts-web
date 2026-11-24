@@ -6,15 +6,17 @@ import {
   within,
 } from '@testing-library/react';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import ProfessionalsPage from './page';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  useSearchParams: jest.fn(),
 }));
 
 const mockedUseRouter = useRouter as jest.Mock;
+const mockedUseSearchParams = useSearchParams as jest.Mock;
 
 function mockResponse({
   status = 200,
@@ -59,6 +61,7 @@ describe('ProfessionalsPage', () => {
     mockedUseRouter.mockReturnValue({
       replace,
     });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
 
     global.fetch = jest.fn();
   });
@@ -144,9 +147,7 @@ describe('ProfessionalsPage', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:3000/professionals?page=1&limit=10',
-      {
-        credentials: 'include',
-      },
+      { credentials: 'include', signal: expect.any(AbortSignal) },
     );
   });
 
@@ -300,72 +301,153 @@ describe('ProfessionalsPage', () => {
     });
   });
 
-  it('aplica filtros por nome e especialidade', async () => {
-    mockApi(
-      jest
-        .fn()
-        .mockResolvedValueOnce(
-          mockResponse({
-            data: {
-              data: [],
-              pagination: {
-                page: 1,
-                limit: 10,
-                total: 0,
-                totalPages: 0,
-              },
-            },
-          }),
-        )
-        .mockResolvedValue(
-          mockResponse({
-            data: {
-              data: [
-                {
-                  id: 'professional-uuid',
-                  name: 'Maria Silva',
-                  email: 'maria@example.com',
-                  specialism: {
-                    id: 'psychologist',
-                    name: 'Psicologia',
-                  },
-                  registration: null,
-                  institution: null,
-                  cnes: null,
-                },
-              ],
-              pagination: {
-                page: 1,
-                limit: 10,
-                total: 1,
-                totalPages: 1,
-              },
-            },
-          }),
-        ),
+  const EMPTY_PAGE = {
+    data: [],
+    pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+  };
+
+  it('lê busca, filtros e ordenação da URL e consulta a API com eles', async () => {
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams(
+        'q=Maria&specialism=psychologist,doctor&council=CRP&uf=PR&sort=specialism&order=desc',
+      ),
     );
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY_PAGE })));
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Nenhum profissional encontrado');
+
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      'http://localhost:3000/professionals?page=1&limit=10&q=Maria&specialism=doctor%2Cpsychologist&council=CRP&councilState=PR&sort=specialism&order=desc',
+      { credentials: 'include', signal: expect.any(AbortSignal) },
+    );
+    expect(screen.getByRole('searchbox')).toHaveValue('Maria');
+    expect(screen.getByLabelText('Ordenar por')).toHaveValue('specialism');
+    expect(
+      screen.getByRole('button', { name: 'Ordem decrescente' }),
+    ).toBeInTheDocument();
+  });
+
+  it('grava os filtros e a ordenação na URL', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY_PAGE })));
 
     render(<ProfessionalsPage />);
 
     await screen.findByText('Nenhum profissional cadastrado');
 
-    fireEvent.change(screen.getByPlaceholderText('Nome do profissional'), {
-      target: { value: 'Maria' },
-    });
-    fireEvent.keyDown(screen.getByPlaceholderText('Nome do profissional'), {
-      key: 'Enter',
-    });
+    expect(
+      screen.queryByRole('button', { name: 'Limpar' }),
+    ).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Psicologia' }));
-
-    expect(await screen.findByText('Maria Silva')).toBeInTheDocument();
-
-    expect(global.fetch).toHaveBeenLastCalledWith(
-      'http://localhost:3000/professionals?page=1&limit=10&name=Maria&specialism=psychologist',
-      {
-        credentials: 'include',
-      },
+    expect(replace).toHaveBeenLastCalledWith(
+      '/professionals?specialism=psychologist',
+      { scroll: false },
     );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'CRP' }));
+    expect(replace).toHaveBeenLastCalledWith('/professionals?council=CRP', {
+      scroll: false,
+    });
+
+    fireEvent.change(screen.getByLabelText('UF do registro'), {
+      target: { value: 'SC' },
+    });
+    expect(replace).toHaveBeenLastCalledWith('/professionals?uf=SC', {
+      scroll: false,
+    });
+
+    fireEvent.change(screen.getByLabelText('Ordenar por'), {
+      target: { value: 'specialism' },
+    });
+    expect(replace).toHaveBeenLastCalledWith('/professionals?sort=specialism', {
+      scroll: false,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ordem crescente' }));
+    expect(replace).toHaveBeenLastCalledWith('/professionals?order=desc', {
+      scroll: false,
+    });
+  });
+
+  it('limpa os filtros pela URL e mantém a busca e a ordenação', async () => {
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams(
+        'q=Ana&specialism=doctor&council=CRM&uf=PR&sort=specialism',
+      ),
+    );
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY_PAGE })));
+
+    render(<ProfessionalsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Limpar' }));
+
+    expect(replace).toHaveBeenLastCalledWith(
+      '/professionals?q=Ana&sort=specialism',
+      { scroll: false },
+    );
+  });
+
+  it('busca com Enter, grava q na URL e limpa com Esc', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse({ data: EMPTY_PAGE })));
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Nenhum profissional cadastrado');
+
+    const input = screen.getByPlaceholderText('Nome, e-mail ou nº de registro');
+
+    fireEvent.change(input, { target: { value: 'M' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(replace).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: ' Maria ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(replace).toHaveBeenLastCalledWith('/professionals?q=Maria', {
+      scroll: false,
+    });
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        'http://localhost:3000/professionals?page=1&limit=10&q=Maria',
+        { credentials: 'include', signal: expect.any(AbortSignal) },
+      ),
+    );
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+
+    expect(input).toHaveValue('');
+    expect(replace).toHaveBeenLastCalledWith('/professionals', {
+      scroll: false,
+    });
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        'http://localhost:3000/professionals?page=1&limit=10',
+        { credentials: 'include', signal: expect.any(AbortSignal) },
+      ),
+    );
+  });
+
+  it('mostra a mensagem da API quando ela vem no erro', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith('/me')
+          ? mockResponse({ data: ACCOUNT })
+          : mockResponse({
+              status: 400,
+              ok: false,
+              data: { status: 'ERROR', message: 'Parâmetro inválido: council' },
+            }),
+      ),
+    );
+
+    render(<ProfessionalsPage />);
+
+    expect(
+      await screen.findByText('Parâmetro inválido: council'),
+    ).toBeInTheDocument();
   });
 
   it('consulta a próxima página mantendo os filtros', async () => {
@@ -440,9 +522,7 @@ describe('ProfessionalsPage', () => {
 
     expect(global.fetch).toHaveBeenLastCalledWith(
       'http://localhost:3000/professionals?page=2&limit=10',
-      {
-        credentials: 'include',
-      },
+      { credentials: 'include', signal: expect.any(AbortSignal) },
     );
   });
 });
