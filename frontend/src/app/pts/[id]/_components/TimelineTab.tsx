@@ -43,7 +43,7 @@ type TimelineUrlState = {
   limit: number;
 };
 
-/** Estado inicial lido da URL, para valer ao recarregar e compartilhar (NFUS003). */
+// Busca, filtros, ordem e página ficam na URL (NFUS003).
 function readUrlState(): TimelineUrlState {
   const params = new URLSearchParams(
     typeof window === 'undefined' ? '' : window.location.search,
@@ -70,7 +70,6 @@ function readUrlState(): TimelineUrlState {
   };
 }
 
-/** Grava o estado na URL sem nova navegação, mantendo a aba (#timeline). */
 function writeUrlState(state: TimelineUrlState) {
   const params = new URLSearchParams();
   const { filters } = state;
@@ -106,15 +105,10 @@ function writeUrlState(state: TimelineUrlState) {
 type TimelineTabProps = {
   ptsId: string;
   patientId: string;
-  // Responsável e membros: opções do filtro Autor para o paciente.
   team: TimelinePerson[];
-  // O paciente não vê o link dos eventos de documento (RN028) nem consulta
-  // a lista de profissionais (RFPRO001).
   isPatient: boolean;
 };
 
-// Aba Timeline do PTS (RFTL001): eventos agrupados por dia, do mais recente ao
-// mais antigo (ou o contrário), com busca, filtros e paginação. Só leitura.
 export default function TimelineTab({
   ptsId,
   patientId,
@@ -196,7 +190,6 @@ export default function TimelineTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ptsId, key]);
 
-  // Mudar busca ou filtro volta à primeira página.
   function changeFilters(next: TimelineFilterValue) {
     setFilters(next);
     setPage(1);

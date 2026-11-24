@@ -18,7 +18,6 @@ export type TimelineFilterValue = {
   types: TimelineTargetType[];
   authorId: string;
   period: TimelinePeriod;
-  // Usados só no período personalizado (AAAA-MM-DD).
   from: string;
   to: string;
 };
@@ -35,7 +34,6 @@ const TYPE_OPTIONS = (
   Object.entries(TIMELINE_TYPE_LABELS) as [TimelineTargetType, string][]
 ).map(([value, label]) => ({ value, label }));
 
-/** Data local em `AAAA-MM-DD`. */
 function isoDay(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -43,10 +41,6 @@ function isoDay(date: Date) {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * Período da consulta: últimos 30 ou 90 dias contam a partir de hoje
- * (inclusive); o personalizado usa as datas informadas.
- */
 export function periodRange(
   value: Pick<TimelineFilterValue, 'period' | 'from' | 'to'>,
   today = new Date(),
@@ -84,14 +78,10 @@ type TimelineFiltersProps = {
   onChange: (value: TimelineFilterValue) => void;
   order: TimelineOrder;
   onOrderChange: (order: TimelineOrder) => void;
-  // Autor: autocomplete na busca de profissionais (RFPRO001) para a equipe e
-  // o admin; o paciente não consulta profissionais e escolhe entre `team`.
   searchProfessionals: boolean;
   team: TimelinePerson[];
 };
 
-// Busca, filtros e ordenação da aba Timeline (pts-detalhe.html, pts.html):
-// Tipo do evento, Autor e Período (Listagem das Telas, 3.8).
 export default function TimelineFilters({
   search,
   value,
@@ -102,7 +92,7 @@ export default function TimelineFilters({
   team,
 }: TimelineFiltersProps) {
   const [open, setOpen] = useState(hasTimelineFilters(value));
-  // Muda a cada "Limpar", para o campo Autor voltar vazio.
+  // Muda a cada "Limpar" para remontar o campo Autor vazio.
   const [clearCount, setClearCount] = useState(0);
   const filtered = hasTimelineFilters(value);
 
@@ -262,8 +252,7 @@ function sameName(a: string, b: string) {
   );
 }
 
-// Autor (quem executou): o nome é digitado e a consulta usa o id do perfil
-// profissional. Busca no servidor com 300 ms e 2 caracteres (NFUS003).
+// Autor é quem executou. O paciente não consulta profissionais (RFPRO001) e escolhe na equipe.
 function AuthorFilter({
   value,
   onChange,
@@ -276,7 +265,6 @@ function AuthorFilter({
   const [found, setFound] = useState<TimelinePerson[]>([]);
   const options = searchProfessionals ? found : team;
 
-  // Autor vindo da URL e fora da equipe: busca o nome pelo id.
   useEffect(() => {
     if (!value || !searchProfessionals || text) {
       return;
@@ -295,7 +283,7 @@ function AuthorFilter({
     return () => {
       active = false;
     };
-    // Só ao abrir com um autor já escolhido.
+    // Só busca o nome ao abrir com um autor já escolhido (vindo da URL).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, searchProfessionals]);
 
@@ -332,7 +320,6 @@ function AuthorFilter({
         onChange(match.id);
       }
     } else if (value) {
-      // Texto que não é mais o autor escolhido tira o filtro.
       onChange('');
     }
   }

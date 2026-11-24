@@ -242,7 +242,6 @@ describe('PtsDetail', () => {
     expect(
       screen.queryByRole('link', { name: 'Prontuário' }),
     ).not.toBeInTheDocument();
-    // O paciente começa na Equipe.
     expect(screen.getByText('2 profissionais')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: 'Timeline' }));

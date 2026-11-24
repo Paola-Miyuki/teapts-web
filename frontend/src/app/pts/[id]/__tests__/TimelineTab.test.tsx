@@ -22,7 +22,6 @@ const AUTHORS = [
   { id: 'prof-2', name: 'João Lima' },
 ];
 
-// 12/11 às 14:45 e 11/11 às 17:03 e 09:20, no horário de Brasília.
 const RECORDS: TimelineRecord[] = [
   {
     id: 'rec-1',
@@ -87,8 +86,6 @@ function respond(status: number, body: unknown) {
   } as unknown as Response;
 }
 
-// /professionals responde com a equipe; /timeline, com as respostas em
-// ordem (a última se repete).
 function mockFetch(...responses: Response[]) {
   const queue = [...responses];
   const fetchMock = jest.fn((url: string) =>
@@ -203,7 +200,6 @@ describe('TimelineTab', () => {
       'href',
       '/patients/patient-1#documentos',
     );
-    // Evento de equipe não tem link.
     const removal = screen
       .getByText(/removeu Marcos Vieira/)
       .closest('article')!;
@@ -278,7 +274,6 @@ describe('TimelineTab', () => {
       ),
     );
 
-    // Autocomplete na busca de profissionais (RFPRO001).
     const author = screen.getByPlaceholderText('Quem executou');
     fireEvent.change(author, { target: { value: 'Ana' } });
     await waitFor(() =>

@@ -60,7 +60,6 @@ describe('formatos da timeline', () => {
   it('agrupa por dia no horário de Brasília, mantendo a ordem', () => {
     const groups = groupTimelineByDay([
       record({ id: 'a', happenedAt: '2026-11-12T17:45:00.000Z' }),
-      // 01:30 UTC de 12/11 ainda é 11/11 em Brasília.
       record({ id: 'b', happenedAt: '2026-11-12T01:30:00.000Z' }),
       record({ id: 'c', happenedAt: '2026-11-11T12:00:00.000Z' }),
     ]);

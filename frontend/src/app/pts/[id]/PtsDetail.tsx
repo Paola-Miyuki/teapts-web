@@ -22,8 +22,7 @@ const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
 type Tab = 'visao' | 'equipe' | 'timeline';
 
-// Como nos mockups, a aba ativa é o #hash da URL; hash desconhecido abre a
-// primeira aba. `/pts/:id#timeline` é o atalho de historico.html.
+// Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
 function currentHash() {
   return typeof window === 'undefined' ? '' : window.location.hash.slice(1);
 }
@@ -73,11 +72,8 @@ function professionalLabel(professional: PtsProfessional) {
   return `${professional.name}, ${professional.specialism.name}`;
 }
 
-// Detalhe do PTS de `pts-detalhe.html` para a equipe e o admin (GET /pts/:id,
-// RN016) e de `pts.html` para o paciente titular (RN028, sem a ficha):
-// cabeçalho, Visão geral (só a equipe), Equipe e Timeline (RFTL001).
-// Diagnóstico, metas, atividades, atendimentos e as ações do PTS entram com
-// as tasks deles.
+// Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
+// Metas, atividades, atendimentos e as ações do PTS entram com as tasks deles.
 export default function PtsDetailPage({ id }: { id: string }) {
   const [patientName, setPatientName] = useState('');
 
@@ -110,9 +106,7 @@ function PtsDetailContent({
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
-  // O paciente não vê a ficha do PTS (RN028).
   isPatient: boolean;
-  // O prontuário é da equipe e do admin (RN028).
   canOpenRecord: boolean;
 }) {
   const router = useRouter();

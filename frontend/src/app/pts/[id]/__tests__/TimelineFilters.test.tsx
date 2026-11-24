@@ -23,7 +23,6 @@ function respond(body: unknown) {
   } as unknown as Response;
 }
 
-// GET /professionals: a busca por nome devolve os profissionais do diretório.
 function mockProfessionals(data: { id: string; name: string }[]) {
   const fetchMock = jest.fn().mockResolvedValue(
     respond({
@@ -141,7 +140,6 @@ describe('TimelineFilters', () => {
       ...EMPTY_TIMELINE_FILTERS,
       authorId: 'prof-2',
     });
-    // O paciente não consulta profissionais (RFPRO001).
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
@@ -255,7 +253,6 @@ describe('TimelineFilters', () => {
   it('mostra "Limpar" com filtro e volta tudo ao padrão', () => {
     const onChange = jest.fn();
 
-    // Como na aba: o pai guarda o valor e o repassa.
     function Harness() {
       const [value, setValue] = useState<TimelineFilterValue>({
         ...EMPTY_TIMELINE_FILTERS,
