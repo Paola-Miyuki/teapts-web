@@ -8,6 +8,7 @@ import { Professional } from '../../professionals/entities/professional.entity';
 import { PtsEntity } from '../../pts/entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Patient } from '../entities/patient.entity';
+import { Medication } from '../entities/medication.entity';
 import { SupportContact } from '../entities/support-contact.entity';
 import {
   ACTIVE_PTS_STATES,
@@ -46,7 +47,7 @@ describe('PatientsRepository list and detail', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'postgres',
-      entities: [Account, Patient, SupportContact, Professional, PtsEntity],
+      entities: [Account, Patient, Medication, SupportContact, Professional, PtsEntity],
     });
     await (
       dataSource as unknown as { buildMetadatas(): Promise<void> }
@@ -249,7 +250,7 @@ describe('PatientsRepository.findEligibleForProposalPaginated', () => {
   beforeAll(async () => {
     dataSource = new DataSource({
       type: 'postgres',
-      entities: [Account, Patient, SupportContact, Professional, PtsEntity],
+      entities: [Account, Patient, Medication, SupportContact, Professional, PtsEntity],
     });
     await (
       dataSource as unknown as { buildMetadatas(): Promise<void> }

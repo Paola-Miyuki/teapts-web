@@ -1,5 +1,5 @@
-﻿// Este arquivo expÃµe as rotas autenticadas de pacientes: a consulta de
-// pacientes autorizados, o cadastro do perfil de paciente (sÃ³ admin) e os
+// Este arquivo expõe as rotas autenticadas de pacientes: a consulta de
+// pacientes autorizados, o cadastro do perfil de paciente (só admin) e os
 // contatos de suporte, contato a contato. O ValidationPipe global valida a
 // query e o corpo, e o controller delega ao PatientsService.
 
@@ -67,7 +67,7 @@ function invalidParam(name: string): ParseUUIDPipe {
     exceptionFactory: () =>
       new BadRequestException({
         status: 'VALIDATION_ERROR',
-        message: `ParÃ¢metro invÃ¡lido: ${name}`,
+        message: `Parâmetro inválido: ${name}`,
       }),
   });
 }
@@ -78,21 +78,21 @@ const parseMedicationId = invalidParam('medicationId');
 
 const SUPPORT_CONTACT_FORBIDDEN = {
   status: 'FORBIDDEN',
-  message: 'Acesso restrito ao administrador ou Ã  equipe de um PTS ativo.',
+  message: 'Acesso restrito ao administrador ou à equipe de um PTS ativo.',
 };
 
 const PATIENT_NOT_FOUND = {
   status: 'PATIENT_NOT_FOUND',
-  message: 'Paciente nÃ£o encontrado.',
+  message: 'Paciente não encontrado.',
 };
 
 const SUPPORT_CONTACT_NOT_FOUND = {
   status: 'SUPPORT_CONTACT_NOT_FOUND',
-  message: 'Contato de suporte nÃ£o encontrado.',
+  message: 'Contato de suporte não encontrado.',
 };
 
 /**
- * ExpÃµe a consulta de pacientes autorizados, o cadastro de perfil de
+ * Expõe a consulta de pacientes autorizados, o cadastro de perfil de
  * paciente e os contatos de suporte.
  */
 @ApiTags('patients')
@@ -106,26 +106,26 @@ export class PatientsController {
   /**
    * Retorna pacientes autorizados, filtrados por PTS ativo e paginados.
    *
-   * O accountId Ã© obtido do contexto autenticado, e o responsÃ¡vel do PTS
+   * O accountId é obtido do contexto autenticado, e o responsável do PTS
    * conta como membro da equipe, conforme a RN005. O administrador recebe
    * todos os pacientes cadastrados (RN022).
    *
    * @param account contexto da conta autenticada
-   * @param query parÃ¢metros jÃ¡ normalizados
-   * @returns pacientes autorizados e dados de paginaÃ§Ã£o
+   * @param query parâmetros já normalizados
+   * @returns pacientes autorizados e dados de paginação
    */
   @Get('patients/authorized')
   @UseGuards(AuthGuard)
   @ApiOkResponse({ type: GetAuthorizedPatientsResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    example: { status: 'ERROR', message: 'ParÃ¢metro invÃ¡lido: limit' },
+    example: { status: 'ERROR', message: 'Parâmetro inválido: limit' },
   })
   @ApiInternalServerErrorResponse({
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel consultar os pacientes autorizados.',
+      message: 'Não foi possível consultar os pacientes autorizados.',
     },
   })
   async findAuthorized(
@@ -136,11 +136,11 @@ export class PatientsController {
   }
 
   /**
-   * Busca os pacientes elegÃ­veis para uma nova proposta de PTS (RFPTS001):
+   * Busca os pacientes elegíveis para uma nova proposta de PTS (RFPTS001):
    * sem PTS em planejamento ou em andamento e sem rascunho (RN011), por nome,
-   * nome social, e-mail ou CPF (NFUS003). O CPF nÃ£o volta na resposta (DP011).
+   * nome social, e-mail ou CPF (NFUS003). O CPF não volta na resposta (DP011).
    *
-   * Diferente de `/patients/authorized`, nÃ£o exige vÃ­nculo prÃ©vio com um PTS;
+   * Diferente de `/patients/authorized`, não exige vínculo prévio com um PTS;
    * exige conta com perfil profissional ou de administrador (RN029).
    */
   @Get('patients')
@@ -148,7 +148,7 @@ export class PatientsController {
   @ApiOkResponse({ type: GetEligiblePatientsResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    example: { status: 'ERROR', message: 'ParÃ¢metro invÃ¡lido: withActivePts' },
+    example: { status: 'ERROR', message: 'Parâmetro inválido: withActivePts' },
   })
   @ApiForbiddenResponse({
     type: ErrorResponseDto,
@@ -161,7 +161,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel consultar os pacientes elegÃ­veis.',
+      message: 'Não foi possível consultar os pacientes elegíveis.',
     },
   })
   async findEligibleForProposal(
@@ -172,9 +172,9 @@ export class PatientsController {
   }
 
   /**
-   * Retorna o detalhe de um paciente: o administrador vÃª qualquer paciente
+   * Retorna o detalhe de um paciente: o administrador vê qualquer paciente
    * (RN022); o profissional, os pacientes dos PTS de que faz ou fez parte
-   * (RN016), sÃ³ para leitura quando o PTS estÃ¡ encerrado (RN024).
+   * (RN016), só para leitura quando o PTS está encerrado (RN024).
    *
    * @param account contexto da conta autenticada
    * @param id identificador do paciente (a conta)
@@ -185,7 +185,7 @@ export class PatientsController {
   @ApiOkResponse({ type: PatientDetailResponseDto })
   @ApiBadRequestResponse({
     type: ErrorResponseDto,
-    example: { status: 'ERROR', message: 'ParÃ¢metro invÃ¡lido: id' },
+    example: { status: 'ERROR', message: 'Parâmetro inválido: id' },
   })
   @ApiForbiddenResponse({
     type: ErrorResponseDto,
@@ -198,14 +198,14 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'PATIENT_NOT_FOUND',
-      message: 'Paciente nÃ£o encontrado.',
+      message: 'Paciente não encontrado.',
     },
   })
   @ApiInternalServerErrorResponse({
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel consultar o paciente.',
+      message: 'Não foi possível consultar o paciente.',
     },
   })
   async findOne(
@@ -216,7 +216,7 @@ export class PatientsController {
         exceptionFactory: () =>
           new BadRequestException({
             status: 'ERROR',
-            message: 'ParÃ¢metro invÃ¡lido: id',
+            message: 'Parâmetro inválido: id',
           }),
       }),
     )
@@ -228,7 +228,7 @@ export class PatientsController {
   /**
    * Cria o perfil de paciente de uma conta existente (RFPAC001).
    *
-   * @param body conta e contatos de suporte jÃ¡ validados
+   * @param body conta e contatos de suporte já validados
    * @returns perfil criado
    */
   @Post('patients')
@@ -250,7 +250,7 @@ export class PatientsController {
   })
   @ApiNotFoundResponse({
     type: ErrorResponseDto,
-    example: { status: 'ACCOUNT_NOT_FOUND', message: 'Conta nÃ£o encontrada.' },
+    example: { status: 'ACCOUNT_NOT_FOUND', message: 'Conta não encontrada.' },
   })
   @ApiConflictResponse({
     type: ErrorResponseDto,
@@ -259,21 +259,21 @@ export class PatientsController {
         summary: 'Conta de administrador',
         value: {
           status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
-          message: 'Conta de administrador nÃ£o pode ter perfil de paciente.',
+          message: 'Conta de administrador não pode ter perfil de paciente.',
         },
       },
       ACCOUNT_HAS_PROFESSIONAL_PROFILE: {
         summary: 'Conta com perfil profissional',
         value: {
           status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
-          message: 'A conta jÃ¡ possui um perfil profissional.',
+          message: 'A conta já possui um perfil profissional.',
         },
       },
       PATIENT_PROFILE_ALREADY_EXISTS: {
-        summary: 'Conta que jÃ¡ tem perfil de paciente',
+        summary: 'Conta que já tem perfil de paciente',
         value: {
           status: 'PATIENT_PROFILE_ALREADY_EXISTS',
-          message: 'A conta jÃ¡ possui perfil de paciente.',
+          message: 'A conta já possui perfil de paciente.',
         },
       },
     },
@@ -282,7 +282,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel cadastrar o perfil de paciente.',
+      message: 'Não foi possível cadastrar o perfil de paciente.',
     },
   })
   async create(
@@ -503,7 +503,7 @@ export class PatientsController {
   }
   /**
    * Lista os contatos de suporte do paciente (RFPAC003): admin, profissional
-   * com vÃ­nculo (RN016) e o prÃ³prio paciente.
+   * com vínculo (RN016) e o próprio paciente.
    */
   @Get('patients/:patientId/support-contacts')
   @UseGuards(AuthGuard)
@@ -512,7 +512,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'VALIDATION_ERROR',
-      message: 'ParÃ¢metro invÃ¡lido: patientId',
+      message: 'Parâmetro inválido: patientId',
     },
   })
   @ApiForbiddenResponse({
@@ -527,7 +527,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel consultar os contatos de suporte.',
+      message: 'Não foi possível consultar os contatos de suporte.',
     },
   })
   async findSupportContacts(
@@ -539,7 +539,7 @@ export class PatientsController {
 
   /**
    * Cria um contato de suporte (RFPAC003): admin ou membro da equipe de um
-   * PTS ativo do paciente (RN024). NÃ£o concede acesso ao contato (RN017).
+   * PTS ativo do paciente (RN024). Não concede acesso ao contato (RN017).
    */
   @Post('patients/:patientId/support-contacts')
   @UseGuards(AuthGuard)
@@ -548,7 +548,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'VALIDATION_ERROR',
-      message: 'Informe o telefone do contato de emergÃªncia.',
+      message: 'Informe o telefone do contato de emergência.',
     },
   })
   @ApiForbiddenResponse({
@@ -560,7 +560,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel cadastrar o contato de suporte.',
+      message: 'Não foi possível cadastrar o contato de suporte.',
     },
   })
   async createSupportContact(
@@ -573,7 +573,7 @@ export class PatientsController {
 
   /**
    * Atualiza um contato de suporte (RFPAC003): os campos ausentes ficam como
-   * estÃ£o e `null` limpa a descriÃ§Ã£o, o e-mail ou o telefone.
+   * estão e `null` limpa a descrição, o e-mail ou o telefone.
    */
   @Patch('patients/:patientId/support-contacts/:contactId')
   @UseGuards(AuthGuard)
@@ -582,7 +582,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'VALIDATION_ERROR',
-      message: 'Informe um e-mail vÃ¡lido para o contato.',
+      message: 'Informe um e-mail válido para o contato.',
     },
   })
   @ApiForbiddenResponse({
@@ -603,7 +603,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel atualizar o contato de suporte.',
+      message: 'Não foi possível atualizar o contato de suporte.',
     },
   })
   async updateSupportContact(
@@ -629,7 +629,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'VALIDATION_ERROR',
-      message: 'ParÃ¢metro invÃ¡lido: contactId',
+      message: 'Parâmetro inválido: contactId',
     },
   })
   @ApiForbiddenResponse({
@@ -650,7 +650,7 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'NÃ£o foi possÃ­vel remover o contato de suporte.',
+      message: 'Não foi possível remover o contato de suporte.',
     },
   })
   async deleteSupportContact(
