@@ -241,7 +241,7 @@ describe('PatientsRepository list and detail', () => {
 
     const page = captured[1];
     expect(page.sql).toContain('1 = 0');
-    expect(page.sql).not.toContain('IS NULL');
+    expect(page.sql).not.toContain('listed.pts_status IS NULL');
     expect(page.parameters.statusFilter).toBeUndefined();
   });
 

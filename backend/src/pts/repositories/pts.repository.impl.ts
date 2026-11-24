@@ -34,6 +34,8 @@ import { Patient } from '../../patients/entities/patient.entity';
 import {
   activePtsAlreadyExists,
   ptsProposalNotDraft,
+  ptsProposalNotDraftForDelete,
+  ptsProposalNotFound,
   ptsProposalNotPending,
 } from '../pts.errors';
 
@@ -568,6 +570,45 @@ export class PtsRepositoryImpl extends PtsRepository {
         acceptedAt: null,
         rejectedAt: now.toISOString(),
       };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async softDeleteProposal(id: string): Promise<void> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava a proposta e refaz as checagens: uma aprovação ou outra
+      // exclusão simultânea não passam despercebidas. O query builder já
+      // ignora propostas com deletedAt preenchido.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id })
+        .getOne();
+
+      if (!locked) {
+        throw ptsProposalNotFound();
+      }
+
+      if (locked.status !== PtsStateEnum.DRAFT) {
+        throw ptsProposalNotDraftForDelete();
+      }
+
+      // Só deletedAt muda: a linha e a equipe continuam no banco.
+      await queryRunner.manager.softDelete(PtsEntity, id);
+
+      await queryRunner.commitTransaction();
     } catch (error) {
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();

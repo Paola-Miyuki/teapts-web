@@ -24,7 +24,18 @@ export class InMemoryPtsRepository extends PtsRepository {
   activePts: ActivePtsResponseDto[] = [];
   ptsById = new Map<string, PtsDetailResponseDto>();
   socialSituationTargets = new Map<string, SocialSituationTarget>();
+  /** Ids com deletedAt preenchido (exclusão lógica). */
+  deletedIds = new Set<string>();
   private nextId = 100;
+
+  // Como o TypeORM com @DeleteDateColumn: excluídas somem das consultas.
+  private get visible(): CreatePtsResponseDto[] {
+    return this.created.filter((proposal) => !this.deletedIds.has(proposal.id));
+  }
+
+  async softDeleteProposal(id: string): Promise<void> {
+    this.deletedIds.add(id);
+  }
 
   async findProfessionalById(id: string): Promise<ProfessionalRecord | null> {
     return this.professionals.get(id) ?? null;
@@ -66,7 +77,7 @@ export class InMemoryPtsRepository extends PtsRepository {
     } = input;
     const term = q?.toLocaleLowerCase('pt-BR');
 
-    const draftProposals = this.created.filter(
+    const draftProposals = this.visible.filter(
       (proposal) =>
         (!patientId || proposal.patient.id === patientId) &&
         (!term ||
@@ -103,7 +114,7 @@ export class InMemoryPtsRepository extends PtsRepository {
       return false;
     }
 
-    return this.created.some(
+    return this.visible.some(
       (proposal) =>
         proposal.patient.id === patientId &&
         this.isProfessionalOnProposal(proposal, profileIds),
@@ -113,7 +124,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   async findDraftProposalById(
     id: string,
   ): Promise<PtsProposalResponseDto | null> {
-    const proposal = this.created.find(
+    const proposal = this.visible.find(
       (item) => item.id === id && item.status === PtsStateEnum.DRAFT,
     );
 
@@ -132,7 +143,7 @@ export class InMemoryPtsRepository extends PtsRepository {
 
   async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
     return (
-      (this.created.find((proposal) => proposal.id === id) as
+      (this.visible.find((proposal) => proposal.id === id) as
         PtsProposalResponseDto | undefined) ?? null
     );
   }
@@ -178,7 +189,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   async findProposalForDecision(
     id: string,
   ): Promise<ProposalDecisionTarget | null> {
-    const proposal = this.created.find((item) => item.id === id);
+    const proposal = this.visible.find((item) => item.id === id);
 
     return proposal
       ? {
@@ -193,7 +204,7 @@ export class InMemoryPtsRepository extends PtsRepository {
     id: string,
     patientId: string,
   ): Promise<PtsDecisionResponseDto> {
-    const proposal = this.created.find((item) => item.id === id);
+    const proposal = this.visible.find((item) => item.id === id);
 
     if (!proposal) {
       throw new Error('Proposta não encontrada.');
@@ -202,7 +213,7 @@ export class InMemoryPtsRepository extends PtsRepository {
     const now = new Date().toISOString();
     proposal.status = PtsStateEnum.PLANNING;
 
-    for (const otherProposal of this.created) {
+    for (const otherProposal of this.visible) {
       if (
         otherProposal.patient.id === patientId &&
         otherProposal.id !== id &&
@@ -221,7 +232,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   }
 
   async rejectProposal(id: string): Promise<PtsDecisionResponseDto> {
-    const proposal = this.created.find((item) => item.id === id);
+    const proposal = this.visible.find((item) => item.id === id);
 
     if (!proposal) {
       throw new Error('Proposta não encontrada.');

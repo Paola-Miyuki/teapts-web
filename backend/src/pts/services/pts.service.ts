@@ -15,6 +15,7 @@ import type {
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
@@ -37,6 +38,8 @@ import {
   socialSituationForbidden,
   teamProfessionalNotFound,
   validationError,
+  ptsProposalDeleteForbidden,
+  ptsProposalNotDraftForDelete,
 } from '../pts.errors';
 
 @Injectable()
@@ -382,6 +385,34 @@ export class PtsService {
     await this.findDecidableProposal(id, account);
 
     return this.ptsRepository.rejectProposal(id);
+  }
+
+  async deleteProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<DeletePtsProposalResponseDto> {
+    // Proposta já excluída não é encontrada: responde 404.
+    const proposal = await this.ptsRepository.findProposalById(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(proposal.responsible.id)
+    ) {
+      throw ptsProposalDeleteForbidden();
+    }
+
+    // PTS aprovado não é excluído: é cancelado no encerramento (RFPTS010).
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotDraftForDelete();
+    }
+
+    await this.ptsRepository.softDeleteProposal(id);
+
+    return { status: 'OK' };
   }
 
   private async findDecidableProposal(id: string, account: AccountContext) {

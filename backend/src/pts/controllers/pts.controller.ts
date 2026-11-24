@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -20,6 +21,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -45,6 +47,7 @@ import {
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { PtsService } from '../services/pts.service';
 
@@ -209,5 +212,40 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<PtsDecisionResponseDto> {
     return this.ptsService.rejectProposal(id, account);
+  }
+
+  @Delete('proposals/:id')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Exclui uma proposta de PTS em DRAFT (RFPTS008)',
+    description:
+      'Exclusão lógica (deletedAt): só o responsável (ou o admin) exclui. ' +
+      'A proposta deixa de aparecer em GET /pts/proposals e GET /pts/proposals/:id.',
+  })
+  @ApiOkResponse({ type: DeletePtsProposalResponseDto })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_DRAFT: {
+        summary: 'Proposta que não está em draft',
+        value: {
+          status: 'PTS_NOT_DRAFT',
+          message: 'Somente propostas aguardando decisão podem ser excluídas.',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async deleteProposal(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<DeletePtsProposalResponseDto> {
+    return this.ptsService.deleteProposal(id, account);
   }
 }

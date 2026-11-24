@@ -136,3 +136,17 @@ export const ptsNotActive = () =>
     'PTS_NOT_ACTIVE',
     'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
   );
+
+export const ptsProposalDeleteForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode excluir a proposta.',
+  );
+
+export const ptsProposalNotDraftForDelete = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_DRAFT',
+    'Somente propostas aguardando decisão podem ser excluídas.',
+  );

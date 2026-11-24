@@ -111,4 +111,7 @@ export abstract class PtsRepository {
   ): Promise<PtsDecisionResponseDto>;
 
   abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;
+
+  /** Exclusão lógica da proposta em DRAFT: preenche deletedAt. */
+  abstract softDeleteProposal(id: string): Promise<void>;
 }

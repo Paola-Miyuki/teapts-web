@@ -110,15 +110,17 @@ src/
   pts/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
                                                GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
-                                               PATCH /pts/:id/social-situation e POST
-                                               /pts/proposals/:id/approve e /reject, todos com sessão
+                                               PATCH /pts/:id/social-situation, POST
+                                               /pts/proposals/:id/approve e /reject e
+                                               DELETE /pts/proposals/:id, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
                                                equipe e admin), estados do PTS e decisão das propostas
     repositories/pts.repository.ts             contrato do repositório (implementação em
                                                pts.repository.impl.ts)
     dto/                                       contratos e validação de criação, consulta,
                                                edição, situação social e decisão
-    entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e)
+    entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e);
+                                               deleted_at é a exclusão lógica da proposta
     pts.errors.ts                              erros { status, message } do módulo
   auth/
     services/supertokens.service.ts        receitas EmailPassword e Session; campos da conta no
@@ -187,6 +189,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/active?patientId=` | paciente titular, membro da equipe ou admin | [GET /pts/active](#get-ptsactive) |
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
+| DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 | POST | `/pts/proposals/:id/reject` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
@@ -507,6 +510,29 @@ possíveis são `400` (`VALIDATION_ERROR` ou
 `TEAM_PROFESSIONAL_NOT_FOUND`), `401` (sem sessão), `403`
 (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
 (`PTS_NOT_DRAFT`).
+
+## DELETE /pts/proposals/:id
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN022)
+excluem uma proposta em `draft`. Não há corpo.
+
+A exclusão é lógica (RN021): a proposta ganha `deleted_at` com a data atual,
+sem apagar a linha nem a equipe. A partir daí ela some de
+`GET /pts/proposals`, `GET /pts/proposals/:id` (`404`) e das demais rotas
+de proposta, e não pode mais ser aprovada. PTS aprovado não é excluído: ele
+é cancelado no encerramento (RFPTS010).
+
+A resposta `200` é:
+
+```json
+{ "status": "OK" }
+```
+
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
+`401` (sem sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`, inclusive
+para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
+proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
+simultânea não deixa excluir um PTS que acabou de ser aprovado.
 
 ## POST /pts/proposals/:id/approve e /reject
 

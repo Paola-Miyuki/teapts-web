@@ -1374,3 +1374,140 @@ describe('PtsService.findPtsById', () => {
     );
   });
 });
+
+describe('PtsService.deleteProposal', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+  });
+
+  const createDraft = () => service.createPts(body, responsibleAccount);
+
+  it('exclui a proposta em DRAFT e responde { status: OK }', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.deleteProposal(proposal.id, responsibleAccount),
+    ).resolves.toEqual({ status: 'OK' });
+    expect(repo.deletedIds.has(proposal.id)).toBe(true);
+  });
+
+  it('é lógica: a proposta continua guardada com a equipe', async () => {
+    const proposal = await createDraft();
+
+    await service.deleteProposal(proposal.id, responsibleAccount);
+
+    expect(repo.created).toContainEqual(
+      expect.objectContaining({
+        id: proposal.id,
+        team: expect.arrayContaining([
+          expect.objectContaining({ id: 'prof-11' }),
+        ]),
+      }),
+    );
+  });
+
+  it('a proposta excluída some de GET /pts/proposals', async () => {
+    const proposal = await createDraft();
+
+    await service.deleteProposal(proposal.id, responsibleAccount);
+
+    const result = await service.findDraftProposals(
+      { patientId: 'patient-25', page: 1, limit: 20 },
+      adminAccount,
+    );
+    expect(result.data).toEqual([]);
+    expect(result.pagination.total).toBe(0);
+  });
+
+  it('a proposta excluída responde 404 em GET /pts/proposals/:id', async () => {
+    const proposal = await createDraft();
+
+    await service.deleteProposal(proposal.id, responsibleAccount);
+
+    await expectApiError(
+      () => service.findDraftProposalById(proposal.id, responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('excluir de novo responde 404 PTS_NOT_FOUND', async () => {
+    const proposal = await createDraft();
+    await service.deleteProposal(proposal.id, responsibleAccount);
+
+    await expectApiError(
+      () => service.deleteProposal(proposal.id, responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('a proposta excluída não pode mais ser aprovada', async () => {
+    const proposal = await createDraft();
+    await service.deleteProposal(proposal.id, responsibleAccount);
+
+    await expectApiError(
+      () => service.approveProposal(proposal.id, adminAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('responde 404 PTS_NOT_FOUND para proposta inexistente', async () => {
+    await expectApiError(
+      () => service.deleteProposal('999', responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it.each([
+    ['membro da equipe', teamAccount],
+    ['outro profissional', otherProfessionalAccount],
+    ['paciente', patientAccount],
+    ['conta sem perfil', noProfileAccount],
+  ])('responde 403 para %s', async (_label, account) => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => service.deleteProposal(proposal.id, account),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.deletedIds.size).toBe(0);
+  });
+
+  it.each([
+    PtsStateEnum.PLANNING,
+    PtsStateEnum.RUNNING,
+    PtsStateEnum.REJECTED,
+    PtsStateEnum.CONCLUDED,
+    PtsStateEnum.CANCELLED,
+  ])('responde 409 PTS_NOT_DRAFT para proposta em %s', async (status) => {
+    const proposal = await createDraft();
+    proposal.status = status;
+
+    const error = await expectApiError(
+      () => service.deleteProposal(proposal.id, responsibleAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+
+    expect(error.message).toBe(
+      'Somente propostas aguardando decisão podem ser excluídas.',
+    );
+    expect(repo.deletedIds.size).toBe(0);
+  });
+
+  it('permite ao admin excluir (RN022)', async () => {
+    const proposal = await createDraft();
+
+    await expect(
+      service.deleteProposal(proposal.id, adminAccount),
+    ).resolves.toEqual({ status: 'OK' });
+  });
+});
