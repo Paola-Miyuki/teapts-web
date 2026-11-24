@@ -9,6 +9,7 @@ import { CreatePatientAndProfessional1791148860000 } from './migrations/17911488
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { CreatePtsTables1791148870000 } from './migrations/1791148870000-CreatePtsTables';
 import { AddProfessionalAccountSpecialismUnique1791148880000 } from './migrations/1791148880000-AddProfessionalAccountSpecialismUnique';
+import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
 import { AddPatientListFields1791148910000 } from './migrations/1791148910000-AddPatientListFields';
 import { StandardizeColumnNames1791148920000 } from './migrations/1791148920000-StandardizeColumnNames';
 import { CreateSupportContact1791148930000 } from './migrations/1791148930000-CreateSupportContact';
@@ -16,6 +17,7 @@ import { AlignPatientAndProfessionalConstraints1791148940000 } from './migration
 import { AddAccountPersonalFields1791148950000 } from './migrations/1791148950000-AddAccountPersonalFields';
 import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
 import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
+import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-CreateTimelineRecord';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -77,7 +79,14 @@ describe('getDatabaseOptions', () => {
 
   it('registers the entities and migrations explicitly', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
-      entities: [Account, Patient, SupportContact, Professional, Pts],
+      entities: [
+        Account,
+        Patient,
+        SupportContact,
+        Professional,
+        Pts,
+        TimelineRecord,
+      ],
       migrations: [
         CreateAccount1791072000000,
         LinkAccountToSupertokens1791148800000,
@@ -91,6 +100,7 @@ describe('getDatabaseOptions', () => {
         AddAccountPersonalFields1791148950000,
         AddProfessionalCouncilFields1791148960000,
         AddDeletedAtToPts1791148970000,
+        CreateTimelineRecord1791148980000,
       ],
     });
   });

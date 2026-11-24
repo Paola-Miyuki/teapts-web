@@ -1511,3 +1511,169 @@ describe('PtsService.deleteProposal', () => {
     ).resolves.toEqual({ status: 'OK' });
   });
 });
+
+describe('PtsService.removeTeamMember', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const responsible = {
+    id: 'prof-10',
+    name: 'Kaio Segunda Conta',
+    specialism: { id: 'psychologist', name: 'Psicologia' },
+    registration: null,
+  };
+  const member = {
+    id: 'prof-11',
+    name: 'Ana Souza',
+    specialism: { id: 'doctor', name: 'Medicina' },
+    registration: null,
+  };
+
+  const seedPts = (status: PtsStateEnum = PtsStateEnum.RUNNING) => {
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status,
+      responsible,
+      team: [member],
+    });
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+    seedPts();
+  });
+
+  it('remove o membro e devolve o PTS com a equipe atualizada', async () => {
+    const result = await service.removeTeamMember(
+      'pts-100',
+      'prof-11',
+      responsibleAccount,
+    );
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsible,
+      team: [],
+    });
+  });
+
+  it('o acesso do removido ao PTS cessa', async () => {
+    await service.removeTeamMember('pts-100', 'prof-11', responsibleAccount);
+
+    await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-11', teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect((await repo.findPtsTeam('pts-100'))?.team).toEqual([]);
+  });
+
+  it('grava o evento na timeline com o responsável como autor', async () => {
+    await service.removeTeamMember('pts-100', 'prof-11', responsibleAccount);
+
+    expect(repo.timelineRecords).toEqual([
+      {
+        ptsId: 'pts-100',
+        professionalId: 'prof-11',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'acc-1',
+        description: 'Remoção de Ana Souza da equipe.',
+      },
+    ]);
+  });
+
+  it('aceita PTS em PLANNING', async () => {
+    seedPts(PtsStateEnum.PLANNING);
+
+    const result = await service.removeTeamMember(
+      'pts-100',
+      'prof-11',
+      responsibleAccount,
+    );
+
+    expect(result.team).toEqual([]);
+  });
+
+  it('retorna 404 PTS_NOT_FOUND para PTS inexistente', async () => {
+    await expectApiError(
+      () => service.removeTeamMember('pts-999', 'prof-11', responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it.each([
+    ['membro da equipe', teamAccount],
+    ['outro profissional', otherProfessionalAccount],
+    ['paciente', patientAccount],
+    ['conta sem perfil', noProfileAccount],
+  ])('retorna 403 para %s', async (_label, account) => {
+    await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-11', account),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.timelineRecords).toHaveLength(0);
+  });
+
+  it.each([
+    PtsStateEnum.DRAFT,
+    PtsStateEnum.CONCLUDED,
+    PtsStateEnum.CANCELLED,
+    PtsStateEnum.REJECTED,
+  ])('retorna 409 PTS_NOT_ACTIVE para PTS em %s', async (status) => {
+    seedPts(status);
+
+    await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-11', responsibleAccount),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+  });
+
+  it('retorna 409 CANNOT_REMOVE_RESPONSIBLE ao tentar remover o responsável', async () => {
+    const error = await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-10', responsibleAccount),
+      409,
+      'CANNOT_REMOVE_RESPONSIBLE',
+    );
+
+    expect(error.message).toBe(
+      'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
+    );
+    expect(repo.timelineRecords).toHaveLength(0);
+  });
+
+  it('retorna 404 TEAM_MEMBER_NOT_FOUND para profissional fora da equipe', async () => {
+    await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-20', responsibleAccount),
+      404,
+      'TEAM_MEMBER_NOT_FOUND',
+    );
+  });
+
+  it('permite ao admin remover, sem autor profissional no evento (RN006/RN022)', async () => {
+    const result = await service.removeTeamMember(
+      'pts-100',
+      'prof-11',
+      adminAccount,
+    );
+
+    expect(result.team).toEqual([]);
+    // O admin não atribui profissional, mas a conta dele fica registrada (RN029).
+    expect(repo.timelineRecords[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+    });
+  });
+
+  it('mantém o 409 CANNOT_REMOVE_RESPONSIBLE para o admin', async () => {
+    await expectApiError(
+      () => service.removeTeamMember('pts-100', 'prof-10', adminAccount),
+      409,
+      'CANNOT_REMOVE_RESPONSIBLE',
+    );
+  });
+});

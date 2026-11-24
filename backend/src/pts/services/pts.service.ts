@@ -14,6 +14,7 @@ import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsRepository } from '../repositories/pts.repository';
@@ -35,6 +36,9 @@ import {
   ptsNotActive,
   ptsForbidden,
   ptsNotFound,
+  cannotRemoveResponsible,
+  teamEditForbidden,
+  teamMemberNotFound,
   socialSituationForbidden,
   teamProfessionalNotFound,
   validationError,
@@ -413,6 +417,56 @@ export class PtsService {
     await this.ptsRepository.softDeleteProposal(id);
 
     return { status: 'OK' };
+  }
+
+  async removeTeamMember(
+    id: string,
+    professionalId: string,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeam(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RN006: só o responsável (ou o admin, RN022) altera a equipe.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsible.id)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    // RN007: a saída do responsável é feita pela transferência (RFEM002).
+    if (professionalId === pts.responsible.id) {
+      throw cannotRemoveResponsible();
+    }
+
+    const member = pts.team.find(
+      (professional) => professional.id === professionalId,
+    );
+
+    if (!member) {
+      throw teamMemberNotFound();
+    }
+
+    return this.ptsRepository.removeTeamMember({
+      ptsId: id,
+      professionalId,
+      authorProfessionalId: admin ? null : pts.responsible.id,
+      executedByAccountId: account.accountId,
+      description: `Remoção de ${member.name} da equipe.`,
+    });
   }
 
   private async findDecidableProposal(id: string, account: AccountContext) {

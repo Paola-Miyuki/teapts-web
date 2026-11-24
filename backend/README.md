@@ -111,8 +111,9 @@ src/
     controllers/pts.controller.ts              POST /pts, GET /pts/proposals, GET /pts/proposals/:id,
                                                GET /pts/active, GET /pts/:id, PATCH /pts/proposals/:id,
                                                PATCH /pts/:id/social-situation, POST
-                                               /pts/proposals/:id/approve e /reject e
-                                               DELETE /pts/proposals/:id, todos com sessão
+                                               /pts/proposals/:id/approve e /reject,
+                                               DELETE /pts/proposals/:id e
+                                               DELETE /pts/:id/team/:professionalId, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
                                                equipe e admin), estados do PTS e decisão das propostas
     repositories/pts.repository.ts             contrato do repositório (implementação em
@@ -122,6 +123,9 @@ src/
     entities/pts.entity.ts                     projeto_terapeutico_singular e a equipe (pts_state_e);
                                                deleted_at é a exclusão lógica da proposta
     pts.errors.ts                              erros { status, message } do módulo
+  timeline/
+    entities/timeline-record.entity.ts         timeline_record (eventos do PTS)
+    enums/                                     timeline_record_type_e e timeline_record_target_e
   auth/
     services/supertokens.service.ts        receitas EmailPassword e Session; campos da conta no
                                            signup; overrides de signUpPOST, signUp,
@@ -190,6 +194,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
+| DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
 | POST | `/pts/proposals/:id/reject` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
@@ -533,6 +538,43 @@ Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
 para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
 proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
 simultânea não deixa excluir um PTS que acabou de ser aprovado.
+
+## DELETE /pts/:id/team/:professionalId
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN006 e
+RN022) removem um membro da equipe de um PTS em `planning` ou `running`. Não
+há corpo. O responsável não sai por esta rota (RN007): a saída dele é a
+transferência de responsabilidade (RFEM002).
+
+Na mesma transação, o vínculo em
+`professional_participating_on_therapeutic_journey` é apagado e um
+`timeline_record` é gravado: `type: member_removed`, `target_type: team_member`,
+`target_id` = id do profissional removido, `pts_id`, `author_professional_id`
+= responsável (nulo quando o admin remove) e `executed_by_account_id` = conta
+que executou (RN029). Registros anteriores do removido mantêm a autoria.
+
+A resposta `200` retorna o PTS com o responsável e a equipe atualizada:
+
+```json
+{
+  "id": "3f2e1d0c-9b8a-4765-a432-10fedcba9876",
+  "status": "running",
+  "responsible": {
+    "id": "7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+    "name": "Kaio Segunda Conta",
+    "specialism": { "id": "psychologist", "name": "Psicologia" },
+    "registration": null
+  },
+  "team": []
+}
+```
+
+Os erros possíveis são `400` (parâmetro que não é UUID), `401` (sem
+sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND` ou
+`TEAM_MEMBER_NOT_FOUND`) e `409` (`PTS_NOT_ACTIVE` ou
+`CANNOT_REMOVE_RESPONSIBLE`). A transação trava o PTS
+(`pessimistic_write`) e refaz as checagens, então uma transferência de
+responsabilidade ou um encerramento simultâneo não passam despercebidos.
 
 ## POST /pts/proposals/:id/approve e /reject
 

@@ -150,3 +150,24 @@ export const ptsProposalNotDraftForDelete = () =>
     'PTS_NOT_DRAFT',
     'Somente propostas aguardando decisão podem ser excluídas.',
   );
+
+export const teamEditForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode alterar a equipe.',
+  );
+
+export const teamMemberNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'TEAM_MEMBER_NOT_FOUND',
+    'O profissional não faz parte da equipe deste PTS.',
+  );
+
+export const cannotRemoveResponsible = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'CANNOT_REMOVE_RESPONSIBLE',
+    'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
+  );

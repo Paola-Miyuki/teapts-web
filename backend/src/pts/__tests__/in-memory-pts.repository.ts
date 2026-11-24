@@ -12,9 +12,11 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type RemoveTeamMemberInput,
   type SocialSituationTarget,
 } from '../repositories/pts.repository';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 
 export class InMemoryPtsRepository extends PtsRepository {
   professionals = new Map<string, ProfessionalRecord>();
@@ -23,6 +25,8 @@ export class InMemoryPtsRepository extends PtsRepository {
   created: CreatePtsResponseDto[] = [];
   activePts: ActivePtsResponseDto[] = [];
   ptsById = new Map<string, PtsDetailResponseDto>();
+  ptsTeams = new Map<string, PtsTeamResponseDto>();
+  timelineRecords: RemoveTeamMemberInput[] = [];
   socialSituationTargets = new Map<string, SocialSituationTarget>();
   /** Ids com deletedAt preenchido (exclusão lógica). */
   deletedIds = new Set<string>();
@@ -247,6 +251,29 @@ export class InMemoryPtsRepository extends PtsRepository {
       acceptedAt: null,
       rejectedAt,
     };
+  }
+
+  async findPtsTeam(id: string): Promise<PtsTeamResponseDto | null> {
+    const pts = this.ptsTeams.get(id);
+
+    return pts ? { ...pts, team: [...pts.team] } : null;
+  }
+
+  async removeTeamMember(
+    input: RemoveTeamMemberInput,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = this.ptsTeams.get(input.ptsId);
+
+    if (!pts) {
+      throw new Error('PTS não encontrado.');
+    }
+
+    pts.team = pts.team.filter(
+      (professional) => professional.id !== input.professionalId,
+    );
+    this.timelineRecords.push({ ...input });
+
+    return { ...pts, team: [...pts.team] };
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {

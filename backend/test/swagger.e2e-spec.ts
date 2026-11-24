@@ -72,6 +72,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'get'],
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
+  ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
@@ -263,6 +264,10 @@ describe('Swagger (e2e)', () => {
     ['/patients/authorized', 'get', '400'],
     ['/patients/authorized', 'get', '500'],
     ['/accounts', 'get', '400'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '400'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '403'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '404'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '409'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
     ['/patients', 'post', '400'],
@@ -425,6 +430,37 @@ describe('Swagger (e2e)', () => {
           {},
       ),
     ).toEqual(['PTS_NOT_DRAFT']);
+  });
+
+  it('documents DELETE /pts/{id}/team/{professionalId}', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/team/{professionalId}'].delete;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(
+      (operation.parameters ?? [])
+        .filter((parameter) => parameter.in === 'path')
+        .map((parameter) => parameter.name),
+    ).toEqual(['id', 'professionalId']);
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/PtsTeamResponseDto',
+    );
+    expect(components.schemas.PtsTeamResponseDto.required).toEqual([
+      'id',
+      'status',
+      'responsible',
+      'team',
+    ]);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND', 'TEAM_MEMBER_NOT_FOUND']);
+    expect(examples('409')).toEqual([
+      'PTS_NOT_ACTIVE',
+      'CANNOT_REMOVE_RESPONSIBLE',
+    ]);
   });
 
   it('reads the POST /patients body from the DTO', async () => {
