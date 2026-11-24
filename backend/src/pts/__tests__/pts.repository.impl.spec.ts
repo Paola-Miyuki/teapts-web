@@ -294,6 +294,7 @@ function createTeamRepository(locked: Partial<PtsEntity> | null, affected = 1) {
         entity ? lockQuery : deleteQuery,
       ),
       insert: jest.fn(async () => ({ identifiers: [] })),
+      update: jest.fn(async () => ({ affected: 1 })),
       findOne: jest.fn(async () => reloaded),
     },
     query: jest.fn(async () => []),
@@ -585,6 +586,102 @@ describe('PtsRepositoryImpl.addTeamMembers', () => {
     await expectApiError(() => repository.addTeamMembers(input), status, code);
 
     expect(queryRunner.query).not.toHaveBeenCalled();
+    expect(queryRunner.manager.insert).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.startPts', () => {
+  const input = {
+    ptsId: 'pts-1',
+    authorProfessionalId: 'prof-10',
+    executedByAccountId: 'account-10',
+    description: 'Ana Souza iniciou a execução do PTS',
+  };
+  const planning: Partial<PtsEntity> = {
+    id: 'pts-1',
+    status: PtsStateEnum.PLANNING,
+    responsibleProfessionalId: 'prof-10',
+  };
+
+  it('trava o PTS, grava status e began_at e registra pts_started na mesma transação', async () => {
+    const { repository, lockQuery, queryRunner } =
+      createTeamRepository(planning);
+
+    const result = await repository.startPts(input);
+
+    expect(lockQuery.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(queryRunner.manager.update).toHaveBeenCalledWith(
+      PtsEntity,
+      'pts-1',
+      { status: PtsStateEnum.RUNNING, beganAt: new Date(result.beganAt) },
+    );
+    expect(queryRunner.manager.insert).toHaveBeenCalledWith(
+      TimelineRecordEntity,
+      {
+        type: TimelineRecordType.PtsStarted,
+        description: 'Ana Souza iniciou a execução do PTS',
+        targetId: 'pts-1',
+        targetType: TimelineRecordTarget.Pts,
+        ptsId: 'pts-1',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'account-10',
+      },
+    );
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+    expect(result).toEqual({
+      id: 'pts-1',
+      status: PtsStateEnum.RUNNING,
+      beganAt: expect.any(String),
+    });
+  });
+
+  it('grava o admin sem profissional atribuído (RN029)', async () => {
+    const { repository, queryRunner } = createTeamRepository(planning);
+
+    await repository.startPts({ ...input, authorProfessionalId: null });
+
+    expect(queryRunner.manager.insert).toHaveBeenCalledWith(
+      TimelineRecordEntity,
+      expect.objectContaining({
+        authorProfessionalId: null,
+        executedByAccountId: 'account-10',
+      }),
+    );
+  });
+
+  it('desfaz o início quando a gravação da timeline falha', async () => {
+    const { repository, queryRunner } = createTeamRepository(planning);
+    queryRunner.manager.insert.mockRejectedValueOnce(new Error('falha'));
+
+    await expect(repository.startPts(input)).rejects.toThrow('falha');
+
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    expect(queryRunner.release).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PTS sumiu antes do lock', null, 404, 'PTS_NOT_FOUND'],
+    [
+      'responsabilidade transferida antes do lock',
+      { ...planning, responsibleProfessionalId: 'prof-99' },
+      403,
+      'FORBIDDEN',
+    ],
+    [
+      'PTS iniciado antes do lock',
+      { ...planning, status: PtsStateEnum.RUNNING },
+      409,
+      'PTS_NOT_PLANNING',
+    ],
+  ])('não inicia: %s', async (_label, locked, status, code) => {
+    const { repository, queryRunner } = createTeamRepository(locked);
+
+    await expectApiError(() => repository.startPts(input), status, code);
+
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
     expect(queryRunner.manager.insert).not.toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });

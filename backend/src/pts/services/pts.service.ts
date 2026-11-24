@@ -15,6 +15,7 @@ import type {
   UpdateSocialSituationRequestDto,
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
+import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
@@ -38,6 +39,8 @@ import {
   ptsNotActive,
   ptsForbidden,
   ptsNotFound,
+  ptsNotPlanning,
+  ptsStartForbidden,
   cannotRemoveResponsible,
   teamEditForbidden,
   teamMemberNotFound,
@@ -636,6 +639,42 @@ export class PtsService {
       authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
       executedByAccountId: account.accountId,
       description: `${executorName} transferiu a responsabilidade do PTS para ${newResponsible.name}`,
+    });
+  }
+
+  async startPts(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsStartResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RFPTS006: só o responsável (ou o admin, RN022) inicia a execução.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw ptsStartForbidden();
+    }
+
+    if (pts.status !== PtsStateEnum.PLANNING) {
+      throw ptsNotPlanning();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.startPts({
+      ptsId: id,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} iniciou a execução do PTS`,
     });
   }
 

@@ -4,6 +4,7 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
@@ -106,6 +107,16 @@ export interface TransferResponsibilityInput {
   description: string;
 }
 
+export interface StartPtsInput {
+  ptsId: string;
+  /** Profissional atribuído ao evento (RN029); nulo quando o admin age. */
+  authorProfessionalId: string | null;
+  /** Conta que executou a ação (RN029). */
+  executedByAccountId: string;
+  /** Texto do evento na timeline. */
+  description: string;
+}
+
 /** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
   abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
@@ -178,6 +189,12 @@ export abstract class PtsRepository {
   abstract transferResponsibility(
     input: TransferResponsibilityInput,
   ): Promise<PtsTeamResponseDto>;
+
+  /**
+   * Passa o PTS de planning para running e grava o evento na timeline, na
+   * mesma transação.
+   */
+  abstract startPts(input: StartPtsInput): Promise<PtsStartResponseDto>;
 
   abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;
 

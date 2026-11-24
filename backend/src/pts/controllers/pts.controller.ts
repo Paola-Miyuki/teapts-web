@@ -48,6 +48,7 @@ import {
   UpdateSocialSituationResponseDto,
 } from '../dto/update-social-situation.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
@@ -254,6 +255,71 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<DeletePtsProposalResponseDto> {
     return this.ptsService.deleteProposal(id, account);
+  }
+
+  @Post(':id/start')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Inicia a execução de um PTS aprovado (RFPTS006)',
+    description:
+      'Só o responsável (ou o admin, RN022) inicia, e só um PTS em planning. ' +
+      'O PTS passa para running com began_at, e o evento pts_started é gravado na timeline na mesma transação.',
+  })
+  @ApiOkResponse({ type: PtsStartResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      VALIDATION_ERROR: {
+        summary: 'id que não é UUID',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Parâmetro inválido: id',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    examples: {
+      FORBIDDEN: {
+        summary: 'Conta que não é a do responsável nem do admin',
+        value: {
+          status: 'FORBIDDEN',
+          message: 'Somente o responsável pode iniciar a execução do PTS.',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_FOUND: {
+        summary: 'PTS inexistente',
+        value: { status: 'PTS_NOT_FOUND', message: 'PTS não encontrado.' },
+      },
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      PTS_NOT_PLANNING: {
+        summary: 'PTS fora de planning',
+        value: {
+          status: 'PTS_NOT_PLANNING',
+          message: 'Só um PTS em planejamento pode ter a execução iniciada.',
+        },
+      },
+    },
+  })
+  async startPts(
+    @Param('id', parseProposalId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<PtsStartResponseDto> {
+    return this.ptsService.startPts(id, account);
   }
 
   @Post(':id/team')
