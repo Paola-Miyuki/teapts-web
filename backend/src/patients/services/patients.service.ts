@@ -1,7 +1,7 @@
-// Este arquivo concentra as regras de pacientes: a consulta de pacientes
+﻿// Este arquivo concentra as regras de pacientes: a consulta de pacientes
 // autorizados e o cadastro do perfil de paciente.
 // A query da consulta fica no PatientsRepository; aqui ficam o erro seguro, a
-// conversão para o contrato público e os metadados da paginação.
+// conversÃ£o para o contrato pÃºblico e os metadados da paginaÃ§Ã£o.
 import {
   BadRequestException,
   ConflictException,
@@ -42,6 +42,7 @@ import type {
 import type { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import {
   type EligiblePatientsPage,
+  type PatientDetailRow,
   type PatientRow,
   type PatientScope,
   type PatientsPage,
@@ -49,20 +50,20 @@ import {
   type SupportContactValues,
 } from '../repositories/patients.repository';
 
-/** Código do Postgres para violação de chave única (`unique_violation`). */
+/** CÃ³digo do Postgres para violaÃ§Ã£o de chave Ãºnica (`unique_violation`). */
 const UNIQUE_VIOLATION = '23505';
 
 const OPTIONAL_CONTACT_FIELDS = ['description', 'email', 'phone'] as const;
 
-/** Erro `409` de conta que já tem perfil de paciente (RN002). */
+/** Erro `409` de conta que jÃ¡ tem perfil de paciente (RN002). */
 function patientProfileAlreadyExists(): ConflictException {
   return new ConflictException({
     status: 'PATIENT_PROFILE_ALREADY_EXISTS',
-    message: 'A conta já possui perfil de paciente.',
+    message: 'A conta jÃ¡ possui perfil de paciente.',
   });
 }
 
-/** Diz se o erro do banco é uma violação de chave única. */
+/** Diz se o erro do banco Ã© uma violaÃ§Ã£o de chave Ãºnica. */
 function isUniqueViolation(error: unknown): boolean {
   return (
     error instanceof QueryFailedError &&
@@ -72,7 +73,7 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
- * Monta o contato salvo no banco: textos sem espaços externos e sem os
+ * Monta o contato salvo no banco: textos sem espaÃ§os externos e sem os
  * campos opcionais vazios.
  */
 function toSupportContact(contact: SupportContactDto): SupportContactDto {
@@ -102,9 +103,9 @@ function forbiddenPatient(): ForbiddenException {
 }
 
 /**
- * Escopo de quem consulta: o administrador vê todos (RN022); o profissional,
+ * Escopo de quem consulta: o administrador vÃª todos (RN022); o profissional,
  * os pacientes dos PTS de que faz ou fez parte (RN016). Conta sem perfil
- * profissional, que não seja de administrador, recebe 403 (RFPAC002.E04).
+ * profissional, que nÃ£o seja de administrador, recebe 403 (RFPAC002.E04).
  */
 function patientScope(account: AccountContext): PatientScope {
   if (isAdmin(account)) {
@@ -131,7 +132,7 @@ function toSupportContactResponse(
   };
 }
 
-/** Erro `400` do contato que não segue a regra do cadastro (RFPAC001.E03). */
+/** Erro `400` do contato que nÃ£o segue a regra do cadastro (RFPAC001.E03). */
 function invalidSupportContact(message: string): BadRequestException {
   return new BadRequestException({ status: 'VALIDATION_ERROR', message });
 }
@@ -139,18 +140,18 @@ function invalidSupportContact(message: string): BadRequestException {
 function patientNotFound(): NotFoundException {
   return new NotFoundException({
     status: 'PATIENT_NOT_FOUND',
-    message: 'Paciente não encontrado.',
+    message: 'Paciente nÃ£o encontrado.',
   });
 }
 
 function supportContactNotFound(): NotFoundException {
   return new NotFoundException({
     status: 'SUPPORT_CONTACT_NOT_FOUND',
-    message: 'Contato de suporte não encontrado.',
+    message: 'Contato de suporte nÃ£o encontrado.',
   });
 }
 
-/** Texto sem espaços externos; vazio vira `null`. */
+/** Texto sem espaÃ§os externos; vazio vira `null`. */
 function textOrNull(value: string | null | undefined): string | null {
   const text = value?.trim();
 
@@ -194,8 +195,8 @@ export class PatientsService {
    * O administrador recebe todos os pacientes cadastrados (RN022).
    *
    * @param account contexto da conta autenticada
-   * @param request parâmetros já validados pelo ValidationPipe global
-   * @returns pacientes autorizados e metadados da paginação
+   * @param request parÃ¢metros jÃ¡ validados pelo ValidationPipe global
+   * @returns pacientes autorizados e metadados da paginaÃ§Ã£o
    * @throws InternalServerErrorException quando a consulta ao banco falha,
    *   sem expor o erro original
    */
@@ -215,7 +216,7 @@ export class PatientsService {
       this.logger.error('Authorized patients query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível consultar os pacientes autorizados.',
+        message: 'NÃ£o foi possÃ­vel consultar os pacientes autorizados.',
       });
     }
 
@@ -230,7 +231,7 @@ export class PatientsService {
     patientId: string,
   ): Promise<PatientDetailResponseDto> {
     const scope = patientScope(account);
-    let row: PatientRow | null;
+    let row: PatientDetailRow | null;
     let exists: boolean;
 
     try {
@@ -242,7 +243,7 @@ export class PatientsService {
       this.logger.error('Patient detail query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível consultar o paciente.',
+        message: 'NÃ£o foi possÃ­vel consultar o paciente.',
       });
     }
 
@@ -262,24 +263,31 @@ export class PatientsService {
       this.logger.error('Patient support contacts query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível consultar o paciente.',
+        message: 'NÃ£o foi possÃ­vel consultar o paciente.',
       });
     }
 
     return {
       ...toAuthorizedPatient(row),
       cpf: row.cpf,
+      clinicalHistory: row.clinical_history,
+      surgicalHistory: row.surgical_history,
+      familyHistory: row.family_history,
+      habits: row.habits,
+      developmentalMilestones: row.developmental_milestones,
+      allergies: row.allergies,
+      noKnownAllergies: row.no_known_allergies,
       supportContacts: contacts.map(toSupportContactResponse),
     };
   }
 
   /**
-   * Lista os contatos de suporte do paciente (RFPAC003). Quem vê: o admin, o
-   * profissional com vínculo (RN016, inclusive de PTS encerrado) e o próprio
+   * Lista os contatos de suporte do paciente (RFPAC003). Quem vÃª: o admin, o
+   * profissional com vÃ­nculo (RN016, inclusive de PTS encerrado) e o prÃ³prio
    * paciente (RN028).
    *
    * @throws NotFoundException `PATIENT_NOT_FOUND`
-   * @throws ForbiddenException quando a conta não tem acesso ao paciente
+   * @throws ForbiddenException quando a conta nÃ£o tem acesso ao paciente
    */
   async findSupportContacts(
     account: AccountContext,
@@ -298,11 +306,11 @@ export class PatientsService {
   }
 
   /**
-   * Cria um contato de suporte (RFPAC003). Só o admin e o membro de PTS ativo
-   * do paciente (RN024). Contato de suporte não concede acesso (RN017).
+   * Cria um contato de suporte (RFPAC003). SÃ³ o admin e o membro de PTS ativo
+   * do paciente (RN024). Contato de suporte nÃ£o concede acesso (RN017).
    *
    * @throws BadRequestException `VALIDATION_ERROR` quando faltam e-mail e
-   *   telefone, ou o contato de emergência não tem telefone
+   *   telefone, ou o contato de emergÃªncia nÃ£o tem telefone
    */
   async createSupportContact(
     account: AccountContext,
@@ -331,11 +339,11 @@ export class PatientsService {
 
   /**
    * Atualiza um contato de suporte (RFPAC003). Os campos ausentes ficam como
-   * estão e `null` limpa o campo opcional; a regra do contato inteiro vale
+   * estÃ£o e `null` limpa o campo opcional; a regra do contato inteiro vale
    * para o resultado.
    *
-   * @throws NotFoundException `SUPPORT_CONTACT_NOT_FOUND` quando o contato não
-   *   existe ou é de outro paciente
+   * @throws NotFoundException `SUPPORT_CONTACT_NOT_FOUND` quando o contato nÃ£o
+   *   existe ou Ã© de outro paciente
    */
   async updateSupportContact(
     account: AccountContext,
@@ -391,7 +399,7 @@ export class PatientsService {
   }
 
   /**
-   * Remove um contato de suporte (RFPAC003). Só o admin e o membro de PTS
+   * Remove um contato de suporte (RFPAC003). SÃ³ o admin e o membro de PTS
    * ativo do paciente (RN024).
    *
    * @throws NotFoundException `SUPPORT_CONTACT_NOT_FOUND`
@@ -419,8 +427,8 @@ export class PatientsService {
 
   /**
    * Confere o acesso aos contatos: `read` para o admin, o profissional com
-   * vínculo (RN016) e o próprio paciente; `write` só para o admin e o membro
-   * de PTS ativo (RN024), com o profissional de PTS encerrado só lendo.
+   * vÃ­nculo (RN016) e o prÃ³prio paciente; `write` sÃ³ para o admin e o membro
+   * de PTS ativo (RN024), com o profissional de PTS encerrado sÃ³ lendo.
    */
   private async assertSupportContactAccess(
     account: AccountContext,
@@ -453,7 +461,7 @@ export class PatientsService {
     }
   }
 
-  /** Aplica a regra do contato inteiro (e-mail ou telefone, emergência). */
+  /** Aplica a regra do contato inteiro (e-mail ou telefone, emergÃªncia). */
   private assertSupportContactChannels(contact: SupportContactChannels): void {
     const message = supportContactChannelError(contact);
 
@@ -472,17 +480,17 @@ export class PatientsService {
 
     return new InternalServerErrorException({
       status: 'ERROR',
-      message: `Não foi possível ${action}.`,
+      message: `NÃ£o foi possÃ­vel ${action}.`,
     });
   }
 
   /**
-   * Busca os pacientes elegíveis para uma nova proposta de PTS (RFPTS001,
+   * Busca os pacientes elegÃ­veis para uma nova proposta de PTS (RFPTS001,
    * RN011), para o profissional ou o administrador.
    *
    * @param account contexto da conta autenticada
-   * @param request busca e paginação já validadas
-   * @returns pacientes elegíveis (id, nome exibido e e-mail) e paginação
+   * @param request busca e paginaÃ§Ã£o jÃ¡ validadas
+   * @returns pacientes elegÃ­veis (id, nome exibido e e-mail) e paginaÃ§Ã£o
    */
   async findEligibleForProposal(
     account: AccountContext,
@@ -507,7 +515,7 @@ export class PatientsService {
       this.logger.error('Eligible patients query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível consultar os pacientes elegíveis.',
+        message: 'NÃ£o foi possÃ­vel consultar os pacientes elegÃ­veis.',
       });
     }
 
@@ -526,20 +534,20 @@ export class PatientsService {
   /**
    * Cria o perfil de paciente de uma conta existente (RFPAC001).
    *
-   * Uma conta tem no máximo um perfil de paciente (RN002); admin, paciente e
-   * profissional usam contas separadas (RFPAC001.E04); contato de suporte não
+   * Uma conta tem no mÃ¡ximo um perfil de paciente (RN002); admin, paciente e
+   * profissional usam contas separadas (RFPAC001.E04); contato de suporte nÃ£o
    * concede tutela (RN017).
    *
-   * @param request corpo já validado pelo ValidationPipe global
+   * @param request corpo jÃ¡ validado pelo ValidationPipe global
    * @returns perfil criado
-   * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta não existe
-   * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta é de
+   * @throws NotFoundException `ACCOUNT_NOT_FOUND` quando a conta nÃ£o existe
+   * @throws ConflictException `ADMIN_ACCOUNT_NOT_ALLOWED` quando a conta Ã© de
    *   administrador
    * @throws ConflictException `ACCOUNT_HAS_PROFESSIONAL_PROFILE` quando a
-   *   conta já tem perfil profissional
+   *   conta jÃ¡ tem perfil profissional
    * @throws ConflictException `PATIENT_PROFILE_ALREADY_EXISTS` quando a conta
-   *   já tem perfil de paciente, inclusive em pedidos simultâneos
-   * @throws InternalServerErrorException quando a gravação falha por outro
+   *   jÃ¡ tem perfil de paciente, inclusive em pedidos simultÃ¢neos
+   * @throws InternalServerErrorException quando a gravaÃ§Ã£o falha por outro
    *   motivo, sem expor o erro original
    */
   async create(request: CreatePatientRequestDto): Promise<PatientResponseDto> {
@@ -551,21 +559,21 @@ export class PatientsService {
     if (!account) {
       throw new NotFoundException({
         status: 'ACCOUNT_NOT_FOUND',
-        message: 'Conta não encontrada.',
+        message: 'Conta nÃ£o encontrada.',
       });
     }
 
     if (account.role === AccountRole.Admin) {
       throw new ConflictException({
         status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
-        message: 'Conta de administrador não pode ter perfil de paciente.',
+        message: 'Conta de administrador nÃ£o pode ter perfil de paciente.',
       });
     }
 
     if (account.professionalProfiles?.length) {
       throw new ConflictException({
         status: 'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
-        message: 'A conta já possui um perfil profissional.',
+        message: 'A conta jÃ¡ possui um perfil profissional.',
       });
     }
 
@@ -588,10 +596,14 @@ export class PatientsService {
       this.logger.error('Patient profile insert failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível cadastrar o perfil de paciente.',
+        message: 'NÃ£o foi possÃ­vel cadastrar o perfil de paciente.',
       });
     }
 
     return patient;
   }
 }
+
+
+
+

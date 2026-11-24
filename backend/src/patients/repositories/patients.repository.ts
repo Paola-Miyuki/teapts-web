@@ -1,5 +1,5 @@
-// Este arquivo concentra o acesso a dados de pacientes: a consulta de
-// pacientes autorizados (projeção pública da resposta) e a gravação do perfil.
+﻿// Este arquivo concentra o acesso a dados de pacientes: a consulta de
+// pacientes autorizados (projeÃ§Ã£o pÃºblica da resposta) e a gravaÃ§Ã£o do perfil.
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,8 +22,8 @@ import { SupportContact } from '../entities/support-contact.entity';
 export const ACTIVE_PTS_STATES = [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING];
 
 /**
- * Estados de PTS que dão ao profissional acesso ao paciente (RN016): os ativos,
- * com edição, e os encerrados, só para leitura e sem prazo.
+ * Estados de PTS que dÃ£o ao profissional acesso ao paciente (RN016): os ativos,
+ * com ediÃ§Ã£o, e os encerrados, sÃ³ para leitura e sem prazo.
  */
 export const PROFESSIONAL_ACCESS_PTS_STATES = [
   ...ACTIVE_PTS_STATES,
@@ -31,11 +31,11 @@ export const PROFESSIONAL_ACCESS_PTS_STATES = [
   PtsStateEnum.CANCELLED,
 ];
 
-/** Quem consulta: o administrador vê todos; o profissional, pelo vínculo. */
+/** Quem consulta: o administrador vÃª todos; o profissional, pelo vÃ­nculo. */
 export type PatientScope =
   { kind: 'all' } | { kind: 'professional'; accountId: string };
 
-/** Filtros e paginação já validados da consulta de pacientes autorizados. */
+/** Filtros e paginaÃ§Ã£o jÃ¡ validados da consulta de pacientes autorizados. */
 export type AuthorizedPatientsQuery = {
   page: number;
   limit: number;
@@ -48,27 +48,27 @@ export type AuthorizedPatientsQuery = {
   order?: SortOrder;
 };
 
-/** Filtros e paginação da busca de pacientes elegíveis para uma proposta. */
+/** Filtros e paginaÃ§Ã£o da busca de pacientes elegÃ­veis para uma proposta. */
 export type EligiblePatientsQuery = {
   page: number;
   limit: number;
   q?: string;
 };
 
-/** Linha projetada pela busca de pacientes elegíveis (sem o CPF, DP011). */
+/** Linha projetada pela busca de pacientes elegÃ­veis (sem o CPF, DP011). */
 export type EligiblePatientRow = {
   patient_id: string;
   display_name: string;
   email: string;
 };
 
-/** Página de linhas e total de pacientes elegíveis. */
+/** PÃ¡gina de linhas e total de pacientes elegÃ­veis. */
 export type EligiblePatientsPage = {
   rows: EligiblePatientRow[];
   total: number;
 };
 
-/** Linha da lista e do detalhe do paciente, já com o status do PTS. */
+/** Linha da lista e do detalhe do paciente, jÃ¡ com o status do PTS. */
 export type PatientRow = {
   patient_id: string;
   account_name: string;
@@ -83,7 +83,17 @@ export type PatientRow = {
   read_only: boolean;
 };
 
-/** Página de linhas e total da lista de pacientes. */
+export type PatientDetailRow = PatientRow & {
+  clinical_history: string | null;
+  surgical_history: string | null;
+  family_history: string | null;
+  habits: string | null;
+  developmental_milestones: string | null;
+  allergies: string | null;
+  no_known_allergies: boolean;
+};
+
+/** PÃ¡gina de linhas e total da lista de pacientes. */
 export type PatientsPage = {
   rows: PatientRow[];
   total: number;
@@ -95,7 +105,7 @@ export type NewPatient = {
   supportContacts: SupportContactDto[];
 };
 
-/** Campos de um contato de suporte a gravar, já normalizados. */
+/** Campos de um contato de suporte a gravar, jÃ¡ normalizados. */
 export type SupportContactValues = {
   name: string;
   description: string | null;
@@ -114,8 +124,8 @@ const SORT_COLUMNS: Record<PatientSortField, string> = {
 
 /**
  * Busca parcial por nome, nome social, e-mail, CNS ou CPF (NFUS003). Quando o
- * termo só tem dígitos e pontuação, compara também os dígitos do CNS e do CPF.
- * Com `withCns` falso (busca de paciente elegível), o CNS fica fora.
+ * termo sÃ³ tem dÃ­gitos e pontuaÃ§Ã£o, compara tambÃ©m os dÃ­gitos do CNS e do CPF.
+ * Com `withCns` falso (busca de paciente elegÃ­vel), o CNS fica fora.
  */
 function applySearch(
   query: SelectQueryBuilder<Patient>,
@@ -169,15 +179,15 @@ export class PatientsRepository {
 
   /**
    * Lista os pacientes do escopo, com o status do PTS de cada um, a busca, os
-   * filtros, a ordenação e a paginação.
+   * filtros, a ordenaÃ§Ã£o e a paginaÃ§Ã£o.
    *
    * A consulta do escopo vira uma subconsulta (`listed`) para que o filtro e a
-   * ordenação usem o status do PTS já calculado. Offset/limit em vez de
+   * ordenaÃ§Ã£o usem o status do PTS jÃ¡ calculado. Offset/limit em vez de
    * skip/take, porque getRawMany ignora skip/take.
    *
-   * @param scope todos (admin) ou os do vínculo do profissional (RN016)
-   * @param filters filtros e paginação já validados
-   * @returns linhas da página pedida e total filtrado
+   * @param scope todos (admin) ou os do vÃ­nculo do profissional (RN016)
+   * @param filters filtros e paginaÃ§Ã£o jÃ¡ validados
+   * @returns linhas da pÃ¡gina pedida e total filtrado
    * @throws erro do banco, sem tratamento
    */
   async findPatientsPaginated(
@@ -269,7 +279,7 @@ export class PatientsRepository {
   /**
    * Busca um paciente dentro do escopo de quem consulta.
    *
-   * @param scope todos (admin) ou os do vínculo do profissional (RN016)
+   * @param scope todos (admin) ou os do vÃ­nculo do profissional (RN016)
    * @param patientId identificador do paciente (a conta)
    * @returns a linha do paciente, ou `null` fora do escopo
    * @throws erro do banco, sem tratamento
@@ -277,10 +287,19 @@ export class PatientsRepository {
   async findPatient(
     scope: PatientScope,
     patientId: string,
-  ): Promise<PatientRow | null> {
+  ): Promise<PatientDetailRow | null> {
     const row = await this.scopedPatients(scope)
+      .addSelect([
+        'patient.clinical_history AS clinical_history',
+        'patient.surgical_history AS surgical_history',
+        'patient.family_history AS family_history',
+        'patient.habits AS habits',
+        'patient.developmental_milestones AS developmental_milestones',
+        'patient.allergies AS allergies',
+        'patient.no_known_allergies AS no_known_allergies',
+      ])
       .andWhere('patient.accountId = :patientId', { patientId })
-      .getRawOne<PatientRow>();
+      .getRawOne<PatientDetailRow>();
 
     return row ?? null;
   }
@@ -297,8 +316,8 @@ export class PatientsRepository {
 
   /**
    * Monta a consulta dos pacientes do escopo com o status do PTS de cada um:
-   * o PTS ativo; sem ele, o mais recente sem contar os rejeitados; só com
-   * rejeitados, `rejected`; sem PTS, nulo. O responsável conta como membro da
+   * o PTS ativo; sem ele, o mais recente sem contar os rejeitados; sÃ³ com
+   * rejeitados, `rejected`; sem PTS, nulo. O responsÃ¡vel conta como membro da
    * equipe (RN005).
    */
   private scopedPatients(scope: PatientScope): SelectQueryBuilder<Patient> {
@@ -393,12 +412,12 @@ export class PatientsRepository {
   }
 
   /**
-   * Busca os pacientes elegíveis para uma nova proposta de PTS (RN011): sem PTS
-   * em `planning` ou `running` e sem rascunho (`draft` não excluído). A busca
-   * (NFUS003) é por nome, nome social, e-mail ou CPF; o CPF não é projetado.
+   * Busca os pacientes elegÃ­veis para uma nova proposta de PTS (RN011): sem PTS
+   * em `planning` ou `running` e sem rascunho (`draft` nÃ£o excluÃ­do). A busca
+   * (NFUS003) Ã© por nome, nome social, e-mail ou CPF; o CPF nÃ£o Ã© projetado.
    *
-   * @param filters busca e paginação já validadas
-   * @returns linhas da página pedida e total filtrado
+   * @param filters busca e paginaÃ§Ã£o jÃ¡ validadas
+   * @returns linhas da pÃ¡gina pedida e total filtrado
    * @throws erro do banco, sem tratamento
    */
   async findEligibleForProposalPaginated(
@@ -454,9 +473,9 @@ export class PatientsRepository {
   }
 
   /**
-   * Grava o perfil de paciente e os contatos de suporte numa transação.
+   * Grava o perfil de paciente e os contatos de suporte numa transaÃ§Ã£o.
    *
-   * @param patient conta e contatos já normalizados
+   * @param patient conta e contatos jÃ¡ normalizados
    * @throws erro do banco, sem tratamento (ex.: `23505` na PK duplicada)
    */
   async insert(patient: NewPatient): Promise<void> {
@@ -484,7 +503,7 @@ export class PatientsRepository {
    *
    * @param patientId identificador do paciente (a conta)
    * @param contactId identificador do contato
-   * @returns o contato, ou `null` se não existe ou é de outro paciente
+   * @returns o contato, ou `null` se nÃ£o existe ou Ã© de outro paciente
    * @throws erro do banco, sem tratamento
    */
   async findSupportContact(
@@ -516,7 +535,7 @@ export class PatientsRepository {
   /**
    * Atualiza um contato de suporte e marca o `updated_at`.
    *
-   * @returns o contato atualizado, ou `null` se não existe ou é de outro
+   * @returns o contato atualizado, ou `null` se nÃ£o existe ou Ã© de outro
    *   paciente
    * @throws erro do banco, sem tratamento
    */
@@ -542,7 +561,7 @@ export class PatientsRepository {
   /**
    * Remove um contato de suporte do paciente.
    *
-   * @returns `false` se o contato não existe ou é de outro paciente
+   * @returns `false` se o contato nÃ£o existe ou Ã© de outro paciente
    * @throws erro do banco, sem tratamento
    */
   async deleteSupportContact(
@@ -557,3 +576,8 @@ export class PatientsRepository {
     return (result.affected ?? 0) > 0;
   }
 }
+
+
+
+
+
