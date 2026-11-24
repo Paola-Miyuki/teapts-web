@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Combobox from '@/components/Combobox';
 import HelpTooltip from '@/components/HelpTooltip';
 import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
 import { initials } from '@/lib/format';
 
 export type TeamProfessional = {
@@ -19,6 +20,8 @@ type TeamMembersProps = {
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
+  // Escolher a sugestão já inclui o profissional (sem o botão "Adicionar").
+  addOnSelect?: boolean;
 };
 
 function label(professional: TeamProfessional) {
@@ -32,6 +35,7 @@ export default function TeamMembers({
   selectedIds,
   onChange,
   disabled,
+  addOnSelect = false,
 }: TeamMembersProps) {
   const [input, setInput] = useState('');
   const [pendingId, setPendingId] = useState('');
@@ -68,7 +72,8 @@ export default function TeamMembers({
         <span className="ux-titletip">
           <h3>Membros da equipe</h3>
           <HelpTooltip id="team-tip" label="Membros da equipe">
-            Cada conta entra uma vez na equipe, contando o responsável.
+            Só profissionais ativos. Cada conta entra uma vez na equipe,
+            contando o responsável.
           </HelpTooltip>
         </span>
       </header>
@@ -87,6 +92,12 @@ export default function TeamMembers({
                 setPendingId('');
               }}
               onSelect={(option) => {
+                if (addOnSelect) {
+                  onChange([...selectedIds, option.value]);
+                  setInput('');
+                  return;
+                }
+
                 setInput(option.label);
                 setPendingId(option.value);
               }}
@@ -96,17 +107,23 @@ export default function TeamMembers({
               disabled={disabled}
               describedBy="team-tip"
             />
-            <button
-              type="button"
-              className="btn"
-              disabled={disabled || !pendingId}
-              onClick={add}
-            >
-              <Icon name="plus" className="icon-sm" />
-              Adicionar
-            </button>
+            {!addOnSelect && (
+              <button
+                type="button"
+                className="btn"
+                disabled={disabled || !pendingId}
+                onClick={add}
+              >
+                <Icon name="plus" className="icon-sm" />
+                Adicionar
+              </button>
+            )}
           </div>
         </div>
+
+        {addOnSelect && selected.length === 0 && (
+          <p className={ui.hint}>Nenhum membro além do responsável.</p>
+        )}
 
         {selected.length > 0 && (
           <ul className="mini-list ux-contacts ux-members">

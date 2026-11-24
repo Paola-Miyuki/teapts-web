@@ -43,8 +43,8 @@ import {
 import { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import { GetAuthorizedPatientsResponseDto } from '../dto/get-authorized-patients-response.dto';
-import { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-request.dto';
-import { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
+import { GetEligiblePatientsRequestDto } from '../dto/get-eligible-patients-request.dto';
+import { GetEligiblePatientsResponseDto } from '../dto/get-eligible-patients-response.dto';
 import { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import { PatientResponseDto } from '../dto/patient-response.dto';
 import {
@@ -128,15 +128,20 @@ export class PatientsController {
   }
 
   /**
-   * Retorna pacientes sem PTS ativo para criação de uma nova proposta.
+   * Busca os pacientes elegíveis para uma nova proposta de PTS (RFPTS001):
+   * sem PTS em planejamento ou em andamento e sem rascunho (RN011), por nome,
+   * nome social, e-mail ou CPF (NFUS003). O CPF não volta na resposta (DP011).
    *
-   * Diferente de `/patients/authorized`, esta consulta não exige vínculo
-   * prévio com um PTS; exige que a conta tenha perfil profissional ou seja de
-   * administrador (RN022).
+   * Diferente de `/patients/authorized`, não exige vínculo prévio com um PTS;
+   * exige conta com perfil profissional ou de administrador (RN029).
    */
-  @Get('patients/available-for-pts')
+  @Get('patients')
   @UseGuards(AuthGuard)
-  @ApiOkResponse({ type: GetAvailablePatientsResponseDto })
+  @ApiOkResponse({ type: GetEligiblePatientsResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: { status: 'ERROR', message: 'Parâmetro inválido: withActivePts' },
+  })
   @ApiForbiddenResponse({
     type: ErrorResponseDto,
     example: {
@@ -148,14 +153,14 @@ export class PatientsController {
     type: ErrorResponseDto,
     example: {
       status: 'ERROR',
-      message: 'Não foi possível consultar os pacientes disponíveis.',
+      message: 'Não foi possível consultar os pacientes elegíveis.',
     },
   })
-  async findAvailableForPts(
+  async findEligibleForProposal(
     @CurrentAccount() account: AccountContext,
-    @Query() query: GetAvailablePatientsRequestDto,
-  ): Promise<GetAvailablePatientsResponseDto> {
-    return this.patientsService.findAvailableForPts(account, query);
+    @Query() query: GetEligiblePatientsRequestDto,
+  ): Promise<GetEligiblePatientsResponseDto> {
+    return this.patientsService.findEligibleForProposal(account, query);
   }
 
   /**

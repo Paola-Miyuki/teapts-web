@@ -11,15 +11,26 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   Validate,
   type ValidationArguments,
   ValidatorConstraint,
   type ValidatorConstraintInterface,
 } from 'class-validator';
 
-/** Telefone com DDD: 10 ou 11 dígitos, com ou sem máscara. */
-export const SUPPORT_CONTACT_PHONE = /^\D*(?:\d\D*){10,11}$/;
+/**
+ * Telefone com DDD (10 ou 11 dígitos, com ou sem +55), aceitando só dígitos,
+ * espaços, parênteses, ponto, hífen e `+` inicial. Mesma regra do `isValidPhone`
+ * do frontend (`frontend/src/lib/patients.ts`).
+ */
+export function isValidSupportContactPhone(phone: string): boolean {
+  if (!/^\+?[\d\s().-]+$/.test(phone)) {
+    return false;
+  }
+
+  const digits = phone.replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+
+  return digits.length === 10 || digits.length === 11;
+}
 
 export const INVALID_SUPPORT_CONTACT_PHONE =
   'Informe um telefone válido para o contato.';
@@ -79,6 +90,13 @@ class SupportContactChannelsConstraint implements ValidatorConstraintInterface {
   }
 }
 
+@ValidatorConstraint({ name: 'supportContactPhone', async: false })
+export class SupportContactPhoneConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    return typeof value === 'string' && isValidSupportContactPhone(value);
+  }
+}
+
 /** Contato de suporte do paciente; o nome e um meio de contato são obrigatórios. */
 export class SupportContactDto {
   /** @example Maria Martins */
@@ -103,7 +121,9 @@ export class SupportContactDto {
   @Transform(trimOptionalText)
   @IsOptional()
   @IsString({ message: INVALID_SUPPORT_CONTACT_PHONE })
-  @Matches(SUPPORT_CONTACT_PHONE, { message: INVALID_SUPPORT_CONTACT_PHONE })
+  @Validate(SupportContactPhoneConstraint, {
+    message: INVALID_SUPPORT_CONTACT_PHONE,
+  })
   phone?: string;
 
   /** Contato de emergência; padrão `false`. @example false */

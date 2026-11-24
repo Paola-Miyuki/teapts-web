@@ -12,12 +12,12 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
+  Validate,
   ValidateIf,
 } from 'class-validator';
 import {
   INVALID_SUPPORT_CONTACT_PHONE,
-  SUPPORT_CONTACT_PHONE,
+  SupportContactPhoneConstraint,
   trimOptionalText,
   trimText,
 } from './support-contact.dto';
@@ -55,7 +55,9 @@ export class UpdateSupportContactRequestDto {
   @Transform(trimOptionalText)
   @IsOptional()
   @IsString({ message: INVALID_SUPPORT_CONTACT_PHONE })
-  @Matches(SUPPORT_CONTACT_PHONE, { message: INVALID_SUPPORT_CONTACT_PHONE })
+  @Validate(SupportContactPhoneConstraint, {
+    message: INVALID_SUPPORT_CONTACT_PHONE,
+  })
   phone?: string | null;
 
   @ApiPropertyOptional({ example: false })
