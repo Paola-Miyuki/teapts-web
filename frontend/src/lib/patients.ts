@@ -176,6 +176,7 @@ export function getPatients({ signal, ...query }: PatientsQuery) {
 }
 
 export type PatientDetail = PatientListItem & {
+  phone: string | null;
   cpf: string | null;
   supportContacts: SupportContact[];
 };

@@ -75,6 +75,7 @@ export type PatientRow = {
   account_name: string;
   social_name: string | null;
   email: string;
+  phone: string | null;
   cpf: string | null;
   cns: string | null;
   guardian_name: string | null;
@@ -340,6 +341,7 @@ export class PatientsRepository {
         'account.name AS account_name',
         'account.social_name AS social_name',
         'account.email AS email',
+        'account.phone AS phone',
         'account.cpf AS cpf',
         'patient.cns AS cns',
         'patient.guardian_name AS guardian_name',

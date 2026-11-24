@@ -209,6 +209,17 @@ O seed precisa do PostgreSQL e do SuperTokens em execução, com as migrations a
 | Paciente | `luna@teapts.local` / `paciente123` | Luna Ferreira, CNS `700 0022 2333 4444`; CPF `111.444.777-35`, 15/03/2007, feminino |
 | Paciente | `diego@teapts.local` / `paciente123` | Diego Alves, menor de idade, responsável tutelar Paula Alves, CNS `700 0055 5666 7777`; CPF `321.654.987-91`, 22/08/2015, masculino |
 
+Contas sem perfil, para testar a tela Contas do admin (`/accounts`). A cada execução do seed a situação delas volta ao que está na tabela, então dá para desativar e testar de novo:
+
+| Conta | E-mail / senha | Situação e dados |
+| --- | --- | --- |
+| Bruno Takeda | `bruno@teapts.local` / `conta123` | ativa, sem perfil; CPF `390.533.447-05`, criada em 10/11/2026 |
+| Priscila Martins | `priscila@teapts.local` / `conta123` | ativa, sem perfil; CPF `529.982.247-25`, criada em 14/11/2026 |
+| Sofia Andrade | `sofia@teapts.local` / `conta123` | ativa, sem perfil, sem telefone; CPF `168.995.350-09`, criada em 30/08/2026 |
+| Marcelo Duarte | `marcela@teapts.local` / `conta123` | ativa, sem perfil, nome social "Marcela Duarte" (a lista mostra e busca pelo nome social); CPF `135.792.468-28`, criada em 02/10/2026 |
+| Helena Rocha | `helena@teapts.local` / `conta123` | inativa (desativada em 01/09/2026), sem perfil; CPF `246.813.579-28`, criada em 17/04/2026 |
+| Kaio Segunda Conta | `kaio.admin@teapts.local` / `teapts123` | segunda conta de administrador, sem CPF nem perfil, criada em 05/01/2026 |
+
 PTS de teste (um de cada status):
 
 | Paciente | Status | Responsável | Equipe |

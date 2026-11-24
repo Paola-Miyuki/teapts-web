@@ -10,6 +10,7 @@ import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import type { Account } from '@/lib/account';
+import { formatPhone } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   getPatient,
@@ -163,19 +164,28 @@ function PatientDetailContent({
                 <div className="ux-badges">
                   <PtsStatusBadge status={patient.ptsStatus} />
                 </div>
-                {patient.activePtsId && (
-                  <Link className="link" href={`/pts/${patient.activePtsId}`}>
-                    Abrir PTS
-                  </Link>
-                )}
               </div>
 
               <div className="ux-idaccount">
                 <h3>Dados da conta</h3>
                 <dl className="ux-idfacts">
                   <div>
+                    <span className="ux-idfact-ic" aria-hidden="true">
+                      <Icon name="mail" className="icon-sm" />
+                    </span>
                     <dt>E-mail</dt>
                     <dd>{patient.email}</dd>
+                  </div>
+                  <div>
+                    <span className="ux-idfact-ic" aria-hidden="true">
+                      <Icon name="phone" className="icon-sm" />
+                    </span>
+                    <dt>Telefone</dt>
+                    <dd>
+                      <Value>
+                        {patient.phone && formatPhone(patient.phone)}
+                      </Value>
+                    </dd>
                   </div>
                   <div>
                     <span className="ux-idfact-ic" aria-hidden="true">

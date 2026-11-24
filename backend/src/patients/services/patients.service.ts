@@ -268,6 +268,7 @@ export class PatientsService {
 
     return {
       ...toAuthorizedPatient(row),
+      phone: row.phone,
       cpf: row.cpf,
       supportContacts: contacts.map(toSupportContactResponse),
     };

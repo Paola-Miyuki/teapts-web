@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 
 import { useRouter } from 'next/navigation';
 
@@ -28,6 +28,7 @@ const PATIENT = {
   name: 'Ana Clara Ribeiro',
   socialName: null,
   email: 'ribeiro.familia@gmail.com',
+  phone: '41998123344',
   cpf: '11144477735',
   cns: '700001234567891',
   guardianName: 'Juliana Ribeiro',
@@ -89,7 +90,7 @@ describe('PatientDetail', () => {
     );
   });
 
-  it('leva ao PTS ativo do paciente', async () => {
+  it('não mostra o link para o PTS no perfil, nem com PTS ativo', async () => {
     mockApi(
       respond(200, {
         ...PATIENT,
@@ -101,9 +102,40 @@ describe('PatientDetail', () => {
 
     render(<PatientDetail id="patient-1" />);
 
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
     expect(
-      await screen.findByRole('link', { name: 'Abrir PTS' }),
-    ).toHaveAttribute('href', '/pts/pts-1');
+      screen.queryByRole('link', { name: 'Abrir PTS' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mostra E-mail, Telefone e Cadastrado em no cartão da conta', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    const facts = document.querySelector('.ux-idfacts') as HTMLElement;
+
+    expect(facts.querySelectorAll('.ux-idfact-ic')).toHaveLength(3);
+    expect(within(facts).getByText('E-mail')).toBeInTheDocument();
+    expect(
+      within(facts).getByText('ribeiro.familia@gmail.com'),
+    ).toBeInTheDocument();
+    expect(within(facts).getByText('Telefone')).toBeInTheDocument();
+    expect(within(facts).getByText('(41) 99812-3344')).toBeInTheDocument();
+    expect(within(facts).getByText('Cadastrado em')).toBeInTheDocument();
+    expect(within(facts).getByText('14/02/2026')).toBeInTheDocument();
+  });
+
+  it('mostra "—" no telefone quando a conta não tem', async () => {
+    mockApi(respond(200, { ...PATIENT, phone: null }));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    const facts = document.querySelector('.ux-idfacts') as HTMLElement;
+
+    expect(within(facts).getByLabelText('Não informado')).toBeInTheDocument();
   });
 
   it('não mostra o link sem PTS ativo', async () => {
