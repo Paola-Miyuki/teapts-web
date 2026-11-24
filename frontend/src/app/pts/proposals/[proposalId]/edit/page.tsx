@@ -6,14 +6,14 @@ export const metadata = {
 
 type EditPtsProposalPageProps = {
   params: Promise<{
-    id: string;
+    proposalId: string;
   }>;
 };
 
 export default async function EditPtsProposalPage({
   params,
 }: EditPtsProposalPageProps) {
-  const { id } = await params;
+  const { proposalId } = await params;
 
-  return <EditPtsProposalClient proposalId={id} />;
+  return <EditPtsProposalClient proposalId={proposalId} />;
 }

@@ -8,7 +8,17 @@ import { PtsRepositoryImpl } from '../repositories/pts.repository.impl';
 import { TimelineRecordEntity } from '../../timeline/entities/timeline-record.entity';
 import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../../timeline/enums/timeline-record-type.enum';
+import { TimelineRepositoryImpl } from '../../timeline/repositories/timeline.repository.impl';
+import { TimelineRecorderService } from '../../timeline/services/timeline-recorder.service';
 import { expectApiError } from './test-utils';
+
+const timelineRecorder = () =>
+  new TimelineRecorderService(
+    new TimelineRepositoryImpl(
+      {} as Repository<TimelineRecordEntity>,
+      {} as Repository<PtsEntity>,
+    ),
+  );
 
 // Substitui o QueryRunner para conferir lock, transação e rollback da decisão
 // sem depender de uma conexão com o banco.
@@ -51,6 +61,7 @@ function createRepository(lockedRows: Partial<PtsEntity>[]) {
     {} as Repository<PtsEntity>,
     {} as Repository<Professional>,
     {} as Repository<Patient>,
+    timelineRecorder(),
   );
 
   return { repository, query, queryRunner };
@@ -302,6 +313,7 @@ function createTeamRepository(locked: Partial<PtsEntity> | null, affected = 1) {
     {} as Repository<PtsEntity>,
     {} as Repository<Professional>,
     {} as Repository<Patient>,
+    timelineRecorder(),
   );
 
   return { repository, lockQuery, deleteQuery, queryRunner };
@@ -313,7 +325,7 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
     professionalId: 'prof-11',
     authorProfessionalId: 'prof-10',
     executedByAccountId: 'account-10',
-    description: 'Remoção de Ana Souza da equipe.',
+    description: 'Kaio Segunda Conta removeu Ana Souza da equipe',
   };
   const running: Partial<PtsEntity> = {
     id: 'pts-1',
@@ -343,7 +355,7 @@ describe('PtsRepositoryImpl.removeTeamMember', () => {
       TimelineRecordEntity,
       {
         type: TimelineRecordType.MemberRemoved,
-        description: 'Remoção de Ana Souza da equipe.',
+        description: 'Kaio Segunda Conta removeu Ana Souza da equipe',
         targetId: 'prof-11',
         targetType: TimelineRecordTarget.TeamMember,
         ptsId: 'pts-1',

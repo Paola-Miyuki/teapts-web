@@ -72,6 +72,14 @@ export type PtsTeamResponse = {
   team: PtsProfessional[];
 };
 
+// DELETE /pts/:id/team/:professionalId
+export function removeTeamMember(id: string, professionalId: string) {
+  return request<PtsTeamResponse>(
+    `/pts/${encodeURIComponent(id)}/team/${encodeURIComponent(professionalId)}`,
+    { method: 'DELETE' },
+  );
+}
+
 export type PtsDetail = {
   id: string;
   status: PtsStatus;

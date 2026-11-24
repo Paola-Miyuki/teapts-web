@@ -122,6 +122,9 @@ export abstract class PtsRepository {
     patientId: string,
   ): Promise<PtsDecisionResponseDto>;
 
+  /** Nome social, se houver; senão o nome. */
+  abstract findAccountDisplayName(accountId: string): Promise<string | null>;
+
   /** PTS com responsável e equipe, em qualquer estado. */
   abstract findPtsTeam(id: string): Promise<PtsTeamResponseDto | null>;
 

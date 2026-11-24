@@ -1571,6 +1571,8 @@ describe('PtsService.removeTeamMember', () => {
   });
 
   it('grava o evento na timeline com o responsável como autor', async () => {
+    repo.accountNames.set('acc-1', 'Kaio Segunda Conta');
+
     await service.removeTeamMember('pts-100', 'prof-11', responsibleAccount);
 
     expect(repo.timelineRecords).toEqual([
@@ -1579,9 +1581,34 @@ describe('PtsService.removeTeamMember', () => {
         professionalId: 'prof-11',
         authorProfessionalId: 'prof-10',
         executedByAccountId: 'acc-1',
-        description: 'Remoção de Ana Souza da equipe.',
+        description: 'Kaio Segunda Conta removeu Ana Souza da equipe',
       },
     ]);
+  });
+
+  it('grava o admin como quem executou, sem profissional atribuído (RN029)', async () => {
+    repo.accountNames.set('acc-admin', 'Kaio Admin');
+
+    await service.removeTeamMember('pts-100', 'prof-11', {
+      accountId: 'acc-admin',
+      role: AccountRole.Admin,
+      patientProfileId: null,
+      professionalProfileIds: [],
+    });
+
+    expect(repo.timelineRecords[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+      description: 'Kaio Admin removeu Ana Souza da equipe',
+    });
+  });
+
+  it('usa o nome do responsável quando a conta não tem nome cadastrado', async () => {
+    await service.removeTeamMember('pts-100', 'prof-11', responsibleAccount);
+
+    expect(repo.timelineRecords[0].description).toBe(
+      'Kaio Segunda Conta removeu Ana Souza da equipe',
+    );
   });
 
   it('aceita PTS em PLANNING', async () => {

@@ -2,8 +2,15 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { Account } from '@/lib/account';
+import { personalData } from '@/test-utils/account';
 
 import PtsOverview from './_components/PtsOverview';
+
+// A Timeline tem os próprios testes; aqui o fetch simulado é só o da equipe.
+jest.mock('@/components/pts/TimelineTab', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
 const mockReplace = jest.fn();
 // Mesmo objeto em todo render, como o useRouter do Next.
@@ -35,6 +42,7 @@ function professionalAccount(professionalId = RESPONSIBLE_ID): Account {
     name: 'Profissional',
     email: 'profissional@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: null,
     professionalProfileIds: [professionalId],
   };
@@ -46,6 +54,7 @@ function patientAccount(): Account {
     name: 'Priscila Martins',
     email: 'paciente@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: PATIENT_ID,
     professionalProfileIds: [],
   };

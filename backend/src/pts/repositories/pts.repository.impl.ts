@@ -29,13 +29,14 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { PtsEntity } from '../entities/pts.entity';
+import { Account } from '../../accounts/entities/account.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
-import { TimelineRecordEntity } from '../../timeline/entities/timeline-record.entity';
 import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../../timeline/enums/timeline-record-type.enum';
+import { TimelineRecorderService } from '../../timeline/services/timeline-recorder.service';
 import {
   activePtsAlreadyExists,
   cannotRemoveResponsible,
@@ -59,6 +60,7 @@ export class PtsRepositoryImpl extends PtsRepository {
     private readonly professionalRepository: Repository<Professional>,
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
+    private readonly timelineRecorder: TimelineRecorderService,
   ) {
     super();
   }
@@ -629,6 +631,15 @@ export class PtsRepositoryImpl extends PtsRepository {
     }
   }
 
+  async findAccountDisplayName(accountId: string): Promise<string | null> {
+    const account = await this.dataSource.getRepository(Account).findOne({
+      where: { id: accountId },
+      select: { id: true, name: true, socialName: true },
+    });
+
+    return account ? account.socialName?.trim() || account.name : null;
+  }
+
   async findPtsTeam(id: string): Promise<PtsTeamResponseDto | null> {
     const pts = await this.ptsRepository.findOne({
       where: { id },
@@ -696,15 +707,18 @@ export class PtsRepositoryImpl extends PtsRepository {
       }
 
       // Só o vínculo sai: registros feitos pelo profissional mantêm a autoria.
-      await queryRunner.manager.insert(TimelineRecordEntity, {
-        type: TimelineRecordType.MemberRemoved,
-        description: input.description,
-        targetId: input.professionalId,
-        targetType: TimelineRecordTarget.TeamMember,
-        ptsId: input.ptsId,
-        authorProfessionalId: input.authorProfessionalId,
-        executedByAccountId: input.executedByAccountId,
-      });
+      await this.timelineRecorder.record(
+        {
+          type: TimelineRecordType.MemberRemoved,
+          description: input.description,
+          targetId: input.professionalId,
+          targetType: TimelineRecordTarget.TeamMember,
+          ptsId: input.ptsId,
+          authorProfessionalId: input.authorProfessionalId,
+          executedByAccountId: input.executedByAccountId,
+        },
+        queryRunner.manager,
+      );
 
       const pts = await queryRunner.manager.findOne(PtsEntity, {
         where: { id: input.ptsId },

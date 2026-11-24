@@ -460,12 +460,16 @@ export class PtsService {
       throw teamMemberNotFound();
     }
 
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsible.name);
+
     return this.ptsRepository.removeTeamMember({
       ptsId: id,
       professionalId,
       authorProfessionalId: admin ? null : pts.responsible.id,
       executedByAccountId: account.accountId,
-      description: `Remoção de ${member.name} da equipe.`,
+      description: `${executorName} removeu ${member.name} da equipe`,
     });
   }
 

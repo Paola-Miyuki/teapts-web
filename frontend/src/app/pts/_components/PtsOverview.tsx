@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import Icon from '@/components/Icon';
+import TimelineTab from '@/components/pts/TimelineTab';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
 import { ApiError } from '@/lib/api';
@@ -310,6 +311,17 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
                 : undefined
             }
           />
+
+          <section id="timeline" aria-label="Timeline">
+            <TimelineTab
+              ptsId={pts.id}
+              patientId={pts.patient.id}
+              team={[pts.responsible, ...(pts.team ?? [])].map(
+                ({ id, name }) => ({ id, name }),
+              )}
+              isPatient={isOwnPts}
+            />
+          </section>
         </div>
 
         <aside className={styles.aside} aria-labelledby="pts-about-title">

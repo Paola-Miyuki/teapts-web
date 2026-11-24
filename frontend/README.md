@@ -82,14 +82,16 @@ src/
                            (POST /pts/proposals/:id/approve e /reject); o responsável e o admin
                            excluem a proposta em `draft` pelo menu ⋮, com confirmação
                            (DELETE /pts/proposals/:id)
-        [id]/edit/         editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
-      [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin:
-                           cabeçalho, Visão geral (situação social) e Equipe (registro e papel)
+        [proposalId]/edit/ editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
+      [ptsId]/             detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin
+                           e de `pts.html` para o paciente (sem a ficha nem o prontuário): cabeçalho,
+                           Visão geral (situação social, só a equipe), Equipe (registro e papel) e
+                           Timeline; `/pts/:id#timeline` abre direto na Timeline (atalho de `historico.html`)
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
                            todos na URL; modal "Adicionar paciente" (só admin)
-      [id]/                detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
+      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
                            contatos de suporte editados contato a contato
       _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar"),
                            AddPatientModal/AddPatientForm, AccountCombobox (combobox ARIA da conta:
@@ -101,8 +103,12 @@ src/
   components/              AppShell (sidebar, cabeçalho e breadcrumb em níveis), AuthenticatedPage
                            (sessão, perfil e "Acesso restrito"), LogoutButton, HelpTooltip, Icon,
                            Logo, Modal (`dialog.modal` dos mockups) e Combobox (`pat-combobox`)
-    pts/                   peças das telas de proposta: WizardSteps (passos) e TeamMembers
-                           (membros da equipe com busca, adicionar e remover)
+    pts/                   peças das telas de PTS: WizardSteps (passos), TeamMembers (membros da
+                           equipe com busca, adicionar e remover) e a Timeline (RFTL001), usada em
+                           /pts/:id e no Meu PTS: TimelineTab (GET /pts/:id/timeline, eventos por dia
+                           com hora, autor, "Atribuído a", tipo e links; paginação, carregamento,
+                           lista vazia e erro) e TimelineFilters (busca, Tipo do evento, Autor,
+                           Período e "Ordenar por"); busca, filtros, ordem e página ficam na URL
     table/                 peças das tabelas dos mockups: KebabMenu (menu ⋮), MultiSelect,
                            Pagination (faixa, páginas e itens por página), PtsStatusBadge e RegistrationCell (registro com copiar)
   styles/                  teapts-mockups.css e teapts-ui.css: classes globais dos mockups
@@ -124,6 +130,8 @@ src/
     pts-status.ts          status do PTS e rótulos das telas
     proposals.ts           GET /pts/proposals (getProposals)
     pts.ts                 GET /pts/:id (getPts)
+    timeline.ts            GET /pts/:id/timeline (getTimeline), rótulos e ícones dos tipos, hora e dia
+                           no horário de Brasília, agrupamento por dia e o link de cada evento
     format.ts              datas, CPF, telefone (máscaras e exibição), idade e iniciais
   test-utils/
     account.ts             dados pessoais padrão da conta nos testes
@@ -161,7 +169,8 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 | `/pts/proposals/:id/edit` | Editar proposta de PTS | responsável ou admin, proposta em `draft` | `editar-proposta.html` |
-| `/pts/:id` | Detalhe do PTS (Visão geral e Equipe); aberto por "Abrir PTS" em Pacientes | admin e profissional da equipe (RN016) | `pts-detalhe.html` |
+| `/pts` | Meu PTS: PTS ativo com a equipe e a Timeline (sem link nos eventos de documento, RN028); o profissional abre por `/patients/:patientId/pts` | paciente titular e profissional da equipe | `pts.html` |
+| `/pts/:id` | Detalhe do PTS (Visão geral, Equipe e Timeline); aberto por "Abrir PTS" em Pacientes; `#timeline` abre a aba Timeline | admin, profissional da equipe (RN016) e paciente titular, sem a Visão geral e sem link nos eventos de documento (`viewPts`, RN028) | `pts-detalhe.html`, `pts.html`, `historico.html` |
 
 ## Layouts (`design/`)
 

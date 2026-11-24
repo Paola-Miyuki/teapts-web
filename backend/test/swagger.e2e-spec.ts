@@ -8,6 +8,7 @@ import { Account } from '../src/accounts/entities/account.entity';
 import { Patient } from '../src/patients/entities/patient.entity';
 import { Professional } from '../src/professionals/entities/professional.entity';
 import { PtsEntity } from '../src/pts/entities/pts.entity';
+import { TimelineRecordEntity } from '../src/timeline/entities/timeline-record.entity';
 import { AppModule } from '../src/app.module';
 import { setupSwagger } from '../src/common/swagger/setup-swagger';
 
@@ -73,6 +74,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
+  ['/pts/{id}/timeline', 'get'],
   ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
@@ -110,6 +112,8 @@ describe('Swagger (e2e)', () => {
       .overrideProvider(getRepositoryToken(Patient))
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(TimelineRecordEntity))
       .useValue({})
       .compile();
 
@@ -278,6 +282,9 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/team/{professionalId}', 'delete', '403'],
     ['/pts/{id}/team/{professionalId}', 'delete', '404'],
     ['/pts/{id}/team/{professionalId}', 'delete', '409'],
+    ['/pts/{id}/timeline', 'get', '400'],
+    ['/pts/{id}/timeline', 'get', '403'],
+    ['/pts/{id}/timeline', 'get', '404'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
     ['/patients', 'post', '400'],
@@ -470,6 +477,60 @@ describe('Swagger (e2e)', () => {
     expect(examples('409')).toEqual([
       'PTS_NOT_ACTIVE',
       'CANNOT_REMOVE_RESPONSIBLE',
+    ]);
+  });
+
+  it('documents GET /pts/{id}/timeline', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/timeline'].get;
+    const parameters = operation.parameters ?? [];
+    const byName = Object.fromEntries(
+      parameters
+        .filter((parameter) => parameter.in === 'query')
+        .map((parameter) => [parameter.name, parameter]),
+    );
+
+    expect(operation.tags).toEqual(['timeline']);
+    expect(
+      parameters
+        .filter((parameter) => parameter.in === 'path')
+        .map((parameter) => parameter.name),
+    ).toEqual(['id']);
+    expect(Object.keys(byName)).toEqual(
+      expect.arrayContaining([
+        'q',
+        'type',
+        'authorId',
+        'from',
+        'to',
+        'order',
+        'page',
+        'limit',
+      ]),
+    );
+    expect(Object.values(byName).every((p) => p.required === false)).toBe(true);
+    expect(byName.page).toMatchObject({
+      schema: { type: 'integer', default: 1, minimum: 1 },
+    });
+    expect(byName.limit).toMatchObject({
+      schema: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
+    });
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/GetTimelineResponseDto',
+    );
+    expect(components.schemas.GetTimelineResponseDto.required).toEqual([
+      'data',
+      'pagination',
+    ]);
+    expect(components.schemas.TimelineRecordDto.required).toEqual([
+      'id',
+      'type',
+      'targetType',
+      'targetId',
+      'description',
+      'happenedAt',
+      'author',
+      'assignedTo',
     ]);
   });
 

@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { PatientsModule } from './patients/patients.module';
 import { PtsModule } from './pts/pts.module';
+import { TimelineModule } from './timeline/timeline.module';
 
 /**
  * Módulo raiz: configura o banco de dados e reúne os módulos da API.
@@ -32,6 +33,7 @@ import { PtsModule } from './pts/pts.module';
     ProfessionalsModule,
     PatientsModule,
     PtsModule,
+    TimelineModule,
   ],
 })
 export class AppModule {}
