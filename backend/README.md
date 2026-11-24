@@ -81,7 +81,7 @@ Nunca edite migration já aplicada. No Docker, migration nova só vale depois do
 **Administradores**
 
 - `teste@teapts.local` / `teapts123`: papel `admin`; sem CPF nem dados pessoais (RN001)
-- `kaio.admin@teapts.local` / `teapts123`: Kaio Segunda Conta, segundo admin, sem CPF nem perfil
+- `maria.admin@teapts.local` / `teapts123`: Maria Santos, segundo admin, sem CPF nem perfil
 
 **Profissionais** (senha `profissional123`)
 

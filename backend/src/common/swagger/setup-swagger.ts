@@ -32,7 +32,7 @@ Só para desenvolvimento. Rode \`make seed\` (Docker) ou \`pnpm --dir backend ru
 | Conta | E-mail | Senha | Perfil |
 | --- | --- | --- | --- |
 | Administrador | \`teste@teapts.local\` | \`teapts123\` | admin, sem CPF nem perfil |
-| Kaio Segunda Conta | \`kaio.admin@teapts.local\` | \`teapts123\` | segundo admin |
+| Maria Santos | \`maria.admin@teapts.local\` | \`teapts123\` | segundo admin |
 | Profissional de Teste | \`profissional@teapts.local\` | \`profissional123\` | psicólogo, CRP-PR 12345 |
 | Beatriz Lopes | \`fisioterapeuta@teapts.local\` | \`profissional123\` | fisioterapeuta, Crefito-PR 54321 |
 | Paciente de Teste | \`paciente@teapts.local\` | \`paciente123\` | paciente |

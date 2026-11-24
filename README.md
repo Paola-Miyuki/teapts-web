@@ -115,14 +115,6 @@ ACCESS=$(curl -s -D - -o /dev/null -X POST "$API/auth/signin" \
 curl -s "$API/me" -H "Authorization: Bearer $ACCESS"
 ```
 
-**Bom saber:**
-
-- Erros saem como `{ "status": "CODIGO", "message": "..." }`; o `401` é `{ "message": "unauthorised" }` (sem token) ou `"try refresh token"` (access token expirado: chame `/auth/session/refresh`).
-- `/auth/signin` responde `200` mesmo com senha errada (`{"status":"WRONG_CREDENTIALS_ERROR"}`): leia o `status` do corpo. Signup inválido também volta `200`, com `FIELD_ERROR` ou `EMAIL_ALREADY_EXISTS_ERROR`.
-- Login ou signup com `500` costuma ser conta órfã (usuário no SuperTokens sem linha em `account`) ou Core fora do ar: veja `make logs-backend`.
-- As rotas `/auth/*` do SDK são descritas à mão no Swagger; as demais saem dos controllers e DTOs.
-- A senha precisa de pelo menos 8 caracteres, com letra e número.
-
 ---
 
 ## 7. Testes e qualidade
