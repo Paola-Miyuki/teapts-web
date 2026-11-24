@@ -73,6 +73,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'get'],
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
+  ['/pts/{id}/start', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
   ['/pts/proposals/{id}', 'delete'],
@@ -281,6 +282,10 @@ describe('Swagger (e2e)', () => {
     ['/patients/authorized', 'get', '400'],
     ['/patients/authorized', 'get', '500'],
     ['/accounts', 'get', '400'],
+    ['/pts/{id}/start', 'post', '400'],
+    ['/pts/{id}/start', 'post', '403'],
+    ['/pts/{id}/start', 'post', '404'],
+    ['/pts/{id}/start', 'post', '409'],
     ['/pts/{id}/team/{professionalId}', 'delete', '400'],
     ['/pts/{id}/team/{professionalId}', 'delete', '403'],
     ['/pts/{id}/team/{professionalId}', 'delete', '404'],
@@ -555,6 +560,30 @@ describe('Swagger (e2e)', () => {
       'PTS_NOT_ACTIVE',
       'CANNOT_REMOVE_RESPONSIBLE',
     ]);
+  });
+
+  it('documents POST /pts/{id}/start', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/start'].post;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/PtsStartResponseDto',
+    );
+    expect(components.schemas.PtsStartResponseDto.required).toEqual([
+      'id',
+      'status',
+      'beganAt',
+    ]);
+    expect(examples('400')).toEqual(['VALIDATION_ERROR']);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual(['PTS_NOT_PLANNING']);
   });
 
   it('documents GET /pts/{id}/timeline', async () => {
