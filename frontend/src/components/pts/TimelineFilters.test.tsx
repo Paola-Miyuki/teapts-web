@@ -8,7 +8,7 @@ import TimelineFilters, {
   periodRange,
   type TimelineFilterValue,
   type TimelineSearch,
-} from '../_components/TimelineFilters';
+} from './TimelineFilters';
 
 const TEAM = [
   { id: 'prof-1', name: 'Ana Souza' },

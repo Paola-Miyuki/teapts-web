@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 
 import type { TimelineRecord } from '@/lib/timeline';
 
-import TimelineTab from '../_components/TimelineTab';
+import TimelineTab from './TimelineTab';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),

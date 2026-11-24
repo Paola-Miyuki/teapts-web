@@ -16,7 +16,7 @@ import { formatDate } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
 import { getPts, type PtsDetail, type PtsProfessional } from '@/lib/pts';
-import TimelineTab from './_components/TimelineTab';
+import TimelineTab from '@/components/pts/TimelineTab';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
