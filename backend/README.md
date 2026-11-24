@@ -114,7 +114,7 @@ src/
                                                PATCH /pts/:id/social-situation, POST
                                                /pts/proposals/:id/approve e /reject,
                                                DELETE /pts/proposals/:id,
-                                               POST /pts/:id/team,
+                                               POST /pts/:id/start, POST /pts/:id/team,
                                                DELETE /pts/:id/team/:professionalId e
                                                POST /pts/:id/team/transfer-responsibility, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
@@ -212,6 +212,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | GET | `/pts/:id` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id](#get-ptsid) |
 | PATCH | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [PATCH /pts/proposals/:id](#patch-ptsproposalsid) |
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
+| POST | `/pts/:id/start` | responsável ou admin, PTS em `planning` | [POST /pts/:id/start](#post-ptsidstart) |
 | POST | `/pts/:id/team` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team](#post-ptsidteam) |
 | DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
 | POST | `/pts/:id/team/transfer-responsibility` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team/transfer-responsibility](#post-ptsidteamtransfer-responsibility) |
@@ -602,6 +603,32 @@ Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID),
 para proposta já excluída) e `409` (`PTS_NOT_DRAFT`). A transação trava a
 proposta (`pessimistic_write`) e refaz as checagens, então uma aprovação
 simultânea não deixa excluir um PTS que acabou de ser aprovado.
+
+## POST /pts/:id/start
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN022)
+iniciam a execução de um PTS em `planning` (RFPTS006). Não há corpo.
+
+Na mesma transação (com o PTS travado por `pessimistic_write` e as checagens
+refeitas), o PTS passa para `running` com `began_at`, e um `timeline_record` é
+gravado: `type: pts_started`, `target_type: pts`, `target_id` = id do PTS,
+`author_professional_id` = responsável (nulo quando o admin inicia) e
+`executed_by_account_id` = conta que executou (RN029). A descrição é "<quem
+executou> iniciou a execução do PTS".
+
+A resposta `200` retorna o novo estado:
+
+```json
+{
+  "id": "3f2c9a1e-7b4d-4c8e-9f1a-2b3c4d5e6f70",
+  "status": "running",
+  "beganAt": "2026-12-01T13:00:00.000Z"
+}
+```
+
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `id` que não é UUID), `401`
+(sem sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND`) e `409`
+(`PTS_NOT_PLANNING`). Em qualquer erro, o PTS não muda.
 
 ## POST /pts/:id/team
 
