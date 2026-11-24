@@ -10,7 +10,7 @@ import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import type { Account } from '@/lib/account';
-import { formatPhone } from '@/lib/format';
+import { formatDate, formatPhone } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   getPatient,
@@ -216,12 +216,7 @@ function PatientDetailContent({
                         <Icon name="calendar" className="icon-sm" />
                       </span>
                       <dt>Cadastrado em</dt>
-                      <dd>
-                        {new Date(patient.registeredAt).toLocaleDateString(
-                          'pt-BR',
-                          { timeZone: 'UTC' },
-                        )}
-                      </dd>
+                      <dd>{formatDate(patient.registeredAt)}</dd>
                     </div>
                   </dl>
                 </div>

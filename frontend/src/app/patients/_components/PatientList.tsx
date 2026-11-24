@@ -20,6 +20,7 @@ import {
   type SortOrder,
 } from '@/lib/patients';
 import { getProfessionals, type Professional } from '@/lib/professionals';
+import { formatDate } from '@/lib/format';
 import { PTS_STATUS_LABELS } from '@/lib/pts-status';
 import styles from '../patients.module.css';
 import DeletePatientDialog from './DeletePatientDialog';
@@ -55,10 +56,6 @@ const RANGE_DAYS: Record<string, number> = { '30': 30, '90': 90 };
 
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
 // CNS em grupos de 3, 4, 4 e 4 dígitos, como nos mockups.

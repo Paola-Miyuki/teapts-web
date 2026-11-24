@@ -1,4 +1,5 @@
 import { request } from '@/lib/api';
+import { formatDate, TIME_ZONE } from '@/lib/format';
 
 export type TimelineTargetType =
   'pts' | 'activity' | 'appointment' | 'team_member' | 'document';
@@ -92,18 +93,9 @@ export function getTimeline(ptsId: string, query: TimelineQuery) {
   );
 }
 
-// Hora e dia no horário de Brasília, iguais em qualquer máquina.
-export const TIMELINE_TIME_ZONE = 'America/Sao_Paulo';
-
-export function formatTimelineDay(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    timeZone: TIMELINE_TIME_ZONE,
-  });
-}
-
 export function formatTimelineTime(iso: string) {
   return new Date(iso).toLocaleTimeString('pt-BR', {
-    timeZone: TIMELINE_TIME_ZONE,
+    timeZone: TIME_ZONE,
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -113,7 +105,7 @@ export function groupTimelineByDay(records: TimelineRecord[]) {
   const groups: { day: string; records: TimelineRecord[] }[] = [];
 
   for (const record of records) {
-    const day = formatTimelineDay(record.happenedAt);
+    const day = formatDate(record.happenedAt);
     const current = groups[groups.length - 1];
 
     if (current?.day === day) {
