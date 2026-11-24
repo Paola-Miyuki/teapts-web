@@ -3,6 +3,7 @@ import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsTeamResponseDto } from '../dto/add-pts-team-members.dto';
 import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import {
@@ -13,6 +14,8 @@ import {
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
   type SocialSituationTarget,
+  type PtsTeamTarget,
+  type ProfessionalAccountRecord,
 } from '../repositories/pts.repository';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 
@@ -277,6 +280,70 @@ export class InMemoryPtsRepository extends PtsRepository {
 
     this.created.push(pts);
     return pts;
+  }
+
+  async findPtsTeamTarget(id: string): Promise<PtsTeamTarget | null> {
+    const pts =
+      this.activePts.find((item) => item.id === id) ??
+      this.ptsById.get(id) ??
+      this.visible.find((item) => item.id === id);
+
+    if (!pts) {
+      return null;
+    }
+
+    const responsibleRecord = this.professionals.get(pts.responsible.id);
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum,
+      responsibleProfessionalId: pts.responsible.id,
+      responsibleAccountId: responsibleRecord?.accountId ?? '',
+      teamMembers: pts.team.map((member) => ({
+        professionalId: member.id,
+        accountId: this.professionals.get(member.id)?.accountId ?? '',
+      })),
+    };
+  }
+
+  async findProfessionalsWithAccountByIds(
+    ids: string[],
+  ): Promise<ProfessionalAccountRecord[]> {
+    return ids
+      .map((id) => this.professionals.get(id))
+      .filter(
+        (record): record is ProfessionalAccountRecord => record !== undefined,
+      );
+  }
+
+  async addTeamMembers(
+    ptsId: string,
+    professionalIds: string[],
+  ): Promise<PtsTeamResponseDto> {
+    const pts =
+      this.activePts.find((item) => item.id === ptsId) ??
+      this.ptsById.get(ptsId) ??
+      this.visible.find((item) => item.id === ptsId);
+
+    if (!pts) {
+      throw new Error('PTS não encontrado.');
+    }
+
+    const newMembers = professionalIds.map((professionalId) => ({
+      id: professionalId,
+      name: `Profissional ${professionalId}`,
+      specialism: { id: 'default', name: 'Geral' },
+      registration: null,
+    }));
+
+    pts.team = [...pts.team, ...newMembers];
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+      responsible: pts.responsible,
+      team: pts.team,
+    };
   }
 }
 

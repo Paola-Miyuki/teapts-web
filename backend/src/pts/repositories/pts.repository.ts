@@ -4,6 +4,7 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsTeamResponseDto } from '../dto/add-pts-team-members.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 export interface ProfessionalRecord {
@@ -53,6 +54,22 @@ export interface ProposalDecisionTarget {
   id: string;
   status: PtsStateEnum;
   patientId: string;
+}
+
+export interface PtsTeamTarget {
+  id: string;
+  status: PtsStateEnum;
+  responsibleProfessionalId: string;
+  responsibleAccountId: string;
+  teamMembers: Array<{
+    professionalId: string;
+    accountId: string;
+  }>;
+}
+
+export interface ProfessionalAccountRecord {
+  id: string;
+  accountId: string;
 }
 
 /** Contrato de persistência dos PTS. */
@@ -114,4 +131,15 @@ export abstract class PtsRepository {
 
   /** Exclusão lógica da proposta em DRAFT: preenche deletedAt. */
   abstract softDeleteProposal(id: string): Promise<void>;
+
+  abstract findPtsTeamTarget(id: string): Promise<PtsTeamTarget | null>;
+
+  abstract findProfessionalsWithAccountByIds(
+    ids: string[],
+  ): Promise<ProfessionalAccountRecord[]>;
+
+  abstract addTeamMembers(
+    ptsId: string,
+    professionalIds: string[],
+  ): Promise<PtsTeamResponseDto>;
 }

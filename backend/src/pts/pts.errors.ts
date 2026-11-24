@@ -150,3 +150,18 @@ export const ptsProposalNotDraftForDelete = () =>
     'PTS_NOT_DRAFT',
     'Somente propostas aguardando decisão podem ser excluídas.',
   );
+
+export const ptsTeamEditForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode alterar a equipe do PTS.',
+  );
+
+export const teamDuplicateAccount = (ids: string[]) =>
+  new PtsApiError(
+    HttpStatus.BAD_REQUEST,
+    'TEAM_DUPLICATE_ACCOUNT',
+    'A equipe não pode ter mais de um perfil da mesma conta, contando o responsável.',
+    { professionalIds: ids },
+  );

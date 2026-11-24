@@ -16,6 +16,10 @@ import type {
 } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
+import type {
+  AddPtsTeamMembersRequestDto,
+  PtsTeamResponseDto,
+} from '../dto/add-pts-team-members.dto';
 import { PtsRepository } from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
@@ -40,6 +44,8 @@ import {
   validationError,
   ptsProposalDeleteForbidden,
   ptsProposalNotDraftForDelete,
+  ptsTeamEditForbidden,
+  teamDuplicateAccount,
 } from '../pts.errors';
 
 @Injectable()
@@ -222,9 +228,9 @@ export class PtsService {
   }
 
   /**
-   * Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
-   * paciente, os próprios, sem a situação social (RN028); o profissional, os
-   * de cuja equipe faz parte, menos o rejeitado (RN016).
+- Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
+- paciente, os próprios, sem a situação social (RN028); o profissional, os
+- de cuja equipe faz parte, menos o rejeitado (RN016).
    */
   async findPtsById(
     id: string,
@@ -413,6 +419,89 @@ export class PtsService {
     await this.ptsRepository.softDeleteProposal(id);
 
     return { status: 'OK' };
+  }
+
+  async addTeamMembers(
+    id: string,
+    dto: AddPtsTeamMembersRequestDto,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const uniqueIds = [...new Set(dto.professionalIds)];
+
+    if (
+      uniqueIds.length === 0 ||
+      uniqueIds.length !== dto.professionalIds.length
+    ) {
+      throw validationError([
+        {
+          field: 'professionalIds',
+          message:
+            'Informe ao menos um perfil profissional e sem IDs repetidos.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw ptsTeamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    const professionals =
+      await this.ptsRepository.findProfessionalsWithAccountByIds(uniqueIds);
+
+    const professionalMap = new Map(
+      professionals.map((professional) => [professional.id, professional]),
+    );
+
+    const missingIds = uniqueIds.filter(
+      (professionalId) => !professionalMap.has(professionalId),
+    );
+
+    if (missingIds.length > 0) {
+      throw teamProfessionalNotFound(missingIds);
+    }
+
+    const existingAccountIds = new Set<string>([
+      pts.responsibleAccountId,
+      ...pts.teamMembers.map((member) => member.accountId),
+    ]);
+
+    const seenNewAccountIds = new Set<string>();
+    const duplicateAccountProfessionalIds: string[] = [];
+
+    for (const professionalId of uniqueIds) {
+      const professional = professionalMap.get(professionalId)!;
+
+      if (
+        existingAccountIds.has(professional.accountId) ||
+        seenNewAccountIds.has(professional.accountId)
+      ) {
+        duplicateAccountProfessionalIds.push(professionalId);
+      } else {
+        seenNewAccountIds.add(professional.accountId);
+      }
+    }
+
+    if (duplicateAccountProfessionalIds.length > 0) {
+      throw teamDuplicateAccount(duplicateAccountProfessionalIds);
+    }
+
+    return this.ptsRepository.addTeamMembers(id, uniqueIds);
   }
 
   private async findDecidableProposal(id: string, account: AccountContext) {

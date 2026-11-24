@@ -21,11 +21,14 @@ import {
   type UpdatePtsProposalInput,
   type SocialSituationTarget,
   type ProposalDecisionTarget,
+  type PtsTeamTarget,
+  type ProfessionalAccountRecord,
 } from './pts.repository';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { PtsTeamResponseDto } from '../dto/add-pts-team-members.dto';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -33,6 +36,8 @@ import { Specialism } from '../../professionals/enums/specialism.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import {
   activePtsAlreadyExists,
+  ptsNotActive,
+  ptsNotFound,
   ptsProposalNotDraft,
   ptsProposalNotDraftForDelete,
   ptsProposalNotFound,
@@ -609,6 +614,119 @@ export class PtsRepositoryImpl extends PtsRepository {
       await queryRunner.manager.softDelete(PtsEntity, id);
 
       await queryRunner.commitTransaction();
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async findPtsTeamTarget(id: string): Promise<PtsTeamTarget | null> {
+    const pts = await this.ptsRepository.findOne({
+      where: { id },
+      relations: {
+        responsible: { account: true },
+        team: { account: true },
+      },
+    });
+
+    if (!pts) {
+      return null;
+    }
+
+    return {
+      id: pts.id,
+      status: pts.status as PtsStateEnum,
+      responsibleProfessionalId: pts.responsibleProfessionalId,
+      responsibleAccountId: pts.responsible?.account?.id ?? '',
+      teamMembers: (pts.team ?? []).map((member) => ({
+        professionalId: member.id,
+        accountId: member.account?.id ?? '',
+      })),
+    };
+  }
+
+  async findProfessionalsWithAccountByIds(
+    ids: string[],
+  ): Promise<ProfessionalAccountRecord[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const found = await this.professionalRepository.find({
+      where: { id: In(ids) },
+      relations: { account: true },
+    });
+
+    return found.map((professional) => ({
+      id: professional.id,
+      accountId: professional.account?.id ?? '',
+    }));
+  }
+
+  async addTeamMembers(
+    ptsId: string,
+    professionalIds: string[],
+  ): Promise<PtsTeamResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsNotActive();
+      }
+
+      for (const professionalId of professionalIds) {
+        await queryRunner.query(
+          `INSERT INTO professional_participating_on_therapeutic_journey
+            (professional_id, therapeutic_journey_id)
+           VALUES ($1, $2)`,
+          [professionalId, ptsId],
+        );
+      }
+
+      const updatedPts = await queryRunner.manager.findOne(PtsEntity, {
+        where: { id: ptsId },
+        relations: {
+          responsible: { account: true },
+          team: { account: true },
+        },
+      });
+
+      if (!updatedPts) {
+        throw ptsNotFound();
+      }
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id: updatedPts.id,
+        status: updatedPts.status as
+          PtsStateEnum.PLANNING | PtsStateEnum.RUNNING,
+        responsible: this.mapProfessional(updatedPts.responsible),
+        team: (updatedPts.team ?? []).map((professional) =>
+          this.mapProfessional(professional),
+        ),
+      };
     } catch (error) {
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();
