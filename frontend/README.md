@@ -83,8 +83,18 @@ src/
                            excluem a proposta em `draft` pelo menu ⋮, com confirmação
                            (DELETE /pts/proposals/:id)
         [id]/edit/         editar proposta nos mesmos passos (PATCH /pts/proposals/:id)
-      [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin:
-                           cabeçalho, Visão geral (situação social) e Equipe (registro e papel)
+      [id]/                detalhe do PTS (GET /pts/:id) de `pts-detalhe.html` para a equipe e o admin
+                           e de `pts.html` para o paciente (sem a ficha nem o prontuário): cabeçalho,
+                           Visão geral (situação social, só a equipe), Equipe (registro e papel) e
+                           Timeline; `/pts/:id#timeline` abre direto na Timeline (atalho de `historico.html`)
+        _components/       TimelineTab (GET /pts/:id/timeline: eventos agrupados por dia, com hora,
+                           autor, "Atribuído a" (RN029), tipo e os links Ver atendimento/atividade/
+                           meta/documento; paginação, carregamento, lista vazia e erro) e
+                           TimelineFilters (busca, Tipo do evento, Autor, Período e "Ordenar por"
+                           Data do evento); Autor é autocomplete em GET /professionals (RFPRO001) para a
+                           equipe e o admin e a lista da equipe para o paciente; busca, filtros, ordem e
+                           página ficam na URL (NFUS003)
+        __tests__/         testes de TimelineTab e TimelineFilters
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
@@ -124,6 +134,8 @@ src/
     pts-status.ts          status do PTS e rótulos das telas
     proposals.ts           GET /pts/proposals (getProposals)
     pts.ts                 GET /pts/:id (getPts)
+    timeline.ts            GET /pts/:id/timeline (getTimeline), rótulos e ícones dos tipos, hora e dia
+                           no horário de Brasília, agrupamento por dia e o link de cada evento
     format.ts              datas, CPF, telefone (máscaras e exibição), idade e iniciais
   test-utils/
     account.ts             dados pessoais padrão da conta nos testes
@@ -161,7 +173,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 | `/pts/proposals/:id/edit` | Editar proposta de PTS | responsável ou admin, proposta em `draft` | `editar-proposta.html` |
-| `/pts/:id` | Detalhe do PTS (Visão geral e Equipe); aberto por "Abrir PTS" em Pacientes | admin e profissional da equipe (RN016) | `pts-detalhe.html` |
+| `/pts/:id` | Detalhe do PTS (Visão geral, Equipe e Timeline); aberto por "Abrir PTS" em Pacientes; `#timeline` abre a aba Timeline | admin, profissional da equipe (RN016) e paciente titular, sem a Visão geral e sem link nos eventos de documento (`viewPts`, RN028) | `pts-detalhe.html`, `pts.html`, `historico.html` |
 
 ## Layouts (`design/`)
 
