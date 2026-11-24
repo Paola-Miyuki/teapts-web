@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/api';
 import {
   createPatient,
   type AccountOption,
-  type SupportContact,
+  type SupportContactInput,
 } from '@/lib/patients';
 import styles from '../patients.module.css';
 import AccountCombobox from './AccountCombobox';
@@ -32,13 +32,13 @@ export default function AddPatientForm({
 
   const [account, setAccount] = useState<AccountOption | null>(null);
   const [accountError, setAccountError] = useState('');
-  const [contacts, setContacts] = useState<SupportContact[]>([]);
+  const [contacts, setContacts] = useState<SupportContactInput[]>([]);
   const [isContactOpen, setIsContactOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  function handleSaveContact(contact: SupportContact) {
+  function handleSaveContact(contact: SupportContactInput) {
     setContacts((current) => [...current, contact]);
     setIsContactOpen(false);
   }

@@ -19,12 +19,32 @@ export type AccountsResponse = {
   pagination: PaginationData;
 };
 
-// Campos opcionais vazios não vão no payload.
-export type SupportContact = {
+// Contato a salvar (POST); campos opcionais vazios não vão no payload.
+export type SupportContactInput = {
   name: string;
   description?: string;
   email?: string;
   phone?: string;
+  isEmergency?: boolean;
+};
+
+// Contato de suporte como a API devolve, com o id próprio (RFPAC003).
+export type SupportContact = {
+  id: string;
+  name: string;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  isEmergency: boolean;
+};
+
+// Corpo do PATCH: o que não vem fica como está; `null` limpa o campo.
+export type SupportContactPatch = {
+  name?: string;
+  description?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isEmergency?: boolean;
 };
 
 // Telefone com DDD (10 ou 11 dígitos), com ou sem +55, aceitando a máscara
@@ -41,7 +61,7 @@ export function isValidPhone(phone: string) {
 
 export type CreatePatientBody = {
   accountId: string;
-  supportContacts: SupportContact[];
+  supportContacts: SupportContactInput[];
 };
 
 export type PatientProfile = CreatePatientBody;
@@ -174,4 +194,59 @@ export function createPatient(body: CreatePatientBody) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function supportContactsPath(patientId: string) {
+  return `/patients/${encodeURIComponent(patientId)}/support-contacts`;
+}
+
+function jsonBody(method: string, body: unknown): RequestInit {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  };
+}
+
+// GET /patients/:patientId/support-contacts: admin, profissional com vínculo
+// (RN016) ou o próprio paciente.
+export function getSupportContacts(
+  patientId: string,
+  { signal }: { signal?: AbortSignal } = {},
+) {
+  return request<{ data: SupportContact[] }>(supportContactsPath(patientId), {
+    signal,
+  });
+}
+
+// POST /patients/:patientId/support-contacts: admin ou membro de PTS ativo
+// (RN024).
+export function createSupportContact(
+  patientId: string,
+  contact: SupportContactInput,
+) {
+  return request<SupportContact>(
+    supportContactsPath(patientId),
+    jsonBody('POST', contact),
+  );
+}
+
+// PATCH /patients/:patientId/support-contacts/:contactId.
+export function updateSupportContact(
+  patientId: string,
+  contactId: string,
+  patch: SupportContactPatch,
+) {
+  return request<SupportContact>(
+    `${supportContactsPath(patientId)}/${encodeURIComponent(contactId)}`,
+    jsonBody('PATCH', patch),
+  );
+}
+
+// DELETE /patients/:patientId/support-contacts/:contactId (204).
+export function deleteSupportContact(patientId: string, contactId: string) {
+  return request<void>(
+    `${supportContactsPath(patientId)}/${encodeURIComponent(contactId)}`,
+    { method: 'DELETE' },
+  );
 }

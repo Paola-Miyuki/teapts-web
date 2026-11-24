@@ -9,7 +9,14 @@ import Icon from '@/components/Icon';
 import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
-import { getPatient, type PatientDetail as Patient } from '@/lib/patients';
+import type { Account } from '@/lib/account';
+import { can } from '@/lib/permissions';
+import {
+  getPatient,
+  type PatientDetail as Patient,
+  type SupportContact,
+} from '@/lib/patients';
+import SupportContactsCard from '../_components/SupportContactsCard';
 import styles from '../patients.module.css';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
@@ -47,14 +54,21 @@ export default function PatientDetail({ id }: { id: string }) {
       breadcrumb="Pacientes"
       requiredAction="viewAuthorizedPatients"
     >
-      <PatientDetailContent id={id} />
+      {(account) => <PatientDetailContent id={id} account={account} />}
     </AuthenticatedPage>
   );
 }
 
-function PatientDetailContent({ id }: { id: string }) {
+function PatientDetailContent({
+  id,
+  account,
+}: {
+  id: string;
+  account: Account;
+}) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
 
@@ -65,6 +79,7 @@ function PatientDetailContent({ id }: { id: string }) {
       .then((response) => {
         setError(null);
         setPatient(response);
+        setSupportContacts(response.supportContacts);
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) {
@@ -234,51 +249,15 @@ function PatientDetailContent({ id }: { id: string }) {
               </div>
             </section>
 
-            <section className="ux-card" aria-labelledby="d-support">
-              <div className="ux-card-head">
-                <div>
-                  <h2 id="d-support">Contatos de suporte</h2>
-                </div>
-              </div>
-
-              {patient.supportContacts.length === 0 ? (
-                <p className="hint">Nenhum contato de suporte cadastrado.</p>
-              ) : (
-                <ul className="ux-contact-tiles">
-                  {patient.supportContacts.map((contact, index) => (
-                    <li
-                      className="ux-contact-tile"
-                      key={`${contact.name}-${index}`}
-                    >
-                      <span className="avatar" aria-hidden="true">
-                        {initials(contact.name)}
-                      </span>
-                      <div>
-                        <strong>{contact.name}</strong>
-                        {contact.description && (
-                          <small className="ux-sub">
-                            <span className="ux-sublabel">Descrição:</span>{' '}
-                            {contact.description}
-                          </small>
-                        )}
-                        {contact.email && (
-                          <small className="ux-sub">
-                            <span className="ux-sublabel">E-mail:</span>{' '}
-                            {contact.email}
-                          </small>
-                        )}
-                        {contact.phone && (
-                          <small className="ux-sub">
-                            <span className="ux-sublabel">Telefone:</span>{' '}
-                            {contact.phone}
-                          </small>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <SupportContactsCard
+              patientId={patient.id}
+              patientName={patient.name}
+              contacts={supportContacts}
+              canEdit={can(account, 'manageSupportContacts', {
+                patientReadOnly: patient.readOnly,
+              })}
+              onChange={setSupportContacts}
+            />
           </div>
         </div>
       </section>

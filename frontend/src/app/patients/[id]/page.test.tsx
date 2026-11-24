@@ -36,7 +36,14 @@ const PATIENT = {
   activePtsId: null,
   readOnly: true,
   supportContacts: [
-    { name: 'Rosa Ribeiro', description: 'Avó', phone: '41996772211' },
+    {
+      id: 'contact-1',
+      name: 'Rosa Ribeiro',
+      description: 'Avó',
+      email: null,
+      phone: '41996772211',
+      isEmergency: false,
+    },
   ],
 };
 

@@ -149,3 +149,28 @@ describe('editPtsProposal', () => {
     );
   });
 });
+
+describe('manageSupportContacts', () => {
+  it('libera ao admin sempre', () => {
+    expect(can(admin, 'manageSupportContacts')).toBe(true);
+  });
+
+  it('libera ao profissional só com PTS ativo, e nega com PTS encerrado (RN024)', () => {
+    expect(
+      can(professional, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(true);
+    expect(
+      can(professional, 'manageSupportContacts', { patientReadOnly: true }),
+    ).toBe(false);
+    expect(can(professional, 'manageSupportContacts')).toBe(false);
+  });
+
+  it('nega ao paciente, que só vê os próprios contatos, e à conta sem perfil', () => {
+    expect(
+      can(patient, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(false);
+    expect(
+      can(waiting, 'manageSupportContacts', { patientReadOnly: false }),
+    ).toBe(false);
+  });
+});

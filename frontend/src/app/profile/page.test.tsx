@@ -89,6 +89,23 @@ function mockApi({
         );
       }
 
+      if (url === `${API}/patients/patient-uuid/support-contacts`) {
+        return Promise.resolve(
+          response({
+            data: [
+              {
+                id: 'contact-1',
+                name: 'Juliana Ribeiro',
+                description: 'Mãe',
+                email: null,
+                phone: '41998123344',
+                isEmergency: true,
+              },
+            ],
+          }),
+        );
+      }
+
       return Promise.reject(new Error(`Unexpected request: ${url}`));
     },
   );
@@ -147,6 +164,41 @@ describe('ProfilePage', () => {
         name: 'Meu perfil',
       }),
     ).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('mostra os contatos de suporte do paciente, só para leitura', async () => {
+    mockApi({
+      account: {
+        ...ACCOUNT,
+        patientProfileId: 'patient-uuid',
+        professionalProfileIds: [],
+      },
+    });
+
+    await renderProfile();
+
+    const card = within(
+      (
+        await screen.findByRole('heading', { name: 'Contatos de suporte' })
+      ).closest('section')!,
+    );
+
+    expect(card.getByText('Juliana Ribeiro')).toBeInTheDocument();
+    expect(card.getByText('Emergência')).toBeInTheDocument();
+    expect(card.getByText('(41) 99812-3344')).toBeInTheDocument();
+    expect(
+      card.queryByRole('button', { name: /Adicionar|Editar|Remover/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('não mostra contatos de suporte ao profissional', async () => {
+    mockApi();
+
+    await renderProfile();
+
+    expect(
+      screen.queryByRole('heading', { name: 'Contatos de suporte' }),
+    ).not.toBeInTheDocument();
   });
 
   it('mostra o aviso de dados atualizados vindo da edição', async () => {

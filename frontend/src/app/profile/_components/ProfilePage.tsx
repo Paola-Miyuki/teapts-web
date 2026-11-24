@@ -24,6 +24,7 @@ import {
   initials,
 } from '@/lib/format';
 import { getProfessionals } from '@/lib/professionals';
+import OwnSupportContacts from './OwnSupportContacts';
 
 function Empty() {
   return (
@@ -176,6 +177,13 @@ function ProfileContent({
             </dl>
           </section>
 
+          {kind === 'patient' && account.patientProfileId && (
+            <OwnSupportContacts
+              patientId={account.patientProfileId}
+              patientName={account.name}
+            />
+          )}
+
           {kind === 'professional' && (
             <section className="ux-card" aria-labelledby="pro-title">
               <div className="ux-card-head">
@@ -195,7 +203,8 @@ function ProfileContent({
 }
 
 // Meu perfil de `meu-perfil.html`. Foto, dados do paciente, registro no
-// conselho e exclusão da conta ainda não existem na API e ficam de fora.
+// conselho e exclusão da conta ainda não existem na API e ficam de fora; os
+// contatos de suporte do paciente são só leitura (RFPAC003).
 export default function ProfilePage() {
   return (
     <AuthenticatedPage currentHref="/profile" breadcrumb="Meu perfil">

@@ -1,8 +1,12 @@
 import {
+  createSupportContact,
+  deleteSupportContact,
   getAccountsWithoutProfile,
   getPatient,
   getPatients,
+  getSupportContacts,
   isValidPhone,
+  updateSupportContact,
 } from './patients';
 
 describe('isValidPhone', () => {
@@ -108,6 +112,77 @@ describe('getPatients e getPatient', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       `${API}/patients/patient-1`,
       expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+});
+
+describe('contatos de suporte', () => {
+  const API = 'http://localhost:3000';
+  const URL = `${API}/patients/patient-1/support-contacts`;
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({ data: [] }),
+    });
+  });
+
+  it('lista os contatos do paciente', async () => {
+    await getSupportContacts('patient-1');
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      URL,
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('cria com POST e o corpo em JSON', async () => {
+    await createSupportContact('patient-1', {
+      name: 'Joana',
+      phone: '(11) 98765-4321',
+      isEmergency: true,
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      URL,
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Joana',
+          phone: '(11) 98765-4321',
+          isEmergency: true,
+        }),
+      }),
+    );
+  });
+
+  it('atualiza com PATCH, mandando null para limpar o campo', async () => {
+    await updateSupportContact('patient-1', 'contact/1', { email: null });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${URL}/contact%2F1`,
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ email: null }),
+      }),
+    );
+  });
+
+  it('remove com DELETE e aceita a resposta 204 sem corpo', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: jest.fn().mockRejectedValue(new Error('sem corpo')),
+    });
+
+    await expect(
+      deleteSupportContact('patient-1', 'contact-1'),
+    ).resolves.toBeUndefined();
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${URL}/contact-1`,
+      expect.objectContaining({ method: 'DELETE' }),
     );
   });
 });

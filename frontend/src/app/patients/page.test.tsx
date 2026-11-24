@@ -896,6 +896,44 @@ describe('PatientsPage', () => {
       );
     });
 
+    it('exige e-mail ou telefone', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+      await openAddPatient(user);
+
+      await addContact(user, { name: 'Maria' });
+
+      expect(
+        within(
+          screen.getByRole('group', { name: 'Novo contato de suporte' }),
+        ).getByRole('alert'),
+      ).toHaveTextContent('Informe o e-mail ou o telefone do contato.');
+    });
+
+    it('exige o telefone no contato de emergência', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      render(<PatientsPage />);
+      const { dialog } = await openAddPatient(user);
+
+      await user.click(
+        dialog.getByRole('button', { name: 'Adicionar contato' }),
+      );
+      await user.type(dialog.getByLabelText('Nome do contato'), 'Maria');
+      await user.type(dialog.getByLabelText(/E-mail/), 'maria@exemplo.com');
+      await user.click(dialog.getByLabelText('Contato de emergência'));
+      await user.click(dialog.getByRole('button', { name: 'Salvar contato' }));
+
+      expect(
+        within(
+          screen.getByRole('group', { name: 'Novo contato de suporte' }),
+        ).getByRole('alert'),
+      ).toHaveTextContent('Informe o telefone do contato de emergência.');
+    });
+
     it('exige um e-mail válido quando informado', async () => {
       const user = userEvent.setup();
       mockApi();
@@ -989,13 +1027,13 @@ describe('PatientsPage', () => {
       render(<PatientsPage />);
       await openAddPatient(user);
 
-      await addContact(user, { name: 'Maria Martins' });
+      await addContact(user, { name: 'Maria Martins', phone: '11987654321' });
 
       const list = within(
         screen.getByRole('list', { name: 'Contatos de suporte' }),
       );
 
-      expect(list.getAllByText('Não informado')).toHaveLength(3);
+      expect(list.getAllByText('Não informado')).toHaveLength(2);
     });
 
     it('exclui o contato sem fechar o modal', async () => {
@@ -1027,7 +1065,8 @@ describe('PatientsPage', () => {
       await user.click(
         dialog.getByRole('button', { name: 'Adicionar contato' }),
       );
-      await user.type(dialog.getByLabelText('Nome do contato'), 'Maria{Enter}');
+      await user.type(dialog.getByLabelText('Nome do contato'), 'Maria');
+      await user.type(dialog.getByLabelText(/Telefone/), '11987654321{Enter}');
 
       expect(
         within(
