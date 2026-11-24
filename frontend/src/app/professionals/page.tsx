@@ -1,5 +1,7 @@
 'use client';
 
+import { Suspense } from 'react';
+
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Professionals from './_components/Professionals';
 
@@ -18,7 +20,10 @@ export default function ProfessionalsPage() {
             </div>
           </div>
 
-          <Professionals isAdmin={account.role === 'admin'} />
+          {/* O useSearchParams (busca e filtros) exige um limite de Suspense. */}
+          <Suspense>
+            <Professionals isAdmin={account.role === 'admin'} />
+          </Suspense>
         </>
       )}
     </AuthenticatedPage>

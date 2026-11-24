@@ -68,8 +68,9 @@ function createRepository() {
 const filters: FindProfessionalsQuery = {
   page: 2,
   limit: 10,
-  name: 'Maria',
-  specialism: Specialism.Psychologist,
+  q: 'Maria',
+  specialism: [Specialism.Psychologist],
+  councilState: 'PR',
   ids: ['550e8400-e29b-41d4-a716-446655440000'],
 };
 
@@ -114,12 +115,16 @@ describe('ProfessionalsRepository.findPaginated', () => {
       'account.email AS account_email',
     ]);
     expect(query.andWhere).toHaveBeenCalledWith(
-      'LOWER(account.name) LIKE LOWER(:name)',
-      { name: '%Maria%' },
+      expect.stringContaining('account.email ILIKE :q'),
+      { q: '%Maria%' },
     );
     expect(query.andWhere).toHaveBeenCalledWith(
-      'professional.specialism = :specialism',
-      { specialism: Specialism.Psychologist },
+      'professional.specialism IN (:...specialisms)',
+      { specialisms: [Specialism.Psychologist] },
+    );
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'professional.councilState = :councilState',
+      { councilState: 'PR' },
     );
     expect(query.andWhere).toHaveBeenCalledWith(
       'professional.id IN (:...ids)',
@@ -130,6 +135,88 @@ describe('ProfessionalsRepository.findPaginated', () => {
     expect(query.clone).toHaveBeenCalled();
     expect(query.offset).toHaveBeenCalledWith(10);
     expect(query.limit).toHaveBeenCalledWith(10);
+  });
+
+  it('searches name, email and council number with escaped wildcards', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({ page: 1, limit: 10, q: '50%_a\\' });
+
+    const [sql, params] = query.andWhere.mock.calls[0] as [string, object];
+    expect(sql).toContain('account.name ILIKE :q');
+    expect(sql).toContain('account.email ILIKE :q');
+    expect(sql).toContain('professional.councilNumber ILIKE :q');
+    expect(sql).toContain("ESCAPE '\\'");
+    expect(params).toEqual({ q: '%50\\%\\_a\\\\%' });
+  });
+
+  it('maps councils to specialisms and intersects with the specialism filter', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({
+      page: 1,
+      limit: 10,
+      council: ['CRP', 'CRM'],
+      specialism: [Specialism.Doctor, Specialism.Physiotherapist],
+    });
+
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'professional.specialism IN (:...specialisms)',
+      { specialisms: [Specialism.Doctor] },
+    );
+  });
+
+  it('returns nothing when council and specialism do not intersect', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({
+      page: 1,
+      limit: 10,
+      council: ['CRP'],
+      specialism: [Specialism.Doctor],
+    });
+
+    expect(query.andWhere).toHaveBeenCalledWith('1 = 0');
+  });
+
+  it.each([
+    [{}, 'account.name', 'ASC'],
+    [{ order: 'desc' as const }, 'account.name', 'DESC'],
+    [{ sort: 'name' as const, order: 'desc' as const }, 'account.name', 'DESC'],
+  ])('orders by name (%j)', async (sorting, column, direction) => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({ page: 1, limit: 10, ...sorting });
+
+    expect(query.orderBy).toHaveBeenCalledWith(column, direction);
+    expect(query.addOrderBy).toHaveBeenCalledWith('professional.id', 'ASC');
+  });
+
+  it('orders by specialism name, then by account name', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({
+      page: 1,
+      limit: 10,
+      sort: 'specialism',
+      order: 'desc',
+    });
+
+    expect(query.orderBy).toHaveBeenCalledWith(
+      expect.stringContaining("WHEN 'doctor' THEN 'Medicina'"),
+      'DESC',
+    );
+    expect(query.addOrderBy).toHaveBeenCalledWith('account.name', 'ASC');
   });
 
   it('does not filter when no filter is informed', async () => {

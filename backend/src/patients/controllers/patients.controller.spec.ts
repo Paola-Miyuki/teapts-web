@@ -43,7 +43,9 @@ describe('GET /patients/authorized', () => {
     patientsService = {
       findOne: jest.fn(async () => ({ id: 'patient-1', name: 'Maria Silva' })),
       findAuthorized: jest.fn(async () => ({
-        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        data: [
+          { id: 'patient-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        ],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
       })),
     };
@@ -77,7 +79,9 @@ describe('GET /patients/authorized', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      data: [{ id: 'patient-1', name: 'Maria Silva' }],
+      data: [
+        { id: 'patient-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+      ],
       pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
     });
     expect(patientsService.findAuthorized).toHaveBeenCalledWith(
@@ -158,12 +162,12 @@ describe('GET /patients/authorized', () => {
   });
 });
 
-describe('GET /patients/available-for-pts', () => {
+describe('GET /patients (eligible for a new proposal)', () => {
   let app: INestApplication;
   let currentAccount: AccountContext;
   let guardCanActivate: jest.Mock;
   let patientsService: {
-    findAvailableForPts: jest.Mock;
+    findEligibleForProposal: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -179,8 +183,10 @@ describe('GET /patients/available-for-pts', () => {
       return true;
     });
     patientsService = {
-      findAvailableForPts: jest.fn(async () => ({
-        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+      findEligibleForProposal: jest.fn(async () => ({
+        data: [
+          { id: 'patient-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        ],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
       })),
     };
@@ -207,16 +213,36 @@ describe('GET /patients/available-for-pts', () => {
     await app.close();
   });
 
-  it('returns patients without an active PTS for professionals', async () => {
+  it('returns eligible patients for professionals', async () => {
     const response = await request(app.getHttpServer())
-      .get('/patients/available-for-pts')
-      .query({ page: 1, limit: 10 });
+      .get('/patients')
+      .query({ withActivePts: 'false', q: '  Maria ', page: 1, limit: 10 });
 
     expect(response.status).toBe(200);
-    expect(patientsService.findAvailableForPts).toHaveBeenCalledWith(
+    expect(response.body.data[0]).not.toHaveProperty('cpf');
+    expect(patientsService.findEligibleForProposal).toHaveBeenCalledWith(
       currentAccount,
-      expect.objectContaining({ page: 1, limit: 10 }),
+      expect.objectContaining({ q: 'Maria', page: 1, limit: 10 }),
     );
+  });
+
+  it.each([
+    [{}, 'withActivePts'],
+    [{ withActivePts: 'true' }, 'withActivePts'],
+    [{ withActivePts: 'false', q: 'a' }, 'q'],
+    [{ withActivePts: 'false', limit: 51 }, 'limit'],
+    [{ withActivePts: 'false', page: 0 }, 'page'],
+  ])('rejects the query %j with 400', async (query, param) => {
+    const response = await request(app.getHttpServer())
+      .get('/patients')
+      .query(query);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'ERROR',
+      message: `Parâmetro inválido: ${param}`,
+    });
+    expect(patientsService.findEligibleForProposal).not.toHaveBeenCalled();
   });
 });
 

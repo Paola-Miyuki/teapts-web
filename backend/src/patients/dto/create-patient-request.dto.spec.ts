@@ -60,14 +60,20 @@ describe('CreatePatientRequestDto', () => {
     expect(result.supportContacts?.[0].description).toBeUndefined();
   });
 
-  it.each(['11987654321', '1198765432', '(11) 98765-4321', '11 9 8765 4321'])(
-    'accepts the phone %s with DDD',
-    async (phone) => {
-      await expect(
-        normalize({ accountId, supportContacts: [{ name: 'Maria', phone }] }),
-      ).resolves.toBeDefined();
-    },
-  );
+  it.each([
+    '11987654321',
+    '1198765432',
+    '(11) 98765-4321',
+    '11 9 8765 4321',
+    '+55 (11) 98765-4321',
+    '+5511987654321',
+    '5511987654321',
+    '(11) 3456.7890',
+  ])('accepts the phone %s with DDD', async (phone) => {
+    await expect(
+      normalize({ accountId, supportContacts: [{ name: 'Maria', phone }] }),
+    ).resolves.toBeDefined();
+  });
 
   it.each([
     ['a missing accountId', {}, 'Informe uma conta válida.'],
@@ -104,6 +110,22 @@ describe('CreatePatientRequestDto', () => {
     [
       'a phone without DDD',
       { accountId, supportContacts: [{ name: 'Maria', phone: '98765-4321' }] },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with letters',
+      {
+        accountId,
+        supportContacts: [{ name: 'Maria', phone: '(11) 98765-43ab21' }],
+      },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with a plus sign in the middle',
+      {
+        accountId,
+        supportContacts: [{ name: 'Maria', phone: '11 +98765-4321' }],
+      },
       'Informe um telefone válido para o contato.',
     ],
     [

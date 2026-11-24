@@ -3,6 +3,11 @@ export interface Patient {
   name: string;
 }
 
+// Paciente da busca de elegíveis (RN011); o CPF não vem da API (DP011).
+export interface EligiblePatient extends Patient {
+  email: string;
+}
+
 export interface Professional {
   id: string;
   name: string;

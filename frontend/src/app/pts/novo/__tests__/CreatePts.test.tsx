@@ -20,6 +20,13 @@ jest.mock('../api/ptsApi', () => ({
 
 jest.mock('@/lib/supertokens', () => ({ initSuperTokens: jest.fn() }));
 
+// Mesmo objeto em todo render, como o useRouter do Next.
+const mockRouter = { replace: jest.fn() };
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+}));
+
 const SOCIAL = 'Paciente em situação de vulnerabilidade social.';
 
 const testAccount: Account = {
@@ -63,8 +70,10 @@ async function renderScreen(account: Account = testAccount) {
 type User = ReturnType<typeof userEvent.setup>;
 
 async function choosePatient(user: User, name = 'Maria Silva') {
-  await user.click(screen.getByRole('combobox', { name: /Paciente/ }));
-  await user.click(await screen.findByRole('option', { name }));
+  await user.type(screen.getByRole('combobox', { name: /Paciente/ }), 'ma');
+  await user.click(
+    await screen.findByRole('option', { name: new RegExp(`^${name}`) }),
+  );
 }
 
 async function next(user: User) {
@@ -76,7 +85,6 @@ async function addMember(user: User, name: string) {
   await user.click(
     await screen.findByRole('option', { name: new RegExp(`^${name}`) }),
   );
-  await user.click(screen.getByRole('button', { name: 'Adicionar' }));
 }
 
 // Passa pelos passos 1 e 2 e para no passo de equipe.
@@ -94,10 +102,11 @@ beforeEach(() => {
   jest.resetAllMocks();
 
   (api.listEligiblePatients as jest.Mock).mockResolvedValue([
-    { id: MOCK_PATIENT_ID, name: 'Maria Silva' },
+    { id: MOCK_PATIENT_ID, name: 'Maria Silva', email: 'maria@exemplo.com' },
     {
       id: MOCK_PATIENT_WITH_ACTIVE_PTS_ID,
       name: 'Diego Alves',
+      email: 'diego@exemplo.com',
     },
   ]);
 
@@ -136,22 +145,27 @@ describe('CreatePts', () => {
     ).toHaveLength(mockProfessionals.length - 1);
   });
 
-  it('busca pacientes pelo nome com a paginação padrão', async () => {
+  it('busca os pacientes elegíveis no servidor só a partir de 2 caracteres', async () => {
     const user = userEvent.setup();
     await renderScreen();
+
+    expect(api.listEligiblePatients).not.toHaveBeenCalled();
+
     (api.listEligiblePatients as jest.Mock).mockResolvedValueOnce([
-      { id: 'patient-x', name: 'Mariana Costa' },
+      { id: 'patient-x', name: 'Mariana Costa', email: 'mariana@exemplo.com' },
     ]);
 
     await user.type(screen.getByRole('combobox', { name: /Paciente/ }), 'mari');
 
     expect(
-      await screen.findByRole('option', { name: 'Mariana Costa' }),
+      await screen.findByRole('option', {
+        name: 'Mariana Costa · mariana@exemplo.com',
+      }),
     ).toBeInTheDocument();
-    expect(api.listEligiblePatients).toHaveBeenLastCalledWith(
-      expect.anything(),
-      'mari',
-    );
+    expect(api.listEligiblePatients).toHaveBeenLastCalledWith({
+      q: 'mari',
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('não avança sem paciente nem sem situação social', async () => {
@@ -179,6 +193,9 @@ describe('CreatePts', () => {
 
     await renderScreen();
     await fillUntilTeam(user);
+    expect(
+      screen.getByText('Nenhum membro além do responsável.'),
+    ).toBeInTheDocument();
     await addMember(user, 'Ana Lima');
     await addMember(user, 'Bruno Souza');
 
@@ -280,7 +297,7 @@ describe('CreatePts', () => {
   it('permite tentar de novo quando o carregamento inicial falha', async () => {
     const user = userEvent.setup();
 
-    (api.listEligiblePatients as jest.Mock).mockRejectedValueOnce(
+    (api.listProfessionals as jest.Mock).mockRejectedValueOnce(
       new ApiError(0, 'NETWORK_ERROR'),
     );
 

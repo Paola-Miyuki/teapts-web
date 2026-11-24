@@ -23,7 +23,8 @@ import type { Patient } from '../entities/patient.entity';
 import type { NewPatient } from '../repositories/patients.repository';
 import type { SupportContact } from '../entities/support-contact.entity';
 import type {
-  AuthorizedPatientsPage,
+  EligiblePatientsPage,
+  EligiblePatientsQuery,
   PatientRow,
   PatientScope,
   PatientsPage,
@@ -70,11 +71,9 @@ function createService() {
       >(),
     deleteSupportContact:
       jest.fn<(patientId: string, contactId: string) => Promise<boolean>>(),
-    findAvailableForPtsPaginated:
+    findEligibleForProposalPaginated:
       jest.fn<
-        (
-          filters: GetAuthorizedPatientsRequestDto,
-        ) => Promise<AuthorizedPatientsPage>
+        (filters: EligiblePatientsQuery) => Promise<EligiblePatientsPage>
       >(),
   };
   const accountRepository = {
@@ -198,16 +197,26 @@ describe('PatientsService.findAuthorized', () => {
     });
   });
 
-  describe('PatientsService.findAvailableForPts', () => {
+  describe('PatientsService.findEligibleForProposal', () => {
     it('allows the admin without a professional profile', async () => {
       const { repository, service } = createService();
-      repository.findAvailableForPtsPaginated.mockResolvedValue({
-        rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+      repository.findEligibleForProposalPaginated.mockResolvedValue({
+        rows: [
+          {
+            patient_id: 'patient-1',
+            display_name: 'Maria Silva',
+            email: 'maria@exemplo.com',
+          },
+        ],
         total: 1,
       });
 
       await expect(
-        service.findAvailableForPts(adminAccount, { page: 1, limit: 10 }),
+        service.findEligibleForProposal(adminAccount, {
+          page: 1,
+          limit: 10,
+          withActivePts: 'false',
+        }),
       ).resolves.toMatchObject({ data: [{ id: 'patient-1' }] });
     });
 
@@ -215,50 +224,69 @@ describe('PatientsService.findAuthorized', () => {
       const { repository, service } = createService();
 
       await expect(
-        service.findAvailableForPts(
+        service.findEligibleForProposal(
           { ...professionalAccount, professionalProfileIds: [] },
-          { page: 1, limit: 10 },
+          { page: 1, limit: 10, withActivePts: 'false' },
         ),
       ).rejects.toMatchObject({
         status: 403,
         response: { status: 'FORBIDDEN' },
       });
-      expect(repository.findAvailableForPtsPaginated).not.toHaveBeenCalled();
+      expect(
+        repository.findEligibleForProposalPaginated,
+      ).not.toHaveBeenCalled();
     });
 
     it('returns patients that can receive a new proposal', async () => {
       const { repository, service } = createService();
-      repository.findAvailableForPtsPaginated.mockResolvedValue({
-        rows: [{ patient_id: 'patient-1', account_name: 'Maria Silva' }],
+      repository.findEligibleForProposalPaginated.mockResolvedValue({
+        rows: [
+          {
+            patient_id: 'patient-1',
+            display_name: 'Maria Silva',
+            email: 'maria@exemplo.com',
+          },
+        ],
         total: 1,
       });
 
       await expect(
-        service.findAvailableForPts(professionalAccount, {
+        service.findEligibleForProposal(professionalAccount, {
           page: 1,
           limit: 10,
+          q: 'maria',
+          withActivePts: 'false',
         }),
       ).resolves.toEqual({
-        data: [{ id: 'patient-1', name: 'Maria Silva' }],
+        data: [
+          { id: 'patient-1', name: 'Maria Silva', email: 'maria@exemplo.com' },
+        ],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      });
+      expect(repository.findEligibleForProposalPaginated).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        q: 'maria',
       });
     });
 
-    it('returns a safe internal error when the available-patients query fails', async () => {
+    it('returns a safe internal error when the eligible-patients query fails', async () => {
       const { repository, service } = createService();
-      repository.findAvailableForPtsPaginated.mockRejectedValue(
+      repository.findEligibleForProposalPaginated.mockRejectedValue(
         new Error('database connection details'),
       );
 
       await expect(
-        service.findAvailableForPts(professionalAccount, {
+        service.findEligibleForProposal(professionalAccount, {
           page: 1,
           limit: 10,
+          q: 'maria',
+          withActivePts: 'false',
         }),
       ).rejects.toMatchObject({
         response: {
           status: 'ERROR',
-          message: 'Não foi possível consultar os pacientes disponíveis.',
+          message: 'Não foi possível consultar os pacientes elegíveis.',
         },
       });
     });

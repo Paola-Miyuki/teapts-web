@@ -26,21 +26,33 @@ describe('GetProfessionalsRequestDto', () => {
     await expect(normalize({})).resolves.toEqual({
       page: DEFAULT_PAGE,
       limit: DEFAULT_PAGE_LIMIT,
-      name: undefined,
+      q: undefined,
       specialism: undefined,
+      council: undefined,
+      councilState: undefined,
+      sort: undefined,
+      order: undefined,
       ids: undefined,
     });
   });
 
   // Parâmetros vazios na URL (`?page=&limit=&specialism=`) usam os padrões.
   it('treats empty pagination and specialism as not informed', async () => {
-    const result = await normalize({ page: '', limit: '', specialism: '' });
+    const result = await normalize({
+      page: '',
+      limit: '',
+      specialism: '',
+      council: '',
+      q: '   ',
+    });
 
     expect(result).toMatchObject({
       page: DEFAULT_PAGE,
       limit: DEFAULT_PAGE_LIMIT,
     });
     expect(result.specialism).toBeUndefined();
+    expect(result.council).toBeUndefined();
+    expect(result.q).toBeUndefined();
   });
 
   // Confirma a conversão dos valores da query e a normalização dos filtros válidos.
@@ -49,8 +61,12 @@ describe('GetProfessionalsRequestDto', () => {
       normalize({
         page: '2',
         limit: '20',
-        name: '  Maria  ',
-        specialism: Specialism.Psychologist,
+        q: '  Maria  ',
+        specialism: `${Specialism.Psychologist},${Specialism.Doctor}`,
+        council: ['CRP', 'CRM'],
+        councilState: 'PR',
+        sort: 'specialism',
+        order: 'desc',
         ids: [
           '550e8400-e29b-41d4-a716-446655440000',
           '550e8400-e29b-41d4-a716-446655440000',
@@ -59,8 +75,12 @@ describe('GetProfessionalsRequestDto', () => {
     ).resolves.toEqual({
       page: 2,
       limit: 20,
-      name: 'Maria',
-      specialism: Specialism.Psychologist,
+      q: 'Maria',
+      specialism: [Specialism.Psychologist, Specialism.Doctor],
+      council: ['CRP', 'CRM'],
+      councilState: 'PR',
+      sort: 'specialism',
+      order: 'desc',
       ids: ['550e8400-e29b-41d4-a716-446655440000'],
     });
   });
@@ -88,8 +108,13 @@ describe('GetProfessionalsRequestDto', () => {
     ['limit', { limit: '0' }],
     ['limit', { limit: String(MAX_PAGE_LIMIT + 1) }],
     ['limit', { limit: 'invalid' }],
-    ['name', { name: '   ' }],
+    ['q', { q: ['a', 'b'] }],
     ['specialism', { specialism: 'invalid' }],
+    ['specialism', { specialism: 'doctor,invalid' }],
+    ['council', { council: 'CRX' }],
+    ['councilState', { councilState: 'XX' }],
+    ['sort', { sort: 'email' }],
+    ['order', { order: 'up' }],
     ['ids', { ids: 'not-a-uuid' }],
   ])('rejects an invalid %s parameter', async (parameter, query) => {
     const error: unknown = await normalize(query).catch((e: unknown) => e);
