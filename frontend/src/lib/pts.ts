@@ -50,3 +50,36 @@ export function getActivePts(patientId: string) {
 
   return request<ActivePts>(`/pts/active?${params.toString()}`);
 }
+
+export type UpdateSocialSituationResponse = {
+  id: string;
+  socialSituation: string;
+};
+
+// PATCH /pts/:id/social-situation (RFPTS005).
+export function updateSocialSituation(id: string, socialSituation: string) {
+  return request<UpdateSocialSituationResponse>(
+    `/pts/${encodeURIComponent(id)}/social-situation`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ socialSituation }),
+    },
+  );
+}
+
+// Resposta das ações sobre a equipe do PTS
+export type PtsTeamResponse = {
+  id: string;
+  status: string;
+  responsible: PtsProfessional;
+  team: PtsProfessional[];
+};
+
+// DELETE /pts/:id/team/:professionalId
+export function removeTeamMember(id: string, professionalId: string) {
+  return request<PtsTeamResponse>(
+    `/pts/${encodeURIComponent(id)}/team/${encodeURIComponent(professionalId)}`,
+    { method: 'DELETE' },
+  );
+}

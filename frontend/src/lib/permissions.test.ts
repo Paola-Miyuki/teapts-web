@@ -88,6 +88,26 @@ describe('can', () => {
     expect(can(admin, 'viewPtsSocialSituation')).toBe(true);
     expect(can(patient, 'viewPtsSocialSituation')).toBe(false);
   });
+  it('deixa só a equipe e o admin editarem a situação social (RFPTS005)', () => {
+    const active = {
+      status: 'planning',
+      responsibleProfessionalId: 'responsible-id',
+      teamProfessionalIds: ['professional-id'],
+    };
+
+    expect(can(professional, 'editPtsSocialSituation', { pts: active })).toBe(
+      true,
+    );
+    expect(
+      can(professional, 'editPtsSocialSituation', {
+        pts: { ...active, teamProfessionalIds: [] },
+      }),
+    ).toBe(false);
+    expect(can(professional, 'editPtsSocialSituation')).toBe(false);
+    expect(can(admin, 'editPtsSocialSituation', { pts: active })).toBe(true);
+    expect(can(patient, 'editPtsSocialSituation', { pts: active })).toBe(false);
+    expect(can(waiting, 'editPtsSocialSituation', { pts: active })).toBe(false);
+  });
 
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
@@ -154,5 +174,48 @@ describe('editPtsProposal', () => {
     expect(can(admin, 'editPtsProposal', { pts: { status: 'running' } })).toBe(
       false,
     );
+  });
+});
+
+describe('removePtsTeamMember (RFEM003)', () => {
+  const pts = (status: string, responsibleProfessionalId: string) => ({
+    pts: { status, responsibleProfessionalId },
+  });
+  const prof = {
+    accountId: 'a',
+    role: 'user' as const,
+    patientProfileId: null,
+    professionalProfileIds: ['p1'],
+  };
+
+  it('libera ao responsável com o PTS em planejamento ou execução', () => {
+    expect(can(prof, 'removePtsTeamMember', pts('planning', 'p1'))).toBe(true);
+    expect(can(prof, 'removePtsTeamMember', pts('RUNNING', 'p1'))).toBe(true);
+    expect(can(prof, 'removePtsTeamMember', pts('draft', 'p1'))).toBe(false);
+    expect(can(prof, 'removePtsTeamMember', pts('running', 'p2'))).toBe(false);
+  });
+
+  it('não libera ao paciente nem à conta sem perfil', () => {
+    const patient = {
+      ...prof,
+      patientProfileId: 'patient-id',
+      professionalProfileIds: [],
+    };
+    const waiting = { ...prof, professionalProfileIds: [] };
+    expect(can(patient, 'removePtsTeamMember', pts('running', 'p1'))).toBe(
+      false,
+    );
+    expect(can(waiting, 'removePtsTeamMember', pts('running', 'p1'))).toBe(
+      false,
+    );
+  });
+
+  it('libera ao admin, como a API', () => {
+    const admin = {
+      ...prof,
+      role: 'admin' as const,
+      professionalProfileIds: [],
+    };
+    expect(can(admin, 'removePtsTeamMember', pts('running', 'p2'))).toBe(true);
   });
 });
