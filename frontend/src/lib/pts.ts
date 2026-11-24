@@ -1,6 +1,7 @@
 import { request } from '@/lib/api';
+import type { ProfessionalRegistration } from '@/lib/professionals';
+import type { PtsStatus } from '@/lib/pts-status';
 
-// Mesmos valores do PtsStateEnum da API.
 export type ActivePtsStatus = 'planning' | 'running';
 
 export type PtsProfessional = {
@@ -10,10 +11,9 @@ export type PtsProfessional = {
     id: string;
     name: string;
   };
+  registration: ProfessionalRegistration | null;
 };
 
-// GET /pts/active: a API omite `socialSituation` quando quem consulta é o
-// próprio paciente (DP003).
 export type ActivePts = {
   id: string;
   status: ActivePtsStatus | string;
@@ -34,7 +34,6 @@ export const PTS_STATUS_LABELS: Record<ActivePtsStatus, string> = {
   running: 'Em execução',
 };
 
-// A API usa minúsculas, mas o contrato da issue mostra "PLANNING".
 export function getPtsStatusLabel(status: string) {
   const key = status.toLowerCase() as ActivePtsStatus;
 
@@ -44,7 +43,6 @@ export function getPtsStatusLabel(status: string) {
 export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-// GET /pts/active?patientId=<uuid> (RFPTS004).
 export function getActivePts(patientId: string) {
   const params = new URLSearchParams({ patientId });
 
@@ -56,7 +54,6 @@ export type UpdateSocialSituationResponse = {
   socialSituation: string;
 };
 
-// PATCH /pts/:id/social-situation (RFPTS005).
 export function updateSocialSituation(id: string, socialSituation: string) {
   return request<UpdateSocialSituationResponse>(
     `/pts/${encodeURIComponent(id)}/social-situation`,
@@ -68,7 +65,6 @@ export function updateSocialSituation(id: string, socialSituation: string) {
   );
 }
 
-// Resposta das ações sobre a equipe do PTS
 export type PtsTeamResponse = {
   id: string;
   status: string;
@@ -76,10 +72,24 @@ export type PtsTeamResponse = {
   team: PtsProfessional[];
 };
 
-// DELETE /pts/:id/team/:professionalId
-export function removeTeamMember(id: string, professionalId: string) {
-  return request<PtsTeamResponse>(
-    `/pts/${encodeURIComponent(id)}/team/${encodeURIComponent(professionalId)}`,
-    { method: 'DELETE' },
-  );
+export type PtsDetail = {
+  id: string;
+  status: PtsStatus;
+  socialSituation?: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  rejectedAt: string | null;
+  beganAt: string | null;
+  concludedAt: string | null;
+  cancelledAt: string | null;
+  patient: {
+    id: string;
+    name: string;
+  };
+  responsible: PtsProfessional;
+  team: PtsProfessional[];
+};
+
+export function getPts(id: string, signal?: AbortSignal) {
+  return request<PtsDetail>(`/pts/${encodeURIComponent(id)}`, { signal });
 }

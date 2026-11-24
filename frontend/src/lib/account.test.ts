@@ -1,4 +1,5 @@
 import { getNavigation, type Account } from './account';
+import { personalData } from '@/test-utils/account';
 
 function account(overrides: Partial<Account> = {}): Account {
   return {
@@ -6,6 +7,7 @@ function account(overrides: Partial<Account> = {}): Account {
     name: 'Pessoa',
     email: 'pessoa@example.com',
     role: 'user',
+    ...personalData,
     patientProfileId: null,
     professionalProfileIds: [],
     ...overrides,
@@ -17,7 +19,15 @@ function labels(current: Account) {
 }
 
 describe('getNavigation', () => {
-  it('mostra o item "Pacientes" só para o admin', () => {
+  it('mostra o item "Pacientes" para o admin e o profissional', () => {
+    expect(
+      labels(account({ professionalProfileIds: ['professional'] })),
+    ).toContain('Pacientes');
+    expect(labels(account({ patientProfileId: 'patient' }))).not.toContain(
+      'Pacientes',
+    );
+    expect(labels(account())).not.toContain('Pacientes');
+
     expect(
       getNavigation(account({ role: 'admin' }), '/patients'),
     ).toContainEqual({
@@ -31,7 +41,7 @@ describe('getNavigation', () => {
   it('mostra profissionais e PTS no menu do profissional', () => {
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
   });
 
   it('mantém os itens compartilhados no menu do admin', () => {
@@ -61,9 +71,11 @@ describe('getNavigation', () => {
       label: 'Meu PTS',
       current: true,
     });
+
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
     ).not.toContain('Meu PTS');
+
     expect(labels(account({ role: 'admin' }))).not.toContain('Meu PTS');
   });
 
@@ -74,14 +86,17 @@ describe('getNavigation', () => {
       'PTS',
       'Pacientes',
     ]);
+
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
+
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
-      'Meu cuidado',
+      'Início',
       'Meu PTS',
       'PTS',
     ]);
+
     expect(labels(account())).toEqual(['Início']);
   });
 });

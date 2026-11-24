@@ -120,6 +120,13 @@ export const activePtsAlreadyExists = () =>
     'O paciente já possui um PTS aprovado e ativo.',
   );
 
+export const ptsForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso a este PTS.',
+  );
+
 export const ptsNotFound = () =>
   new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
 
@@ -128,4 +135,39 @@ export const ptsNotActive = () =>
     HttpStatus.CONFLICT,
     'PTS_NOT_ACTIVE',
     'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
+  );
+
+export const ptsProposalDeleteForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode excluir a proposta.',
+  );
+
+export const ptsProposalNotDraftForDelete = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_DRAFT',
+    'Somente propostas aguardando decisão podem ser excluídas.',
+  );
+
+export const teamEditForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode alterar a equipe.',
+  );
+
+export const teamMemberNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'TEAM_MEMBER_NOT_FOUND',
+    'O profissional não faz parte da equipe deste PTS.',
+  );
+
+export const cannotRemoveResponsible = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'CANNOT_REMOVE_RESPONSIBLE',
+    'O responsável não pode ser removido da equipe. Transfira a responsabilidade antes.',
   );

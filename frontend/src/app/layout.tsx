@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Atkinson_Hyperlegible_Next } from 'next/font/google';
 import './globals.css';
+import '../styles/teapts-mockups.css';
+import '../styles/teapts-ui.css';
 
 const atkinson = Atkinson_Hyperlegible_Next({
   variable: '--font-atkinson',

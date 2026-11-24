@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registrar reavaliação · TEA-PTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/teapts-src.css">
+<link rel="stylesheet" href="assets/teapts-mockups.css">
+<link rel="stylesheet" href="assets/teapts-ui.css">
+</head>
+<body class="min-h-full flex flex-col" data-nav="lista-pts.html" data-roles="professional,admin" data-dps="">
+<div class="shell-app">
+<aside id="sidebar" class="shell-sidebar"></aside>
+<div class="shell-workspace">
+<header class="shell-appHeader" id="app-header"></header>
+<main class="shell-content">
+<nav class="shell-breadcrumb" aria-label="Caminho da página"><a href="inicio.html" data-when="role:admin,professional">Início</a><a href="inicio-paciente.html" data-when="role:patient">Início</a><a href="aguardando-perfil.html" data-when="role:none">Início</a><span class="crumb"><span aria-hidden="true">/</span><a href="lista-pts.html">PTS</a></span><span class="crumb"><span aria-hidden="true">/</span><a href="pts-detalhe.html">Ana Clara Ribeiro</a></span><span class="crumb"><span aria-hidden="true">/</span><span>Reavaliação</span></span></nav>
+<div class="mockbar" data-mockbar></div>
+<section>
+<div class="heading"><div><h1>Registrar reavaliação</h1></div></div>
+<section class="ux-card ux-rv-summary" aria-label="PTS reavaliado"><dl class="ux-dl"><div><dt>Paciente</dt><dd>Ana Clara Ribeiro</dd></div><div><dt>PTS</dt><dd>PTS v2, em andamento</dd></div><div><dt>Responsável</dt><dd>Ana Souza, Psicólogo</dd></div><div><dt>Próxima revisão</dt><dd>03/12/2026</dd></div></dl></section>
+<section class="ux-formcard ux-wz-step" id="rv-1" aria-labelledby="rv-1-title" data-results>
+  <div class="ux-wz-head"><ol class="ux-steps ux-steps-2"><li aria-current="step"><span class="ux-step-n">1</span><span class="ux-step-l">Resultado das metas</span></li><li><span class="ux-step-n">2</span><span class="ux-step-l">Encerrar</span></li></ol>
+  <div><h2 id="rv-1-title">Resultado das metas</h2></div></div>
+  <div class="ux-wz-body">
+    <div class="form-grid" style="max-width:340px;margin-bottom:18px"><div class="field full"><label class="field-label" for="rv-date">Data do encontro da equipe<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="rv-date" type="date" value="2026-12-01" aria-required="true"></div></div>
+    <p class="ux-missing" data-result-missing role="status"></p>
+    <ul class="ux-goals"><li class="ux-goal ux-rv-goal">
+<div class="ux-goal-top"><span class="badge plain">Curto prazo</span><span class="badge plain">Comunicação</span></div>
+<p class="ux-goal-text">Fazer pedidos simples com pranchas de CAA ou fala, em casa e na escola.</p>
+<dl class="ux-goal-meta"><div><dt>Critério de medida</dt><dd>5 pedidos por dia, em 4 de 5 dias, registrados pela família e pela professora.</dd></div><div><dt>Data-alvo</dt><dd>30/11/2026</dd></div></dl>
+<fieldset class="ux-seg ux-rv-result"><legend class="ux-rv-label">Resultado</legend><label class="ux-seg-opt ux-seg-done"><input type="radio" name="rv-goal-1" value="done" data-result checked>Atingida</label><label class="ux-seg-opt ux-seg-partial"><input type="radio" name="rv-goal-1" value="partial" data-result>Parcialmente atingida</label><label class="ux-seg-opt ux-seg-missed"><input type="radio" name="rv-goal-1" value="missed" data-result>Não atingida</label></fieldset>
+<div class="field"><label class="field-label" for="rv-obs-1">Observação<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="rv-obs-1" placeholder="Ex.: pede ajuda sozinha em casa, ainda não na escola" aria-required="true"></div>
+</li><li class="ux-goal ux-rv-goal">
+<div class="ux-goal-top"><span class="badge plain">Médio prazo</span><span class="badge plain">Social</span></div>
+<p class="ux-goal-text">Esperar a vez e seguir combinados em grupos de até 4 crianças.</p>
+<dl class="ux-goal-meta"><div><dt>Critério de medida</dt><dd>Esperar a vez em 8 de 10 rodadas sem apoio visual.</dd></div><div><dt>Data-alvo</dt><dd>03/12/2026</dd></div></dl>
+<fieldset class="ux-seg ux-rv-result"><legend class="ux-rv-label">Resultado</legend><label class="ux-seg-opt ux-seg-done"><input type="radio" name="rv-goal-2" value="done" data-result>Atingida</label><label class="ux-seg-opt ux-seg-partial"><input type="radio" name="rv-goal-2" value="partial" data-result checked>Parcialmente atingida</label><label class="ux-seg-opt ux-seg-missed"><input type="radio" name="rv-goal-2" value="missed" data-result>Não atingida</label></fieldset>
+<div class="field"><label class="field-label" for="rv-obs-2">Observação<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="rv-obs-2" placeholder="Ex.: pede ajuda sozinha em casa, ainda não na escola" aria-required="true"></div>
+</li><li class="ux-goal ux-rv-goal">
+<div class="ux-goal-top"><span class="badge plain">Curto prazo</span><span class="badge plain">Motor/Sensorial</span></div>
+<p class="ux-goal-text">Usar o abafador e o canto calmo para se regular no recreio, sem sair da escola.</p>
+<dl class="ux-goal-meta"><div><dt>Critério de medida</dt><dd>No máximo 1 crise por semana no recreio, por 4 semanas seguidas.</dd></div><div><dt>Data-alvo</dt><dd>15/11/2026</dd></div></dl>
+<fieldset class="ux-seg ux-rv-result"><legend class="ux-rv-label">Resultado</legend><label class="ux-seg-opt ux-seg-done"><input type="radio" name="rv-goal-3" value="done" data-result>Atingida</label><label class="ux-seg-opt ux-seg-partial"><input type="radio" name="rv-goal-3" value="partial" data-result>Parcialmente atingida</label><label class="ux-seg-opt ux-seg-missed"><input type="radio" name="rv-goal-3" value="missed" data-result checked>Não atingida</label></fieldset>
+<div class="field"><label class="field-label" for="rv-obs-3">Observação<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="rv-obs-3" placeholder="Ex.: pede ajuda sozinha em casa, ainda não na escola" aria-required="true"></div>
+</li><li class="ux-goal ux-rv-goal">
+<div class="ux-goal-top"><span class="badge plain">Longo prazo</span><span class="badge plain">Cognitivo</span></div>
+<p class="ux-goal-text">Seguir a rotina visual da sala e trocar de atividade com no máximo um aviso do adulto.</p>
+<dl class="ux-goal-meta"><div><dt>Critério de medida</dt><dd>Transições com no máximo um aviso em 80% das trocas observadas pela professora.</dd></div><div><dt>Data-alvo</dt><dd>03/12/2026</dd></div></dl>
+<fieldset class="ux-seg ux-rv-result"><legend class="ux-rv-label">Resultado</legend><label class="ux-seg-opt ux-seg-done"><input type="radio" name="rv-goal-4" value="done" data-result>Atingida</label><label class="ux-seg-opt ux-seg-partial"><input type="radio" name="rv-goal-4" value="partial" data-result>Parcialmente atingida</label><label class="ux-seg-opt ux-seg-missed"><input type="radio" name="rv-goal-4" value="missed" data-result>Não atingida</label></fieldset>
+<div class="field"><label class="field-label" for="rv-obs-4">Observação<span class="ux-req" aria-hidden="true"> *</span></label><input class="input" id="rv-obs-4" placeholder="Ex.: pede ajuda sozinha em casa, ainda não na escola" aria-required="true"></div>
+</li></ul>
+  </div>
+  <div class="ux-formcard-foot ux-wz-foot"><a class="btn" href="pts-detalhe.html">Cancelar</a><button type="button" class="btn btn-primary" data-show="rv-2" data-hide="rv-1" data-result-next>Próximo<i data-icon="chevronRight"></i></button></div>
+</section>
+<section class="ux-formcard ux-wz-step" id="rv-2" hidden aria-labelledby="rv-2-title">
+  <div class="ux-wz-head"><ol class="ux-steps ux-steps-2"><li class="is-done"><span class="ux-step-n"><i data-icon="check"></i></span><span class="ux-step-l">Resultado das metas</span></li><li aria-current="step"><span class="ux-step-n">2</span><span class="ux-step-l">Encerrar</span></li></ol>
+  <div><h2 id="rv-2-title">Encerrar o ciclo</h2></div></div>
+  <div class="ux-wz-body">
+    <ul class="mini-list"><li><span class="grow"><strong>Ampliar a comunicação funcional</strong><small class="ux-sub"><span class="ux-sublabel">Prazo:</span> Curto prazo</small><small class="ux-sub"><span class="ux-sublabel">Área:</span> Comunicação</small></span><span class="badge done">Atingida</span></li><li><span class="grow"><strong>Participar de atividades em grupo</strong><small class="ux-sub"><span class="ux-sublabel">Prazo:</span> Médio prazo</small><small class="ux-sub"><span class="ux-sublabel">Área:</span> Social</small></span><span class="badge partial">Parcialmente atingida</span></li><li><span class="grow"><strong>Reduzir as crises sensoriais no recreio</strong><small class="ux-sub"><span class="ux-sublabel">Prazo:</span> Curto prazo</small><small class="ux-sub"><span class="ux-sublabel">Área:</span> Motor/Sensorial</small></span><span class="badge not-met">Não atingida</span></li><li><span class="grow"><strong>Autonomia na rotina escolar</strong><small class="ux-sub"><span class="ux-sublabel">Prazo:</span> Longo prazo</small><small class="ux-sub"><span class="ux-sublabel">Área:</span> Cognitivo</small></span><span class="badge partial">Parcialmente atingida</span></li></ul>
+    <div class="form-grid" style="margin-top:18px"><div class="field full"><label class="field-label" for="t-motivo-do-encerramento-105">Motivo do encerramento</label><textarea class="input" id="t-motivo-do-encerramento-105" rows="3" placeholder="Ex.: metas do ciclo atingidas"></textarea></div></div>
+    <div class="ux-choice">
+      <div class="ux-card"><h3>Encerrar ciclo e criar PTS v3</h3><p>Abre o rascunho da v3 nos quatro passos, já preenchido: diagnóstico para atualizar, as 3 metas parciais e não atingidas sem prazo nem data-alvo, a mesma equipe e as atividades em andamento.</p>
+      <a class="btn btn-primary" href="pts-nova-versao.html"><i data-icon="pts"></i>Encerrar e criar PTS v3</a></div>
+      <div class="ux-card"><h3>Encerrar sem novo PTS</h3><p>Só conclui o PTS v2. Um próximo PTS, se houver, é criado do zero pela tela de propostas.</p>
+      <button type="button" class="btn" data-confirm="Encerrar sem novo PTS?|O PTS v2 é concluído e fica só para leitura, com o resultado das metas. Nenhum rascunho é criado.|Encerrar sem novo PTS"><i data-icon="lock"></i>Encerrar sem novo PTS</button></div>
+    </div>
+  </div>
+  <div class="ux-formcard-foot ux-wz-foot"><button type="button" class="btn" data-show="rv-1" data-hide="rv-2"><i data-icon="chevronLeft"></i>Voltar</button><span></span></div>
+</section>
+</section>
+</main>
+</div>
+</div>
+<script src="assets/teapts-mockups.js"></script>
+</body>
+</html>

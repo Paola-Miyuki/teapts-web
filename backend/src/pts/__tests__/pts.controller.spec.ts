@@ -53,6 +53,7 @@ describe('PtsController GET /pts/active', () => {
         id: 'prof-10',
         name: 'Profissional responsável',
         specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
       },
       team: [],
     });
@@ -242,6 +243,110 @@ describe('PtsController POST /pts/proposals/:id/approve|reject', () => {
       () => controller.approveProposal(proposal.id, responsibleAccount),
       403,
       'FORBIDDEN',
+    );
+  });
+});
+
+describe('PtsController DELETE /pts/proposals/:id', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  it('exclui a proposta pela rota e responde { status: OK }', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expect(
+      controller.deleteProposal(proposal.id, responsibleAccount),
+    ).resolves.toEqual({ status: 'OK' });
+    await expectApiError(
+      () => controller.findDraftProposalById(proposal.id, responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('nega a exclusão a quem não é o responsável', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga o 409 para proposta fora de DRAFT', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, responsibleAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+  });
+});
+
+describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  });
+
+  it('remove o membro pela rota e devolve a equipe atualizada', async () => {
+    const result = await controller.removeTeamMember(
+      'pts-100',
+      'prof-11',
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'pts-100',
+      responsible: { id: 'prof-10' },
+      team: [],
+    });
+    expect(repo.timelineRecords).toHaveLength(1);
+  });
+
+  it('nega a remoção a quem não é o responsável', async () => {
+    await expectApiError(
+      () => controller.removeTeamMember('pts-100', 'prof-11', teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga o 409 ao tentar remover o responsável', async () => {
+    await expectApiError(
+      () =>
+        controller.removeTeamMember('pts-100', 'prof-10', responsibleAccount),
+      409,
+      'CANNOT_REMOVE_RESPONSIBLE',
     );
   });
 });

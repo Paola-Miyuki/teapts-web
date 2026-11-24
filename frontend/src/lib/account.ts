@@ -1,14 +1,50 @@
 import type { IconName } from '@/components/Icon';
 import { request } from '@/lib/api';
-import { can, getProfileKind, type ProfileKind } from '@/lib/permissions';
+import { can, type ProfileKind } from '@/lib/permissions';
 
 export { getProfileKind, type ProfileKind } from '@/lib/permissions';
 
+export type Sex = 'male' | 'female';
+
+export type Gender =
+  | 'cis_woman'
+  | 'trans_woman'
+  | 'cis_man'
+  | 'trans_man'
+  | 'non_binary'
+  | 'other'
+  | 'prefer_not_to_say';
+
+export const SEX_LABELS: Record<Sex, string> = {
+  female: 'Feminino',
+  male: 'Masculino',
+};
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  cis_woman: 'Mulher cisgênero',
+  trans_woman: 'Mulher transgênero',
+  cis_man: 'Homem cisgênero',
+  trans_man: 'Homem transgênero',
+  non_binary: 'Pessoa não binária',
+  other: 'Outro',
+  prefer_not_to_say: 'Prefiro não informar',
+};
+
+// Campos pessoais nulos só na conta de admin e nas contas antigas; CPF e
+// telefone vêm só com dígitos.
 export type Account = {
   accountId: string;
   name: string;
   email: string;
   role: 'admin' | 'user';
+  socialName: string | null;
+  birthDate: string | null;
+  sex: Sex | null;
+  gender: Gender | null;
+  cpf: string | null;
+  phone: string | null;
+  createdAt: string;
+  updatedAt: string | null;
   patientProfileId: string | null;
   professionalProfileIds: string[];
 };
@@ -18,9 +54,15 @@ export function getMe() {
   return request<Account>('/me');
 }
 
+// null apaga o campo opcional (nome social, gênero, telefone).
 export type UpdateAccountInput = {
   name?: string;
   email?: string;
+  socialName?: string | null;
+  birthDate?: string;
+  sex?: Sex;
+  gender?: Gender | null;
+  phone?: string | null;
 };
 
 // PATCH /me: atualiza somente os campos informados da conta atual.
@@ -57,14 +99,7 @@ export const ROLE_LABELS: Record<ProfileKind, string> = {
   admin: 'Administrador',
   professional: 'Profissional',
   patient: 'Paciente',
-  waiting: 'Aguardando perfil',
-};
-
-const HOME_LABELS: Record<ProfileKind, string> = {
-  admin: 'Início',
-  professional: 'Início',
-  patient: 'Meu cuidado',
-  waiting: 'Início',
+  waiting: 'Aguardando aprovação',
 };
 
 export function isPatientArea(kind: ProfileKind) {
@@ -76,7 +111,7 @@ export function getNavigation(account: Account, currentHref: string) {
     {
       href: '/home',
       icon: 'home',
-      label: HOME_LABELS[getProfileKind(account)],
+      label: 'Início',
     },
   ];
 
@@ -98,7 +133,7 @@ export function getNavigation(account: Account, currentHref: string) {
     items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }
 
-  if (can(account, 'viewPatientRegistry')) {
+  if (can(account, 'viewAuthorizedPatients')) {
     items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
   }
 
