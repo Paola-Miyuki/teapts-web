@@ -15,6 +15,7 @@ export type PermissionAction =
   | 'viewActivePts'
   | 'viewPtsSocialSituation'
   | 'editPtsSocialSituation'
+  | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
@@ -125,6 +126,16 @@ export function can(
     case 'editPtsSocialSituation':
       // RFPTS005 – profissional da equipe (responsável ou membro).
       return professional && pts !== undefined && isProposalMember(user, pts);
+
+    case 'removePtsTeamMember':
+      // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.
+      return (
+        professional &&
+        ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '') &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
+        )
+      );
     case 'createPts':
       // RFPTS001 – profissional.
       return professional;

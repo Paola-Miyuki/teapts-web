@@ -67,3 +67,19 @@ export function updateSocialSituation(id: string, socialSituation: string) {
     },
   );
 }
+
+// Resposta das ações sobre a equipe do PTS
+export type PtsTeamResponse = {
+  id: string;
+  status: string;
+  responsible: PtsProfessional;
+  team: PtsProfessional[];
+};
+
+// DELETE /pts/:id/team/:professionalId
+export function removeTeamMember(id: string, professionalId: string) {
+  return request<PtsTeamResponse>(
+    `/pts/${encodeURIComponent(id)}/team/${encodeURIComponent(professionalId)}`,
+    { method: 'DELETE' },
+  );
+}
