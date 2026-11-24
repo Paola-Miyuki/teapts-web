@@ -13,7 +13,10 @@ export type PermissionAction =
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
   | 'viewPtsProposals'
+  | 'viewActivePts'
   | 'viewPtsSocialSituation'
+  | 'editPtsSocialSituation'
+  | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
@@ -124,9 +127,25 @@ export function can(
     case 'viewPtsProposals':
       // RFPTS002 – paciente titular ou profissional da proposta.
       return patient || (professional && (!pts || isProposalMember(user, pts)));
+    case 'viewActivePts':
+      // RFPTS004 – paciente titular ou profissional (a API confere a equipe).
+      return patient || professional;
     case 'viewPtsSocialSituation':
       // DP003 – oculta para o paciente até a decisão.
       return professional;
+    case 'editPtsSocialSituation':
+      // RFPTS005 – profissional da equipe (responsável ou membro).
+      return professional && pts !== undefined && isProposalMember(user, pts);
+
+    case 'removePtsTeamMember':
+      // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.
+      return (
+        professional &&
+        ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '') &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
+        )
+      );
     case 'createPts':
       // RFPTS001 – profissional.
       return professional;
