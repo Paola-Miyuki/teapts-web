@@ -121,7 +121,7 @@ describe('PtsOverview', () => {
     expect(
       screen.getByText('Mora com a mãe e frequenta a escola municipal.'),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Em execução')).not.toHaveLength(0);
+    expect(screen.getAllByText('Em andamento')).not.toHaveLength(0);
     expect(screen.getByText(/· responsável/)).toBeInTheDocument();
   });
 

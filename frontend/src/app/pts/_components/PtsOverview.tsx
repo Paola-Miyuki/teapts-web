@@ -10,6 +10,7 @@ import TimelineTab from '@/components/pts/TimelineTab';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
 import { ApiError } from '@/lib/api';
+import { formatDate } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import {
   getActivePts,
@@ -39,23 +40,6 @@ type LoadState =
   | { kind: 'error'; message: string };
 
 const LOAD_ERROR = 'Não foi possível carregar o PTS ativo.';
-
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  timeZone: 'America/Sao_Paulo',
-});
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : dateFormatter.format(date);
-}
 
 function StateCard({
   title,
@@ -282,8 +266,8 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
     (account.role === 'admin' ||
       account.professionalProfileIds.includes(pts.responsible.id)) &&
     ['planning', 'running'].includes(pts.status.toLowerCase());
-  const acceptedAt = formatDate(pts.acceptedAt);
-  const beganAt = formatDate(pts.beganAt);
+  const acceptedAt = pts.acceptedAt && formatDate(pts.acceptedAt);
+  const beganAt = pts.beganAt && formatDate(pts.beganAt);
 
   return (
     <>

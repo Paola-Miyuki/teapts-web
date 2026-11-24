@@ -99,7 +99,10 @@ src/
                            GET /professionals?q= e POST /pts/:id/team; o responsável e o admin também
                            transferem a responsabilidade por `TransferResponsibilityModal`: busca em
                            GET /professionals?q= e POST /pts/:id/team/transfer-responsibility) e Timeline; `/pts/:id#timeline`
-                           abre direto na Timeline (atalho de `historico.html`)
+                           abre direto na Timeline (atalho de `historico.html`). No cartão, o responsável e
+                           o admin iniciam a execução em planejamento (`startPts`), por `StartPtsDialog` em
+                           `pts/_components` (POST /pts/:id/start); em andamento aparece "Registrar
+                           reavaliação" (`registerPtsReassessment`), desabilitado até a tela dela (RFEVA005)
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
@@ -146,10 +149,10 @@ src/
                            create, update e delete) e isValidPhone
     pts-status.ts          status do PTS e rótulos das telas
     proposals.ts           GET /pts/proposals (getProposals)
-    pts.ts                 GET /pts/:id (getPts)
+    pts.ts                 GET /pts/:id (getPts) e POST /pts/:id/start (startPts)
     timeline.ts            GET /pts/:id/timeline (getTimeline), rótulos e ícones dos tipos, hora e dia
                            no horário de Brasília, agrupamento por dia e o link de cada evento
-    format.ts              datas, CPF, telefone (máscaras e exibição), idade e iniciais
+    format.ts              datas (horário de Brasília), CPF, telefone (máscaras e exibição), idade e iniciais
   test-utils/
     account.ts             dados pessoais padrão da conta nos testes
 design/                    layouts de referência (HTML estático)
@@ -188,7 +191,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |
 | `/pts/proposals/:id/edit` | Editar proposta de PTS | responsável ou admin, proposta em `draft` | `editar-proposta.html` |
 | `/pts` | Meu PTS: PTS ativo com a equipe e a Timeline (sem link nos eventos de documento, RN028); o profissional abre por `/patients/:patientId/pts` | paciente titular e profissional da equipe | `pts.html` |
-| `/pts/:id` | Detalhe do PTS (Visão geral, Equipe e Timeline); aberto por "Abrir PTS" em Pacientes; `#timeline` abre a aba Timeline | admin, profissional da equipe (RN016) e paciente titular, sem a Visão geral e sem link nos eventos de documento (`viewPts`, RN028) | `pts-detalhe.html`, `pts.html`, `historico.html` |
+| `/pts/:id` | Detalhe do PTS (Visão geral, Equipe e Timeline), com "Iniciar execução" em planejamento para o responsável e o admin; aberto por "Abrir PTS" em Pacientes; `#timeline` abre a aba Timeline | admin, profissional da equipe (RN016) e paciente titular, sem a Visão geral e sem link nos eventos de documento (`viewPts`, RN028) | `pts-detalhe.html`, `pts-planejamento.html`, `pts.html`, `historico.html` |
 
 ## Layouts (`design/`)
 
