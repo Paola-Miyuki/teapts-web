@@ -253,6 +253,13 @@ export class InMemoryPtsRepository extends PtsRepository {
     };
   }
 
+  /** Nome exibido de cada conta, por id. */
+  accountNames = new Map<string, string>();
+
+  async findAccountDisplayName(accountId: string): Promise<string | null> {
+    return this.accountNames.get(accountId) ?? null;
+  }
+
   async findPtsTeam(id: string): Promise<PtsTeamResponseDto | null> {
     const pts = this.ptsTeams.get(id);
 
