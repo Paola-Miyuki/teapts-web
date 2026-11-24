@@ -93,6 +93,8 @@ export class ProfessionalsService {
       // O profissional de conta desativada só aparece para o admin (RFAUT005).
       page = await this.professionalsRepository.findPaginated({
         ...request,
+        // A situação é filtro do admin; os demais só veem os ativos.
+        status: isAdmin(account) ? request.status : undefined,
         includeInactive: isAdmin(account),
       });
     } catch (error) {

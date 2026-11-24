@@ -16,6 +16,7 @@ import {
   invalidParameter,
   PaginationQueryDto,
 } from '../../common/pagination/pagination-query.dto';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Specialism } from '../enums/specialism.enum';
 import { UFS, type Uf } from '../enums/uf.enum';
 import { COUNCILS, type Council } from '../professional-registration';
@@ -123,6 +124,17 @@ export class GetProfessionalsRequestDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(UFS, invalidParameter('councilState'))
   councilState?: Uf;
+
+  @ApiPropertyOptional({
+    description:
+      'Situação da conta, separada por vírgula. Só o administrador filtra; para os demais, a consulta devolve apenas os ativos.',
+    enum: AccountStatus,
+    isArray: true,
+  })
+  @Transform(toList)
+  @IsOptional()
+  @IsEnum(AccountStatus, invalidEach('status'))
+  status?: AccountStatus[];
 
   @ApiPropertyOptional({ enum: PROFESSIONAL_SORT_FIELDS, default: 'name' })
   @Transform(toOptionalText)

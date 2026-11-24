@@ -141,6 +141,42 @@ describe('ProfessionalsService.findAll', () => {
     });
   });
 
+  // A situação é filtro do admin: os demais só veem os ativos.
+  it('passes the status filter only for the admin', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
+    const filtered = { ...request, status: [AccountStatus.Inactive] };
+
+    await service.findAll(
+      {
+        accountId: 'admin-1',
+        role: AccountRole.Admin,
+        patientProfileId: null,
+        professionalProfileIds: [],
+      },
+      filtered,
+    );
+
+    expect(repository.findPaginated).toHaveBeenLastCalledWith({
+      ...filtered,
+      includeInactive: true,
+    });
+
+    await service.findAll(
+      {
+        accountId: 'prof-1',
+        role: AccountRole.User,
+        patientProfileId: null,
+        professionalProfileIds: ['prof-1'],
+      },
+      filtered,
+    );
+
+    expect(repository.findPaginated).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: undefined, includeInactive: false }),
+    );
+  });
+
   // O e-mail do profissional não vai para o paciente (DP011).
   it('hides the e-mail from an account that is not admin nor professional', async () => {
     const { repository, service } = createService();

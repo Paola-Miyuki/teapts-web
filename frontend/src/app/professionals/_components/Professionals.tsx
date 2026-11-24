@@ -19,6 +19,7 @@ import {
   type Professional,
   type ProfessionalCouncil,
   type ProfessionalSort,
+  type ProfessionalStatus,
   type ProfessionalSpecialism,
   type ProfessionalsResponse,
 } from '@/lib/professionals';
@@ -29,6 +30,19 @@ const SPECIALISMS: { value: ProfessionalSpecialism; label: string }[] = [
   { value: 'physiotherapist', label: 'Fisioterapia' },
   { value: 'psychologist', label: 'Psicologia' },
 ];
+
+const STATUSES: { value: ProfessionalStatus; label: string }[] = [
+  { value: 'active', label: 'Ativo' },
+  { value: 'inactive', label: 'Inativo' },
+];
+
+function StatusBadge({ status }: { status: ProfessionalStatus }) {
+  return (
+    <span className={`badge ${status}`}>
+      {status === 'inactive' ? 'Inativo' : 'Ativo'}
+    </span>
+  );
+}
 
 const COUNCILS: { value: ProfessionalCouncil; label: string }[] = [
   { value: 'CRM', label: 'CRM' },
@@ -100,7 +114,7 @@ function ProfessionalViewDialog({
               {item('CNES', professional.cnes)}
               {item(
                 'Situação da conta',
-                <span className="badge active">Ativo</span>,
+                <StatusBadge status={professional.status} />,
               )}
             </dl>
           </section>
@@ -117,12 +131,14 @@ function ProfessionalViewDialog({
 // Lista de `profissionais.html` (o e-mail só vem para admin e profissional,
 // DP011). Busca, filtros e ordenação ficam na URL (`q`, `specialism`,
 // `council`, `uf`, `sort`, `order`). Situação e ações só para o admin; a
-// situação é "Ativo" até existir conta inativa (#108).
+// situação vem da conta (RFAUT005): o profissional só recebe os ativos.
 export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const specialism = listParam(searchParams.get('specialism'), SPECIALISMS);
   const council = listParam(searchParams.get('council'), COUNCILS);
+  // A situação é filtro do admin; para os demais, a URL é ignorada.
+  const status = isAdmin ? listParam(searchParams.get('status'), STATUSES) : [];
   const ufParam = searchParams.get('uf') ?? '';
   const uf = COUNCIL_STATES.some((item) => item === ufParam) ? ufParam : '';
   const sort: ProfessionalSort =
@@ -161,9 +177,16 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const term = search.term;
   const specialismKey = specialism.join(',');
   const councilKey = council.join(',');
-  const queryKey = [term, specialismKey, councilKey, uf, sort, order].join(
-    '\n',
-  );
+  const statusKey = status.join(',');
+  const queryKey = [
+    term,
+    specialismKey,
+    councilKey,
+    uf,
+    statusKey,
+    sort,
+    order,
+  ].join('\n');
   const [lastQuery, setLastQuery] = useState(queryKey);
 
   // Busca, filtro ou ordenação novos voltam à página 1.
@@ -187,6 +210,9 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
           ? (councilKey.split(',') as ProfessionalCouncil[])
           : undefined,
         councilState: uf || undefined,
+        status: statusKey
+          ? (statusKey.split(',') as ProfessionalStatus[])
+          : undefined,
         sort: sort === 'specialism' ? sort : undefined,
         order: order === 'desc' ? order : undefined,
       },
@@ -223,15 +249,16 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
     router,
     sort,
     specialismKey,
+    statusKey,
     term,
     uf,
   ]);
 
-  const hasFilters = Boolean(specialismKey || councilKey || uf);
+  const hasFilters = Boolean(specialismKey || councilKey || uf || statusKey);
   const filtered = Boolean(term || hasFilters);
 
   function clearFilters() {
-    update({ specialism: '', council: '', uf: '' });
+    update({ specialism: '', council: '', uf: '', status: '' });
   }
   const total = result?.pagination.total ?? 0;
   const count = result
@@ -330,6 +357,16 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         id="professionals-more"
         hidden={!filtersOpen}
       >
+        {isAdmin && (
+          <MultiSelect
+            label="Situação"
+            placeholder="Todos"
+            options={STATUSES}
+            value={status}
+            onChange={(value) => update({ status: value.join(',') })}
+          />
+        )}
+
         <MultiSelect
           label="Profissão"
           placeholder="Todas as profissões"
@@ -439,7 +476,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
                     {isAdmin && (
                       <>
                         <td>
-                          <span className="badge active">Ativo</span>
+                          <StatusBadge status={professional.status} />
                         </td>
                         <td className="actions-col">
                           <KebabMenu label={`Ações para ${professional.name}`}>

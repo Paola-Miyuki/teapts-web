@@ -10,6 +10,8 @@ export type ProfessionalRegistration = {
   state: string;
 };
 
+export type ProfessionalStatus = 'active' | 'inactive';
+
 export type Professional = {
   id: string;
   name: string;
@@ -23,6 +25,8 @@ export type Professional = {
   registration: ProfessionalRegistration | null;
   institution: string | null;
   cnes: string | null;
+  // Situação da conta; só o admin recebe os inativos.
+  status: ProfessionalStatus;
 };
 
 /** Registro como nas telas, ex.: "CRP-PR 12345". */
@@ -86,6 +90,8 @@ export type ProfessionalsQuery = {
   specialism?: ProfessionalSpecialism[];
   council?: ProfessionalCouncil[];
   councilState?: string;
+  // Só o admin filtra por situação.
+  status?: ProfessionalStatus[];
   sort?: ProfessionalSort;
   order?: 'asc' | 'desc';
   ids?: string[];
@@ -101,6 +107,7 @@ export function getProfessionals(
     specialism = [],
     council = [],
     councilState,
+    status = [],
     sort,
     order,
     ids = [],
@@ -128,6 +135,10 @@ export function getProfessionals(
 
   if (councilState) {
     params.set('councilState', councilState);
+  }
+
+  if (status.length > 0) {
+    params.set('status', status.join(','));
   }
 
   if (sort) {
