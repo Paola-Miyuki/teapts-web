@@ -4,9 +4,11 @@ export function onlyDigits(value: string) {
   return value.replace(/\D/g, '');
 }
 
-/** Data e hora ISO em `dd/mm/aaaa`. */
+export const TIME_ZONE = 'America/Sao_Paulo';
+
+/** Data e hora ISO em `dd/mm/aaaa`, no horário de Brasília. */
 export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  return new Date(iso).toLocaleDateString('pt-BR', { timeZone: TIME_ZONE });
 }
 
 /** Data `AAAA-MM-DD` em `dd/mm/aaaa`, sem passar por fuso horário. */

@@ -19,7 +19,9 @@ import {
   type PtsTeamTarget,
   type ProfessionalAccountRecord,
   type TransferResponsibilityInput,
+  type StartPtsInput,
 } from '../repositories/pts.repository';
+import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 
@@ -33,6 +35,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   ptsTeams = new Map<string, PtsTeamResponseDto>();
   timelineRecords: RemoveTeamMemberInput[] = [];
   transferredRecords: TransferResponsibilityInput[] = [];
+  startedRecords: StartPtsInput[] = [];
   /** Eventos member_added: um por profissional adicionado. */
   addedRecords: Array<
     Omit<AddTeamMembersInput, 'members'> & {
@@ -329,6 +332,23 @@ export class InMemoryPtsRepository extends PtsRepository {
     this.transferredRecords.push({ ...input });
 
     return { ...pts, team: [...pts.team] };
+  }
+
+  async startPts(input: StartPtsInput): Promise<PtsStartResponseDto> {
+    const pts = this.ptsTeams.get(input.ptsId);
+
+    if (!pts) {
+      throw new Error('PTS não encontrado.');
+    }
+
+    pts.status = PtsStateEnum.RUNNING;
+    this.startedRecords.push({ ...input });
+
+    return {
+      id: input.ptsId,
+      status: PtsStateEnum.RUNNING,
+      beganAt: '2026-12-01T13:00:00.000Z',
+    };
   }
 
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {

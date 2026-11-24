@@ -26,7 +26,9 @@ export type PermissionAction =
   | 'approvePtsProposal'
   | 'rejectPtsProposal'
   | 'editPtsProposal'
-  | 'deletePtsProposal';
+  | 'deletePtsProposal'
+  | 'startPts'
+  | 'registerPtsReassessment';
 
 // Mesmos valores do PtsStateEnum da API.
 export type PtsStatus =
@@ -93,7 +95,8 @@ export function can(
 
   // RN022 – o administrador acessa todo o sistema. Ficam de fora o que só
   // escolhe o início (paciente e conta sem perfil) e a regra de estado:
-  // aprovar, rejeitar e editar seguem valendo só em DRAFT.
+  // aprovar, rejeitar e editar seguem valendo só em DRAFT; iniciar, só em
+  // PLANNING; reavaliar, só em RUNNING.
   if (admin) {
     switch (action) {
       case 'viewOwnCare':
@@ -104,6 +107,10 @@ export function can(
       case 'editPtsProposal':
       case 'deletePtsProposal':
         return pts?.status === 'draft';
+      case 'startPts':
+        return pts?.status === 'planning';
+      case 'registerPtsReassessment':
+        return pts?.status === 'running';
       case 'editPts':
         return isActivePts(pts);
       default:
@@ -197,6 +204,24 @@ export function can(
       return (
         professional &&
         pts?.status === 'draft' &&
+        user.professionalProfileIds.includes(
+          pts.responsibleProfessionalId ?? '',
+        )
+      );
+    case 'startPts':
+      // RFPTS006 – profissional responsável, só em planejamento.
+      return (
+        professional &&
+        pts?.status === 'planning' &&
+        user.professionalProfileIds.includes(
+          pts.responsibleProfessionalId ?? '',
+        )
+      );
+    case 'registerPtsReassessment':
+      // RFEVA005 – profissional responsável, só em andamento.
+      return (
+        professional &&
+        pts?.status === 'running' &&
         user.professionalProfileIds.includes(
           pts.responsibleProfessionalId ?? '',
         )

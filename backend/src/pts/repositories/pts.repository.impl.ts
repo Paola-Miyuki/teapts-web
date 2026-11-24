@@ -30,7 +30,9 @@ import {
   type RemoveTeamMemberInput,
   type AddTeamMembersInput,
   type TransferResponsibilityInput,
+  type StartPtsInput,
 } from './pts.repository';
+import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
@@ -50,6 +52,8 @@ import {
   cannotRemoveResponsible,
   ptsNotActive,
   ptsNotFound,
+  ptsNotPlanning,
+  ptsStartForbidden,
   ptsProposalNotDraft,
   ptsProposalNotDraftForDelete,
   ptsProposalNotFound,
@@ -1049,6 +1053,74 @@ export class PtsRepositoryImpl extends PtsRepository {
       await queryRunner.commitTransaction();
 
       return this.toTeamResponse(pts);
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async startPts(input: StartPtsInput): Promise<PtsStartResponseDto> {
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      // Trava o PTS e refaz as checagens: outro início, um encerramento ou uma
+      // transferência simultânea não passam despercebidos.
+      const locked = await queryRunner.manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: input.ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        input.authorProfessionalId !== null &&
+        locked.responsibleProfessionalId !== input.authorProfessionalId
+      ) {
+        throw ptsStartForbidden();
+      }
+
+      if (locked.status !== PtsStateEnum.PLANNING) {
+        throw ptsNotPlanning();
+      }
+
+      const beganAt = new Date();
+
+      await queryRunner.manager.update(PtsEntity, input.ptsId, {
+        status: PtsStateEnum.RUNNING,
+        beganAt,
+      });
+
+      await this.timelineRecorder.record(
+        {
+          type: TimelineRecordType.PtsStarted,
+          description: input.description,
+          targetId: input.ptsId,
+          targetType: TimelineRecordTarget.Pts,
+          ptsId: input.ptsId,
+          authorProfessionalId: input.authorProfessionalId,
+          executedByAccountId: input.executedByAccountId,
+        },
+        queryRunner.manager,
+      );
+
+      await queryRunner.commitTransaction();
+
+      return {
+        id: input.ptsId,
+        status: PtsStateEnum.RUNNING,
+        beganAt: beganAt.toISOString(),
+      };
     } catch (error) {
       if (queryRunner.isTransactionActive) {
         await queryRunner.rollbackTransaction();

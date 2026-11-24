@@ -12,15 +12,22 @@ import RegistrationCell from '@/components/table/RegistrationCell';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import type { Account } from '@/lib/account';
 import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
-import { getPts, type PtsDetail, type PtsProfessional } from '@/lib/pts';
+import {
+  getPts,
+  type PtsDetail,
+  type PtsProfessional,
+  type PtsStartResponse,
+} from '@/lib/pts';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
 import {
   AddTeamMembersModal,
   type PtsData,
 } from '../_components/AddTeamMembersModal';
+import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
@@ -95,9 +102,7 @@ export default function PtsDetailPage({ id }: { id: string }) {
           id={id}
           onLoaded={setPatientName}
           isPatient={kind === 'patient'}
-          canOpenRecord={can(account, 'viewAuthorizedPatients')}
-          currentUserProfileIds={account.professionalProfileIds ?? []}
-          isAdmin={account.role === 'admin'}
+          account={account}
         />
       )}
     </AuthenticatedPage>
@@ -108,21 +113,21 @@ function PtsDetailContent({
   id,
   onLoaded,
   isPatient,
-  canOpenRecord,
-  currentUserProfileIds,
-  isAdmin,
+  account,
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
   isPatient: boolean;
-  canOpenRecord: boolean;
-  currentUserProfileIds: string[];
-  isAdmin: boolean;
+  account: Account;
 }) {
   const router = useRouter();
+  const canOpenRecord = can(account, 'viewAuthorizedPatients');
+  const currentUserProfileIds = account.professionalProfileIds ?? [];
+  const isAdmin = account.role === 'admin';
   const [pts, setPts] = useState<PtsDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [isStartOpen, setIsStartOpen] = useState(false);
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient ? ['equipe', 'timeline'] : ['visao', 'equipe', 'timeline'],
@@ -218,6 +223,20 @@ function PtsDetailContent({
       members.some((member) => currentUserProfileIds.includes(member.id))) &&
     ['planning', 'running'].includes(pts.status);
 
+  const permissionPts = {
+    status: pts.status,
+    responsibleProfessionalId: pts.responsible.id,
+  };
+  const canStart = can(account, 'startPts', { pts: permissionPts });
+  const canReassess = can(account, 'registerPtsReassessment', {
+    pts: permissionPts,
+  });
+
+  const handleStarted = ({ status, beganAt }: PtsStartResponse) => {
+    setPts((prev) => (prev ? { ...prev, status, beganAt } : prev));
+    setIsStartOpen(false);
+  };
+
   const handleTeamUpdated = (updatedPts: PtsData) => {
     setPts((prev) =>
       prev
@@ -261,21 +280,48 @@ function PtsDetailContent({
 
         {(canOpenRecord || canEditPts) && (
           <div className="heading-actions">
-            {canEditPts && (
-              <Link className="btn" href={`/pts/${pts.id}/edit`}>
-                <Icon name="edit" className="icon-sm" />
-                Editar PTS
-              </Link>
-            )}
             {canOpenRecord && (
               <Link className="btn" href={`/patients/${pts.patient.id}`}>
                 <Icon name="patient" className="icon-sm" />
                 Prontuário
               </Link>
             )}
+            {canEditPts && (
+              <Link className="btn" href={`/pts/${pts.id}/edit`}>
+                <Icon name="edit" className="icon-sm" />
+                Editar PTS
+              </Link>
+            )}
+            {canStart && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setIsStartOpen(true)}
+              >
+                <Icon name="check" className="icon-sm" />
+                Iniciar execução
+              </button>
+            )}
+            {/* Desabilitado até existir a tela de reavaliação (RFEVA005). */}
+            {canReassess && (
+              <button type="button" className="btn btn-primary" disabled>
+                <Icon name="checkCircle" className="icon-sm" />
+                Registrar reavaliação
+              </button>
+            )}
           </div>
         )}
       </section>
+
+      {canStart && (
+        <StartPtsDialog
+          open={isStartOpen}
+          ptsId={pts.id}
+          patientName={pts.patient.name}
+          onClose={() => setIsStartOpen(false)}
+          onStarted={handleStarted}
+        />
+      )}
 
       <nav className="tabs ux-ptabs" aria-label="Seções do PTS">
         {!isPatient && (
@@ -315,7 +361,9 @@ function PtsDetailContent({
 
       {tab === 'timeline' ? (
         <section data-panel="timeline" id="timeline">
+          {/* A key recarrega os eventos quando o status muda (pts_started). */}
           <TimelineTab
+            key={pts.status}
             ptsId={pts.id}
             patientId={pts.patient.id}
             team={members.map(({ id: memberId, name }) => ({

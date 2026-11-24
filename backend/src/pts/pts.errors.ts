@@ -137,6 +137,20 @@ export const ptsNotActive = () =>
     'Somente PTS em PLANNING ou RUNNING podem ser alterados.',
   );
 
+export const ptsStartForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode iniciar a execução do PTS.',
+  );
+
+export const ptsNotPlanning = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_PLANNING',
+    'Só um PTS em planejamento pode ter a execução iniciada.',
+  );
+
 export const ptsProposalDeleteForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,

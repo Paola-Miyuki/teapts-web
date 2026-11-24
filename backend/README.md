@@ -36,32 +36,33 @@ test/           e2e (*.e2e-spec.ts)
 
 Todas exigem sessão, exceto `GET /health` e `/auth/signup|signin|session/refresh` (SDK do SuperTokens). Corpo e respostas: Swagger. Erros: `{ status, message }`.
 
-| Rota                                                                                         | Acesso                                                                                             |
-| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `POST /auth/logout`, `POST /me/password`                                                     | conta da sessão                                                                                    |
-| `GET, PATCH, DELETE /me`                                                                     | conta da sessão (DELETE desativa a própria conta)                                                  |
-| `GET /accounts`, `GET, DELETE /accounts/:id`                                                 | admin (DELETE desativa e revoga as sessões)                                                        |
-| `GET /patients/authorized`                                                                   | profissional (admin vê todos)                                                                      |
-| `GET /patients`                                                                              | profissional ou admin: pacientes elegíveis para nova proposta                                      |
-| `GET /patients/:id`                                                                          | admin ou profissional com acesso (RN016)                                                           |
-| `POST /patients`                                                                             | admin                                                                                              |
-| `PATCH /patients/:patientId/clinical-data`                                                   | admin ou membro de PTS ativo (RN024)                                                               |
-| `GET, POST /patients/:patientId/medications`                                                 | ver: com acesso ao paciente; criar: admin ou membro de PTS ativo                                   |
-| `PATCH …/medications/:medicationId`, `POST …/:medicationId/stop`                             | admin ou membro de PTS ativo                                                                       |
-| `GET /patients/:patientId/support-contacts`                                                  | admin, profissional com vínculo ou o próprio paciente                                              |
-| `POST, PATCH, DELETE …/support-contacts[/:contactId]`                                        | admin ou membro de PTS ativo (RN024)                                                               |
-| `GET /professionals`                                                                         | conta da sessão (e-mail só para admin e profissional)                                              |
-| `POST /professionals`                                                                        | admin: `accountId`, `specialism`, `councilNumber`, `councilState`; opcionais `institution`, `cnes` |
-| `POST /pts`                                                                                  | profissional (vira o responsável) ou admin                                                         |
-| `GET /pts/proposals[/:id]`                                                                   | paciente titular, profissional da proposta ou admin                                                |
-| `PATCH, DELETE /pts/proposals/:id`                                                           | responsável ou admin, proposta em `draft`                                                          |
-| `POST /pts/proposals/:id/approve`, `/reject`                                                 | paciente titular ou admin, proposta em `draft`                                                     |
-| `GET /pts/active?patientId=`                                                                 | paciente titular, equipe ou admin                                                                  |
-| `GET /pts/:id`                                                                               | paciente titular (sem a ficha), equipe (menos PTS rejeitado) ou admin                              |
-| `PATCH /pts/:id/sheet`                                                                       | equipe ou admin, PTS ativo; grava `pts_updated` na timeline                                        |
-| `POST /pts/:id/team`, `DELETE …/team/:professionalId`, `POST …/team/transfer-responsibility` | responsável ou admin, PTS ativo                                                                    |
-| `GET /pts/:id/timeline`                                                                      | paciente titular, equipe (menos PTS rejeitado) ou admin                                            |
-| `GET /health`                                                                                | público (`200` ou `503` com o banco fora)                                                          |
+| Rota                                                                                         | Acesso                                                                                                                                          |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/logout`, `POST /me/password`                                                     | conta da sessão                                                                                                                                 |
+| `GET, PATCH, DELETE /me`                                                                     | conta da sessão (DELETE desativa a própria conta)                                                                                               |
+| `GET /accounts`, `GET, DELETE /accounts/:id`                                                 | admin (DELETE desativa e revoga as sessões)                                                                                                     |
+| `GET /patients/authorized`                                                                   | profissional (admin vê todos)                                                                                                                   |
+| `GET /patients`                                                                              | profissional ou admin: pacientes elegíveis para nova proposta                                                                                   |
+| `GET /patients/:id`                                                                          | admin ou profissional com acesso (RN016)                                                                                                        |
+| `POST /patients`                                                                             | admin                                                                                                                                           |
+| `PATCH /patients/:patientId/clinical-data`                                                   | admin ou membro de PTS ativo (RN024)                                                                                                            |
+| `GET, POST /patients/:patientId/medications`                                                 | ver: com acesso ao paciente; criar: admin ou membro de PTS ativo                                                                                |
+| `PATCH …/medications/:medicationId`, `POST …/:medicationId/stop`                             | admin ou membro de PTS ativo                                                                                                                    |
+| `GET /patients/:patientId/support-contacts`                                                  | admin, profissional com vínculo ou o próprio paciente                                                                                           |
+| `POST, PATCH, DELETE …/support-contacts[/:contactId]`                                        | admin ou membro de PTS ativo (RN024)                                                                                                            |
+| `GET /professionals`                                                                         | conta da sessão (e-mail só para admin e profissional)                                                                                           |
+| `POST /professionals`                                                                        | admin: `accountId`, `specialism`, `councilNumber`, `councilState`; opcionais `institution`, `cnes`                                              |
+| `POST /pts`                                                                                  | profissional (vira o responsável) ou admin                                                                                                      |
+| `GET /pts/proposals[/:id]`                                                                   | paciente titular, profissional da proposta ou admin                                                                                             |
+| `PATCH, DELETE /pts/proposals/:id`                                                           | responsável ou admin, proposta em `draft`                                                                                                       |
+| `POST /pts/proposals/:id/approve`, `/reject`                                                 | paciente titular ou admin, proposta em `draft`                                                                                                  |
+| `GET /pts/active?patientId=`                                                                 | paciente titular, equipe ou admin                                                                                                               |
+| `GET /pts/:id`                                                                               | paciente titular (sem a ficha), equipe (menos PTS rejeitado) ou admin                                                                           |
+| `PATCH /pts/:id/sheet`                                                                       | equipe ou admin, PTS ativo; grava `pts_updated` na timeline                                                                                     |
+| `POST /pts/:id/start`                                                                        | responsável ou admin, PTS em `planning`; passa para `running`, grava `began_at` e `pts_started` na timeline (`409 PTS_NOT_PLANNING` fora disso) |
+| `POST /pts/:id/team`, `DELETE …/team/:professionalId`, `POST …/team/transfer-responsibility` | responsável ou admin, PTS ativo                                                                                                                 |
+| `GET /pts/:id/timeline`                                                                      | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                         |
+| `GET /health`                                                                                | público (`200` ou `503` com o banco fora)                                                                                                       |
 
 ## Banco de dados
 
@@ -114,6 +115,8 @@ Nunca edite migration já aplicada. No Docker, migration nova só vale depois do
 | Diego Alves       | `planning`                               | Beatriz Lopes         | Profissional de Teste |
 
 O seed não cria medicações, contatos de suporte, dados clínicos nem eventos de timeline.
+
+Para testar "Iniciar execução", use o PTS em `planning` do Diego Alves, com a Beatriz Lopes (responsável) ou o admin. Depois de iniciado ele fica em `running`, e o seed não o volta para `planning`.
 
 **Conferir e zerar:** `make db-tables`, `db-account`, `db-patients`, `db-professionals`, `db-pts`, `db-query SQL="..."`, `make psql` e `make health`. Zerar: `make clean`, `make up-d`, `make seed` (apaga também usuários e sessões do SuperTokens).
 
