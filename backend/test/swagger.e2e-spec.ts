@@ -175,7 +175,17 @@ describe('Swagger (e2e)', () => {
     expect(
       parameters.filter((p) => p.in === 'query').map((p) => p.name),
     ).toEqual(
-      expect.arrayContaining(['page', 'limit', 'name', 'specialism', 'ids']),
+      expect.arrayContaining([
+        'page',
+        'limit',
+        'q',
+        'specialism',
+        'council',
+        'councilState',
+        'sort',
+        'order',
+        'ids',
+      ]),
     );
   });
 
@@ -325,14 +335,14 @@ describe('Swagger (e2e)', () => {
       required: false,
       schema: { type: 'string' },
     });
-    expect(byName.name).toMatchObject({ required: false });
+    expect(byName.q).toMatchObject({ required: false });
     expect(byName.specialism).toMatchObject({ required: false });
   });
 
   it.each([
     ['/accounts', 20, 50],
     ['/patients/authorized', 20, 50],
-    ['/patients/available-for-pts', 20, 50],
+    ['/patients', 20, 50],
   ])(
     'documents the GET %s pagination defaults and limits',
     async (path, defaultLimit, maxLimit) => {

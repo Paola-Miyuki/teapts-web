@@ -9,13 +9,25 @@ import { Account } from '../../accounts/entities/account.entity';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
 import type { Uf } from '../enums/uf.enum';
+import { escapeLike } from '../../common/search/escape-like';
+import {
+  type Council,
+  specialismsOfCouncils,
+} from '../professional-registration';
+
+/** Nome da especialidade, para ordenar pelo texto mostrado na tela. */
+const SPECIALISM_ORDER_SQL = `CASE professional.specialism WHEN 'doctor' THEN 'Medicina' WHEN 'physiotherapist' THEN 'Fisioterapia' WHEN 'psychologist' THEN 'Psicologia' END`;
 
 /** Filtros e paginação já validados da consulta de profissionais. */
 export type FindProfessionalsQuery = {
   page: number;
   limit: number;
-  name?: string;
-  specialism?: Specialism;
+  q?: string;
+  specialism?: Specialism[];
+  council?: Council[];
+  councilState?: Uf;
+  sort?: 'name' | 'specialism';
+  order?: 'asc' | 'desc';
   ids?: string[];
 };
 
@@ -74,15 +86,36 @@ export class ProfessionalsRepository {
         'account.email AS account_email',
       ]);
 
-    if (filters.name !== undefined) {
-      query.andWhere('LOWER(account.name) LIKE LOWER(:name)', {
-        name: `%${filters.name}%`,
-      });
+    if (filters.q !== undefined) {
+      query.andWhere(
+        `(account.name ILIKE :q ESCAPE '\\' OR account.email ILIKE :q ESCAPE '\\' OR professional.councilNumber ILIKE :q ESCAPE '\\')`,
+        { q: `%${escapeLike(filters.q)}%` },
+      );
     }
 
-    if (filters.specialism !== undefined) {
-      query.andWhere('professional.specialism = :specialism', {
-        specialism: filters.specialism,
+    // Profissão e conselho combinam: vale a interseção das duas listas.
+    let specialisms = filters.specialism;
+
+    if (filters.council !== undefined) {
+      const ofCouncils = specialismsOfCouncils(filters.council);
+      specialisms = specialisms
+        ? specialisms.filter((item) => ofCouncils.includes(item))
+        : ofCouncils;
+    }
+
+    if (specialisms !== undefined) {
+      if (specialisms.length === 0) {
+        query.andWhere('1 = 0');
+      } else {
+        query.andWhere('professional.specialism IN (:...specialisms)', {
+          specialisms,
+        });
+      }
+    }
+
+    if (filters.councilState !== undefined) {
+      query.andWhere('professional.councilState = :councilState', {
+        councilState: filters.councilState,
       });
     }
 
@@ -90,7 +123,17 @@ export class ProfessionalsRepository {
       query.andWhere('professional.id IN (:...ids)', { ids: filters.ids });
     }
 
-    query.orderBy('account.name', 'ASC').addOrderBy('professional.id', 'ASC');
+    const direction = filters.order === 'desc' ? 'DESC' : 'ASC';
+
+    if (filters.sort === 'specialism') {
+      query
+        .orderBy(SPECIALISM_ORDER_SQL, direction)
+        .addOrderBy('account.name', 'ASC');
+    } else {
+      query.orderBy('account.name', direction);
+    }
+
+    query.addOrderBy('professional.id', 'ASC');
 
     const total = await query.clone().getCount();
     const rows = await query

@@ -25,8 +25,8 @@ import type {
   AuthorizedPatientResponseDto,
   GetAuthorizedPatientsResponseDto,
 } from '../dto/get-authorized-patients-response.dto';
-import type { GetAvailablePatientsRequestDto } from '../dto/get-available-patients-request.dto';
-import type { GetAvailablePatientsResponseDto } from '../dto/get-available-patients-response.dto';
+import type { GetEligiblePatientsRequestDto } from '../dto/get-eligible-patients-request.dto';
+import type { GetEligiblePatientsResponseDto } from '../dto/get-eligible-patients-response.dto';
 import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
 import type { SupportContact } from '../entities/support-contact.entity';
@@ -41,7 +41,7 @@ import type {
 } from '../dto/support-contact-response.dto';
 import type { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import {
-  type AuthorizedPatientsPage,
+  type EligiblePatientsPage,
   type PatientRow,
   type PatientScope,
   type PatientsPage,
@@ -476,10 +476,18 @@ export class PatientsService {
     });
   }
 
-  async findAvailableForPts(
+  /**
+   * Busca os pacientes elegíveis para uma nova proposta de PTS (RFPTS001,
+   * RN011), para o profissional ou o administrador.
+   *
+   * @param account contexto da conta autenticada
+   * @param request busca e paginação já validadas
+   * @returns pacientes elegíveis (id, nome exibido e e-mail) e paginação
+   */
+  async findEligibleForProposal(
     account: AccountContext,
-    request: GetAvailablePatientsRequestDto,
-  ): Promise<GetAvailablePatientsResponseDto> {
+    request: GetEligiblePatientsRequestDto,
+  ): Promise<GetEligiblePatientsResponseDto> {
     if (!isAdmin(account) && account.professionalProfileIds.length === 0) {
       throw new ForbiddenException({
         status: 'FORBIDDEN',
@@ -487,16 +495,19 @@ export class PatientsService {
       });
     }
 
-    let page: AuthorizedPatientsPage;
+    let page: EligiblePatientsPage;
 
     try {
-      page =
-        await this.patientsRepository.findAvailableForPtsPaginated(request);
+      page = await this.patientsRepository.findEligibleForProposalPaginated({
+        page: request.page,
+        limit: request.limit,
+        q: request.q,
+      });
     } catch (error) {
-      this.logger.error('Available patients query failed', error);
+      this.logger.error('Eligible patients query failed', error);
       throw new InternalServerErrorException({
         status: 'ERROR',
-        message: 'Não foi possível consultar os pacientes disponíveis.',
+        message: 'Não foi possível consultar os pacientes elegíveis.',
       });
     }
 
@@ -505,7 +516,8 @@ export class PatientsService {
     return {
       data: rows.map((row) => ({
         id: row.patient_id,
-        name: row.account_name,
+        name: row.display_name,
+        email: row.email,
       })),
       pagination: toPagination(request, total),
     };

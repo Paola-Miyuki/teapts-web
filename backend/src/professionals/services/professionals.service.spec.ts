@@ -63,8 +63,8 @@ const patientAccount: AccountContext = {
 const request: GetProfessionalsRequestDto = {
   page: 2,
   limit: 10,
-  name: 'Maria',
-  specialism: Specialism.Psychologist,
+  q: 'Maria',
+  specialism: [Specialism.Psychologist],
   ids: ['550e8400-e29b-41d4-a716-446655440000'],
 };
 

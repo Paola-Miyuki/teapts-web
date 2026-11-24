@@ -48,6 +48,13 @@ describe('UpdateSupportContactRequestDto', () => {
     expect(result.phone).toBe('(11) 98765-4321');
   });
 
+  it.each(['+55 (11) 98765-4321', '5511987654321', '(11) 3456-7890'])(
+    'accepts the phone %s with DDD',
+    async (phone) => {
+      await expect(normalize({ phone })).resolves.toEqual({ phone });
+    },
+  );
+
   it('does not require e-mail or phone, which the service checks on the result', async () => {
     await expect(normalize({ name: 'Joana' })).resolves.toEqual({
       name: 'Joana',
@@ -75,6 +82,11 @@ describe('UpdateSupportContactRequestDto', () => {
     [
       'a phone without DDD',
       { phone: '98765-4321' },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with letters',
+      { phone: '(11) 98765-43ab21' },
       'Informe um telefone válido para o contato.',
     ],
     [

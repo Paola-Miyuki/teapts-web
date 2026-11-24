@@ -54,6 +54,10 @@ export const mockPatients: Patient[] = [
   { id: '00000000-0000-4000-8000-000000000027', name: 'Priscila Martins' },
 ];
 
+export function mockPatientEmail(patient: Patient): string {
+  return `${patient.name.toLowerCase().replace(/\s+/g, '.')}@exemplo.com`;
+}
+
 function toPtsProfessional(professional: Professional): PtsProfessional {
   return {
     id: professional.id,
