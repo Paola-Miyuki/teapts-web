@@ -102,9 +102,12 @@ src/
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
                            status do PTS, responsável e data de cadastro, ordenação e paginação,
                            todos na URL; modal "Adicionar paciente" (só admin)
-      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente, com os
-                           contatos de suporte editados contato a contato
-      _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar"),
+      [patientId]/         detalhe do paciente (GET /patients/:id), aba Dados do paciente: cartão
+                           com e-mail, telefone e data de cadastro, "Excluir paciente" só para o
+                           admin e contatos de suporte editados contato a contato
+      _components/         PatientList (tabela, filtros e menu ⋮ com "Visualizar" e, só para o
+                           admin, "Excluir"), DeletePatientDialog ("Excluir paciente" = desativa a
+                           conta, DELETE /accounts/:id),
                            AddPatientModal/AddPatientForm, AccountCombobox (combobox ARIA da conta:
                            GET /accounts?isPatient=false&isProfessional=false&q=; POST /patients) e
                            SupportContactFields/SupportContactList (contatos do cadastro),
@@ -177,7 +180,7 @@ rejeitar continua só em proposta `draft`. O menu lateral sai de `getNavigation`
 | `/profile/edit` | Editar perfil e Redefinir senha | conta da sessão | `meu-perfil-editar.html` |
 | `/accounts` | Contas: lista, Visualizar, Tornar paciente e Desativar | admin (`manageAccounts`) | `contas.html` |
 | `/patients` | Pacientes cadastrados (admin) ou vinculados (profissional) e "Adicionar paciente" (com `?account=<id>`, abre o modal com a conta escolhida) | admin e profissional (`viewAuthorizedPatients`) | `pacientes.html`, `criar-paciente.html` |
-| `/patients/:id` | Detalhe do paciente (Dados do paciente); contatos de suporte editáveis pelo admin e pelo membro de PTS ativo (`manageSupportContacts`, RN024) | admin e profissional com acesso (RN016) | `paciente.html` |
+| `/patients/:id` | Detalhe do paciente (Dados do paciente); contatos de suporte editáveis pelo admin e pelo membro de PTS ativo (`manageSupportContacts`, RN024); o admin exclui o paciente (desativa a conta) | admin e profissional com acesso (RN016) | `paciente.html` |
 | `/professionals` | Profissionais | admin e profissional (`viewProfessionalDirectory`) | `profissionais.html` |
 | `/pts/proposals` | Propostas de PTS | paciente, profissional da proposta e admin (`viewPtsProposals`) | `propostas-pts.html` |
 | `/pts/novo` | Criar proposta de PTS | profissional e admin (`createPts`) | `criar-pts.html` |

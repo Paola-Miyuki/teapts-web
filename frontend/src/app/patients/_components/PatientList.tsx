@@ -22,6 +22,7 @@ import {
 import { getProfessionals, type Professional } from '@/lib/professionals';
 import { PTS_STATUS_LABELS } from '@/lib/pts-status';
 import styles from '../patients.module.css';
+import DeletePatientDialog from './DeletePatientDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 const DEFAULT_LIMIT = PER_PAGE_OPTIONS[0];
@@ -164,6 +165,10 @@ export default function PatientList({
   const hasFilters = status.length > 0 || Boolean(responsibleId || registered);
 
   const [retryKey, setRetryKey] = useState(0);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [success, setSuccess] = useState('');
   const key = [
     search.term,
     status.join(','),
@@ -241,285 +246,337 @@ export default function PatientList({
     });
   }
 
+  function handleDeleted(_id: string, name: string) {
+    setDeleting(null);
+    setSuccess(`Paciente ${name} excluído.`);
+    setRetryKey((current) => current + 1);
+  }
+
   return (
-    <div className="ux-tcard" aria-busy={loading}>
-      <div className="ux-tcard-head">
-        <div>
-          <h2>{isAdmin ? 'Pacientes cadastrados' : 'Pacientes vinculados'}</h2>
-          <p className="count" aria-live="polite">
-            {count}
-          </p>
+    <>
+      {success && (
+        <div
+          className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
+          role="status"
+        >
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
+          </div>
+
+          <span>{success}</span>
         </div>
-      </div>
+      )}
 
-      <div className="ux-toolbar">
-        <label className="field">
-          <span>Busca</span>
-          <span className="with-icon">
-            <Icon name="search" className="icon-sm" />
-            <input
-              className="input"
-              type="search"
-              placeholder="Nome, nome social, e-mail, CNS ou CPF"
-              value={search.input}
-              onChange={(event) => search.setInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  search.commit();
-                }
+      <div className="ux-tcard" aria-busy={loading}>
+        <div className="ux-tcard-head">
+          <div>
+            <h2>
+              {isAdmin ? 'Pacientes cadastrados' : 'Pacientes vinculados'}
+            </h2>
+            <p className="count" aria-live="polite">
+              {count}
+            </p>
+          </div>
+        </div>
 
-                if (event.key === 'Escape') {
-                  search.clear();
-                }
-              }}
-            />
-          </span>
-        </label>
+        <div className="ux-toolbar">
+          <label className="field">
+            <span>Busca</span>
+            <span className="with-icon">
+              <Icon name="search" className="icon-sm" />
+              <input
+                className="input"
+                type="search"
+                placeholder="Nome, nome social, e-mail, CNS ou CPF"
+                value={search.input}
+                onChange={(event) => search.setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    search.commit();
+                  }
 
-        <div className="ux-tools">
-          <button
-            type="button"
-            className="btn filter-toggle"
-            aria-expanded={filtersOpen}
-            aria-controls="patients-more"
-            onClick={() => setFiltersOpen((current) => !current)}
-          >
-            <Icon name="filter" className="icon-sm" />
-            Filtros
-          </button>
+                  if (event.key === 'Escape') {
+                    search.clear();
+                  }
+                }}
+              />
+            </span>
+          </label>
 
-          {hasFilters && (
-            <button type="button" className="btn" onClick={clearFilters}>
-              <Icon name="close" className="icon-sm" />
-              Limpar
+          <div className="ux-tools">
+            <button
+              type="button"
+              className="btn filter-toggle"
+              aria-expanded={filtersOpen}
+              aria-controls="patients-more"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <Icon name="filter" className="icon-sm" />
+              Filtros
             </button>
-          )}
 
-          <label className="ux-sort" htmlFor="patients-sort">
-            <span>Ordenar por</span>
+            {hasFilters && (
+              <button type="button" className="btn" onClick={clearFilters}>
+                <Icon name="close" className="icon-sm" />
+                Limpar
+              </button>
+            )}
+
+            <label className="ux-sort" htmlFor="patients-sort">
+              <span>Ordenar por</span>
+              <select
+                className="select"
+                id="patients-sort"
+                value={sort}
+                onChange={(event) =>
+                  update({
+                    sort:
+                      event.target.value === 'registeredAt'
+                        ? 'registeredAt'
+                        : '',
+                  })
+                }
+              >
+                <option value="name">Nome</option>
+                <option value="registeredAt">Data de cadastro</option>
+              </select>
+              <button
+                type="button"
+                className="btn btn-sm sort-dir"
+                data-dir={order}
+                aria-label={
+                  order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'
+                }
+                onClick={() => update({ order: order === 'asc' ? 'desc' : '' })}
+              >
+                <Icon
+                  name={order === 'asc' ? 'sortUp' : 'sortDown'}
+                  className="icon-sm"
+                />
+              </button>
+            </label>
+          </div>
+        </div>
+
+        <div className="filter-more" id="patients-more" hidden={!filtersOpen}>
+          <MultiSelect
+            label="Status do PTS"
+            options={statusOptions(isAdmin)}
+            value={status}
+            onChange={(value) => update({ status: value.join(',') })}
+          />
+
+          <ResponsibleFilter
+            value={responsibleId}
+            onChange={(id) => update({ responsible: id })}
+          />
+
+          <div className="field">
+            <label className="field-label" htmlFor="patients-registered">
+              Data de cadastro
+            </label>
             <select
               className="select"
-              id="patients-sort"
-              value={sort}
+              id="patients-registered"
+              value={registered}
               onChange={(event) =>
                 update({
-                  sort:
-                    event.target.value === 'registeredAt' ? 'registeredAt' : '',
+                  registered: event.target.value,
+                  registeredFrom: '',
+                  registeredTo: '',
                 })
               }
             >
-              <option value="name">Nome</option>
-              <option value="registeredAt">Data de cadastro</option>
+              <option value="">Qualquer data</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
+              <option value="custom">Personalizado</option>
             </select>
+
+            {registered === 'custom' && (
+              <div className="range-custom">
+                <input
+                  className="input"
+                  type="date"
+                  aria-label="De"
+                  value={registeredFromParam}
+                  onChange={(event) =>
+                    update({ registeredFrom: event.target.value })
+                  }
+                />
+                <input
+                  className="input"
+                  type="date"
+                  aria-label="Até"
+                  value={registeredToParam}
+                  onChange={(event) =>
+                    update({ registeredTo: event.target.value })
+                  }
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {failure?.key === key ? (
+          <div className={ui.empty} role="alert">
+            <div className={ui.emptyIcon}>
+              <Icon name="alertCircle" />
+            </div>
+            <h2>Não foi possível carregar os pacientes</h2>
+            <p>
+              {failure.error instanceof ApiError && failure.error.apiMessage
+                ? failure.error.apiMessage
+                : LOAD_ERROR}
+            </p>
             <button
               type="button"
-              className="btn btn-sm sort-dir"
-              data-dir={order}
-              aria-label={
-                order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'
-              }
-              onClick={() => update({ order: order === 'asc' ? 'desc' : '' })}
+              className={`${ui.btn} ${ui.btnSecondary}`}
+              onClick={() => setRetryKey((current) => current + 1)}
             >
-              <Icon
-                name={order === 'asc' ? 'sortUp' : 'sortDown'}
-                className="icon-sm"
-              />
+              Tentar novamente
             </button>
-          </label>
-        </div>
-      </div>
-
-      <div className="filter-more" id="patients-more" hidden={!filtersOpen}>
-        <MultiSelect
-          label="Status do PTS"
-          options={statusOptions(isAdmin)}
-          value={status}
-          onChange={(value) => update({ status: value.join(',') })}
-        />
-
-        <ResponsibleFilter
-          value={responsibleId}
-          onChange={(id) => update({ responsible: id })}
-        />
-
-        <div className="field">
-          <label className="field-label" htmlFor="patients-registered">
-            Data de cadastro
-          </label>
-          <select
-            className="select"
-            id="patients-registered"
-            value={registered}
-            onChange={(event) =>
-              update({
-                registered: event.target.value,
-                registeredFrom: '',
-                registeredTo: '',
-              })
-            }
-          >
-            <option value="">Qualquer data</option>
-            <option value="30">Últimos 30 dias</option>
-            <option value="90">Últimos 90 dias</option>
-            <option value="custom">Personalizado</option>
-          </select>
-
-          {registered === 'custom' && (
-            <div className="range-custom">
-              <input
-                className="input"
-                type="date"
-                aria-label="De"
-                value={registeredFromParam}
-                onChange={(event) =>
-                  update({ registeredFrom: event.target.value })
-                }
-              />
-              <input
-                className="input"
-                type="date"
-                aria-label="Até"
-                value={registeredToParam}
-                onChange={(event) =>
-                  update({ registeredTo: event.target.value })
-                }
-              />
+          </div>
+        ) : !last ? (
+          <div className={ui.empty} role="status" aria-live="polite">
+            <div className={styles.loader} />
+            <p>Carregando pacientes...</p>
+          </div>
+        ) : last.response.data.length === 0 ? (
+          <div className={ui.empty}>
+            <div className={ui.emptyIcon}>
+              <Icon name={filtered ? 'search' : 'patient'} />
             </div>
-          )}
-        </div>
-      </div>
-
-      {failure?.key === key ? (
-        <div className={ui.empty} role="alert">
-          <div className={ui.emptyIcon}>
-            <Icon name="alertCircle" />
+            {filtered ? (
+              <>
+                <h2>Nenhum paciente encontrado</h2>
+                <p>Revise a busca ou os filtros.</p>
+              </>
+            ) : isAdmin ? (
+              <>
+                <h2>Nenhum paciente cadastrado</h2>
+                <p>Os pacientes adicionados aparecem aqui.</p>
+              </>
+            ) : (
+              <>
+                <h2>Nenhum paciente vinculado</h2>
+                <p>Os pacientes dos PTS em que você atua aparecem aqui.</p>
+              </>
+            )}
           </div>
-          <h2>Não foi possível carregar os pacientes</h2>
-          <p>
-            {failure.error instanceof ApiError && failure.error.apiMessage
-              ? failure.error.apiMessage
-              : LOAD_ERROR}
-          </p>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSecondary}`}
-            onClick={() => setRetryKey((current) => current + 1)}
-          >
-            Tentar novamente
-          </button>
-        </div>
-      ) : !last ? (
-        <div className={ui.empty} role="status" aria-live="polite">
-          <div className={styles.loader} />
-          <p>Carregando pacientes...</p>
-        </div>
-      ) : last.response.data.length === 0 ? (
-        <div className={ui.empty}>
-          <div className={ui.emptyIcon}>
-            <Icon name={filtered ? 'search' : 'patient'} />
-          </div>
-          {filtered ? (
-            <>
-              <h2>Nenhum paciente encontrado</h2>
-              <p>Revise a busca ou os filtros.</p>
-            </>
-          ) : isAdmin ? (
-            <>
-              <h2>Nenhum paciente cadastrado</h2>
-              <p>Os pacientes adicionados aparecem aqui.</p>
-            </>
-          ) : (
-            <>
-              <h2>Nenhum paciente vinculado</h2>
-              <p>Os pacientes dos PTS em que você atua aparecem aqui.</p>
-            </>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className={`table-wrap ${loading ? styles.refreshing : ''}`}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Paciente</th>
-                  <th scope="col">E-mail</th>
-                  <th scope="col">CNS</th>
-                  <th scope="col">Responsável tutelar</th>
-                  <th scope="col">Status do PTS</th>
-                  <th scope="col">Cadastrado em</th>
-                  <th scope="col" className="actions-col">
-                    <span className="sr-only">Ações</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {last.response.data.map((patient) => (
-                  <tr key={patient.id}>
-                    <td>
-                      <div className="person">
-                        <span className="avatar" aria-hidden="true">
-                          {initial(patient.name)}
-                        </span>
-                        <div>
-                          <strong>{patient.name}</strong>
+        ) : (
+          <>
+            <div className={`table-wrap ${loading ? styles.refreshing : ''}`}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Paciente</th>
+                    <th scope="col">E-mail</th>
+                    <th scope="col">CNS</th>
+                    <th scope="col">Responsável tutelar</th>
+                    <th scope="col">Status do PTS</th>
+                    <th scope="col">Cadastrado em</th>
+                    <th scope="col" className="actions-col">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {last.response.data.map((patient) => (
+                    <tr key={patient.id}>
+                      <td>
+                        <div className="person">
+                          <span className="avatar" aria-hidden="true">
+                            {initial(patient.name)}
+                          </span>
+                          <div>
+                            <strong>{patient.name}</strong>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td>{patient.email}</td>
-                    <td className="num">
-                      {patient.cns ? formatCns(patient.cns) : <EmptyCell />}
-                    </td>
-                    <td>{patient.guardianName ?? <EmptyCell />}</td>
-                    <td className="nowrap">
-                      <PtsStatusBadge status={patient.ptsStatus} />
-                    </td>
-                    <td className="num">{formatDate(patient.registeredAt)}</td>
-                    <td className="actions-col">
-                      <KebabMenu label={`Ações para ${patient.name}`}>
-                        <li>
-                          <Link
-                            role="menuitem"
-                            href={`/patients/${patient.id}`}
-                          >
-                            <Icon name="eye" className="icon-sm" />
-                            Visualizar
-                          </Link>
-                        </li>
-                        {patient.activePtsId && (
+                      </td>
+                      <td>{patient.email}</td>
+                      <td className="num">
+                        {patient.cns ? formatCns(patient.cns) : <EmptyCell />}
+                      </td>
+                      <td>{patient.guardianName ?? <EmptyCell />}</td>
+                      <td className="nowrap">
+                        <PtsStatusBadge status={patient.ptsStatus} />
+                      </td>
+                      <td className="num">
+                        {formatDate(patient.registeredAt)}
+                      </td>
+                      <td className="actions-col">
+                        <KebabMenu label={`Ações para ${patient.name}`}>
                           <li>
                             <Link
                               role="menuitem"
-                              href={`/pts/${patient.activePtsId}`}
+                              href={`/patients/${patient.id}`}
                             >
-                              <Icon name="pts" className="icon-sm" />
-                              Abrir PTS
+                              <Icon name="eye" className="icon-sm" />
+                              Visualizar
                             </Link>
                           </li>
-                        )}
-                      </KebabMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          {patient.activePtsId && (
+                            <li>
+                              <Link
+                                role="menuitem"
+                                href={`/pts/${patient.activePtsId}`}
+                              >
+                                <Icon name="pts" className="icon-sm" />
+                                Abrir PTS
+                              </Link>
+                            </li>
+                          )}
+                          {isAdmin && (
+                            <li>
+                              <div className="sep" />
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="danger"
+                                onClick={() =>
+                                  setDeleting({
+                                    id: patient.id,
+                                    name: patient.name,
+                                  })
+                                }
+                              >
+                                <Icon name="trash" className="icon-sm" />
+                                Excluir
+                              </button>
+                            </li>
+                          )}
+                        </KebabMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <Pagination
-            label="Paginação de pacientes"
-            page={last.response.pagination.page}
-            limit={limit}
-            total={last.response.pagination.total}
-            totalPages={last.response.pagination.totalPages}
-            onPageChange={(next) =>
-              update({ page: next > 1 ? String(next) : '' }, true)
-            }
-            onLimitChange={(next) =>
-              update({ limit: next === DEFAULT_LIMIT ? '' : String(next) })
-            }
-          />
-        </>
-      )}
-    </div>
+            <Pagination
+              label="Paginação de pacientes"
+              page={last.response.pagination.page}
+              limit={limit}
+              total={last.response.pagination.total}
+              totalPages={last.response.pagination.totalPages}
+              onPageChange={(next) =>
+                update({ page: next > 1 ? String(next) : '' }, true)
+              }
+              onLimitChange={(next) =>
+                update({ limit: next === DEFAULT_LIMIT ? '' : String(next) })
+              }
+            />
+          </>
+        )}
+      </div>
+
+      <DeletePatientDialog
+        patient={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={handleDeleted}
+      />
+    </>
   );
 }
 

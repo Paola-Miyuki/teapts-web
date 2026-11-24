@@ -17,6 +17,7 @@ import {
   type PatientDetail as Patient,
   type SupportContact,
 } from '@/lib/patients';
+import DeletePatientDialog from '../_components/DeletePatientDialog';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import styles from '../patients.module.css';
 
@@ -72,6 +73,7 @@ function PatientDetailContent({
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -202,6 +204,17 @@ function PatientDetailContent({
                 </dl>
               </div>
 
+              {account.role === 'admin' && (
+                <button
+                  type="button"
+                  className="btn btn-danger ux-idedit"
+                  onClick={() => setDeleting(true)}
+                >
+                  <Icon name="trash" className="icon-sm" />
+                  Excluir paciente
+                </button>
+              )}
+
               {patient.readOnly && (
                 <p className="hint">
                   Somente leitura: o PTS de que você fez parte está encerrado.
@@ -271,6 +284,12 @@ function PatientDetailContent({
           </div>
         </div>
       </section>
+
+      <DeletePatientDialog
+        patient={deleting ? { id: patient.id, name: patient.name } : null}
+        onClose={() => setDeleting(false)}
+        onDeleted={() => router.replace('/patients')}
+      />
     </section>
   );
 }

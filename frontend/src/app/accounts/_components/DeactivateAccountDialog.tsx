@@ -13,6 +13,14 @@ type DeactivateAccountDialogProps = {
   account: { id: string; name: string } | null;
   onClose: () => void;
   onDeactivated: (id: string, name: string) => void;
+  // Textos do diálogo; sem eles, os de "Desativar conta" de `contas.html`.
+  // "Excluir paciente" (`pacientes.html`) usa o mesmo `DELETE /accounts/:id`.
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  confirmingLabel?: string;
+  errorMessage?: string;
+  icon?: 'lock' | 'trash';
 };
 
 const DEACTIVATE_ERROR = 'Não foi possível desativar a conta.';
@@ -24,6 +32,12 @@ export default function DeactivateAccountDialog({
   account,
   onClose,
   onDeactivated,
+  title = `Desativar a conta de ${account?.name ?? ''}?`,
+  description = 'A conta e os perfis vinculados ficam inativos e as sessões abertas são encerradas. Os dados e os registros são mantidos.',
+  confirmLabel = 'Desativar conta',
+  confirmingLabel = 'Desativando...',
+  errorMessage = DEACTIVATE_ERROR,
+  icon = 'lock',
 }: DeactivateAccountDialogProps) {
   const router = useRouter();
   const [error, setError] = useState('');
@@ -55,7 +69,7 @@ export default function DeactivateAccountDialog({
       setError(
         caught instanceof ApiError && caught.apiMessage
           ? caught.apiMessage
-          : DEACTIVATE_ERROR,
+          : errorMessage,
       );
       return;
     }
@@ -69,8 +83,8 @@ export default function DeactivateAccountDialog({
       open={account !== null}
       id="deactivate-account"
       size="sm"
-      title={`Desativar a conta de ${account?.name ?? ''}?`}
-      description="A conta e os perfis vinculados ficam inativos e as sessões abertas são encerradas. Os dados e os registros são mantidos."
+      title={title}
+      description={description}
       busy={submitting}
       onClose={handleClose}
       footer={
@@ -89,8 +103,8 @@ export default function DeactivateAccountDialog({
             onClick={handleConfirm}
             disabled={submitting}
           >
-            <Icon name="lock" className="icon-sm" />
-            {submitting ? 'Desativando...' : 'Desativar conta'}
+            <Icon name={icon} className="icon-sm" />
+            {submitting ? confirmingLabel : confirmLabel}
           </button>
         </>
       }

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { useRouter } from 'next/navigation';
 
@@ -60,6 +61,38 @@ function mockApi(detail: Response) {
   global.fetch = jest.fn((url: string) =>
     Promise.resolve(url.endsWith('/me') ? respond(200, PROFESSIONAL) : detail),
   ) as jest.Mock;
+}
+
+const ADMIN: Account = {
+  ...PROFESSIONAL,
+  accountId: 'admin-uuid',
+  name: 'Kaio Admin',
+  email: 'kaio.admin@example.com',
+  role: 'admin',
+  professionalProfileIds: [],
+};
+
+// Admin: /me responde a conta de admin, o DELETE /accounts/:id a resposta
+// pedida e o detalhe, o paciente.
+function mockAdminApi(deleteResponse?: Response) {
+  global.fetch = jest.fn((url: string, init?: RequestInit) => {
+    if (url.endsWith('/me')) {
+      return Promise.resolve(respond(200, ADMIN));
+    }
+
+    if (init?.method === 'DELETE') {
+      return Promise.resolve(
+        deleteResponse ??
+          respond(200, {
+            id: 'patient-1',
+            status: 'inactive',
+            deactivatedAt: '2026-11-24T12:00:00.000Z',
+          }),
+      );
+    }
+
+    return Promise.resolve(respond(200, PATIENT));
+  }) as jest.Mock;
 }
 
 describe('PatientDetail', () => {
@@ -147,6 +180,75 @@ describe('PatientDetail', () => {
     expect(
       screen.queryByRole('link', { name: 'Abrir PTS' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('não mostra "Excluir paciente" para o profissional', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    expect(
+      screen.queryByRole('button', { name: 'Excluir paciente' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('exclui o paciente pelo admin e volta para a lista', async () => {
+    const user = userEvent.setup();
+    mockAdminApi();
+
+    render(<PatientDetail id="patient-1" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('heading', {
+        name: 'Excluir o paciente Ana Clara Ribeiro?',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/O prontuário do paciente é mantido/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${API}/accounts/patient-1`,
+        expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+      ),
+    );
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/patients'));
+  });
+
+  it('mostra a mensagem da API e fica na página quando a exclusão falha', async () => {
+    const user = userEvent.setup();
+    mockAdminApi(
+      respond(409, {
+        status: 'ACCOUNT_ALREADY_DEACTIVATED',
+        message: 'A conta já está desativada.',
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Excluir paciente' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    expect(
+      await within(dialog).findByText('A conta já está desativada.'),
+    ).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalledWith('/patients');
   });
 
   it('mostra "Sem acesso" no 403', async () => {

@@ -263,6 +263,116 @@ describe('PatientsPage', () => {
       ).toHaveAttribute('href', '/patients/1-0');
     });
 
+    it('mostra "Excluir" no menu só para o admin', async () => {
+      const user = userEvent.setup();
+      mockApi();
+
+      const { unmount } = render(<PatientsPage />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
+      );
+
+      expect(
+        screen.getByRole('menuitem', { name: 'Excluir' }),
+      ).toBeInTheDocument();
+
+      unmount();
+      mockApi({ account: PROFESSIONAL });
+      render(<PatientsPage />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
+      );
+
+      expect(
+        screen.getByRole('menuitem', { name: 'Visualizar' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: 'Excluir' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('exclui o paciente (desativa a conta), avisa e recarrega a lista', async () => {
+      const user = userEvent.setup();
+      const accounts = jest.fn().mockResolvedValue(
+        mockResponse({
+          data: {
+            id: '1-0',
+            status: 'inactive',
+            deactivatedAt: '2026-11-24T12:00:00.000Z',
+          },
+        }),
+      );
+      const { list } = mockApi({ accounts });
+
+      render(<PatientsPage />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
+      );
+      await user.click(screen.getByRole('menuitem', { name: 'Excluir' }));
+
+      expect(
+        await screen.findByRole('heading', {
+          name: 'Excluir o paciente Maria Sílvia?',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/O prontuário do paciente é mantido/),
+      ).toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole('button', { name: 'Excluir paciente' }),
+      );
+
+      await waitFor(() =>
+        expect(accounts).toHaveBeenCalledWith(
+          `${API}/accounts/1-0`,
+          expect.objectContaining({
+            method: 'DELETE',
+            credentials: 'include',
+          }),
+        ),
+      );
+      expect(
+        await screen.findByText('Paciente Maria Sílvia excluído.'),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    });
+
+    it('mostra a mensagem da API quando a exclusão falha', async () => {
+      const user = userEvent.setup();
+      const accounts = jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 409,
+          ok: false,
+          data: {
+            status: 'ACCOUNT_ALREADY_DEACTIVATED',
+            message: 'A conta já está desativada.',
+          },
+        }),
+      );
+      mockApi({ accounts });
+
+      render(<PatientsPage />);
+
+      await user.click(
+        await screen.findByRole('button', { name: 'Ações para Maria Sílvia' }),
+      );
+      await user.click(screen.getByRole('menuitem', { name: 'Excluir' }));
+      await user.click(
+        await screen.findByRole('button', { name: 'Excluir paciente' }),
+      );
+
+      expect(
+        await screen.findByText('A conta já está desativada.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Paciente Maria Sílvia excluído.'),
+      ).not.toBeInTheDocument();
+    });
+
     it('mostra ao profissional os pacientes vinculados e o filtro do papel', async () => {
       const user = userEvent.setup();
       mockApi({ account: PROFESSIONAL });
