@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import Icon from '@/components/Icon';
 import Modal from '@/components/Modal';
@@ -14,8 +14,11 @@ import ui from '@/components/ui.module.css';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { ApiError } from '@/lib/api';
 import {
+  COUNCIL_STATES,
   getProfessionals,
   type Professional,
+  type ProfessionalCouncil,
+  type ProfessionalSort,
   type ProfessionalSpecialism,
   type ProfessionalsResponse,
 } from '@/lib/professionals';
@@ -26,6 +29,23 @@ const SPECIALISMS: { value: ProfessionalSpecialism; label: string }[] = [
   { value: 'physiotherapist', label: 'Fisioterapia' },
   { value: 'psychologist', label: 'Psicologia' },
 ];
+
+const COUNCILS: { value: ProfessionalCouncil; label: string }[] = [
+  { value: 'CRM', label: 'CRM' },
+  { value: 'Crefito', label: 'Crefito' },
+  { value: 'CRP', label: 'CRP' },
+];
+
+function listParam<T extends string>(
+  raw: string | null,
+  options: { value: T }[],
+): T[] {
+  const values = (raw ?? '').split(',');
+
+  return options
+    .map((option) => option.value)
+    .filter((v) => values.includes(v));
+}
 
 function initial(name: string) {
   return name.trim().charAt(0).toUpperCase();
@@ -95,12 +115,41 @@ function ProfessionalViewDialog({
 }
 
 // Lista de `profissionais.html` (o e-mail só vem para admin e profissional,
-// DP011). Situação e ações só para o admin; a situação é "Ativo" até existir
-// conta inativa (#108). A API filtra uma especialidade por vez.
+// DP011). Busca, filtros e ordenação ficam na URL (`q`, `specialism`,
+// `council`, `uf`, `sort`, `order`). Situação e ações só para o admin; a
+// situação é "Ativo" até existir conta inativa (#108).
 export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
-  const search = useDebouncedSearch();
-  const [specialism, setSpecialism] = useState<ProfessionalSpecialism | ''>('');
+  const searchParams = useSearchParams();
+  const specialism = listParam(searchParams.get('specialism'), SPECIALISMS);
+  const council = listParam(searchParams.get('council'), COUNCILS);
+  const ufParam = searchParams.get('uf') ?? '';
+  const uf = COUNCIL_STATES.some((item) => item === ufParam) ? ufParam : '';
+  const sort: ProfessionalSort =
+    searchParams.get('sort') === 'specialism' ? 'specialism' : 'name';
+  const order = searchParams.get('order') === 'desc' ? 'desc' : 'asc';
+
+  function update(changes: Record<string, string>) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    }
+
+    const query = params.toString();
+    router.replace(query ? `/professionals?${query}` : '/professionals', {
+      scroll: false,
+    });
+  }
+
+  const search = useDebouncedSearch({
+    initialTerm: searchParams.get('q') ?? '',
+    onTermChange: (value) => update({ q: value }),
+  });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(PER_PAGE_OPTIONS[0]);
@@ -110,31 +159,45 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const [viewing, setViewing] = useState<Professional | null>(null);
 
   const term = search.term;
-  const [lastQuery, setLastQuery] = useState({ term, specialism });
+  const specialismKey = specialism.join(',');
+  const councilKey = council.join(',');
+  const queryKey = [term, specialismKey, councilKey, uf, sort, order].join(
+    '\n',
+  );
+  const [lastQuery, setLastQuery] = useState(queryKey);
 
-  // Busca ou filtro novos voltam à página 1.
-  if (lastQuery.term !== term || lastQuery.specialism !== specialism) {
-    setLastQuery({ term, specialism });
+  // Busca, filtro ou ordenação novos voltam à página 1.
+  if (lastQuery !== queryKey) {
+    setLastQuery(queryKey);
     setPage(1);
   }
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    getProfessionals({
-      page,
-      limit,
-      name: term,
-      specialism: specialism || undefined,
-    })
+    getProfessionals(
+      {
+        page,
+        limit,
+        q: term,
+        specialism: specialismKey
+          ? (specialismKey.split(',') as ProfessionalSpecialism[])
+          : undefined,
+        council: councilKey
+          ? (councilKey.split(',') as ProfessionalCouncil[])
+          : undefined,
+        councilState: uf || undefined,
+        sort: sort === 'specialism' ? sort : undefined,
+        order: order === 'desc' ? order : undefined,
+      },
+      controller.signal,
+    )
       .then((response) => {
-        if (!cancelled) {
-          setError('');
-          setResult(response);
-        }
+        setError('');
+        setResult(response);
       })
       .catch((reason: unknown) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -143,15 +206,33 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
           return;
         }
 
-        setError('Não foi possível consultar os profissionais.');
+        setError(
+          reason instanceof ApiError && reason.apiMessage
+            ? reason.apiMessage
+            : 'Não foi possível consultar os profissionais.',
+        );
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [limit, page, retryKey, router, specialism, term]);
+    return () => controller.abort();
+  }, [
+    councilKey,
+    limit,
+    order,
+    page,
+    retryKey,
+    router,
+    sort,
+    specialismKey,
+    term,
+    uf,
+  ]);
 
-  const filtered = Boolean(term || specialism);
+  const hasFilters = Boolean(specialismKey || councilKey || uf);
+  const filtered = Boolean(term || hasFilters);
+
+  function clearFilters() {
+    update({ specialism: '', council: '', uf: '' });
+  }
   const total = result?.pagination.total ?? 0;
   const count = result
     ? `${total} ${total === 1 ? 'profissional' : 'profissionais'}${filtered ? ' com os filtros atuais' : ''}`
@@ -176,7 +257,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
             <input
               className="input"
               type="search"
-              placeholder="Nome do profissional"
+              placeholder="Nome, e-mail ou nº de registro"
               value={search.input}
               onChange={(event) => search.setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -204,16 +285,43 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
             Filtros
           </button>
 
-          {specialism && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setSpecialism('')}
-            >
+          {hasFilters && (
+            <button type="button" className="btn" onClick={clearFilters}>
               <Icon name="close" className="icon-sm" />
               Limpar
             </button>
           )}
+
+          <label className="ux-sort" htmlFor="professionals-sort">
+            <span>Ordenar por</span>
+            <select
+              className="select"
+              id="professionals-sort"
+              value={sort}
+              onChange={(event) =>
+                update({
+                  sort: event.target.value === 'specialism' ? 'specialism' : '',
+                })
+              }
+            >
+              <option value="name">Nome</option>
+              <option value="specialism">Profissão</option>
+            </select>
+            <button
+              type="button"
+              className="btn btn-sm sort-dir"
+              data-dir={order}
+              aria-label={
+                order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'
+              }
+              onClick={() => update({ order: order === 'asc' ? 'desc' : '' })}
+            >
+              <Icon
+                name={order === 'asc' ? 'sortUp' : 'sortDown'}
+                className="icon-sm"
+              />
+            </button>
+          </label>
         </div>
       </div>
 
@@ -223,17 +331,35 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         hidden={!filtersOpen}
       >
         <MultiSelect
-          label="Especialidade"
-          placeholder="Todas as especialidades"
+          label="Profissão"
+          placeholder="Todas as profissões"
           options={SPECIALISMS}
-          value={specialism ? [specialism] : []}
-          onChange={(value) =>
-            setSpecialism(
-              (value.filter((item) => item !== specialism)[0] ?? '') as
-                ProfessionalSpecialism | '',
-            )
-          }
+          value={specialism}
+          onChange={(value) => update({ specialism: value.join(',') })}
         />
+
+        <MultiSelect
+          label="Conselho regional"
+          options={COUNCILS}
+          value={council}
+          onChange={(value) => update({ council: value.join(',') })}
+        />
+
+        <label className="field">
+          <span>UF do registro</span>
+          <select
+            className="select"
+            value={uf}
+            onChange={(event) => update({ uf: event.target.value })}
+          >
+            <option value="">Todas</option>
+            {COUNCIL_STATES.map((state) => (
+              <option key={state} value={state}>
+                {state}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {error ? (

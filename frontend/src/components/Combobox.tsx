@@ -91,6 +91,7 @@ export default function Combobox({
         aria-required={required || undefined}
         aria-describedby={describedBy}
         onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={handleKeyDown}
         onChange={(event) => {

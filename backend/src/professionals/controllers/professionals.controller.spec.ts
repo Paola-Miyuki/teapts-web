@@ -101,7 +101,7 @@ describe('GET /professionals', () => {
       .query({
         page: 1,
         limit: 10,
-        name: 'Maria',
+        q: 'Maria',
         specialism: Specialism.Psychologist,
         ids: '550e8400-e29b-41d4-a716-446655440000',
       });
@@ -132,8 +132,8 @@ describe('GET /professionals', () => {
     expect(professionalsService.findAll).toHaveBeenCalledWith(listingAccount, {
       page: 1,
       limit: 10,
-      name: 'Maria',
-      specialism: 'psychologist',
+      q: 'Maria',
+      specialism: ['psychologist'],
       ids: ['550e8400-e29b-41d4-a716-446655440000'],
     });
   });
@@ -144,8 +144,12 @@ describe('GET /professionals', () => {
       .query({
         page: '2',
         limit: '20',
-        name: '  Maria ',
-        specialism: 'psychologist',
+        q: '  Maria ',
+        specialism: 'psychologist,doctor',
+        council: 'CRP',
+        councilState: 'PR',
+        sort: 'specialism',
+        order: 'desc',
         ids: '550e8400-e29b-41d4-a716-446655440000',
       });
 
@@ -153,8 +157,12 @@ describe('GET /professionals', () => {
     expect(professionalsService.findAll).toHaveBeenCalledWith(listingAccount, {
       page: 2,
       limit: 20,
-      name: 'Maria',
-      specialism: 'psychologist',
+      q: 'Maria',
+      specialism: ['psychologist', 'doctor'],
+      council: ['CRP'],
+      councilState: 'PR',
+      sort: 'specialism',
+      order: 'desc',
       ids: ['550e8400-e29b-41d4-a716-446655440000'],
     });
   });

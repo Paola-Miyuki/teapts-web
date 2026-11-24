@@ -1,0 +1,27 @@
+/* Combobox do passo "Paciente" (`pat-combobox` dos mockups), com ✕ para limpar
+   e resultados anteriores mais claros durante a nova busca. */
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Mais específico que `.input`, senão o padding ignora o espaço do ✕. */
+.search .input {
+  padding-right: 48px;
+}
+
+.clear {
+  position: absolute;
+  right: 2px;
+}
+
+.refreshing {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.retry {
+  margin-top: 10px;
+}

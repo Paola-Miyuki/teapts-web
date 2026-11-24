@@ -48,22 +48,23 @@ export type AuthorizedPatientsQuery = {
   order?: SortOrder;
 };
 
-/** Filtros e paginação da consulta de pacientes disponíveis para um PTS. */
-export type AvailablePatientsQuery = {
+/** Filtros e paginação da busca de pacientes elegíveis para uma proposta. */
+export type EligiblePatientsQuery = {
   page: number;
   limit: number;
-  name?: string;
+  q?: string;
 };
 
-/** Linha projetada pela consulta de pacientes disponíveis. */
-export type AuthorizedPatientRow = {
+/** Linha projetada pela busca de pacientes elegíveis (sem o CPF, DP011). */
+export type EligiblePatientRow = {
   patient_id: string;
-  account_name: string;
+  display_name: string;
+  email: string;
 };
 
-/** Página de linhas e total de pacientes disponíveis. */
-export type AuthorizedPatientsPage = {
-  rows: AuthorizedPatientRow[];
+/** Página de linhas e total de pacientes elegíveis. */
+export type EligiblePatientsPage = {
+  rows: EligiblePatientRow[];
   total: number;
 };
 
@@ -114,10 +115,12 @@ const SORT_COLUMNS: Record<PatientSortField, string> = {
 /**
  * Busca parcial por nome, nome social, e-mail, CNS ou CPF (NFUS003). Quando o
  * termo só tem dígitos e pontuação, compara também os dígitos do CNS e do CPF.
+ * Com `withCns` falso (busca de paciente elegível), o CNS fica fora.
  */
 function applySearch(
   query: SelectQueryBuilder<Patient>,
   q: string | undefined,
+  withCns = true,
 ): void {
   if (q === undefined) {
     return;
@@ -132,16 +135,22 @@ function applySearch(
         'account.name',
         'account.social_name',
         'account.email',
-        'patient.cns',
+        ...(withCns ? ['patient.cns'] : []),
         'account.cpf',
       ]) {
         where.orWhere(`${column} ILIKE :term ESCAPE '\\'`);
       }
 
       if (onlyDigits) {
-        where
-          .orWhere(`regexp_replace(account.cpf, '\\D', '', 'g') LIKE :digits`)
-          .orWhere(`regexp_replace(patient.cns, '\\D', '', 'g') LIKE :digits`);
+        where.orWhere(
+          `regexp_replace(account.cpf, '\\D', '', 'g') LIKE :digits`,
+        );
+
+        if (withCns) {
+          where.orWhere(
+            `regexp_replace(patient.cns, '\\D', '', 'g') LIKE :digits`,
+          );
+        }
       }
     }),
     { term: `%${escapeLike(q)}%`, digits: `%${digits}%` },
@@ -384,38 +393,49 @@ export class PatientsRepository {
   }
 
   /**
-   * Busca pacientes que podem receber uma nova proposta de PTS.
+   * Busca os pacientes elegíveis para uma nova proposta de PTS (RN011): sem PTS
+   * em `planning` ou `running` e sem rascunho (`draft` não excluído). A busca
+   * (NFUS003) é por nome, nome social, e-mail ou CPF; o CPF não é projetado.
    *
-   * Propostas em DRAFT não impedem uma nova proposta; somente PTS em
-   * PLANNING ou RUNNING tornam o paciente indisponível para criação.
+   * @param filters busca e paginação já validadas
+   * @returns linhas da página pedida e total filtrado
+   * @throws erro do banco, sem tratamento
    */
-  async findAvailableForPtsPaginated(
-    filters: AvailablePatientsQuery,
-  ): Promise<AuthorizedPatientsPage> {
+  async findEligibleForProposalPaginated(
+    filters: EligiblePatientsQuery,
+  ): Promise<EligiblePatientsPage> {
     const query = this.patientRepository
       .createQueryBuilder('patient')
       .innerJoin(Account, 'account', 'account.id = patient.accountId')
       .select([
         'patient.accountId AS patient_id',
-        'account.name AS account_name',
+        'COALESCE(account.social_name, account.name) AS display_name',
+        'account.email AS email',
       ])
       .where(
         `NOT EXISTS (
     SELECT 1
     FROM projeto_terapeutico_singular pts
     WHERE pts.patient_id = patient.account_id
-      AND pts.status IN (:...states)
-  )`,
-        { states: ACTIVE_PTS_STATES },
+      AND (
+        pts.status IN (:...activeStates)
+        OR (pts.status = :draftState AND pts.deleted_at IS NULL)
       )
-      .orderBy('account.name', 'ASC')
+  )`,
+        { activeStates: ACTIVE_PTS_STATES, draftState: PtsStateEnum.DRAFT },
+      );
+
+    applySearch(query, filters.q, false);
+
+    query
+      .orderBy('COALESCE(account.social_name, account.name)', 'ASC')
       .addOrderBy('patient.accountId', 'ASC');
 
     const total = await query.clone().getCount();
     const rows = await query
       .offset((filters.page - 1) * filters.limit)
       .limit(filters.limit)
-      .getRawMany<AuthorizedPatientRow>();
+      .getRawMany<EligiblePatientRow>();
 
     return { rows, total };
   }
