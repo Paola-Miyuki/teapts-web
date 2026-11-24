@@ -243,6 +243,25 @@ describe('ProfessionalsRepository.findPaginated', () => {
     expect(query.offset).toHaveBeenCalledWith(0);
   });
 
+  it('filters by account status for the admin, without the default active filter', async () => {
+    const { query, repository } = createRepository();
+    query.getCount.mockResolvedValue(0);
+    query.getRawMany.mockResolvedValue([]);
+
+    await repository.findPaginated({
+      page: 1,
+      limit: 10,
+      includeInactive: true,
+      status: [AccountStatus.Inactive],
+    });
+
+    expect(query.andWhere).toHaveBeenCalledTimes(1);
+    expect(query.andWhere).toHaveBeenCalledWith(
+      'account.status IN (:...statuses)',
+      { statuses: [AccountStatus.Inactive] },
+    );
+  });
+
   it('keeps the inactive accounts for the admin', async () => {
     const { query, repository } = createRepository();
     query.getCount.mockResolvedValue(0);

@@ -170,6 +170,7 @@ describe('ProfessionalsPage', () => {
                   },
                   institution: 'IMA',
                   cnes: '2771112',
+                  status: 'active',
                 },
               ],
               pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
@@ -581,5 +582,113 @@ describe('ProfessionalsPage: adicionar profissional', () => {
     expect(
       screen.queryByText('Profissional adicionado'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('ProfessionalsPage: situação da conta', () => {
+  const replace = jest.fn();
+  const ADMIN = { ...ACCOUNT, role: 'admin', professionalProfileIds: [] };
+  const person = (name: string, status: 'active' | 'inactive') => ({
+    id: `${name}-uuid`,
+    name,
+    email: `${name.toLowerCase()}@example.com`,
+    specialism: { id: 'psychologist', name: 'Psicólogo' },
+    registration: null,
+    institution: null,
+    cnes: null,
+    status,
+  });
+  const PAGE = {
+    data: {
+      data: [person('Ana', 'active'), person('Bruno', 'inactive')],
+      pagination: { page: 1, limit: 10, total: 2, totalPages: 1 },
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseRouter.mockReturnValue({ replace });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
+    global.fetch = jest.fn();
+  });
+
+  it('mostra a situação de cada conta, ativa ou inativa, ao admin', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)), ADMIN);
+
+    render(<ProfessionalsPage />);
+
+    const active = (await screen.findByText('Ana')).closest('tr')!;
+    const inactive = screen.getByText('Bruno').closest('tr')!;
+
+    expect(within(active).getByText('Ativo')).toHaveClass('active');
+    expect(within(inactive).getByText('Inativo')).toHaveClass('inactive');
+  });
+
+  it('filtra por situação só para o admin, gravando na URL', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)), ADMIN);
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Inativo' }));
+
+    expect(replace).toHaveBeenLastCalledWith('/professionals?status=inactive', {
+      scroll: false,
+    });
+  });
+
+  it('não mostra o filtro de situação a quem não é admin', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)));
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+
+    expect(
+      screen.queryByRole('checkbox', { name: 'Inativo' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('envia a situação da URL à API só para o admin', async () => {
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams('status=active,inactive'),
+    );
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)), ADMIN);
+
+    const { unmount } = render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      'http://localhost:3000/professionals?page=1&limit=10&status=active%2Cinactive',
+      { credentials: 'include', signal: expect.any(AbortSignal) },
+    );
+    unmount();
+
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)));
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      'http://localhost:3000/professionals?page=1&limit=10',
+      { credentials: 'include', signal: expect.any(AbortSignal) },
+    );
+  });
+
+  it('o botão Limpar aparece com a situação e a remove da URL', async () => {
+    mockedUseSearchParams.mockReturnValue(
+      new URLSearchParams('status=inactive'),
+    );
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)), ADMIN);
+
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+
+    expect(replace).toHaveBeenLastCalledWith('/professionals', {
+      scroll: false,
+    });
   });
 });

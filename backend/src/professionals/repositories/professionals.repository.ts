@@ -33,6 +33,8 @@ export type FindProfessionalsQuery = {
   specialism?: Specialism[];
   council?: Council[];
   councilState?: Uf;
+  /** Situação da conta; só o administrador filtra por ela. */
+  status?: AccountStatus[];
   sort?: 'name' | 'specialism';
   order?: 'asc' | 'desc';
   ids?: string[];
@@ -99,7 +101,11 @@ export class ProfessionalsRepository {
 
     // O perfil segue a situação da conta: o de conta desativada sai da
     // consulta e da seleção de equipes, e só o administrador o vê.
-    if (filters.includeInactive !== true) {
+    if (filters.status !== undefined) {
+      query.andWhere('account.status IN (:...statuses)', {
+        statuses: filters.status,
+      });
+    } else if (filters.includeInactive !== true) {
       query.andWhere('account.status = :activeStatus', {
         activeStatus: AccountStatus.Active,
       });

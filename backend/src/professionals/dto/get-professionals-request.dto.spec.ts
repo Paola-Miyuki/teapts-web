@@ -85,6 +85,19 @@ describe('GetProfessionalsRequestDto', () => {
     });
   });
 
+  // A situação aceita uma ou mais opções, separadas por vírgula.
+  it('parses the status filter as a list', async () => {
+    await expect(
+      normalize({ status: 'active,inactive,active' }),
+    ).resolves.toMatchObject({ status: ['active', 'inactive'] });
+    await expect(normalize({ status: 'inactive' })).resolves.toMatchObject({
+      status: ['inactive'],
+    });
+    await expect(normalize({ status: ' ' })).resolves.toMatchObject({
+      status: undefined,
+    });
+  });
+
   // Aceita IDs separados por vírgulas e remove valores vazios da lista.
   it('parses comma-separated ids and ignores empty values', async () => {
     await expect(
@@ -113,6 +126,8 @@ describe('GetProfessionalsRequestDto', () => {
     ['specialism', { specialism: 'doctor,invalid' }],
     ['council', { council: 'CRX' }],
     ['councilState', { councilState: 'xx' }],
+    ['status', { status: 'blocked' }],
+    ['status', { status: 'active,blocked' }],
     ['sort', { sort: 'email' }],
     ['order', { order: 'up' }],
     ['ids', { ids: 'not-a-uuid' }],
