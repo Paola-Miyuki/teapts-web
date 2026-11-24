@@ -3,6 +3,7 @@ import {
   councilOf,
   createProfessional,
   SPECIALISMS,
+  updateProfessional,
 } from './professionals';
 
 describe('especialidades', () => {
@@ -82,5 +83,45 @@ describe('createProfessional', () => {
       councilNumber: '1',
       councilState: 'sc',
     });
+  });
+});
+
+describe('updateProfessional', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 'prof' }),
+    });
+  });
+
+  it('envia o PATCH com os cookies, aparando o número e a UF em minúsculas', async () => {
+    await updateProfessional('prof', {
+      specialism: 'nurse',
+      councilNumber: ' 5678 ',
+      councilState: 'SP',
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/professionals/prof',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          specialism: 'nurse',
+          councilNumber: '5678',
+          councilState: 'sp',
+        }),
+        credentials: 'include',
+      },
+    );
+  });
+
+  it('envia só a especialidade quando o registro não muda', async () => {
+    await updateProfessional('prof', { specialism: 'neuropsychologist' });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+
+    expect(JSON.parse(init.body)).toEqual({ specialism: 'neuropsychologist' });
   });
 });

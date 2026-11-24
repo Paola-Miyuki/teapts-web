@@ -265,3 +265,35 @@ export type CreatedProfessional = {
   institution: string | null;
   cnes: string | null;
 };
+
+// PATCH /professionals/:id (só admin): troca a especialidade. Mesmo conselho
+// mantém o registro; com outro conselho, número e UF do novo registro são
+// obrigatórios (RN026). A UF vai em minúsculas (`uf_e`).
+export type UpdateProfessionalInput = {
+  specialism: ProfessionalSpecialism;
+  councilNumber?: string;
+  councilState?: string;
+};
+
+export type UpdatedProfessional = Omit<CreatedProfessional, 'registration'> & {
+  registration: ProfessionalRegistration | null;
+  deactivatedAt: string | null;
+};
+
+export function updateProfessional(id: string, input: UpdateProfessionalInput) {
+  const councilNumber = input.councilNumber?.trim();
+
+  return request<UpdatedProfessional>(`/professionals/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      specialism: input.specialism,
+      ...(councilNumber && input.councilState
+        ? {
+            councilNumber,
+            councilState: input.councilState.toLowerCase(),
+          }
+        : {}),
+    }),
+  });
+}

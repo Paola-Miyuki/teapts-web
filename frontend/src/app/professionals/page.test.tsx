@@ -45,10 +45,11 @@ const ACCOUNT = {
 
 // /me responde com a conta; as demais chamadas vão para o mock de profissionais.
 function mockApi(professionals: jest.Mock, account: object = ACCOUNT) {
-  (global.fetch as jest.Mock).mockImplementation((url: string) =>
-    url.endsWith('/me')
-      ? Promise.resolve(mockResponse({ data: account }))
-      : professionals(url),
+  (global.fetch as jest.Mock).mockImplementation(
+    (url: string, init?: RequestInit) =>
+      url.endsWith('/me')
+        ? Promise.resolve(mockResponse({ data: account }))
+        : professionals(url, init),
   );
 }
 
@@ -690,5 +691,311 @@ describe('ProfessionalsPage: situação da conta', () => {
     expect(replace).toHaveBeenLastCalledWith('/professionals', {
       scroll: false,
     });
+  });
+});
+
+describe('ProfessionalsPage: editar especialidade', () => {
+  const replace = jest.fn();
+  const ADMIN = { ...ACCOUNT, role: 'admin', professionalProfileIds: [] };
+  const PAGE = {
+    data: {
+      data: [
+        {
+          id: 'ana-uuid',
+          name: 'Ana Souza',
+          email: 'ana@example.com',
+          specialism: { id: 'psychologist', name: 'Psicólogo' },
+          registration: { council: 'CRP', number: '12345', state: 'pr' },
+          institution: null,
+          cnes: null,
+          status: 'active',
+        },
+      ],
+      pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    },
+  };
+
+  function updated(specialism: object, registration: object) {
+    return {
+      id: 'ana-uuid',
+      accountId: 'account-uuid',
+      name: 'Ana Souza',
+      email: 'ana@example.com',
+      specialism,
+      registration,
+      institution: null,
+      cnes: null,
+      deactivatedAt: null,
+    };
+  }
+
+  // GET /professionals responde com a lista; o PATCH, com `patch`.
+  function mockList(patch?: jest.Mock) {
+    mockApi(
+      jest.fn((_url: string, init?: RequestInit) =>
+        init?.method === 'PATCH'
+          ? patch!(_url, init)
+          : Promise.resolve(mockResponse(PAGE)),
+      ),
+      ADMIN,
+    );
+  }
+
+  async function openEdit() {
+    render(<ProfessionalsPage />);
+
+    const row = (await screen.findByText('Ana Souza')).closest('tr')!;
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana Souza' }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Editar especialidade' }),
+    );
+
+    return screen.getByRole('dialog', {
+      name: 'Editar especialidade de Ana Souza',
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseRouter.mockReturnValue({ replace });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
+    global.fetch = jest.fn();
+  });
+
+  it('abre o modal pelo Visualizar', async () => {
+    mockList();
+    render(<ProfessionalsPage />);
+
+    const row = (await screen.findByText('Ana Souza')).closest('tr')!;
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana Souza' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Visualizar' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Ana Souza' })).getByRole(
+        'button',
+        { name: 'Editar especialidade' },
+      ),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Editar especialidade de Ana Souza' }),
+    ).toBeInTheDocument();
+  });
+
+  it('não mostra a ação a quem não é admin', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)));
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana Souza');
+
+    expect(
+      screen.queryByRole('button', { name: 'Ações para Ana Souza' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('com o mesmo conselho mantém o registro e atualiza a linha sem recarregar', async () => {
+    const patch = jest.fn().mockResolvedValue(
+      mockResponse({
+        data: updated(
+          { id: 'neuropsychologist', name: 'Neuropsicólogo' },
+          { council: 'CRP', number: '12345', state: 'pr' },
+        ),
+      }),
+    );
+    mockList(patch);
+
+    const dialog = await openEdit();
+
+    expect(within(dialog).getByLabelText('Registro no conselho')).toHaveValue(
+      'CRP-PR 12345',
+    );
+    expect(
+      within(dialog).queryByLabelText(/Nº do novo registro/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText(/Profissão/), {
+      target: { value: 'neuropsychologist' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    expect(await screen.findByText('Especialidade atualizada.')).toBeVisible();
+
+    const [url, init] = patch.mock.calls[0];
+
+    expect(url).toBe('http://localhost:3000/professionals/ana-uuid');
+    expect(init.credentials).toBe('include');
+    expect(JSON.parse(init.body)).toEqual({ specialism: 'neuropsychologist' });
+
+    const row = screen.getByText('Ana Souza').closest('tr')!;
+
+    expect(within(row).getByText('Neuropsicólogo')).toBeInTheDocument();
+    expect(within(row).getByText('CRP-PR 12345')).toBeInTheDocument();
+    // A lista não foi pedida de novo.
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        String(url).includes('/professionals?'),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('com outro conselho pede o número e a UF e só salva com eles', async () => {
+    const patch = jest.fn().mockResolvedValue(
+      mockResponse({
+        data: updated(
+          { id: 'nurse', name: 'Enfermeiro' },
+          { council: 'Coren', number: '5678', state: 'sp' },
+        ),
+      }),
+    );
+    mockList(patch);
+
+    const dialog = await openEdit();
+
+    fireEvent.change(within(dialog).getByLabelText(/Profissão/), {
+      target: { value: 'nurse' },
+    });
+
+    expect(within(dialog).getByLabelText('Conselho regional')).toHaveValue(
+      'Coren',
+    );
+    expect(
+      within(dialog).queryByLabelText('Registro no conselho'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Informe o número do novo registro'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Escolha a UF do registro'),
+    ).toBeInTheDocument();
+    expect(patch).not.toHaveBeenCalled();
+
+    fireEvent.change(
+      within(dialog).getByLabelText(/Nº do novo registro/, {
+        selector: 'input',
+      }),
+      {
+        target: { value: '5678' },
+      },
+    );
+    fireEvent.change(within(dialog).getByLabelText(/UF do registro/), {
+      target: { value: 'SP' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    await screen.findByText('Especialidade atualizada.');
+
+    expect(JSON.parse(patch.mock.calls[0][1].body)).toEqual({
+      specialism: 'nurse',
+      councilNumber: '5678',
+      councilState: 'sp',
+    });
+    expect(
+      within(screen.getByText('Ana Souza').closest('tr')!).getByText(
+        'Coren-SP 5678',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('não salva com a mesma especialidade', async () => {
+    const patch = jest.fn();
+    mockList(patch);
+
+    const dialog = await openEdit();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    expect(
+      await within(dialog).findByText(
+        'Escolha uma profissão diferente da atual',
+      ),
+    ).toBeInTheDocument();
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('desabilita o Salvar durante o envio', async () => {
+    mockList(jest.fn(() => new Promise(() => {})));
+
+    const dialog = await openEdit();
+
+    fireEvent.change(within(dialog).getByLabelText(/Profissão/), {
+      target: { value: 'neuropsychologist' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    const saving = await within(dialog).findByRole('button', {
+      name: 'Salvando...',
+    });
+
+    expect(saving).toBeDisabled();
+  });
+
+  it('mostra a mensagem da API no modal e mantém o modal aberto', async () => {
+    mockList(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 404,
+          ok: false,
+          data: {
+            status: 'PROFESSIONAL_NOT_FOUND',
+            message: 'Profissional não encontrado.',
+          },
+        }),
+      ),
+    );
+
+    const dialog = await openEdit();
+
+    fireEvent.change(within(dialog).getByLabelText(/Profissão/), {
+      target: { value: 'neuropsychologist' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Profissional não encontrado.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Especialidade atualizada.')).toBeNull();
+  });
+
+  it('redireciona para o login quando a sessão expira', async () => {
+    mockList(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 401,
+          ok: false,
+          data: { status: 'UNAUTHORISED', message: 'Sessão inválida' },
+        }),
+      ),
+    );
+
+    const dialog = await openEdit();
+
+    fireEvent.change(within(dialog).getByLabelText(/Profissão/), {
+      target: { value: 'neuropsychologist' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 });

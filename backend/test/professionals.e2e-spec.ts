@@ -1,6 +1,6 @@
 /*
- * Este teste cobre o fluxo HTTP do cadastro de perfil profissional (RFPRO002):
- * o POST /professionals, com o AuthGuard e o AdminGuard reais, o
+ * Este teste cobre o fluxo HTTP do cadastro de perfil profissional (RFPRO002)
+ * e a troca de especialidade (RFPRO003): o POST e o PATCH /professionals, com o AuthGuard e o AdminGuard reais, o
  * ValidationPipe global e o service real. O SuperTokens e o banco são
  * trocados por dublês.
  */
@@ -89,6 +89,8 @@ describe('professional profile (e2e)', () => {
   let professionalsRepository: {
     insert: jest.Mock<(professional: unknown) => Promise<string>>;
     findPaginated: jest.Mock<(filters: unknown) => Promise<unknown>>;
+    findById: jest.Mock<(id: string) => Promise<unknown>>;
+    update: jest.Mock<(id: string, changes: unknown) => Promise<void>>;
   };
 
   function signIn(role: 'admin' | 'user') {
@@ -104,7 +106,12 @@ describe('professional profile (e2e)', () => {
 
   beforeEach(async () => {
     accountRepository = { findOne: jest.fn() };
-    professionalsRepository = { insert: jest.fn(), findPaginated: jest.fn() };
+    professionalsRepository = {
+      insert: jest.fn(),
+      findPaginated: jest.fn(),
+      findById: jest.fn(),
+      update: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ProfessionalsController],
@@ -352,5 +359,132 @@ describe('professional profile (e2e)', () => {
         status: 'active',
       },
     ]);
+  });
+
+  describe('PATCH /professionals/:id', () => {
+    const current = {
+      id: professionalId,
+      accountId,
+      specialism: 'physiotherapist',
+      councilNumber: '1234',
+      councilState: 'pr',
+      institution: null,
+      cnes: null,
+      account: {
+        name: 'Kaio Felipe',
+        email: 'kaio@exemplo.com',
+        deactivatedAt: null,
+      },
+    };
+
+    it('keeps the registration when the council stays the same', async () => {
+      signIn('admin');
+      professionalsRepository.findById.mockResolvedValue(current);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'occupational_therapist' });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        id: professionalId,
+        specialism: {
+          id: 'occupational_therapist',
+          name: 'Terapeuta ocupacional',
+        },
+        registration: { council: 'Crefito', number: '1234', state: 'pr' },
+      });
+      expect(professionalsRepository.update).toHaveBeenCalledWith(
+        professionalId,
+        {
+          specialism: 'occupational_therapist',
+          councilNumber: '1234',
+          councilState: 'pr',
+        },
+      );
+    });
+
+    it('replaces the registration when the council changes', async () => {
+      signIn('admin');
+      professionalsRepository.findById.mockResolvedValue(current);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({
+          specialism: 'psychologist',
+          councilNumber: '5678',
+          councilState: 'sp',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.registration).toEqual({
+        council: 'CRP',
+        number: '5678',
+        state: 'sp',
+      });
+    });
+
+    it('answers 400 VALIDATION_ERROR when the council changes without a registration', async () => {
+      signIn('admin');
+      professionalsRepository.findById.mockResolvedValue(current);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'psychologist' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o número e a UF do registro no novo conselho.',
+      });
+      expect(professionalsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR for a specialism outside the list', async () => {
+      signIn('admin');
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'astronaut' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.status).toBe('VALIDATION_ERROR');
+    });
+
+    it('answers 401 without a session', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'nurse' });
+
+      expect(response.status).toBe(401);
+      expect(professionalsRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('answers 403 FORBIDDEN to a user who is not an admin', async () => {
+      signIn('user');
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'nurse' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.status).toBe('FORBIDDEN');
+      expect(professionalsRepository.findById).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 PROFESSIONAL_NOT_FOUND for a missing profile', async () => {
+      signIn('admin');
+      professionalsRepository.findById.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .patch(`/professionals/${professionalId}`)
+        .send({ specialism: 'nurse' });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toEqual({
+        status: 'PROFESSIONAL_NOT_FOUND',
+        message: 'Profissional não encontrado.',
+      });
+    });
   });
 });
