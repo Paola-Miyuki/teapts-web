@@ -95,6 +95,17 @@ export interface RemoveTeamMemberInput {
   description: string;
 }
 
+export interface TransferResponsibilityInput {
+  ptsId: string;
+  newResponsibleId: string;
+  /** Profissional atribuído ao evento (RN029); nulo quando o admin age. */
+  authorProfessionalId: string | null;
+  /** Conta que executou a ação (RN029). */
+  executedByAccountId: string;
+  /** Texto do evento na timeline. */
+  description: string;
+}
+
 /** Contrato de persistência dos PTS. */
 export abstract class PtsRepository {
   abstract findProfessionalById(id: string): Promise<ProfessionalRecord | null>;
@@ -162,6 +173,10 @@ export abstract class PtsRepository {
    */
   abstract removeTeamMember(
     input: RemoveTeamMemberInput,
+  ): Promise<PtsTeamResponseDto>;
+
+  abstract transferResponsibility(
+    input: TransferResponsibilityInput,
   ): Promise<PtsTeamResponseDto>;
 
   abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;

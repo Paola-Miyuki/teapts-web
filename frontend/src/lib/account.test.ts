@@ -96,6 +96,7 @@ describe('getNavigation', () => {
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Início',
       'Meu PTS',
+      'Medicações',
       'PTS',
     ]);
 

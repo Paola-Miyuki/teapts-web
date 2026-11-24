@@ -7,6 +7,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Account } from '../entities/account.entity';
 import { AccountRole } from '../enums/account-role.enum';
 import { AccountStatus } from '../enums/account-status.enum';
+import { Medication } from '../../patients/entities/medication.entity';
 import { Patient } from '../../patients/entities/patient.entity';
 import { SupportContact } from '../../patients/entities/support-contact.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
@@ -29,6 +30,7 @@ beforeAll(async () => {
     entities: [
       Account,
       Patient,
+      Medication,
       SupportContact,
       Professional,
       PtsEntity,

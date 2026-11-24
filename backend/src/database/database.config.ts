@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 import { Account } from '../accounts/entities/account.entity';
+import { Medication } from '../patients/entities/medication.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 import { Professional } from '../professionals/entities/professional.entity';
@@ -19,13 +20,15 @@ import { AddAccountPersonalFields1791148950000 } from './migrations/179114895000
 import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
 import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
 import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-CreateTimelineRecord';
-import { AddAccountStatus1791148990000 } from './migrations/1791148990000-AddAccountStatus';
+import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1791148990000-AddPatientClinicalDataAndMedication';
+import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
 // precisa ser registrada aqui.
 const entities = [
   Account,
+  Medication,
   Patient,
   SupportContact,
   Professional,
@@ -46,7 +49,8 @@ const migrations = [
   AddProfessionalCouncilFields1791148960000,
   AddDeletedAtToPts1791148970000,
   CreateTimelineRecord1791148980000,
-  AddAccountStatus1791148990000,
+  AddPatientClinicalDataAndMedication1791148990000,
+  AddAccountStatus1791149000000,
 ];
 
 export function getDatabaseOptions(

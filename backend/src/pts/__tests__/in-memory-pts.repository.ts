@@ -17,6 +17,7 @@ import {
   type SocialSituationTarget,
   type PtsTeamTarget,
   type ProfessionalAccountRecord,
+  type TransferResponsibilityInput,
 } from '../repositories/pts.repository';
 import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
@@ -30,6 +31,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   ptsById = new Map<string, PtsDetailResponseDto>();
   ptsTeams = new Map<string, PtsTeamResponseDto>();
   timelineRecords: RemoveTeamMemberInput[] = [];
+  transferredRecords: TransferResponsibilityInput[] = [];
   /** Eventos member_added: um por profissional adicionado. */
   addedRecords: Array<
     Omit<AddTeamMembersInput, 'members'> & {
@@ -292,6 +294,41 @@ export class InMemoryPtsRepository extends PtsRepository {
     return { ...pts, team: [...pts.team] };
   }
 
+  async transferResponsibility(
+    input: TransferResponsibilityInput,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = this.ptsTeams.get(input.ptsId);
+
+    if (!pts) {
+      throw new Error('PTS não encontrado.');
+    }
+
+    const newResponsible = this.professionals.get(input.newResponsibleId);
+
+    if (!newResponsible) {
+      throw new Error('Profissional responsável não encontrado.');
+    }
+
+    const newResponsibleSummary = pts.team.find(
+      (professional) => professional.id === input.newResponsibleId,
+    ) ?? {
+      id: newResponsible.id,
+      name: `Profissional ${newResponsible.id}`,
+      specialism: { id: 'default', name: 'Geral' },
+      registration: null,
+    };
+
+    pts.team = pts.team.filter(
+      (professional) =>
+        professional.id !== pts.responsible.id &&
+        professional.id !== input.newResponsibleId,
+    );
+    pts.responsible = newResponsibleSummary;
+    this.transferredRecords.push({ ...input });
+
+    return { ...pts, team: [...pts.team] };
+  }
+
   async createDraft(input: CreateDraftInput): Promise<CreatePtsResponseDto> {
     const prof = this.professionals.get(input.responsibleProfessionalId);
 
@@ -323,6 +360,24 @@ export class InMemoryPtsRepository extends PtsRepository {
   }
 
   async findPtsTeamTarget(id: string): Promise<PtsTeamTarget | null> {
+    const team = this.ptsTeams.get(id);
+
+    if (team) {
+      const responsibleRecord = this.professionals.get(team.responsible.id);
+
+      return {
+        id: team.id,
+        status: team.status,
+        responsibleProfessionalId: team.responsible.id,
+        responsibleAccountId: responsibleRecord?.accountId ?? '',
+        responsibleName: team.responsible.name,
+        teamMembers: team.team.map((member) => ({
+          professionalId: member.id,
+          accountId: this.professionals.get(member.id)?.accountId ?? '',
+        })),
+      };
+    }
+
     const pts =
       this.activePts.find((item) => item.id === id) ??
       this.ptsById.get(id) ??

@@ -8,6 +8,7 @@ type PtsTeamListProps = {
   team: PtsProfessional[];
   // RFEM003 – só o responsável remove; o botão nunca aparece no responsável.
   onRemove?: (member: PtsProfessional) => void;
+  onTransferResponsibility?: () => void;
 };
 
 function initial(name: string) {
@@ -59,6 +60,7 @@ export default function PtsTeamList({
   responsible,
   team,
   onRemove,
+  onTransferResponsibility,
 }: PtsTeamListProps) {
   const members = team.filter((member) => member.id !== responsible.id);
   const total = members.length + 1;
@@ -71,6 +73,18 @@ export default function PtsTeamList({
           {total} {total === 1 ? 'profissional' : 'profissionais'}
         </span>
       </summary>
+
+      {onTransferResponsibility && (
+        <div className={styles.teamActions}>
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnSecondary}`}
+            onClick={onTransferResponsibility}
+          >
+            Transferir responsabilidade
+          </button>
+        </div>
+      )}
 
       <ul className={styles.teamList} aria-label="Equipe multidisciplinar">
         <Member professional={responsible} isResponsible />

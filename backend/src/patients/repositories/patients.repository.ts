@@ -16,6 +16,7 @@ import type {
   SortOrder,
 } from '../dto/get-authorized-patients-request.dto';
 import type { SupportContactDto } from '../dto/support-contact.dto';
+import { Medication } from '../entities/medication.entity';
 import { Patient } from '../entities/patient.entity';
 import { SupportContact } from '../entities/support-contact.entity';
 
@@ -85,6 +86,16 @@ export type PatientRow = {
   read_only: boolean;
 };
 
+export type PatientDetailRow = PatientRow & {
+  clinical_history: string | null;
+  surgical_history: string | null;
+  family_history: string | null;
+  habits: string | null;
+  developmental_milestones: string | null;
+  allergies: string | null;
+  no_known_allergies: boolean;
+};
+
 /** Página de linhas e total da lista de pacientes. */
 export type PatientsPage = {
   rows: PatientRow[];
@@ -106,6 +117,25 @@ export type SupportContactValues = {
   isEmergency: boolean;
 };
 
+export type ClinicalDataValues = {
+  clinicalHistory: string | null;
+  surgicalHistory: string | null;
+  familyHistory: string | null;
+  habits: string | null;
+  developmentalMilestones: string | null;
+  allergies: string | null;
+  noKnownAllergies: boolean;
+};
+
+export type MedicationValues = {
+  drugName: string;
+  dose: string;
+  frequency: string;
+  prescriber: string | null;
+  reason: string | null;
+  startDate: string;
+  endDate: string | null;
+};
 const PROFESSIONAL_STATUS_FILTERS: PatientPtsStatusFilter[] =
   PROFESSIONAL_ACCESS_PTS_STATES;
 
@@ -283,10 +313,19 @@ export class PatientsRepository {
   async findPatient(
     scope: PatientScope,
     patientId: string,
-  ): Promise<PatientRow | null> {
+  ): Promise<PatientDetailRow | null> {
     const row = await this.scopedPatients(scope)
+      .addSelect([
+        'patient.clinical_history AS clinical_history',
+        'patient.surgical_history AS surgical_history',
+        'patient.family_history AS family_history',
+        'patient.habits AS habits',
+        'patient.developmental_milestones AS developmental_milestones',
+        'patient.allergies AS allergies',
+        'patient.no_known_allergies AS no_known_allergies',
+      ])
       .andWhere('patient.accountId = :patientId', { patientId })
-      .getRawOne<PatientRow>();
+      .getRawOne<PatientDetailRow>();
 
     return row ?? null;
   }
@@ -562,5 +601,141 @@ export class PatientsRepository {
     });
 
     return (result.affected ?? 0) > 0;
+  }
+  /**
+   * Atualiza os dados clinicos do paciente (RFPAC007).
+   */
+  async updateClinicalData(
+    patientId: string,
+    values: ClinicalDataValues,
+    updatedByAccountId: string,
+  ): Promise<Patient | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Patient,
+      { accountId: patientId },
+      {
+        ...values,
+        updatedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return manager.findOne(Patient, {
+      where: { accountId: patientId },
+    });
+  }
+
+  /**
+   * Lista as medicacoes do paciente.
+   */
+  async findMedications(patientId: string): Promise<Medication[]> {
+    return this.patientRepository.manager.find(Medication, {
+      where: { patientId },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * Busca uma medicacao especifica do paciente.
+   */
+  async findMedication(
+    patientId: string,
+    medicationId: string,
+  ): Promise<Medication | null> {
+    return this.patientRepository.manager.findOne(Medication, {
+      where: {
+        id: medicationId,
+        patientId,
+      },
+    });
+  }
+
+  /**
+   * Cadastra uma medicacao para o paciente.
+   */
+  async insertMedication(
+    patientId: string,
+    values: MedicationValues,
+    registeredByAccountId: string,
+  ): Promise<Medication> {
+    const manager = this.patientRepository.manager;
+
+    return manager.save(
+      Medication,
+      manager.create(Medication, {
+        ...values,
+        patientId,
+        registeredByAccountId,
+        stoppedByAccountId: null,
+      }),
+    );
+  }
+
+  /**
+   * Atualiza uma medicacao do paciente.
+   */
+  async updateMedication(
+    patientId: string,
+    medicationId: string,
+    values: MedicationValues,
+  ): Promise<Medication | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Medication,
+      {
+        id: medicationId,
+        patientId,
+      },
+      {
+        ...values,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findMedication(patientId, medicationId);
+  }
+
+  /**
+   * Suspende uma medicacao sem apagar o registro.
+   */
+  async stopMedication(
+    patientId: string,
+    medicationId: string,
+    stoppedByAccountId: string,
+    endDate: string,
+  ): Promise<Medication | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Medication,
+      {
+        id: medicationId,
+        patientId,
+      },
+      {
+        endDate,
+        stoppedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findMedication(patientId, medicationId);
   }
 }

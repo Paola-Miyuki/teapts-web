@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { getDatabaseOptions } from './database.config';
 import { Account } from '../accounts/entities/account.entity';
 import { Patient } from '../patients/entities/patient.entity';
+import { Medication } from '../patients/entities/medication.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
@@ -18,7 +19,8 @@ import { AddAccountPersonalFields1791148950000 } from './migrations/179114895000
 import { AddProfessionalCouncilFields1791148960000 } from './migrations/1791148960000-AddProfessionalCouncilFields';
 import { AddDeletedAtToPts1791148970000 } from './migrations/1791148970000-AddDeletedAtToPts';
 import { CreateTimelineRecord1791148980000 } from './migrations/1791148980000-CreateTimelineRecord';
-import { AddAccountStatus1791148990000 } from './migrations/1791148990000-AddAccountStatus';
+import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1791148990000-AddPatientClinicalDataAndMedication';
+import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -82,6 +84,7 @@ describe('getDatabaseOptions', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
       entities: [
         Account,
+        Medication,
         Patient,
         SupportContact,
         Professional,
@@ -102,7 +105,8 @@ describe('getDatabaseOptions', () => {
         AddProfessionalCouncilFields1791148960000,
         AddDeletedAtToPts1791148970000,
         CreateTimelineRecord1791148980000,
-        AddAccountStatus1791148990000,
+        AddPatientClinicalDataAndMedication1791148990000,
+        AddAccountStatus1791149000000,
       ],
     });
   });

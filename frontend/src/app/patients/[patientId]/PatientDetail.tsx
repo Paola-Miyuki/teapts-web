@@ -17,7 +17,9 @@ import {
   type PatientDetail as Patient,
   type SupportContact,
 } from '@/lib/patients';
+import ClinicalDataCard from '../_components/ClinicalDataCard';
 import DeletePatientDialog from '../_components/DeletePatientDialog';
+import MedicationsCard from '../_components/MedicationsCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import styles from '../patients.module.css';
 
@@ -70,6 +72,7 @@ function PatientDetailContent({
 }) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [activeTab, setActiveTab] = useState<'dados' | 'medicacoes'>('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -149,141 +152,190 @@ function PatientDetailContent({
   return (
     <section>
       <nav className="tabs ux-ptabs" aria-label="Seções do paciente">
-        <a href="#dados" aria-current="page">
+        <a
+          href="#dados"
+          aria-current={activeTab === 'dados' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('dados');
+          }}
+        >
           Dados do paciente
+        </a>
+
+        <a
+          href="#medicacoes"
+          aria-current={activeTab === 'medicacoes' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('medicacoes');
+          }}
+        >
+          Medicações
         </a>
       </nav>
 
-      <section data-panel="dados" id="dados">
-        <div className="ux-profile">
-          <div className="ux-profile-side">
-            <section className="ux-card ux-idcard" aria-labelledby="pat-id">
-              <div className="ux-idhead">
-                <span className="photo" aria-hidden="true">
-                  {initials(patient.name)}
-                </span>
-                <h2 id="pat-id">{patient.name}</h2>
-                <div className="ux-badges">
-                  <PtsStatusBadge status={patient.ptsStatus} />
+      {activeTab === 'dados' && (
+        <section data-panel="dados" id="dados">
+          <div className="ux-profile">
+            <div className="ux-profile-side">
+              <section className="ux-card ux-idcard" aria-labelledby="pat-id">
+                <div className="ux-idhead">
+                  <span className="photo" aria-hidden="true">
+                    {initials(patient.name)}
+                  </span>
+                  <h2 id="pat-id">{patient.name}</h2>
+                  <div className="ux-badges">
+                    <PtsStatusBadge status={patient.ptsStatus} />
+                  </div>
                 </div>
-              </div>
 
-              <div className="ux-idaccount">
-                <h3>Dados da conta</h3>
-                <dl className="ux-idfacts">
-                  <div>
-                    <span className="ux-idfact-ic" aria-hidden="true">
-                      <Icon name="mail" className="icon-sm" />
-                    </span>
-                    <dt>E-mail</dt>
-                    <dd>{patient.email}</dd>
-                  </div>
-                  <div>
-                    <span className="ux-idfact-ic" aria-hidden="true">
-                      <Icon name="phone" className="icon-sm" />
-                    </span>
-                    <dt>Telefone</dt>
-                    <dd>
-                      <Value>
-                        {patient.phone && formatPhone(patient.phone)}
-                      </Value>
-                    </dd>
-                  </div>
-                  <div>
-                    <span className="ux-idfact-ic" aria-hidden="true">
-                      <Icon name="calendar" className="icon-sm" />
-                    </span>
-                    <dt>Cadastrado em</dt>
-                    <dd>
-                      {new Date(patient.registeredAt).toLocaleDateString(
-                        'pt-BR',
-                        { timeZone: 'UTC' },
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
-              {account.role === 'admin' && (
-                <button
-                  type="button"
-                  className="btn btn-danger ux-idedit"
-                  onClick={() => setDeleting(true)}
-                >
-                  <Icon name="trash" className="icon-sm" />
-                  Excluir paciente
-                </button>
-              )}
-
-              {patient.readOnly && (
-                <p className="hint">
-                  Somente leitura: o PTS de que você fez parte está encerrado.
-                </p>
-              )}
-            </section>
-          </div>
-
-          <div className="ux-profile-main">
-            <section className="ux-card" aria-labelledby="d-personal">
-              <div className="ux-card-head">
-                <div>
-                  <h2 id="d-personal">Dados pessoais</h2>
+                <div className="ux-idaccount">
+                  <h3>Dados da conta</h3>
+                  <dl className="ux-idfacts">
+                    <div>
+                      <span className="ux-idfact-ic" aria-hidden="true">
+                        <Icon name="mail" className="icon-sm" />
+                      </span>
+                      <dt>E-mail</dt>
+                      <dd>{patient.email}</dd>
+                    </div>
+                    <div>
+                      <span className="ux-idfact-ic" aria-hidden="true">
+                        <Icon name="phone" className="icon-sm" />
+                      </span>
+                      <dt>Telefone</dt>
+                      <dd>
+                        <Value>
+                          {patient.phone && formatPhone(patient.phone)}
+                        </Value>
+                      </dd>
+                    </div>
+                    <div>
+                      <span className="ux-idfact-ic" aria-hidden="true">
+                        <Icon name="calendar" className="icon-sm" />
+                      </span>
+                      <dt>Cadastrado em</dt>
+                      <dd>
+                        {new Date(patient.registeredAt).toLocaleDateString(
+                          'pt-BR',
+                          { timeZone: 'UTC' },
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-              </div>
 
-              <div className="ux-psec">
-                <h3>Identificação</h3>
-                <dl className="ux-dl">
-                  <div>
-                    <dt>Nome completo</dt>
-                    <dd>{patient.name}</dd>
-                  </div>
-                  <div>
-                    <dt>Nome social</dt>
-                    <dd>
-                      <Value>{patient.socialName}</Value>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>CPF</dt>
-                    <dd>
-                      <Value>{patient.cpf && formatCpf(patient.cpf)}</Value>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>CNS (Cartão SUS)</dt>
-                    <dd>
-                      <Value>{patient.cns && formatCns(patient.cns)}</Value>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
+                {account.role === 'admin' && (
+                  <button
+                    type="button"
+                    className="btn btn-danger ux-idedit"
+                    onClick={() => setDeleting(true)}
+                  >
+                    <Icon name="trash" className="icon-sm" />
+                    Excluir paciente
+                  </button>
+                )}
 
-              <div className="ux-psec">
-                <h3>Responsável tutelar</h3>
-                <dl className="ux-dl">
-                  <div>
-                    <dt>Responsável tutelar</dt>
-                    <dd>
-                      <Value>{patient.guardianName}</Value>
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </section>
+                {patient.readOnly && (
+                  <p className="hint">
+                    Somente leitura: o PTS de que você fez parte está encerrado.
+                  </p>
+                )}
+              </section>
+            </div>
 
-            <SupportContactsCard
-              patientId={patient.id}
-              patientName={patient.name}
-              contacts={supportContacts}
-              canEdit={can(account, 'manageSupportContacts', {
-                patientReadOnly: patient.readOnly,
-              })}
-              onChange={setSupportContacts}
-            />
+            <div className="ux-profile-main">
+              <section className="ux-card" aria-labelledby="d-personal">
+                <div className="ux-card-head">
+                  <div>
+                    <h2 id="d-personal">Dados pessoais</h2>
+                  </div>
+                </div>
+
+                <div className="ux-psec">
+                  <h3>Identificação</h3>
+                  <dl className="ux-dl">
+                    <div>
+                      <dt>Nome completo</dt>
+                      <dd>{patient.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Nome social</dt>
+                      <dd>
+                        <Value>{patient.socialName}</Value>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>CPF</dt>
+                      <dd>
+                        <Value>{patient.cpf && formatCpf(patient.cpf)}</Value>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>CNS (Cartão SUS)</dt>
+                      <dd>
+                        <Value>{patient.cns && formatCns(patient.cns)}</Value>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="ux-psec">
+                  <h3>Responsável tutelar</h3>
+                  <dl className="ux-dl">
+                    <div>
+                      <dt>Responsável tutelar</dt>
+                      <dd>
+                        <Value>{patient.guardianName}</Value>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </section>
+
+              <ClinicalDataCard
+                patientId={patient.id}
+                data={patient}
+                canEdit={can(account, 'manageClinicalData', {
+                  patientReadOnly: patient.readOnly,
+                })}
+                onSaved={(clinicalData) =>
+                  setPatient((current) =>
+                    current
+                      ? {
+                          ...current,
+                          ...clinicalData,
+                        }
+                      : current,
+                  )
+                }
+              />
+
+              <SupportContactsCard
+                patientId={patient.id}
+                patientName={patient.name}
+                contacts={supportContacts}
+                canEdit={can(account, 'manageSupportContacts', {
+                  patientReadOnly: patient.readOnly,
+                })}
+                onChange={setSupportContacts}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {activeTab === 'medicacoes' && (
+        <section data-panel="medicacoes" id="medicacoes">
+          <MedicationsCard
+            patientId={patient.id}
+            canEdit={can(account, 'manageMedications', {
+              patientReadOnly: patient.readOnly,
+            })}
+          />
+        </section>
+      )}
 
       <DeletePatientDialog
         patient={deleting ? { id: patient.id, name: patient.name } : null}

@@ -175,11 +175,57 @@ export function getPatients({ signal, ...query }: PatientsQuery) {
   );
 }
 
-export type PatientDetail = PatientListItem & {
-  phone: string | null;
-  cpf: string | null;
-  supportContacts: SupportContact[];
+export type Medication = {
+  id: string;
+  patientId: string;
+  drugName: string;
+  dose: string;
+  frequency: string;
+  prescriber: string | null;
+  reason: string | null;
+  startDate: string;
+  endDate: string | null;
 };
+
+export type MedicationInput = {
+  drugName: string;
+  dose: string;
+  frequency: string;
+  prescriber?: string;
+  reason?: string;
+  startDate: string;
+  endDate?: string;
+};
+
+export type MedicationsResponse = {
+  data: Medication[];
+};
+export type ClinicalData = {
+  allergies: string | null;
+  noKnownAllergies: boolean;
+  clinicalHistory: string | null;
+  surgicalHistory: string | null;
+  familyHistory: string | null;
+  habits: string | null;
+  developmentalMilestones: string | null;
+};
+
+export type ClinicalDataPatch = {
+  allergies?: string;
+  noKnownAllergies?: boolean;
+  clinicalHistory?: string;
+  surgicalHistory?: string;
+  familyHistory?: string;
+  habits?: string;
+  developmentalMilestones?: string;
+};
+
+export type PatientDetail = PatientListItem &
+  ClinicalData & {
+    phone: string | null;
+    cpf: string | null;
+    supportContacts: SupportContact[];
+  };
 
 // GET /patients/:id: admin ou profissional com acesso pela RN016.
 export function getPatient(id: string, signal?: AbortSignal) {
@@ -207,6 +253,18 @@ function jsonBody(method: string, body: unknown): RequestInit {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   };
+}
+
+// PATCH /patients/:id/clinical-data: admin ou profissional membro de PTS ativo
+// do paciente (RFPAC007, RN024).
+export function updateClinicalData(
+  patientId: string,
+  patch: ClinicalDataPatch,
+) {
+  return request<ClinicalData>(
+    `/patients/${encodeURIComponent(patientId)}/clinical-data`,
+    jsonBody('PATCH', patch),
+  );
 }
 
 // GET /patients/:patientId/support-contacts: admin, profissional com vínculo
@@ -249,5 +307,48 @@ export function deleteSupportContact(patientId: string, contactId: string) {
   return request<void>(
     `${supportContactsPath(patientId)}/${encodeURIComponent(contactId)}`,
     { method: 'DELETE' },
+  );
+}
+
+// GET /patients/:id/medications: consulta as medicações do paciente.
+export function getMedications(patientId: string, signal?: AbortSignal) {
+  return request<MedicationsResponse>(
+    `/patients/${encodeURIComponent(patientId)}/medications`,
+    { signal },
+  );
+}
+
+// POST /patients/:id/medications: cadastra uma medicação.
+export function createMedication(
+  patientId: string,
+  medication: MedicationInput,
+) {
+  return request<Medication>(
+    `/patients/${encodeURIComponent(patientId)}/medications`,
+    jsonBody('POST', medication),
+  );
+}
+
+// PATCH /patients/:id/medications/:medicationId: edita uma medicação.
+export function updateMedication(
+  patientId: string,
+  medicationId: string,
+  medication: MedicationInput,
+) {
+  return request<Medication>(
+    `/patients/${encodeURIComponent(patientId)}/medications/${encodeURIComponent(
+      medicationId,
+    )}`,
+    jsonBody('PATCH', medication),
+  );
+}
+
+// POST /patients/:id/medications/:medicationId/stop: suspende sem excluir.
+export function stopMedication(patientId: string, medicationId: string) {
+  return request<Medication>(
+    `/patients/${encodeURIComponent(patientId)}/medications/${encodeURIComponent(
+      medicationId,
+    )}/stop`,
+    { method: 'POST' },
   );
 }

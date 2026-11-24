@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // perfis nem dados. Os perfis de paciente e de profissional seguem a situação
 // da conta. A FK `FK_patient_account` já é `ON DELETE RESTRICT`
 // (AlignPatientAndProfessionalConstraints), então não muda aqui.
-export class AddAccountStatus1791148990000 implements MigrationInterface {
-  name = 'AddAccountStatus1791148990000';
+export class AddAccountStatus1791149000000 implements MigrationInterface {
+  name = 'AddAccountStatus1791149000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
