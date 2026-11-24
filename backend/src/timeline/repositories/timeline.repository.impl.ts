@@ -16,7 +16,6 @@ import {
   type TimelineRecordRow,
 } from './timeline.repository';
 
-/** Nome exibido de uma pessoa: o nome social, se houver; senão o nome. */
 function displayName(account: Pick<Account, 'name' | 'socialName'>): string {
   return account.socialName?.trim() || account.name;
 }
@@ -51,7 +50,7 @@ export class TimelineRepositoryImpl extends TimelineRepository {
   }
 
   async findPtsAccess(ptsId: string): Promise<TimelinePtsAccess | null> {
-    // O TypeORM ignora a proposta excluída (deleted_at preenchido).
+    // O TypeORM ignora a proposta excluída (deleted_at).
     const pts = await this.ptsRepository.findOne({
       where: { id: ptsId },
       relations: { team: true },
@@ -98,8 +97,7 @@ export class TimelineRepositoryImpl extends TimelineRepository {
       });
     }
 
-    // Autor é quem executou (executed_by_account_id, propriedades-front 3.8):
-    // pela conta ou pelo perfil profissional dela.
+    // Autor é quem executou (executed_by_account_id), pela conta ou pelo perfil profissional dela.
     if (input.authorId) {
       query.andWhere(
         new Brackets((where) => {
@@ -155,10 +153,7 @@ export class TimelineRepositoryImpl extends TimelineRepository {
     };
   }
 
-  /**
-   * O profissional só aparece como "Atribuído a" quando outra conta (o admin)
-   * agiu em nome dele (RN029); quando ele mesmo age, o autor já basta.
-   */
+  // "Atribuído a" só quando outra conta (o admin) agiu em nome do profissional (RN029).
   private toAssignedTo(
     executedByAccountId: string,
     professional: TimelineRecordEntity['authorProfessional'],

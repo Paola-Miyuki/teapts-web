@@ -8,8 +8,6 @@ import { TimelineRecordTarget } from '../enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../enums/timeline-record-type.enum';
 import { TimelineRepositoryImpl } from '../repositories/timeline.repository.impl';
 
-// Dublê do SelectQueryBuilder: cada método devolve o próprio builder, e o
-// getManyAndCount devolve as linhas do teste.
 function createQuery(records: Partial<TimelineRecordEntity>[], total: number) {
   const query = {
     innerJoinAndSelect: jest.fn(),
@@ -63,7 +61,6 @@ function createRepository(
 
 const baseInput = { ptsId: 'pts-1', page: 1, limit: 20 };
 
-/** Texto dos `andWhere` simples (os de Brackets aparecem como objeto). */
 function conditions(query: ReturnType<typeof createQuery>) {
   return query.andWhere.mock.calls.map(([condition, parameters]) => [
     condition instanceof Brackets ? 'Brackets' : condition,

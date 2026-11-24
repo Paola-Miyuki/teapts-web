@@ -6,21 +6,11 @@ import {
   type NewTimelineRecord,
 } from '../repositories/timeline.repository';
 
-/**
- * Registro de eventos da timeline (RFTL001), usado pelos módulos que alteram
- * o PTS. Grava a conta que executou e, quando houver, o profissional
- * atribuído (RN029).
- */
 @Injectable()
 export class TimelineRecorderService {
   constructor(private readonly timelineRepository: TimelineRepository) {}
 
-  /**
-   * Grava um evento. Passe o `manager` da transação da operação para que o
-   * evento seja desfeito junto com ela.
-   *
-   * @throws Error quando faltam a descrição, o PTS, o alvo ou a conta
-   */
+  // Passe o manager da transação da operação para o evento ser desfeito junto com ela.
   async record(
     event: NewTimelineRecord,
     manager?: EntityManager,

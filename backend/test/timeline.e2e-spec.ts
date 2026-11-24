@@ -1,8 +1,3 @@
-/*
- * Este teste cobre o fluxo HTTP da consulta da timeline (RFTL001):
- * GET /pts/:id/timeline com o AuthGuard real, o ValidationPipe global e o
- * TimelineService real. O SuperTokens e o repositório são trocados por dublês.
- */
 import { jest } from '@jest/globals';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -16,8 +11,6 @@ type SessionMiddleware = (
   next: (error?: unknown) => void,
 ) => Promise<void>;
 
-// Sessão que o verifySession mockado anexa à requisição; sem ela, o
-// AuthGuard responde 401 porque o payload da sessão é inválido.
 let currentSession: Record<string, unknown> | undefined;
 
 jest.unstable_mockModule(
@@ -35,8 +28,7 @@ jest.unstable_mockModule(
   }),
 );
 
-// Sob ESM os mocks de módulo não são içados: o código da aplicação é
-// importado depois, com import dinâmico (`.js` mapeado para `.ts`).
+// Sob ESM os mocks de módulo não são içados: o código da aplicação vem por import dinâmico.
 let TimelineController: (typeof import('../src/timeline/controllers/timeline.controller.js'))['TimelineController'];
 let TimelineService: (typeof import('../src/timeline/services/timeline.service.js'))['TimelineService'];
 let TimelineRepository: (typeof import('../src/timeline/repositories/timeline.repository.js'))['TimelineRepository'];

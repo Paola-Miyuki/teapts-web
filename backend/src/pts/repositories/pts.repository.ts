@@ -122,10 +122,7 @@ export abstract class PtsRepository {
     patientId: string,
   ): Promise<PtsDecisionResponseDto>;
 
-  /**
-   * Nome exibido da conta (o nome social, se houver; senão o nome), usado no
-   * texto dos eventos da timeline; nulo se a conta não existir.
-   */
+  /** Nome social, se houver; senão o nome. */
   abstract findAccountDisplayName(accountId: string): Promise<string | null>;
 
   /** PTS com responsável e equipe, em qualquer estado. */

@@ -14,7 +14,6 @@ async function validateQuery(query: Record<string, unknown>) {
   return { dto, errors };
 }
 
-/** Mensagem da primeira constraint do primeiro erro, como a API devolve. */
 function firstMessage(errors: Awaited<ReturnType<typeof validate>>) {
   return Object.values(errors[0]?.constraints ?? {})[0];
 }
@@ -45,7 +44,6 @@ describe('GetTimelineQueryDto', () => {
     const { errors } = await validateQuery({ [field]: value });
 
     expect(firstMessage(errors)).toBe(`Parâmetro inválido: ${field}`);
-    // Mesmo status das outras listagens (PaginationQueryDto).
     expect(Object.values(errors[0].contexts ?? {})[0]).toEqual({
       status: 'ERROR',
     });

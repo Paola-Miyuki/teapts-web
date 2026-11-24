@@ -12,15 +12,12 @@ import {
   type TimelineRecordRow,
 } from '../repositories/timeline.repository';
 
-/** Evento guardado em memória, com o profissional atribuído e o perfil de quem executou. */
 export interface StoredTimelineRecord extends TimelineRecordRow {
   ptsId: string;
   authorProfessionalId: string | null;
-  /** Perfil profissional da conta que executou; nulo para o admin. */
   executorProfessionalId: string | null;
 }
 
-/** Dublê em memória do TimelineRepository, com os mesmos filtros do banco. */
 export class InMemoryTimelineRepository extends TimelineRepository {
   pts: TimelinePtsAccess[] = [];
   records: StoredTimelineRecord[] = [];
@@ -101,7 +98,6 @@ export const RESPONSIBLE_ID = 'prof-10';
 export const MEMBER_ID = 'prof-11';
 export const ADMIN_ACCOUNT_ID = 'acc-admin';
 
-/** Evento com valores padrão, para os testes só mudarem o que importa. */
 export function timelineRecord(
   overrides: Partial<StoredTimelineRecord> & { id: string },
 ): StoredTimelineRecord {
@@ -120,7 +116,6 @@ export function timelineRecord(
   };
 }
 
-/** PTS em andamento com um responsável, um membro e eventos de todos os tipos. */
 export function seededTimelineRepo(): InMemoryTimelineRepository {
   const repo = new InMemoryTimelineRepository();
 

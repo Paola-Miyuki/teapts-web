@@ -175,7 +175,6 @@ describe('TimelineService.findTimeline', () => {
     );
 
     expect(byAccount.data.map((record) => record.id)).toEqual(['rec-4']);
-    // rec-1 foi executado pelo admin, só atribuído ao responsável: não entra.
     expect(byProfessional.data.map((record) => record.id)).toEqual([
       'rec-3',
       'rec-2',

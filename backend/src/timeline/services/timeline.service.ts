@@ -27,12 +27,6 @@ type TimelineViewer = 'team' | 'patient';
 export class TimelineService {
   constructor(private readonly timelineRepository: TimelineRepository) {}
 
-  /**
-   * Eventos do PTS, por padrão do mais recente ao mais antigo (RFTL001). Veem o admin
-   * (RN022), o responsável e os membros da equipe (o PTS rejeitado não dá
-   * acesso ao profissional, RN016) e o paciente titular, que recebe os
-   * eventos de documento sem o alvo (RN028).
-   */
   async findTimeline(
     ptsId: string,
     query: GetTimelineQueryDto,
@@ -68,6 +62,7 @@ export class TimelineService {
     };
   }
 
+  // Admin (RN022), equipe (menos PTS rejeitado, RN016) ou paciente titular.
   private resolveViewer(
     pts: TimelinePtsAccess,
     account: AccountContext,
@@ -100,6 +95,7 @@ export class TimelineService {
     row: TimelineRecordRow,
     viewer: TimelineViewer,
   ): TimelineRecordDto {
+    // O paciente não recebe o alvo dos eventos de documento (RN028).
     const hideTarget =
       viewer === 'patient' && row.targetType === TimelineRecordTarget.Document;
 

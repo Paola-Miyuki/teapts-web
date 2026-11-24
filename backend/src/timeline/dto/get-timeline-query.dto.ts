@@ -1,7 +1,3 @@
-// Este arquivo define e valida os parâmetros de GET /pts/:id/timeline.
-// Segue o padrão das listagens: estende o PaginationQueryDto e os erros saem
-// `{ status: 'ERROR', message: 'Parâmetro inválido: <param>' }`.
-
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
@@ -31,12 +27,10 @@ function invalidEach(parameter: string): ValidationOptions {
   return { ...invalidParameter(parameter), each: true };
 }
 
-/** Texto opcional: espaços externos saem, e vazio equivale a sem filtro. */
 function toOptionalText({ value }: { value: unknown }): unknown {
   return typeof value === 'string' ? value.trim() || undefined : value;
 }
 
-/** Aceita `type=a,b` ou `type=a&type=b`; vazio equivale a sem filtro. */
 function toTypeList({ value }: { value: unknown }): unknown {
   if (value === undefined) {
     return undefined;

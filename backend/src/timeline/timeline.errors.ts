@@ -11,6 +11,5 @@ export const timelineForbidden = () =>
     'Você não tem acesso à timeline deste PTS.',
   );
 
-/** Período com `from` depois de `to`. */
 export const invalidTimelinePeriod = () =>
   new PtsApiError(HttpStatus.BAD_REQUEST, 'ERROR', 'Parâmetro inválido: from');

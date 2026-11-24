@@ -460,8 +460,6 @@ export class PtsService {
       throw teamMemberNotFound();
     }
 
-    // Texto no padrão da timeline: quem executou e o que fez (RN029, ex.:
-    // "Ana Souza removeu Marcos Vieira da equipe").
     const executorName =
       (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
       (admin ? 'Administrador' : pts.responsible.name);

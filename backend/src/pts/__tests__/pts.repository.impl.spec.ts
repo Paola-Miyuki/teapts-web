@@ -12,8 +12,6 @@ import { TimelineRepositoryImpl } from '../../timeline/repositories/timeline.rep
 import { TimelineRecorderService } from '../../timeline/services/timeline-recorder.service';
 import { expectApiError } from './test-utils';
 
-// Recorder real: com o manager da transação, ele grava pelo manager.insert do
-// QueryRunner dublê, então os repositórios do TypeORM não são usados.
 const timelineRecorder = () =>
   new TimelineRecorderService(
     new TimelineRepositoryImpl(

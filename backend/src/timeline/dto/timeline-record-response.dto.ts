@@ -1,12 +1,9 @@
-// Este arquivo descreve a resposta de GET /pts/:id/timeline.
-
 import { ApiProperty } from '@nestjs/swagger';
 
 import { PaginationResponseDto } from '../../common/pagination/pagination-response.dto';
 import { TimelineRecordTarget } from '../enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../enums/timeline-record-type.enum';
 
-/** Pessoa ligada ao evento: a conta que executou ou o profissional atribuído. */
 export class TimelinePersonDto {
   @ApiProperty({ example: 'c3a1b2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d' })
   id: string;
@@ -18,7 +15,6 @@ export class TimelinePersonDto {
   name: string;
 }
 
-/** Evento da timeline do PTS (RFTL001). */
 export class TimelineRecordDto {
   @ApiProperty({ format: 'uuid' })
   id: string;
