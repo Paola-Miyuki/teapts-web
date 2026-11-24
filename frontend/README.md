@@ -88,7 +88,9 @@ src/
                            Visão geral (situação social, só a equipe), Equipe (registro e papel; o
                            responsável e o admin adicionam profissionais com o PTS em planejamento ou
                            andamento, por `AddTeamMembersModal` em `pts/_components`: busca em
-                           GET /professionals?q= e POST /pts/:id/team) e Timeline; `/pts/:id#timeline`
+                           GET /professionals?q= e POST /pts/:id/team; o responsável e o admin também
+                           transferem a responsabilidade por `TransferResponsibilityModal`: busca em
+                           GET /professionals?q= e POST /pts/:id/team/transfer-responsibility) e Timeline; `/pts/:id#timeline`
                            abre direto na Timeline (atalho de `historico.html`)
     patients/              pacientes do admin (todos) e do profissional (RN016): tabela de
                            `pacientes.html` (GET /patients/authorized) com busca `q`, filtros de
@@ -107,7 +109,7 @@ src/
                            (sessão, perfil e "Acesso restrito"), LogoutButton, HelpTooltip, Icon,
                            Logo, Modal (`dialog.modal` dos mockups) e Combobox (`pat-combobox`)
     pts/                   peças das telas de PTS: WizardSteps (passos), TeamMembers (membros da
-                           equipe com busca, adicionar e remover) e a Timeline (RFTL001), usada em
+                           equipe com busca, adicionar, remover e transferir a responsabilidade) e a Timeline (RFTL001), usada em
                            /pts/:id e no Meu PTS: TimelineTab (GET /pts/:id/timeline, eventos por dia
                            com hora, autor, "Atribuído a", tipo e links; paginação, carregamento,
                            lista vazia e erro) e TimelineFilters (busca, Tipo do evento, Autor,

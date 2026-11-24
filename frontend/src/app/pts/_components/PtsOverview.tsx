@@ -279,8 +279,8 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
     },
   });
   const canTransferResponsibility =
-    account.role === 'admin' &&
-    account.professionalProfileIds.includes(pts.responsible.id) &&
+    (account.role === 'admin' ||
+      account.professionalProfileIds.includes(pts.responsible.id)) &&
     ['planning', 'running'].includes(pts.status.toLowerCase());
   const acceptedAt = formatDate(pts.acceptedAt);
   const beganAt = formatDate(pts.beganAt);

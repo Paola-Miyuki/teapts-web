@@ -113,8 +113,9 @@ src/
                                                PATCH /pts/:id/social-situation, POST
                                                /pts/proposals/:id/approve e /reject,
                                                DELETE /pts/proposals/:id,
-                                               POST /pts/:id/team e
-                                               DELETE /pts/:id/team/:professionalId, todos com sessão
+                                               POST /pts/:id/team,
+                                               DELETE /pts/:id/team/:professionalId e
+                                               POST /pts/:id/team/transfer-responsibility, todos com sessão
     services/pts.service.ts                    regras de acesso (paciente titular, responsável,
                                                equipe e admin), estados do PTS e decisão das propostas
     repositories/pts.repository.ts             contrato do repositório (implementação em
@@ -209,6 +210,7 @@ Swagger (`/docs`); as seções abaixo detalham as que têm regra própria.
 | DELETE | `/pts/proposals/:id` | responsável ou admin, proposta em `draft` | [DELETE /pts/proposals/:id](#delete-ptsproposalsid) |
 | POST | `/pts/:id/team` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team](#post-ptsidteam) |
 | DELETE | `/pts/:id/team/:professionalId` | responsável ou admin, PTS em `planning` ou `running` | [DELETE /pts/:id/team/:professionalId](#delete-ptsidteamprofessionalid) |
+| POST | `/pts/:id/team/transfer-responsibility` | responsável ou admin, PTS em `planning` ou `running` | [POST /pts/:id/team/transfer-responsibility](#post-ptsidteamtransfer-responsibility) |
 | GET | `/pts/:id/timeline` | paciente titular, equipe (menos PTS rejeitado) ou admin | [GET /pts/:id/timeline](#get-ptsidtimeline) |
 | PATCH | `/pts/:id/social-situation` | membro da equipe ou admin, PTS em `planning` ou `running` | Swagger |
 | POST | `/pts/proposals/:id/approve` | paciente titular ou admin, proposta em `draft` | [POST /pts/proposals/:id/approve e /reject](#post-ptsproposalsidapprove-e-reject) |
@@ -625,6 +627,34 @@ sessão), `403` (`FORBIDDEN`), `404` (`PTS_NOT_FOUND` ou
 `CANNOT_REMOVE_RESPONSIBLE`). A transação trava o PTS
 (`pessimistic_write`) e refaz as checagens, então uma transferência de
 responsabilidade ou um encerramento simultâneo não passam despercebidos.
+
+## POST /pts/:id/team/transfer-responsibility
+
+Exige sessão autenticada; só o profissional responsável ou o admin (RN006 e
+RN022) transferem a responsabilidade de um PTS em `planning` ou `running`
+(RFEM002, RN007). O corpo traz `newResponsibleId` (UUID v4 do perfil
+profissional que assume):
+
+```json
+{ "newResponsibleId": "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a" }
+```
+
+Na mesma transação (com o PTS travado por `pessimistic_write`), o
+`responsible_professional_id` passa ao substituto, o vínculo do responsável
+anterior em `professional_participating_on_therapeutic_journey` é apagado (ele
+sai da equipe) e o vínculo anterior do substituto como membro, se houver, também.
+Um `timeline_record` é gravado: `type: responsibility_transferred`,
+`target_type: team_member`, `target_id` = id do novo responsável, `author_professional_id`
+= responsável anterior (nulo quando o admin age) e `executed_by_account_id` = conta
+que executou (RN029).
+
+A resposta `200` retorna o PTS com o responsável e a equipe atualizada (mesmo
+formato do `DELETE /pts/:id/team/:professionalId`).
+
+Os erros possíveis são `400` (`VALIDATION_ERROR`, `NEW_RESPONSIBLE_NOT_FOUND`,
+`NEW_RESPONSIBLE_INVALID` quando o substituto é o próprio responsável ou não tem
+conta, e `TEAM_DUPLICATE_ACCOUNT`), `401` (sem sessão), `403` (`FORBIDDEN`),
+`404` (`PTS_NOT_FOUND`) e `409` (`PTS_NOT_ACTIVE`).
 
 ## GET /pts/:id/timeline
 
