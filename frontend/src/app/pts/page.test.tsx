@@ -62,6 +62,17 @@ function activePts(overrides: Record<string, unknown> = {}) {
     id: '3f2e1d0c-9b8a-4765-a432-10fedcba9876',
     status: 'planning',
     socialSituation: 'Mora com a mãe e frequenta a escola municipal.',
+    caseStudyDate: '2026-10-01',
+    diagnosisSummary: 'Diagnóstico em comum da equipe.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: null,
+    priorityNeeds: ['Comunicação funcional'],
+    vulnerabilities: null,
+    comorbidities: null,
+    sensoryProfile: null,
+    communicationMethod: null,
+    nextReviewAt: '2027-10-01',
     createdAt: '2026-10-15T12:00:00.000Z',
     acceptedAt: '2026-10-15T12:30:00.000Z',
     beganAt: null,
@@ -88,10 +99,24 @@ describe('PtsOverview', () => {
     global.fetch = jest.fn();
   });
 
-  it('mostra o PTS ativo do próprio paciente sem a situação social', async () => {
-    // A API omite socialSituation para o próprio paciente.
+  it('mostra o PTS ativo do próprio paciente sem a ficha', async () => {
+    // A API omite a ficha (menos a próxima revisão) para o próprio paciente.
     (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(activePts({ socialSituation: undefined })),
+      jsonResponse(
+        activePts({
+          socialSituation: undefined,
+          caseStudyDate: undefined,
+          diagnosisSummary: undefined,
+          cid: undefined,
+          supportLevel: undefined,
+          strengths: undefined,
+          priorityNeeds: undefined,
+          vulnerabilities: undefined,
+          comorbidities: undefined,
+          sensoryProfile: undefined,
+          communicationMethod: undefined,
+        }),
+      ),
     );
 
     render(<PtsOverview account={patientAccount()} patientId={PATIENT_ID} />);
@@ -102,13 +127,17 @@ describe('PtsOverview', () => {
     expect(screen.getByText('Integrante Teste')).toBeInTheDocument();
     expect(screen.getByText('15/10/2026')).toBeInTheDocument();
     expect(screen.queryByText('Situação social')).not.toBeInTheDocument();
+    expect(screen.queryByText('Diagnóstico')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Editar PTS' }),
+    ).not.toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(ACTIVE_URL, {
       credentials: 'include',
     });
   });
 
-  it('mostra a situação social para o profissional da equipe', async () => {
+  it('mostra os cartões da ficha e o botão Editar PTS para o profissional da equipe', async () => {
     (global.fetch as jest.Mock).mockImplementationOnce(() =>
       jsonResponse(activePts({ status: 'RUNNING' })),
     );
@@ -118,9 +147,19 @@ describe('PtsOverview', () => {
     );
 
     expect(await screen.findByText('Situação social')).toBeInTheDocument();
+    expect(screen.getByText('Diagnóstico')).toBeInTheDocument();
+    expect(screen.getByText('Perfil de neurodivergência')).toBeInTheDocument();
+    expect(
+      screen.getByText('Diagnóstico em comum da equipe.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Comunicação funcional')).toBeInTheDocument();
     expect(
       screen.getByText('Mora com a mãe e frequenta a escola municipal.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Editar PTS' })).toHaveAttribute(
+      'href',
+      '/pts/3f2e1d0c-9b8a-4765-a432-10fedcba9876/edit',
+    );
     expect(screen.getAllByText('Em execução')).not.toHaveLength(0);
     expect(screen.getByText(/· responsável/)).toBeInTheDocument();
   });

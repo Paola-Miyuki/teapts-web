@@ -21,9 +21,9 @@ import {
 } from '@/lib/pts';
 
 import styles from '../pts.module.css';
+import PtsSheetCards from './PtsSheetCards';
 import PtsTeamList from './PtsTeamList';
 import RemoveTeamMemberDialog from './RemoveTeamMemberDialog';
-import SocialSituationDialog from './SocialSituationDialog';
 import TransferResponsibilityModal from './TransferResponsibilityModal';
 
 type PtsOverviewProps = {
@@ -87,7 +87,6 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   const router = useRouter();
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryKey, setRetryKey] = useState(0);
-  const [editingSocial, setEditingSocial] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [removingMember, setRemovingMember] = useState<PtsProfessional | null>(
     null,
@@ -143,17 +142,6 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   function handleRetry() {
     setState({ kind: 'loading' });
     setRetryKey((current) => current + 1);
-  }
-
-  // RFPTS005 – fecha o diálogo, troca o texto na página e avisa.
-  function handleSocialSaved(socialSituation: string) {
-    setState((current) =>
-      current.kind === 'loaded'
-        ? { kind: 'loaded', pts: { ...current.pts, socialSituation } }
-        : current,
-    );
-    setEditingSocial(false);
-    setFeedback('Situação social atualizada.');
   }
 
   // RFEM003 – mostra a equipe da resposta e avisa.
@@ -259,19 +247,18 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
   }
 
   const { pts } = state;
-  const showSocialSituation =
+  // RN028 – o paciente não vê a ficha.
+  const showSheet =
     !isOwnPts &&
-    can(account, 'viewPtsSocialSituation') &&
-    pts.socialSituation !== undefined;
-  const canEditSocialSituation =
-    showSocialSituation &&
-    can(account, 'editPtsSocialSituation', {
-      pts: {
-        status: pts.status,
-        responsibleProfessionalId: pts.responsible.id,
-        teamProfessionalIds: (pts.team ?? []).map((member) => member.id),
-      },
-    });
+    can(account, 'viewPtsSheet') &&
+    pts.diagnosisSummary !== undefined;
+  const canEditPts = can(account, 'editPts', {
+    pts: {
+      status: pts.status,
+      responsibleProfessionalId: pts.responsible.id,
+      teamProfessionalIds: (pts.team ?? []).map((member) => member.id),
+    },
+  });
   const canRemoveTeamMember = can(account, 'removePtsTeamMember', {
     pts: {
       status: pts.status,
@@ -318,6 +305,15 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
         <span className={styles.statusBadge}>
           {getPtsStatusLabel(pts.status)}
         </span>
+
+        {canEditPts && (
+          <Link
+            href={`/pts/${pts.id}/edit`}
+            className={`${ui.btn} ${ui.btnSecondary}`}
+          >
+            Editar PTS
+          </Link>
+        )}
       </div>
 
       <div className={styles.grid}>
@@ -342,6 +338,8 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
                 : undefined
             }
           />
+
+          {showSheet && <PtsSheetCards pts={pts} />}
 
           <section id="timeline" aria-label="Timeline">
             <TimelineTab
@@ -393,31 +391,6 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
             )}
           </dl>
 
-          {showSocialSituation && (
-            <>
-              <hr className={styles.rule} />
-
-              <h2>Situação social</h2>
-              <p className={styles.socialSituation}>
-                {pts.socialSituation?.trim() ||
-                  'Nenhuma informação registrada.'}
-              </p>
-
-              {canEditSocialSituation && (
-                <button
-                  type="button"
-                  className={`${ui.btn} ${ui.btnSecondary} ${styles.asideAction}`}
-                  onClick={() => {
-                    setFeedback('');
-                    setEditingSocial(true);
-                  }}
-                >
-                  Editar situação social
-                </button>
-              )}
-            </>
-          )}
-
           <hr className={styles.rule} />
 
           <p className={styles.muted}>
@@ -426,17 +399,6 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
           </p>
         </aside>
       </div>
-
-      {canEditSocialSituation && (
-        <SocialSituationDialog
-          key={editingSocial ? 'open' : 'closed'}
-          open={editingSocial}
-          ptsId={pts.id}
-          currentValue={pts.socialSituation ?? ''}
-          onClose={() => setEditingSocial(false)}
-          onSaved={handleSocialSaved}
-        />
-      )}
 
       {canRemoveTeamMember && (
         <RemoveTeamMemberDialog

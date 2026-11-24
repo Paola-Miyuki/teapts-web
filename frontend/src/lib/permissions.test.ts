@@ -97,32 +97,49 @@ describe('can', () => {
     expect(can(waiting, 'viewActivePts')).toBe(false);
   });
 
-  it('mantém a situação social oculta para o paciente', () => {
-    expect(can(professional, 'viewPtsSocialSituation')).toBe(true);
-    expect(can(admin, 'viewPtsSocialSituation')).toBe(true);
-    expect(can(patient, 'viewPtsSocialSituation')).toBe(false);
+  it('mantém a ficha oculta para o paciente', () => {
+    expect(can(professional, 'viewPtsSheet')).toBe(true);
+    expect(can(admin, 'viewPtsSheet')).toBe(true);
+    expect(can(patient, 'viewPtsSheet')).toBe(false);
   });
 
-  it('deixa só a equipe e o admin editarem a situação social', () => {
+  it('deixa só a equipe e o admin editarem o PTS ativo', () => {
     const active = {
       status: 'planning',
       responsibleProfessionalId: 'responsible-id',
       teamProfessionalIds: ['professional-id'],
     };
 
-    expect(can(professional, 'editPtsSocialSituation', { pts: active })).toBe(
-      true,
-    );
+    expect(can(professional, 'editPts', { pts: active })).toBe(true);
     expect(
-      can(professional, 'editPtsSocialSituation', {
+      can(professional, 'editPts', {
+        pts: { ...active, status: 'running' },
+      }),
+    ).toBe(true);
+    expect(
+      can(professional, 'editPts', {
         pts: { ...active, teamProfessionalIds: [] },
       }),
     ).toBe(false);
-    expect(can(professional, 'editPtsSocialSituation')).toBe(false);
-    expect(can(admin, 'editPtsSocialSituation', { pts: active })).toBe(true);
-    expect(can(patient, 'editPtsSocialSituation', { pts: active })).toBe(false);
-    expect(can(waiting, 'editPtsSocialSituation', { pts: active })).toBe(false);
+    expect(can(professional, 'editPts')).toBe(false);
+    expect(can(admin, 'editPts', { pts: active })).toBe(true);
+    expect(can(patient, 'editPts', { pts: active })).toBe(false);
+    expect(can(waiting, 'editPts', { pts: active })).toBe(false);
   });
+
+  it.each(['draft', 'rejected', 'concluded', 'cancelled'])(
+    'não deixa ninguém editar o PTS em %s',
+    (status) => {
+      const pts = {
+        status,
+        responsibleProfessionalId: 'responsible-id',
+        teamProfessionalIds: ['professional-id'],
+      };
+
+      expect(can(professional, 'editPts', { pts })).toBe(false);
+      expect(can(admin, 'editPts', { pts })).toBe(false);
+    },
+  );
 
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
@@ -151,7 +168,7 @@ describe('can', () => {
       'viewProfessionalDirectory',
       'viewPtsProposals',
       'viewPts',
-      'viewPtsSocialSituation',
+      'viewPtsSheet',
       'createPts',
     ] as const) {
       expect(can(admin, action)).toBe(true);

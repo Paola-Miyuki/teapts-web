@@ -14,12 +14,13 @@ import {
   type FindPtsProposalsResult,
   type RemoveTeamMemberInput,
   type AddTeamMembersInput,
-  type SocialSituationTarget,
+  type PtsSheetTarget,
+  type UpdatePtsSheetInput,
   type PtsTeamTarget,
   type ProfessionalAccountRecord,
   type TransferResponsibilityInput,
 } from '../repositories/pts.repository';
-import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 
 export class InMemoryPtsRepository extends PtsRepository {
@@ -39,7 +40,9 @@ export class InMemoryPtsRepository extends PtsRepository {
       description: string;
     }
   > = [];
-  socialSituationTargets = new Map<string, SocialSituationTarget>();
+  sheetTargets = new Map<string, PtsSheetTarget>();
+  /** Atualizações da ficha (cada uma vira um `pts_updated`). */
+  sheetUpdates: UpdatePtsSheetInput[] = [];
   /** Ids com deletedAt preenchido (exclusão lógica). */
   deletedIds = new Set<string>();
   private nextId = 100;
@@ -189,17 +192,16 @@ export class InMemoryPtsRepository extends PtsRepository {
     return proposal;
   }
 
-  async findSocialSituationTarget(
-    id: string,
-  ): Promise<SocialSituationTarget | null> {
-    return this.socialSituationTargets.get(id) ?? null;
+  async findSheetTarget(id: string): Promise<PtsSheetTarget | null> {
+    return this.sheetTargets.get(id) ?? null;
   }
 
-  async updateSocialSituation(
-    id: string,
-    socialSituation: string,
-  ): Promise<UpdateSocialSituationResponseDto> {
-    return { id, socialSituation };
+  async updateSheet(
+    input: UpdatePtsSheetInput,
+  ): Promise<UpdatePtsSheetResponseDto> {
+    this.sheetUpdates.push(input);
+
+    return { id: input.ptsId, ...input.sheet };
   }
 
   async findProposalForDecision(

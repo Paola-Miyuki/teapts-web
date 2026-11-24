@@ -28,6 +28,40 @@ export class PtsEntity {
   @Column('text', { name: 'social_situation' })
   socialSituation: string;
 
+  // Ficha do PTS (RFPTS005, RN030). Datas 'date' voltam como 'yyyy-mm-dd'.
+  @Column({ name: 'case_study_date', type: 'date' })
+  caseStudyDate: string;
+
+  @Column({ name: 'diagnosis_summary', type: 'text' })
+  diagnosisSummary: string;
+
+  @Column({ type: 'text', nullable: true })
+  cid: string | null;
+
+  @Column({ name: 'support_level', type: 'smallint', nullable: true })
+  supportLevel: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  strengths: string | null;
+
+  @Column({ name: 'priority_needs', type: 'text', array: true, default: [] })
+  priorityNeeds: string[];
+
+  @Column({ type: 'text', nullable: true })
+  vulnerabilities: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  comorbidities: string | null;
+
+  @Column({ name: 'sensory_profile', type: 'text', nullable: true })
+  sensoryProfile: string | null;
+
+  @Column({ name: 'communication_method', type: 'text', nullable: true })
+  communicationMethod: string | null;
+
+  @Column({ name: 'next_review_at', type: 'date' })
+  nextReviewAt: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamp', precision: 3 })
   createdAt: Date;
 

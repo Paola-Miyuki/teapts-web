@@ -2,7 +2,7 @@ import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
-import type { UpdateSocialSituationResponseDto } from '../dto/update-social-situation.dto';
+import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -43,11 +43,23 @@ export interface UpdatePtsProposalInput {
   teamProfessionalIds?: string[];
 }
 
-export interface SocialSituationTarget {
+export interface PtsSheetTarget {
   id: string;
   status: string;
   responsibleProfessionalId: string;
   teamProfessionalIds: string[];
+}
+
+export interface UpdatePtsSheetInput {
+  ptsId: string;
+  /** Ficha já aparada; opcionais vazios chegam como null. */
+  sheet: Omit<UpdatePtsSheetResponseDto, 'id'>;
+  /** Profissional atribuído ao evento (RN029); nulo quando o admin age. */
+  authorProfessionalId: string | null;
+  /** Conta que executou a ação (RN029). */
+  executedByAccountId: string;
+  /** Texto do evento na timeline. */
+  description: string;
 }
 
 export interface ProposalDecisionTarget {
@@ -138,14 +150,12 @@ export abstract class PtsRepository {
     input: UpdatePtsProposalInput,
   ): Promise<PtsProposalResponseDto>;
 
-  abstract findSocialSituationTarget(
-    id: string,
-  ): Promise<SocialSituationTarget | null>;
+  abstract findSheetTarget(id: string): Promise<PtsSheetTarget | null>;
 
-  abstract updateSocialSituation(
-    id: string,
-    socialSituation: string,
-  ): Promise<UpdateSocialSituationResponseDto>;
+  /** Atualiza a ficha e grava `pts_updated` na timeline, na mesma transação. */
+  abstract updateSheet(
+    input: UpdatePtsSheetInput,
+  ): Promise<UpdatePtsSheetResponseDto>;
 
   abstract hasProposalRelation(
     patientId: string,
