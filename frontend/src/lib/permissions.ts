@@ -9,6 +9,8 @@ export type PermissionAction =
   | 'viewOwnCare'
   | 'createPatientProfile'
   | 'manageSupportContacts'
+  | 'manageClinicalData'
+  | 'manageMedications'
   | 'viewAuthorizedPatients'
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
@@ -115,6 +117,16 @@ export function can(
       // RFPAC003, RN024 – administrador (RN022) ou profissional membro de PTS
       // ativo do paciente; o paciente só vê os próprios contatos. Contato de
       // suporte não concede acesso (RN017).
+      return professional && context.patientReadOnly === false;
+
+    case 'manageClinicalData':
+      // RFPAC007, RN024 – administrador (RN022) ou profissional membro da
+      // equipe de um PTS ativo do paciente.
+      return professional && context.patientReadOnly === false;
+
+    case 'manageMedications':
+      // RFPAC007, RN024 – administrador (RN022) ou profissional membro da
+      // equipe de um PTS ativo do paciente.
       return professional && context.patientReadOnly === false;
     case 'viewAuthorizedPatients':
       // RFPAC002 – profissional (a API filtra os vinculados).
