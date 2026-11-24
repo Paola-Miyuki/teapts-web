@@ -7,6 +7,13 @@ import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import HelpTooltip from '@/components/HelpTooltip';
+import Icon from '@/components/Icon';
+import TeamMembers from '@/components/pts/TeamMembers';
+import WizardSteps, {
+  PTS_STEPS,
+  type PtsStep,
+} from '@/components/pts/WizardSteps';
 import ui from '@/components/ui.module.css';
 
 import type { Account } from '@/lib/account';
@@ -14,16 +21,12 @@ import { can } from '@/lib/permissions';
 
 import { initSuperTokens } from '@/lib/supertokens';
 
-import TeamSelector from './_components/TeamSelector';
-
 import {
   getProfessionalsForTeam,
   getPtsProposal,
   PtsProposalApiError,
   updatePtsProposal,
 } from './api';
-
-import styles from './edit.module.css';
 
 import type { Professional, PtsProposal } from './types';
 
@@ -59,6 +62,8 @@ export default function EditPtsProposalForm({
   const [submitError, setSubmitError] = useState('');
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const [step, setStep] = useState<PtsStep>(0);
 
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -159,14 +164,6 @@ export default function EditPtsProposalForm({
     }
   }, [submitError]);
 
-  function toggleTeamMember(professionalId: string) {
-    setTeamIds((current) =>
-      current.includes(professionalId)
-        ? current.filter((id) => id !== professionalId)
-        : [...current, professionalId],
-    );
-  }
-
   function handleRetry() {
     setProposal(null);
     setProfessionals([]);
@@ -192,10 +189,17 @@ export default function EditPtsProposalForm({
     setSocialError('');
     setSubmitError('');
 
-    if (!trimmedSocialSituation) {
+    if (step >= 1 && !trimmedSocialSituation) {
       setSocialError('Descreva a situação social do paciente.');
+      setStep(1);
 
       document.getElementById('edit-social-situation')?.focus();
+
+      return;
+    }
+
+    if (step < 2) {
+      setStep((step + 1) as PtsStep);
 
       return;
     }
@@ -207,19 +211,13 @@ export default function EditPtsProposalForm({
     setIsSaving(true);
 
     try {
-      const updatedProposal = await updatePtsProposal(proposal.id, {
+      await updatePtsProposal(proposal.id, {
         socialSituation: trimmedSocialSituation,
 
         teamProfessionalIds: validTeamIds,
       });
 
-      const params = new URLSearchParams({
-        patientId: updatedProposal.patient.id,
-
-        updated: '1',
-      });
-
-      router.push(`/pts/proposals?${params.toString()}`);
+      router.push('/pts/proposals?updated=1');
     } catch (error: unknown) {
       if (error instanceof PtsProposalApiError && error.statusCode === 401) {
         router.replace('/login');
@@ -239,20 +237,25 @@ export default function EditPtsProposalForm({
     }
   }
 
+  const heading = (
+    <div className="heading">
+      <div>
+        <h1>Editar proposta de PTS</h1>
+      </div>
+      <div className="heading-actions">
+        <Link className="btn" href="/pts/proposals">
+          Cancelar
+        </Link>
+      </div>
+    </div>
+  );
+
   if (loadStatus === 'loading') {
     return (
       <>
-        <div className={ui.heading}>
-          <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
+        {heading}
 
-          <h1>Editar proposta de PTS</h1>
-
-          <p>Atualize a situação social e a equipe inicial da proposta.</p>
-        </div>
-
-        <div className={`${ui.card} ${styles.stateCard}`} role="status">
-          <span className={styles.spinner} aria-hidden="true" />
-
+        <div className={ui.empty} role="status">
           <p>Carregando proposta...</p>
         </div>
       </>
@@ -262,200 +265,183 @@ export default function EditPtsProposalForm({
   if (loadStatus === 'error' || !proposal) {
     return (
       <>
-        <div className={ui.heading}>
-          <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
+        {heading}
 
-          <h1>Editar proposta de PTS</h1>
-        </div>
-
-        <div className={`${ui.card} ${styles.stateCard}`} role="alert">
+        <div className={ui.empty} role="alert">
+          <div className={ui.emptyIcon}>
+            <Icon name="alertCircle" />
+          </div>
           <h2>Não foi possível editar a proposta</h2>
 
           <p>{loadError || 'Não foi possível carregar a proposta.'}</p>
 
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={`${ui.btn} ${ui.btnPrimary}`}
-              onClick={handleRetry}
-            >
-              Tentar novamente
-            </button>
-
-            <Link
-              href="/pts/proposals"
-              className={`${ui.btn} ${ui.btnSecondary}`}
-            >
-              Voltar
-            </Link>
-          </div>
+          <button
+            type="button"
+            className={`${ui.btn} ${ui.btnSecondary}`}
+            onClick={handleRetry}
+          >
+            Tentar novamente
+          </button>
         </div>
       </>
     );
   }
 
-  const backParams = new URLSearchParams({
-    patientId: proposal.patient.id,
-  });
+  let body;
+
+  if (step === 0) {
+    body = (
+      <dl className="ux-summary">
+        <div>
+          <dt>Paciente</dt>
+          <dd>{proposal.patient.name}</dd>
+        </div>
+      </dl>
+    );
+  } else if (step === 1) {
+    body = (
+      <div className="form-grid">
+        <div className="field full">
+          <span className="ux-labeltip">
+            <label className="field-label" htmlFor="edit-social-situation">
+              Situação social
+              <span className="ux-req" aria-hidden="true">
+                {' '}
+                *
+              </span>
+            </label>
+            <HelpTooltip id="edit-social-tip" label="Situação social">
+              Moradia, rotina da família, rede de apoio e acesso a serviços.
+              Nunca aparece ao paciente.
+            </HelpTooltip>
+          </span>
+          <textarea
+            className="input"
+            id="edit-social-situation"
+            name="socialSituation"
+            rows={4}
+            aria-required="true"
+            value={socialSituation}
+            disabled={isSaving}
+            placeholder="Ex.: mora com a mãe e a avó; a mãe trabalha à tarde"
+            aria-invalid={Boolean(socialError)}
+            aria-describedby={
+              socialError
+                ? 'edit-social-tip edit-social-error'
+                : 'edit-social-tip'
+            }
+            onChange={(event) => {
+              setSocialSituation(event.target.value);
+
+              if (socialError) {
+                setSocialError('');
+              }
+            }}
+          />
+          {socialError ? (
+            <p id="edit-social-error" className={ui.fieldError}>
+              {socialError}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  } else {
+    body = (
+      <>
+        <section className="ux-fsection">
+          <header>
+            <h3>Responsável</h3>
+          </header>
+          <div>
+            <div className="field">
+              <label className="field-label" htmlFor="edit-responsible">
+                Profissional responsável
+              </label>
+              <input
+                className="input"
+                id="edit-responsible"
+                type="text"
+                readOnly
+                value={`${proposal.responsible.name} · ${proposal.responsible.specialism.name}`}
+              />
+            </div>
+          </div>
+        </section>
+
+        <TeamMembers
+          professionals={professionals}
+          selectedIds={teamIds}
+          onChange={setTeamIds}
+          disabled={isSaving}
+        />
+      </>
+    );
+  }
 
   return (
     <>
-      <div className={ui.heading}>
-        <p className={ui.eyebrow}>Programa Terapêutico Singular</p>
+      {heading}
 
-        <h1>Editar proposta de PTS</h1>
-
-        <p>Atualize a situação social e a composição inicial da equipe.</p>
-      </div>
-
-      <div className={styles.layout}>
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className={`${ui.card} ${styles.form}`}
+      {submitError ? (
+        <div
+          ref={errorRef}
+          tabIndex={-1}
+          role="alert"
+          className={`${ui.alert} ${ui.alertError}`}
         >
-          <div className={styles.steps}>
-            <span className={`${styles.step} ${styles.stepActive}`}>
-              <span className={styles.stepNumber}>1</span>
-              Editar proposta
-            </span>
-
-            <span aria-hidden="true" className={styles.stepSeparator}>
-              —
-            </span>
-
-            <span className={styles.step}>
-              <span className={styles.stepNumber}>2</span>
-              Aprovação do paciente
-            </span>
+          <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
+            <Icon name="alertCircle" />
           </div>
+          <span>{submitError}</span>
+        </div>
+      ) : null}
 
-          {submitError ? (
-            <div ref={errorRef} tabIndex={-1} role="alert" className={ui.alert}>
-              {submitError}
+      <form onSubmit={handleSubmit} noValidate>
+        <section className="ux-formcard ux-wz-step" aria-labelledby="wz-title">
+          <div className="ux-wz-head">
+            <WizardSteps current={step} />
+            <div>
+              <h2 id="wz-title">{PTS_STEPS[step]}</h2>
             </div>
-          ) : null}
-
-          <div className={ui.field}>
-            <label htmlFor="edit-patient" className={ui.label}>
-              Paciente
-            </label>
-
-            <input
-              id="edit-patient"
-              type="text"
-              readOnly
-              value={proposal.patient.name}
-              className={`${ui.input} ${styles.readonly}`}
-            />
-
-            <p className={ui.hint}>
-              O paciente não pode ser alterado nesta proposta.
-            </p>
           </div>
 
-          <div className={ui.field}>
-            <label htmlFor="edit-responsible" className={ui.label}>
-              Profissional responsável
-            </label>
+          <div className="ux-wz-body">{body}</div>
 
-            <input
-              id="edit-responsible"
-              type="text"
-              readOnly
-              value={`${proposal.responsible.name} · ${proposal.responsible.specialism.name}`}
-              className={`${ui.input} ${styles.readonly}`}
-            />
+          <div className="ux-formcard-foot ux-wz-foot">
+            {step > 0 ? (
+              <button
+                type="button"
+                className="btn"
+                disabled={isSaving}
+                onClick={() => setStep((step - 1) as PtsStep)}
+              >
+                <Icon name="chevronLeft" className="icon-sm" />
+                Voltar
+              </button>
+            ) : (
+              <span />
+            )}
 
-            <p className={ui.hint}>
-              O responsável pela proposta não pode ser alterado.
-            </p>
+            {step < 2 ? (
+              <button type="submit" className="btn btn-primary">
+                Próximo
+                <Icon name="chevronRight" className="icon-sm" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSaving}
+                aria-busy={isSaving}
+                className="btn btn-primary"
+              >
+                <Icon name="check" className="icon-sm" />
+                {isSaving ? 'Salvando...' : 'Salvar proposta'}
+              </button>
+            )}
           </div>
-
-          <TeamSelector
-            professionals={professionals}
-            selectedIds={teamIds}
-            disabled={isSaving}
-            onToggle={toggleTeamMember}
-          />
-
-          <div className={ui.field}>
-            <label htmlFor="edit-social-situation" className={ui.label}>
-              Situação social
-            </label>
-
-            <textarea
-              id="edit-social-situation"
-              name="socialSituation"
-              required
-              value={socialSituation}
-              disabled={isSaving}
-              placeholder="Descreva a situação social do paciente"
-              aria-invalid={Boolean(socialError)}
-              aria-describedby={
-                socialError
-                  ? 'edit-social-help edit-social-error'
-                  : 'edit-social-help'
-              }
-              className={`${ui.input} ${styles.textarea}`}
-              onChange={(event) => {
-                setSocialSituation(event.target.value);
-
-                if (socialError) {
-                  setSocialError('');
-                }
-              }}
-            />
-
-            <p id="edit-social-help" className={ui.hint}>
-              Atualize as informações necessárias para a proposta.
-            </p>
-
-            {socialError ? (
-              <p id="edit-social-error" className={ui.fieldError}>
-                {socialError}
-              </p>
-            ) : null}
-          </div>
-
-          <div className={styles.actions}>
-            <button
-              type="submit"
-              disabled={isSaving}
-              aria-busy={isSaving}
-              className={`${ui.btn} ${ui.btnPrimary}`}
-            >
-              {isSaving ? 'Salvando...' : 'Salvar proposta'}
-            </button>
-
-            <Link
-              href={`/pts/proposals?${backParams.toString()}`}
-              className={`${ui.btn} ${ui.btnSecondary}`}
-            >
-              Cancelar
-            </Link>
-          </div>
-        </form>
-
-        <aside className={styles.aside}>
-          <h2>Mantenha a proposta atualizada.</h2>
-
-          <p>
-            Antes da decisão do paciente, você pode atualizar a situação social
-            e reorganizar a equipe inicial.
-          </p>
-
-          <p>
-            Paciente e profissional responsável permanecem os mesmos durante a
-            edição.
-          </p>
-
-          <p>
-            Depois que a proposta for decidida, ela não poderá mais ser editada
-            por este fluxo.
-          </p>
-        </aside>
-      </div>
+        </section>
+      </form>
     </>
   );
 }

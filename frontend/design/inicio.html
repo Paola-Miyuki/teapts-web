@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Início · TEA-PTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="assets/teapts-src.css">
+<link rel="stylesheet" href="assets/teapts-mockups.css">
+<link rel="stylesheet" href="assets/teapts-ui.css">
+</head>
+<body class="min-h-full flex flex-col" data-nav="inicio.html" data-roles="professional,admin" data-dps="">
+<div class="shell-app">
+<aside id="sidebar" class="shell-sidebar"></aside>
+<div class="shell-workspace">
+<header class="shell-appHeader" id="app-header"></header>
+<main class="shell-content">
+<div class="mockbar" data-mockbar></div>
+<section>
+<div data-when="role:professional">
+<div class="heading"><div><h1>Boas-vindas, Ana</h1></div></div>
+<div class="ux-tiles">
+<a class="ux-tile" href="pacientes.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="patient"></i></span><span class="ux-tile-body"><strong>Pacientes</strong><small>Vinculados a você</small></span><span class="ux-tile-n">4</span></a>
+<a class="ux-tile" href="lista-pts.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="pts"></i></span><span class="ux-tile-body"><strong>PTS</strong><small>De que você é responsável ou membro</small></span><span class="ux-tile-n">7</span></a>
+<a class="ux-tile" href="propostas-pts.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="clipboard"></i></span><span class="ux-tile-body"><strong>Propostas</strong><small>Aguardando o paciente</small></span><span class="ux-tile-n">1</span></a>
+<a class="ux-tile" href="notificacoes.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="bell"></i></span><span class="ux-tile-body"><strong>Notificações</strong><small>Não lidas</small></span><span class="ux-tile-n">2</span></a>
+</div>
+<section class="ux-card " aria-labelledby="home-todo"><div class="ux-card-head"><div><h2 id="home-todo">Para fazer</h2></div><a class="btn btn-sm btn-primary" href="criar-pts.html"><i data-icon="plus"></i>Criar proposta de PTS</a></div><ul class="mini-list ux-todos"><li class="ux-todo"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="checkCircle"></i></span><span class="grow"><strong>Reavaliação aberta</strong><small>PTS de Ana Clara Ribeiro · próxima revisão em 03/12/2026. Você é a responsável.</small></span><a class="btn btn-sm" href="reavaliacao.html">Registrar reavaliação</a></li><li class="ux-todo"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="activity"></i></span><span class="grow"><strong>2 atividades sugeridas</strong><small>PTS de Ana Clara Ribeiro · Rotina visual em casa e Consulta de revisão medicamentosa.</small></span><a class="btn btn-sm" href="pts-detalhe.html#atividades">Aprovar ou rejeitar</a></li><li class="ux-todo"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="clipboard"></i></span><span class="grow"><strong>Proposta aguardando o paciente</strong><small>Luna Ferreira · criada em 28/10/2026.</small></span><a class="btn btn-sm" href="propostas-pts.html">Ver proposta</a></li><li class="ux-todo"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="pts"></i></span><span class="grow"><strong>PTS em planejamento</strong><small>Diego Alves · falta iniciar a execução.</small></span><a class="btn btn-sm" href="lista-pts.html">Ver PTS</a></li></ul></section>
+</div><div data-when="role:admin">
+<div class="heading"><div><h1>Boas-vindas, Kaio</h1></div></div>
+<div class="ux-tiles">
+<a class="ux-tile" href="contas.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="accounts"></i></span><span class="ux-tile-body"><strong>Contas sem perfil</strong><small>Aguardando virar paciente ou profissional</small></span><span class="ux-tile-n">3</span></a>
+<a class="ux-tile" href="pacientes.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="patient"></i></span><span class="ux-tile-body"><strong>Pacientes</strong><small>Cadastrados</small></span><span class="ux-tile-n">23</span></a>
+<a class="ux-tile" href="profissionais.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="people"></i></span><span class="ux-tile-body"><strong>Profissionais</strong><small>Cadastrados</small></span><span class="ux-tile-n">18</span></a>
+<a class="ux-tile" href="lista-pts.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="pts"></i></span><span class="ux-tile-body"><strong>PTS</strong><small>Em todas as fases</small></span><span class="ux-tile-n">31</span></a>
+</div>
+<section class="ux-card " aria-labelledby="home-admin"><div class="ux-card-head"><div><h2 id="home-admin">Atalhos</h2></div></div><div class="ux-tiles ux-tiles-sm"><a class="ux-tile" href="criar-paciente.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="plus"></i></span><span class="ux-tile-body"><strong>Adicionar paciente</strong><small>De uma conta existente</small></span></a><a class="ux-tile" href="criar-profissional.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="plus"></i></span><span class="ux-tile-body"><strong>Adicionar profissional</strong><small>Com registro no conselho</small></span></a><a class="ux-tile" href="propostas-pts.html"><span class="ux-tile-ic" aria-hidden="true"><i data-icon="clipboard"></i></span><span class="ux-tile-body"><strong>Propostas</strong><small>Aprovar em nome do paciente</small></span></a></div></section>
+</div>
+</section>
+</main>
+</div>
+</div>
+<script src="assets/teapts-mockups.js"></script>
+</body>
+</html>

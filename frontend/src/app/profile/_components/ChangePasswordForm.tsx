@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import Icon from '@/components/Icon';
+import Modal from '@/components/Modal';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import { changePassword } from '@/lib/account';
-import styles from '../profile.module.css';
 
 type ChangePasswordFormProps = {
   onCancel: () => void;
@@ -33,7 +33,6 @@ export default function ChangePasswordForm({
   onSuccess,
 }: ChangePasswordFormProps) {
   const router = useRouter();
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const currentRef = useRef<HTMLInputElement>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -50,10 +49,6 @@ export default function ChangePasswordForm({
   const [submitting, setSubmitting] = useState(false);
   const passwordHasMinLength = newPassword.length >= 8;
   const passwordHasNumber = /\d/.test(newPassword);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
 
   function validate() {
     const nextErrors: PasswordErrors = {
@@ -153,37 +148,35 @@ export default function ChangePasswordForm({
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      className={ui.dialog}
-      aria-labelledby="password-title"
-      onCancel={(event) => {
-        if (submitting) {
-          event.preventDefault();
-        }
-      }}
+    <Modal
+      open
+      id="password"
+      size="sm"
+      title="Redefinir senha"
+      description="Preencha os três campos para salvar a nova senha."
+      busy={submitting}
       onClose={onCancel}
-      onClick={(event) => {
-        if (event.target === dialogRef.current && !submitting) {
-          onCancel();
-        }
-      }}
+      footer={
+        <>
+          <button
+            type="button"
+            className="btn"
+            onClick={onCancel}
+            disabled={submitting}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="password-form"
+            className="btn btn-primary"
+            disabled={submitting}
+          >
+            {submitting ? 'Salvando...' : 'Salvar nova senha'}
+          </button>
+        </>
+      }
     >
-      <button
-        type="button"
-        className={`${ui.iconButton} ${ui.dialogClose}`}
-        aria-label="Fechar janela"
-        onClick={onCancel}
-        disabled={submitting}
-      >
-        <Icon name="close" className={ui.icon} />
-      </button>
-
-      <h2 id="password-title">Redefinir senha</h2>
-      <p className={styles.passwordIntro}>
-        Informe sua senha atual e escolha uma nova senha para sua conta.
-      </p>
-
       {errors.form && (
         <div className={`${ui.alert} ${ui.alertError}`} role="alert">
           <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
@@ -193,9 +186,9 @@ export default function ChangePasswordForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate>
-        <div className={styles.passwordFields}>
-          <div className={ui.field}>
+      <form id="password-form" onSubmit={handleSubmit} noValidate>
+        <div className="form-grid">
+          <div className={`${ui.field} full`}>
             <label htmlFor="current-password" className={ui.label}>
               Senha atual
             </label>
@@ -239,7 +232,7 @@ export default function ChangePasswordForm({
             {fieldError('current')}
           </div>
 
-          <div className={ui.field}>
+          <div className={`${ui.field} full`}>
             <label htmlFor="new-password" className={ui.label}>
               Nova senha
             </label>
@@ -280,7 +273,7 @@ export default function ChangePasswordForm({
             {fieldError('next')}
           </div>
 
-          <div className={ui.field}>
+          <div className={`${ui.field} full`}>
             <label htmlFor="confirm-password" className={ui.label}>
               Confirmar nova senha
             </label>
@@ -326,7 +319,7 @@ export default function ChangePasswordForm({
           </div>
         </div>
 
-        <div className={`${ui.requirements} ${styles.passwordRequirements}`}>
+        <div className={ui.requirements}>
           <p className={ui.requirementsTitle}>Requisitos da senha</p>
           <ul>
             <li
@@ -355,25 +348,7 @@ export default function ChangePasswordForm({
             </li>
           </ul>
         </div>
-
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={`${ui.btn} ${ui.btnSecondary}`}
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className={`${ui.btn} ${ui.btnPrimary}`}
-            disabled={submitting}
-          >
-            {submitting ? 'Salvando...' : 'Salvar nova senha'}
-          </button>
-        </div>
       </form>
-    </dialog>
+    </Modal>
   );
 }

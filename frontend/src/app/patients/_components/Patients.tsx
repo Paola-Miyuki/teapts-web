@@ -1,63 +1,37 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import type { Account } from '@/lib/account';
 import { can } from '@/lib/permissions';
 import styles from '../patients.module.css';
 import AddPatientModal from './AddPatientModal';
 import PatientList from './PatientList';
-import PatientSearch from './PatientSearch';
-import SupportContactsModal, {
-  type SupportContactsPatient,
-} from './SupportContactsModal';
 
-// Só o admin consulta e adiciona pacientes; os demais veem o bloqueio, sem
-// chamar a API.
+// Pacientes de `pacientes.html`: o admin vê todos e adiciona; o profissional vê
+// os dos PTS de que faz ou fez parte (RN016). Os demais veem o bloqueio.
 export default function Patients() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  return (
+    <AuthenticatedPage
+      currentHref="/patients"
+      breadcrumb="Pacientes"
+      requiredAction="viewAuthorizedPatients"
+    >
+      {(account) => <PatientsContent account={account} />}
+    </AuthenticatedPage>
+  );
+}
 
-  // O termo fica na URL (/patients?q=) para manter a busca ao recarregar,
-  // voltar ou compartilhar o link.
-  const search = useDebouncedSearch({
-    initialTerm: searchParams.get('q') ?? '',
-    onTermChange: (term) =>
-      router.replace(
-        term ? `/patients?q=${encodeURIComponent(term)}` : '/patients',
-        {
-          scroll: false,
-        },
-      ),
-  });
-
+function PatientsContent({ account }: { account: Account }) {
+  const isAdmin = can(account, 'viewPatientRegistry');
+  const canCreate = can(account, 'createPatientProfile');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [contactsPatient, setContactsPatient] =
-    useState<SupportContactsPatient | null>(null);
   const [success, setSuccess] = useState('');
-  // Muda a cada paciente adicionado, para a lista recarregar.
   const [listKey, setListKey] = useState(0);
-
-  function openAdd() {
-    setSuccess('');
-    setIsAddOpen(true);
-  }
-
-  function openContacts(patient: SupportContactsPatient) {
-    setSuccess('');
-    setContactsPatient(patient);
-  }
-
-  function handleContactsSaved() {
-    setSuccess(
-      `Contatos de suporte de ${contactsPatient?.name ?? 'paciente'} atualizados.`,
-    );
-    setContactsPatient(null);
-  }
 
   function handleAdded(name: string) {
     setIsAddOpen(false);
@@ -66,85 +40,59 @@ export default function Patients() {
   }
 
   return (
-    <AuthenticatedPage
-      currentHref="/patients"
-      breadcrumb="Pacientes"
-      requiredAction="viewPatientRegistry"
-    >
-      {(account) => (
-        <>
-          <div className={`${ui.heading} ${styles.heading}`}>
-            <div>
-              <h1>Pacientes</h1>
+    <>
+      <div className="heading">
+        <div>
+          <h1>Pacientes</h1>
+        </div>
 
-              <p>
-                Consulte os pacientes cadastrados e adicione contas existentes
-                como pacientes.
-              </p>
-            </div>
+        <div className="heading-actions">
+          {canCreate && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setSuccess('');
+                setIsAddOpen(true);
+              }}
+            >
+              <Icon name="plus" className="icon-sm" />
+              Adicionar paciente
+            </button>
+          )}
 
-            {can(account, 'createPatientProfile') && (
-              <button
-                type="button"
-                className={`${ui.btn} ${ui.btnPrimary} ${styles.create}`}
-                onClick={openAdd}
-              >
-                <Icon name="plus" className={ui.icon} />
-                Adicionar paciente
-              </button>
-            )}
+          {!isAdmin && (
+            <Link href="/pts/novo" className="btn btn-primary">
+              <Icon name="plus" className="icon-sm" />
+              Criar proposta de PTS
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {success && (
+        <div
+          className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
+          role="status"
+        >
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
           </div>
 
-          <>
-            {success && (
-              <div
-                className={`${ui.alert} ${ui.alertSuccess} ${styles.success}`}
-                role="status"
-              >
-                <div className={ui.alertIcon}>
-                  <Icon name="checkCircle" />
-                </div>
-
-                <span>{success}</span>
-              </div>
-            )}
-
-            <PatientSearch
-              value={search.input}
-              isTooShort={search.isTooShort}
-              onChange={search.setInput}
-              onCommit={search.commit}
-              onClear={search.clear}
-            />
-
-            <PatientList
-              key={listKey}
-              term={search.term}
-              onAdd={openAdd}
-              onClearSearch={search.clear}
-              canAdd={can(account, 'createPatientProfile')}
-              // A lista só aparece para o admin, que gerencia os contatos de
-              // qualquer paciente (RFPAC003).
-              onEditContacts={
-                can(account, 'manageSupportContacts') ? openContacts : undefined
-              }
-            />
-
-            <AddPatientModal
-              open={isAddOpen}
-              onClose={() => setIsAddOpen(false)}
-              onAdded={handleAdded}
-              canCreate={can(account, 'createPatientProfile')}
-            />
-
-            <SupportContactsModal
-              patient={contactsPatient}
-              onClose={() => setContactsPatient(null)}
-              onSaved={handleContactsSaved}
-            />
-          </>
-        </>
+          <span>{success}</span>
+        </div>
       )}
-    </AuthenticatedPage>
+
+      <PatientList isAdmin={isAdmin} reloadKey={listKey} />
+
+      {canCreate && (
+        <AddPatientModal
+          open={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          onAdded={handleAdded}
+          canCreate={canCreate}
+        />
+      )}
+    </>
   );
 }

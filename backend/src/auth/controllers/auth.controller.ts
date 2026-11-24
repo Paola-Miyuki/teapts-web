@@ -38,7 +38,10 @@ import { ChangePasswordRequestDto } from '../dto/change-password-request.dto';
 import { ChangePasswordResponseDto } from '../dto/change-password-response.dto';
 import { UpdateMeRequestDto } from '../dto/update-me-request.dto';
 import { processLogout } from '../services/supertokens.service';
-import { AccountsService } from '../../accounts/services/accounts.service';
+import {
+  AccountsService,
+  toMeResponse,
+} from '../../accounts/services/accounts.service';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import {
   ErrorResponseDto,
@@ -78,14 +81,7 @@ export class AuthController {
       account.accountId,
     );
 
-    return {
-      accountId: account.accountId,
-      name: accountDetails.name,
-      email: accountDetails.email,
-      role: accountDetails.role,
-      patientProfileId: account.patientProfileId,
-      professionalProfileIds: account.professionalProfileIds,
-    };
+    return toMeResponse(accountDetails, account);
   }
 
   @Patch('me')

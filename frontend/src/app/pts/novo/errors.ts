@@ -50,7 +50,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
 
   if (
     api &&
-    (api.httpStatus === 403 ||
+    (api.status === 403 ||
       (api.code !== undefined && UNAUTHORIZED_CODES.has(api.code)))
   ) {
     return {
@@ -61,7 +61,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
     };
   }
 
-  if (api?.httpStatus === 401) {
+  if (api?.status === 401) {
     return {
       kind: 'session-expired',
       title: 'Sessão expirada',
@@ -69,7 +69,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
     };
   }
 
-  if (api?.httpStatus === 0) {
+  if (api?.status === 0) {
     return {
       kind: 'network',
       title: 'Sem conexão',
@@ -82,7 +82,7 @@ export function mapCreatePtsError(err: unknown): CreatePtsError {
     kind: 'generic',
     title: 'Não foi possível criar a proposta',
     message:
-      api?.message ||
+      api?.apiMessage ||
       'Ocorreu um erro inesperado. Tente novamente em instantes.',
   };
 }

@@ -85,9 +85,12 @@
   color: var(--fg);
 }
 
-.navLink[aria-current='page'] {
-  background: var(--fg);
-  color: var(--surface);
+/* Item ativo em amarelo, como nos mockups (teapts-ui.css, .shell-navLink). */
+.navLink[aria-current='page'],
+.navLink[aria-current='page']:hover {
+  background: var(--accent);
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .navLink:disabled {
