@@ -338,3 +338,122 @@ describe('POST /professionals', () => {
     });
   });
 });
+
+describe('PATCH /professionals/:id', () => {
+  const id = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+  const body = { specialism: Specialism.Psychologist };
+  const profile: ProfessionalProfileResponseDto = {
+    id,
+    accountId: '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b',
+    name: 'Kaio Felipe',
+    email: 'kaio@exemplo.com',
+    specialism: { id: Specialism.Psychologist, name: 'Psicólogo' },
+    registration: { council: 'CRP', number: '12345', state: 'pr' },
+    institution: null,
+    cnes: null,
+    deactivatedAt: null,
+  };
+  let app: INestApplication;
+  let currentAccount: AccountContext;
+  let professionalsService: {
+    update: jest.Mock<
+      (
+        id: string,
+        input: Parameters<ProfessionalsService['update']>[1],
+      ) => Promise<ProfessionalProfileResponseDto>
+    >;
+  };
+
+  beforeEach(async () => {
+    currentAccount = {
+      accountId: 'admin-1',
+      role: AccountRole.Admin,
+      patientProfileId: null,
+      professionalProfileIds: [],
+    };
+    professionalsService = { update: jest.fn(async () => profile) };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ProfessionalsController],
+      providers: [
+        { provide: ProfessionalsService, useValue: professionalsService },
+        AdminGuard,
+      ],
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          context
+            .switchToHttp()
+            .getRequest<{ accountContext?: AccountContext }>().accountContext =
+            currentAccount;
+          return true;
+        },
+      })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    app.useGlobalPipes(createValidationPipe());
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('updates the profile and answers 200', async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/professionals/${id}`)
+      .send({ ...body, councilNumber: '12345', councilState: 'pr' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(profile);
+    expect(professionalsService.update).toHaveBeenCalledWith(id, {
+      ...body,
+      councilNumber: '12345',
+      councilState: 'pr',
+    });
+  });
+
+  it('returns 400 VALIDATION_ERROR for a specialism outside the list', async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/professionals/${id}`)
+      .send({ specialism: 'astronaut' });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Informe uma especialidade válida.',
+    });
+    expect(professionalsService.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 VALIDATION_ERROR for an id that is not a UUID', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/professionals/123')
+      .send(body);
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: id',
+    });
+    expect(professionalsService.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 FORBIDDEN to an account that is not admin', async () => {
+    currentAccount = { ...currentAccount, role: AccountRole.User };
+
+    const response = await request(app.getHttpServer())
+      .patch(`/professionals/${id}`)
+      .send(body);
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador.',
+    });
+    expect(professionalsService.update).not.toHaveBeenCalled();
+  });
+});

@@ -331,3 +331,72 @@ describe('ProfessionalsRepository.insert', () => {
     await expect(repository.insert(newProfile)).rejects.toBe(failure);
   });
 });
+
+describe('ProfessionalsRepository.findById', () => {
+  function createFindRepository() {
+    const typeormRepository = {
+      findOne: jest.fn<(options: unknown) => Promise<Professional | null>>(),
+    };
+    const repository = new ProfessionalsRepository(
+      typeormRepository as unknown as Repository<Professional>,
+    );
+
+    return { typeormRepository, repository };
+  }
+
+  it('loads the profile with its account', async () => {
+    const { typeormRepository, repository } = createFindRepository();
+    const professional = { id: 'professional-1' } as Professional;
+    typeormRepository.findOne.mockResolvedValue(professional);
+
+    await expect(repository.findById('professional-1')).resolves.toBe(
+      professional,
+    );
+
+    expect(typeormRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 'professional-1' },
+      relations: { account: true },
+    });
+  });
+});
+
+describe('ProfessionalsRepository.update', () => {
+  function createUpdateRepository() {
+    const typeormRepository = {
+      update: jest.fn<(id: string, values: unknown) => Promise<unknown>>(),
+    };
+    const repository = new ProfessionalsRepository(
+      typeormRepository as unknown as Repository<Professional>,
+    );
+
+    return { typeormRepository, repository };
+  }
+
+  const changes = {
+    specialism: Specialism.Nurse,
+    councilNumber: '6789',
+    councilState: 'pr' as const,
+  };
+
+  it('saves the specialism and the registration and stamps updated_at', async () => {
+    const { typeormRepository, repository } = createUpdateRepository();
+    typeormRepository.update.mockResolvedValue({});
+
+    await repository.update('professional-1', changes);
+
+    expect(typeormRepository.update).toHaveBeenCalledWith('professional-1', {
+      ...changes,
+      updatedAt: expect.any(Date),
+    });
+  });
+
+  it('propagates database errors to the caller', async () => {
+    const { typeormRepository, repository } = createUpdateRepository();
+    const failure = new Error('connection lost');
+    typeormRepository.update.mockRejectedValue(failure);
+
+    await expect(repository.update('professional-1', changes)).rejects.toBe(
+      failure,
+    );
+  });
+});

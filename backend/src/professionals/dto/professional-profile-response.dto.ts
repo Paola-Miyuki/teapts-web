@@ -17,8 +17,8 @@ export class ProfessionalProfileResponseDto {
   email: string;
   specialism: ProfessionalSpecialismResponseDto;
   /** Registro no conselho; o conselho vem da especialidade. */
-  @ApiProperty({ type: ProfessionalRegistrationResponseDto })
-  registration: ProfessionalRegistrationResponseDto;
+  @ApiProperty({ type: ProfessionalRegistrationResponseDto, nullable: true })
+  registration: ProfessionalRegistrationResponseDto | null;
   /** Instituição ou serviço de vínculo. */
   @ApiProperty({ type: String, nullable: true, example: 'CAPSi Boa Vista' })
   institution: string | null;

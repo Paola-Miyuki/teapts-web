@@ -1,10 +1,11 @@
-// Este arquivo concentra as regras de profissionais: a consulta e o cadastro
-// do perfil profissional.
+// Este arquivo concentra as regras de profissionais: a consulta, o cadastro e
+// a troca de especialidade do perfil profissional.
 // As queries ficam no ProfessionalsRepository; aqui ficam as regras do
 // cadastro, o erro seguro, a conversão para o contrato público e os
 // metadados da paginação.
 
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -17,7 +18,9 @@ import { Account } from '../../accounts/entities/account.entity';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
+import type { Professional } from '../entities/professional.entity';
 import type { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
+import type { UpdateProfessionalRequestDto } from '../dto/update-professional-request.dto';
 import type { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
 import type {
   GetProfessionalsResponseDto,
@@ -218,6 +221,97 @@ export class ProfessionalsService {
       institution,
       cnes,
       deactivatedAt: null,
+    };
+  }
+
+  /**
+   * Troca a especialidade de um perfil profissional (RFPRO003, RN026).
+   *
+   * Mesmo conselho mantém o registro; outro conselho exige o novo número e UF
+   * e os grava no lugar do anterior. As equipes dos PTS não são tocadas.
+   *
+   * @param id id do perfil
+   * @param request corpo já validado pelo ValidationPipe global
+   * @returns perfil profissional atualizado
+   * @throws NotFoundException `PROFESSIONAL_NOT_FOUND` quando o perfil não
+   *   existe
+   * @throws BadRequestException `VALIDATION_ERROR` quando o conselho muda e
+   *   faltam o número ou a UF do novo registro
+   * @throws InternalServerErrorException quando a consulta ou a gravação
+   *   falha, sem expor o erro original
+   */
+  async update(
+    id: string,
+    request: UpdateProfessionalRequestDto,
+  ): Promise<ProfessionalProfileResponseDto> {
+    const failure = () =>
+      new InternalServerErrorException({
+        status: 'ERROR',
+        message: 'Não foi possível atualizar o perfil profissional.',
+      });
+    let professional: Professional | null;
+
+    try {
+      professional = await this.professionalsRepository.findById(id);
+    } catch (error) {
+      this.logger.error('Professional profile query failed', error);
+      throw failure();
+    }
+
+    if (!professional?.account) {
+      throw new NotFoundException({
+        status: 'PROFESSIONAL_NOT_FOUND',
+        message: 'Profissional não encontrado.',
+      });
+    }
+
+    const changesCouncil =
+      SPECIALISM_COUNCILS[request.specialism] !==
+      SPECIALISM_COUNCILS[professional.specialism];
+    const councilNumber = request.councilNumber?.trim();
+
+    if (changesCouncil && (!councilNumber || !request.councilState)) {
+      throw new BadRequestException({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o número e a UF do registro no novo conselho.',
+      });
+    }
+
+    // Mesmo conselho mantém o registro; o enviado no corpo é ignorado.
+    const registration = changesCouncil
+      ? { councilNumber: councilNumber!, councilState: request.councilState! }
+      : {
+          councilNumber: professional.councilNumber,
+          councilState: professional.councilState,
+        };
+
+    try {
+      await this.professionalsRepository.update(professional.id, {
+        specialism: request.specialism,
+        ...registration,
+      });
+    } catch (error) {
+      this.logger.error('Professional profile update failed', error);
+      throw failure();
+    }
+
+    return {
+      id: professional.id,
+      accountId: professional.accountId,
+      name: professional.account.name,
+      email: professional.account.email,
+      specialism: {
+        id: request.specialism,
+        name: SPECIALISM_NAMES[request.specialism],
+      },
+      registration: toProfessionalRegistration(
+        request.specialism,
+        registration.councilNumber,
+        registration.councilState,
+      ),
+      institution: professional.institution,
+      cnes: professional.cnes,
+      deactivatedAt: professional.account.deactivatedAt?.toISOString() ?? null,
     };
   }
 

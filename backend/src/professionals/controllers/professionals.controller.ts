@@ -1,9 +1,21 @@
 // Este arquivo expõe as rotas autenticadas de profissionais: a consulta para
-// seleção e o cadastro do perfil profissional (só admin).
+// seleção e o cadastro e a troca de especialidade do perfil profissional
+// (só admin).
 // O ValidationPipe global valida a query e o corpo, e o controller delega ao
 // ProfessionalsService.
 
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -24,12 +36,21 @@ import { AuthGuard } from '../../auth/guards/auth.guard';
 import { CreateProfessionalRequestDto } from '../dto/create-professional-request.dto';
 import { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
 import { GetProfessionalsResponseDto } from '../dto/get-professionals-response.dto';
+import { UpdateProfessionalRequestDto } from '../dto/update-professional-request.dto';
 import { ProfessionalProfileResponseDto } from '../dto/professional-profile-response.dto';
 import {
   ErrorResponseDto,
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { ProfessionalsService } from '../services/professionals.service';
+
+const parseProfessionalId = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException({
+      status: 'VALIDATION_ERROR',
+      message: 'Parâmetro inválido: id',
+    }),
+});
 
 /**
  * Expõe a consulta autenticada de profissionais para seleção e o cadastro de
@@ -144,5 +165,53 @@ export class ProfessionalsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<ProfessionalProfileResponseDto> {
     return this.professionalsService.create(body, account.accountId);
+  }
+
+  /**
+   * Troca a especialidade de um perfil profissional (RFPRO003).
+   *
+   * @param id id do perfil
+   * @param body especialidade e, se o conselho mudar, o novo registro
+   * @returns perfil atualizado
+   */
+  @Patch('professionals/:id')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: ProfessionalProfileResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe uma especialidade válida.',
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PROFESSIONAL_NOT_FOUND',
+      message: 'Profissional não encontrado.',
+    },
+  })
+  @ApiInternalServerErrorResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'ERROR',
+      message: 'Não foi possível atualizar o perfil profissional.',
+    },
+  })
+  async update(
+    @Param('id', parseProfessionalId) id: string,
+    @Body() body: UpdateProfessionalRequestDto,
+  ): Promise<ProfessionalProfileResponseDto> {
+    return this.professionalsService.update(id, body);
   }
 }
