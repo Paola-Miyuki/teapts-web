@@ -54,8 +54,35 @@ describe('getNavigation', () => {
     ]);
   });
 
-  it('mostra PTS para paciente, profissional e admin, mas não para conta sem perfil', () => {
-    expect(labels(account({ patientProfileId: 'patient' }))).toContain('PTS');
+  it('mostra propostas de PTS com rótulo claro para o paciente', () => {
+    expect(labels(account({ patientProfileId: 'patient' }))).toContain(
+      'Propostas de PTS',
+    );
+    expect(labels(account({ patientProfileId: 'patient' }))).not.toContain(
+      'PTS',
+    );
+    expect(
+      labels(account({ professionalProfileIds: ['professional'] })),
+    ).toContain('PTS');
+    expect(labels(account({ role: 'admin' }))).toContain('PTS');
+    expect(labels(account({}))).not.toContain('PTS');
+  });
+
+  it('usa ícones diferentes para medicações e propostas de PTS', () => {
+    const navigation = getNavigation(
+      account({ patientProfileId: 'patient' }),
+      '/pts',
+    );
+
+    expect(navigation.find((item) => item.href === '/medications')?.icon).toBe(
+      'pill',
+    );
+    expect(
+      navigation.find((item) => item.href === '/pts/proposals')?.icon,
+    ).toBe('clipboard');
+  });
+
+  it('mostra o link para propostas nos outros perfis, mas não para conta sem perfil', () => {
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
     ).toContain('PTS');
@@ -97,7 +124,7 @@ describe('getNavigation', () => {
       'Início',
       'Meu PTS',
       'Medicações',
-      'PTS',
+      'Propostas de PTS',
     ]);
 
     expect(labels(account())).toEqual(['Início']);
