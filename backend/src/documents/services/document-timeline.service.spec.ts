@@ -104,6 +104,43 @@ describe('DocumentTimelineService.recordUploaded', () => {
     });
   });
 
+  describe('DocumentTimelineService.recordDeleted', () => {
+    it('records document_deleted with the actor on the active PTS', async () => {
+      const { service, recorder, manager } = createService({ id: 'pts-1' });
+
+      await service.recordDeleted(
+        document,
+        admin,
+        manager as unknown as EntityManager,
+      );
+
+      expect(recorder.record).toHaveBeenCalledWith(
+        {
+          ptsId: 'pts-1',
+          type: TimelineRecordType.DocumentDeleted,
+          description: 'Documento "Laudo neurológico" excluído.',
+          targetId: 'doc-1',
+          targetType: TimelineRecordTarget.Document,
+          authorProfessionalId: null,
+          executedByAccountId: 'admin-1',
+        },
+        manager,
+      );
+    });
+
+    it('does not record an event when there is no active PTS', async () => {
+      const { service, recorder, manager } = createService(null);
+
+      await service.recordDeleted(
+        document,
+        admin,
+        manager as unknown as EntityManager,
+      );
+
+      expect(recorder.record).not.toHaveBeenCalled();
+    });
+  });
+
   it('leaves the author empty when the admin uploads', async () => {
     const { service, recorder, manager } = createService({ id: 'pts-1' });
 

@@ -149,6 +149,17 @@ export function updateDocument(
   );
 }
 
+export type DeletedDocument = { id: string; deletedAt: string };
+
+// DELETE /documents/:id (RFDOC006): exclusão lógica, só do admin; o registro
+// e o arquivo continuam guardados.
+export function deleteDocument(documentId: string) {
+  return request<DeletedDocument>(
+    `/documents/${encodeURIComponent(documentId)}`,
+    { method: 'DELETE' },
+  );
+}
+
 // POST /patients/:id/documents: confirma o envio e cria o documento. Repetir a
 // `fileKey` devolve o documento já criado.
 export function confirmDocument(

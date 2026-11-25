@@ -23,6 +23,7 @@ import {
 import { formatDate, formatDateOnly } from '@/lib/format';
 import { SPECIALISMS } from '@/lib/professionals';
 import DocumentViewer, { useDocumentViewer } from './DocumentViewer';
+import DeleteDocumentDialog from '@/app/patients/_components/DeleteDocumentDialog';
 import EditDocumentDialog from '@/app/patients/_components/EditDocumentDialog';
 
 type CategoryOption = { value: DocumentCategory; label: string };
@@ -42,6 +43,10 @@ type DocumentsTableProps = {
   action?: ReactNode;
   // A edição só é habilitada nas tabelas do prontuário e para quem tem acesso.
   canEditDocuments?: boolean;
+  // A exclusão (só do admin) também é habilitada só no prontuário.
+  canDeleteDocuments?: boolean;
+  // Chamado depois que um documento é excluído (ex.: recarregar o resumo).
+  onDeleted?: () => void;
   // Muda para a tabela recarregar (ex.: depois de uma ação fora dela).
   reloadKey?: number;
   // Chamado a cada carga bem-sucedida.
@@ -83,7 +88,8 @@ function Issuer({ issuer }: { issuer: DocumentListItem['issuer'] }) {
 // Tabela de documentos de `paciente.html` (abas Documentos e Termos e
 // consentimentos) e de `meus-documentos.html`: busca pelo título, filtro de
 // categoria, paginação e ações de consulta; Editar aparece só no prontuário
-// para contas autorizadas (RFDOC003, RFDOC005, RFDOC007).
+// para contas autorizadas e Excluir só para o admin (RFDOC003, RFDOC005,
+// RFDOC006, RFDOC007).
 export default function DocumentsTable({
   id,
   title,
@@ -94,6 +100,8 @@ export default function DocumentsTable({
   load,
   action,
   canEditDocuments = false,
+  canDeleteDocuments = false,
+  onDeleted,
   reloadKey = 0,
   onLoaded,
 }: DocumentsTableProps) {
@@ -106,6 +114,7 @@ export default function DocumentsTable({
   const [retryKey, setRetryKey] = useState(0);
   const [result, setResult] = useState<DocumentList | null>(null);
   const [editing, setEditing] = useState<DocumentListItem | null>(null);
+  const [deleting, setDeleting] = useState<DocumentListItem | null>(null);
   const [error, setError] = useState('');
   const viewer = useDocumentViewer();
 
@@ -353,6 +362,28 @@ export default function DocumentsTable({
                             </button>
                           </li>
                         )}
+                        {canDeleteDocuments ? (
+                          <li>
+                            <div className="sep" />
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="danger"
+                              onClick={() => setDeleting(document)}
+                            >
+                              <Icon name="trash" className="icon-sm" />
+                              Excluir
+                            </button>
+                          </li>
+                        ) : (
+                          canEditDocuments && (
+                            <li>
+                              <p className="note">
+                                Só o administrador exclui documentos.
+                              </p>
+                            </li>
+                          )
+                        )}
                       </KebabMenu>
                     </td>
                   </tr>
@@ -375,6 +406,22 @@ export default function DocumentsTable({
           />
         </>
       )}
+      <DeleteDocumentDialog
+        document={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => {
+          setDeleting(null);
+
+          // Tira a linha e recarrega: o total muda e a última página some.
+          if (page > 1 && result?.data.length === 1) {
+            setPage(page - 1);
+          } else {
+            setRetryKey((current) => current + 1);
+          }
+
+          onDeleted?.();
+        }}
+      />
       {editing && (
         <EditDocumentDialog
           document={editing}

@@ -16,6 +16,7 @@ export type PermissionAction =
   | 'viewProfessionalDirectory'
   | 'uploadDocument'
   | 'editDocument'
+  | 'deleteDocument'
   | 'viewPatientDocuments'
   | 'createProfessional'
   | 'manageAccounts'
@@ -199,6 +200,9 @@ export function can(
     case 'editDocument':
       // RFDOC005 – admin ou profissional com acesso de escrita ao paciente.
       return professional && context.patientReadOnly === false;
+    case 'deleteDocument':
+      // RFDOC006, DP009 – só o administrador exclui documentos.
+      return admin;
     case 'viewPatientDocuments':
       // RFDOC003, RN028 – admin (RN022) e profissional vinculado (a API
       // confere o vínculo); o paciente não vê os documentos da equipe.

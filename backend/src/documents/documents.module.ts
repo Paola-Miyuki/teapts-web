@@ -13,10 +13,13 @@ import { DocumentAccessService } from './services/document-access.service';
 import { DocumentTimelineService } from './services/document-timeline.service';
 import { DocumentUploadService } from './services/document-upload.service';
 import { DocumentsService } from './services/documents.service';
+import { OrphanUploadsCleanupService } from './services/orphan-uploads-cleanup.service';
+import { OrphanUploadsCleanupTask } from './tasks/orphan-uploads-cleanup.task';
 
 /**
  * Documentos do paciente: URL de envio (RFDOC001), confirmação (RFDOC002),
- * consulta e URL de leitura (RFDOC003) e consulta do paciente (RFDOC007).
+ * consulta e URL de leitura (RFDOC003) e consulta do paciente (RFDOC007) e limpeza agendada dos uploads não
+ * confirmados (RFDOC004).
  */
 @Module({
   imports: [
@@ -37,6 +40,8 @@ import { DocumentsService } from './services/documents.service';
     DocumentsRepository,
     DocumentsService,
     DocumentTimelineService,
+    OrphanUploadsCleanupService,
+    OrphanUploadsCleanupTask,
   ],
   exports: [DocumentAccessService, DocumentTimelineService],
 })

@@ -24,6 +24,6 @@ import { StorageService } from './storage.service';
     StorageTokenService,
     { provide: StorageService, useClass: PostgresStorage },
   ],
-  exports: [StorageService, StorageTokenService],
+  exports: [StorageService, StorageTokenService, STORAGE_CONFIG],
 })
 export class StorageModule {}

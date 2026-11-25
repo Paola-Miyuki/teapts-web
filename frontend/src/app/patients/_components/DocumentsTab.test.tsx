@@ -309,6 +309,154 @@ describe('DocumentsTab', () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 
+  describe('delete', () => {
+    async function openDelete(user: ReturnType<typeof userEvent.setup>) {
+      await screen.findByText('Laudo neurológico');
+      await user.click(
+        screen.getByRole('button', { name: 'Ações para Laudo neurológico' }),
+      );
+    }
+
+    it('deletes the document after the confirmation and reloads the list', async () => {
+      const user = userEvent.setup();
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(respond(200, list([LAUDO, EXAME])))
+        .mockResolvedValueOnce(
+          respond(200, { id: 'doc-1', deletedAt: '2026-12-09T12:00:00.000Z' }),
+        )
+        .mockResolvedValueOnce(respond(200, list([EXAME])));
+
+      render(
+        <DocumentsTab
+          patientId="patient-1"
+          canUpload={false}
+          canEditDocuments
+          canDeleteDocuments
+        />,
+      );
+
+      await openDelete(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Excluir' }));
+
+      const dialog = screen.getByRole('dialog');
+
+      expect(
+        within(dialog).getByText('Excluir "Laudo neurológico"?'),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(/O arquivo não é apagado/),
+      ).toBeInTheDocument();
+
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Excluir documento' }),
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByText('Laudo neurológico')).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText('1 documento')).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${API}/documents/doc-1`,
+        expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+      );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('shows Excluir only to whoever can delete', async () => {
+      const user = userEvent.setup();
+      global.fetch = jest.fn().mockResolvedValue(respond(200, list([LAUDO])));
+
+      render(
+        <DocumentsTab
+          patientId="patient-1"
+          canUpload={false}
+          canEditDocuments
+        />,
+      );
+
+      await openDelete(user);
+
+      expect(
+        screen.queryByRole('menuitem', { name: 'Excluir' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Só o administrador exclui documentos.'),
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the dialog open with the API message on error', async () => {
+      const user = userEvent.setup();
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(respond(200, list([LAUDO])))
+        .mockResolvedValueOnce(
+          respond(404, {
+            status: 'DOCUMENT_NOT_FOUND',
+            message: 'Documento não encontrado.',
+          }),
+        );
+
+      render(
+        <DocumentsTab
+          patientId="patient-1"
+          canUpload={false}
+          canDeleteDocuments
+        />,
+      );
+
+      await openDelete(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Excluir' }));
+      await user.click(
+        screen.getByRole('button', { name: 'Excluir documento' }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Documento não encontrado.',
+      );
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Laudo neurológico')).toBeInTheDocument();
+    });
+
+    it('shows the loading state while deleting', async () => {
+      const user = userEvent.setup();
+      let finish: (response: Response) => void = () => undefined;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(respond(200, list([LAUDO])))
+        .mockReturnValueOnce(
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          }),
+        )
+        .mockResolvedValue(respond(200, list([])));
+
+      render(
+        <DocumentsTab
+          patientId="patient-1"
+          canUpload={false}
+          canDeleteDocuments
+        />,
+      );
+
+      await openDelete(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Excluir' }));
+      await user.click(
+        screen.getByRole('button', { name: 'Excluir documento' }),
+      );
+
+      expect(
+        await screen.findByRole('button', { name: 'Excluindo...' }),
+      ).toBeDisabled();
+
+      finish(respond(200, { id: 'doc-1', deletedAt: '2026-12-09T12:00:00Z' }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+      );
+    });
+  });
+
   describe('view and download', () => {
     let tab: { location: { href: string }; opener: unknown; close: jest.Mock };
 

@@ -16,6 +16,8 @@ describe('getStorageConfig', () => {
   const keys = [
     'STORAGE_TOKEN_SECRET',
     'STORAGE_UPLOAD_URL_TTL_MINUTES',
+    'STORAGE_CLEANUP_INTERVAL_MINUTES',
+    'STORAGE_UNCONFIRMED_TTL_MINUTES',
     'API_DOMAIN',
   ];
   const saved: Record<string, string | undefined> = {};
@@ -41,6 +43,8 @@ describe('getStorageConfig', () => {
     expect(configFrom(validEnv)).toEqual({
       tokenSecret: 'secret',
       uploadUrlTtlMinutes: 15,
+      cleanupIntervalMinutes: 60,
+      unconfirmedTtlMinutes: 1440,
       baseUrl: 'http://localhost:3000',
     });
   });
@@ -78,4 +82,35 @@ describe('getStorageConfig', () => {
       configFrom({ ...validEnv, STORAGE_UPLOAD_URL_TTL_MINUTES: ttl }),
     ).toThrow('STORAGE_UPLOAD_URL_TTL_MINUTES must be a positive integer');
   });
+
+  it('reads the cleanup interval and the unconfirmed window from the environment', () => {
+    const config = configFrom({
+      ...validEnv,
+      STORAGE_CLEANUP_INTERVAL_MINUTES: '30',
+      STORAGE_UNCONFIRMED_TTL_MINUTES: '120',
+    });
+
+    expect(config.cleanupIntervalMinutes).toBe(30);
+    expect(config.unconfirmedTtlMinutes).toBe(120);
+  });
+
+  it.each([
+    'STORAGE_CLEANUP_INTERVAL_MINUTES',
+    'STORAGE_UNCONFIRMED_TTL_MINUTES',
+  ])('rejects an invalid %s', (name) => {
+    for (const value of ['0', '-5', 'abc', '1.5']) {
+      expect(() => configFrom({ ...validEnv, [name]: value })).toThrow(
+        `${name} must be a positive integer`,
+      );
+    }
+  });
+
+  it.each(['15', '10'])(
+    'rejects a window of %s minutes, not greater than the upload url expiry',
+    (window) => {
+      expect(() =>
+        configFrom({ ...validEnv, STORAGE_UNCONFIRMED_TTL_MINUTES: window }),
+      ).toThrow('STORAGE_UNCONFIRMED_TTL_MINUTES must be greater than');
+    },
+  );
 });

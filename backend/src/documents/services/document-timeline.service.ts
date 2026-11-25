@@ -86,4 +86,36 @@ export class DocumentTimelineService {
       manager,
     );
   }
+
+  /** Registra `document_deleted` no PTS ativo, na mesma transação. */
+  async recordDeleted(
+    document: DocumentEntity,
+    account: AccountContext,
+    manager: EntityManager,
+  ): Promise<void> {
+    const pts = await manager.findOne(PtsEntity, {
+      where: {
+        patientId: document.patientId,
+        status: In([PtsStateEnum.PLANNING, PtsStateEnum.RUNNING]),
+      },
+      select: { id: true },
+    });
+
+    if (!pts) {
+      return;
+    }
+
+    await this.recorder.record(
+      {
+        ptsId: pts.id,
+        type: TimelineRecordType.DocumentDeleted,
+        description: `Documento "${document.title}" excluído.`,
+        targetId: document.id,
+        targetType: TimelineRecordTarget.Document,
+        authorProfessionalId: account.professionalProfileIds[0] ?? null,
+        executedByAccountId: account.accountId,
+      },
+      manager,
+    );
+  }
 }

@@ -8,6 +8,8 @@ import type { StoredObject } from './entities/stored-object.entity';
 const config = {
   tokenSecret: 'secret',
   uploadUrlTtlMinutes: 15,
+  cleanupIntervalMinutes: 60,
+  unconfirmedTtlMinutes: 1440,
   baseUrl: 'http://localhost:3000',
 };
 const fileKey = 'patient-1/abc-laudo escolar.pdf';
@@ -218,5 +220,50 @@ describe('PostgresStorage.getObject', () => {
     objects.findOne.mockResolvedValue(null);
 
     await expect(storage.getObject(fileKey)).resolves.toBeNull();
+  });
+});
+
+describe('PostgresStorage.deleteExpiredUnconfirmed', () => {
+  function createDeleteStorage(affected: number | undefined) {
+    const execute = jest.fn(async () => ({ affected, raw: [] }));
+    const where = jest.fn(() => ({ execute }));
+    const from = jest.fn(() => ({ where }));
+    const objects = {
+      createQueryBuilder: jest.fn(() => ({ delete: () => ({ from }) })),
+    };
+    const storage = new PostgresStorage(
+      objects as unknown as Repository<StoredObject>,
+      new StorageTokenService(config),
+      config,
+    );
+
+    return { storage, from, where, execute };
+  }
+
+  it('deletes only inactive objects past the window and without a document', async () => {
+    const { storage, from, where } = createDeleteStorage(3);
+
+    await expect(storage.deleteExpiredUnconfirmed(1440, 100)).resolves.toBe(3);
+
+    expect(from).toHaveBeenCalledWith(expect.any(Function));
+
+    const [condition, params] = where.mock.calls[0] as unknown as [
+      string,
+      unknown,
+    ];
+
+    expect(condition).toContain('stored.active = false');
+    expect(condition).toContain('stored.created_at < now() - make_interval');
+    expect(condition).toContain(
+      'NOT EXISTS (\n              SELECT 1 FROM document WHERE document.file_key = stored.file_key',
+    );
+    expect(condition).toContain('LIMIT :limit');
+    expect(params).toEqual({ minutes: 1440, limit: 100 });
+  });
+
+  it('returns 0 when the driver does not report affected rows', async () => {
+    const { storage } = createDeleteStorage(undefined);
+
+    await expect(storage.deleteExpiredUnconfirmed(1440, 100)).resolves.toBe(0);
   });
 });

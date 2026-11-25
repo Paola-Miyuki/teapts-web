@@ -79,6 +79,15 @@ describe('can', () => {
     );
   });
 
+  it('permite excluir documentos só ao admin', () => {
+    expect(can(admin, 'deleteDocument')).toBe(true);
+    expect(can(professional, 'deleteDocument', { patientReadOnly: false })).toBe(
+      false,
+    );
+    expect(can(patient, 'deleteDocument')).toBe(false);
+    expect(can(waiting, 'deleteDocument')).toBe(false);
+  });
+
   it('abre o PTS e a timeline para a equipe, o paciente e o admin', () => {
     expect(can(admin, 'viewPts')).toBe(true);
     expect(can(professional, 'viewPts')).toBe(true);

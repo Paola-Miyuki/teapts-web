@@ -16,6 +16,8 @@ const fileKey = 'patient-1/abc-laudo.pdf';
 const tokens = new StorageTokenService({
   tokenSecret: 'secret',
   uploadUrlTtlMinutes: 15,
+  cleanupIntervalMinutes: 60,
+  unconfirmedTtlMinutes: 1440,
   baseUrl: 'http://localhost:3000',
 });
 

@@ -16,6 +16,7 @@ import type {
   DocumentListItemResponseDto,
   DocumentListResponseDto,
 } from '../dto/document-list-response.dto';
+import type { DeleteDocumentResponseDto } from '../dto/delete-document-response.dto';
 import type { UpdateDocumentResponseDto } from '../dto/update-document-response.dto';
 import type { DocumentResponseDto } from '../dto/document-response.dto';
 import type { UpdateDocumentRequestDto } from '../dto/update-document-request.dto';
@@ -327,5 +328,44 @@ export class DocumentsService {
       description: updated.description,
       updatedAt: updated.updatedAt.toISOString(),
     };
+  }
+
+  /**
+   * Exclui o documento de forma lógica (RFDOC006, RN021): grava `deleted_at` e
+   * `deleted_by_account_id` e registra `document_deleted`, na mesma transação.
+   * O objeto no storage não é tocado. O papel admin é conferido pelo
+   * `AdminGuard`.
+   *
+   * @throws NotFoundException `DOCUMENT_NOT_FOUND` quando não existe ou já foi
+   *   excluído
+   */
+  async remove(
+    account: AccountContext,
+    documentId: string,
+  ): Promise<DeleteDocumentResponseDto> {
+    const deletedAt = new Date();
+
+    await this.dataSource.transaction(async (manager) => {
+      const document = await this.documents.findActiveById(documentId, manager);
+
+      if (!document) {
+        throw documentNotFound();
+      }
+
+      const deleted = await this.documents.softDelete(
+        documentId,
+        account.accountId,
+        deletedAt,
+        manager,
+      );
+
+      if (!deleted) {
+        throw documentNotFound();
+      }
+
+      await this.timeline.recordDeleted(document, account, manager);
+    });
+
+    return { id: documentId, deletedAt: deletedAt.toISOString() };
   }
 }

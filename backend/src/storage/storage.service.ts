@@ -80,4 +80,16 @@ export abstract class StorageService {
     fileKey: string,
     manager?: EntityManager,
   ): Promise<void>;
+
+  /**
+   * Remove até `limit` objetos que nunca foram confirmados: sem a marca de
+   * ativo, criados há mais de `olderThanMinutes` e sem documento (nem excluído)
+   * apontando para eles.
+   *
+   * @returns quantos objetos foram removidos
+   */
+  abstract deleteExpiredUnconfirmed(
+    olderThanMinutes: number,
+    limit: number,
+  ): Promise<number>;
 }

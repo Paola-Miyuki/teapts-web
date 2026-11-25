@@ -83,6 +83,7 @@ function createService() {
     create: jest.fn<DocumentsRepository['create']>(),
     findActiveById: jest.fn<DocumentsRepository['findActiveById']>(),
     save: jest.fn<DocumentsRepository['save']>(),
+    softDelete: jest.fn<DocumentsRepository['softDelete']>(),
     findPage: jest.fn<DocumentsRepository['findPage']>(),
   };
   const storage = {
@@ -93,6 +94,7 @@ function createService() {
   const timeline = {
     recordUploaded: jest.fn<DocumentTimelineService['recordUploaded']>(),
     recordUpdated: jest.fn<DocumentTimelineService['recordUpdated']>(),
+    recordDeleted: jest.fn<DocumentTimelineService['recordDeleted']>(),
   };
 
   access.assertAccess.mockResolvedValue();
@@ -102,6 +104,7 @@ function createService() {
   documents.create.mockResolvedValue(stored);
   documents.findActiveById.mockImplementation(async () => ({ ...stored }));
   documents.save.mockImplementation(async (document) => document);
+  documents.softDelete.mockResolvedValue(true);
   storage.headObject.mockResolvedValue({
     mimeType: 'application/pdf',
     sizeBytes: 1024,
@@ -113,6 +116,7 @@ function createService() {
   });
   timeline.recordUploaded.mockResolvedValue();
   timeline.recordUpdated.mockResolvedValue();
+  timeline.recordDeleted.mockResolvedValue();
 
   return {
     manager,
@@ -425,6 +429,55 @@ describe('DocumentsService.confirm', () => {
     await expect(
       ctx.service.confirm(account, patientId, request),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('DocumentsService.remove', () => {
+  it('soft deletes the document and records the event in the same transaction', async () => {
+    const ctx = createService();
+
+    const result = await ctx.service.remove(account, stored.id);
+
+    expect(result).toEqual({
+      id: stored.id,
+      deletedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    });
+    expect(ctx.documents.findActiveById).toHaveBeenCalledWith(
+      stored.id,
+      ctx.manager,
+    );
+    expect(ctx.documents.softDelete).toHaveBeenCalledWith(
+      stored.id,
+      account.accountId,
+      expect.any(Date),
+      ctx.manager,
+    );
+    expect(ctx.timeline.recordDeleted).toHaveBeenCalledWith(
+      expect.objectContaining({ id: stored.id }),
+      account,
+      ctx.manager,
+    );
+  });
+
+  it('answers DOCUMENT_NOT_FOUND when the document does not exist or was already deleted', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(null);
+
+    await expect(ctx.service.remove(account, stored.id)).rejects.toMatchObject({
+      response: { status: 'DOCUMENT_NOT_FOUND' },
+    });
+    expect(ctx.documents.softDelete).not.toHaveBeenCalled();
+    expect(ctx.timeline.recordDeleted).not.toHaveBeenCalled();
+  });
+
+  it('answers DOCUMENT_NOT_FOUND when another request deleted it first', async () => {
+    const ctx = createService();
+    ctx.documents.softDelete.mockResolvedValue(false);
+
+    await expect(ctx.service.remove(account, stored.id)).rejects.toMatchObject({
+      response: { status: 'DOCUMENT_NOT_FOUND' },
+    });
+    expect(ctx.timeline.recordDeleted).not.toHaveBeenCalled();
   });
 });
 

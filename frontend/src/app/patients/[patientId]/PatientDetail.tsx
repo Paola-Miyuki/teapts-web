@@ -141,6 +141,7 @@ function PatientDetailContent({
   const canEditDocuments = can(account, 'editDocument', {
     patientReadOnly: patient.readOnly,
   });
+  const canDeleteDocuments = can(account, 'deleteDocument');
   const canUpload = can(account, 'uploadDocument', {
     patientReadOnly: patient.readOnly,
   });
@@ -355,6 +356,7 @@ function PatientDetailContent({
             patientId={patient.id}
             canUpload={canUpload}
             canEditDocuments={canEditDocuments}
+            canDeleteDocuments={canDeleteDocuments}
           />
         </section>
       )}
@@ -365,6 +367,7 @@ function PatientDetailContent({
             patientId={patient.id}
             canUpload={canUpload}
             canEditDocuments={canEditDocuments}
+            canDeleteDocuments={canDeleteDocuments}
           />
         </section>
       )}

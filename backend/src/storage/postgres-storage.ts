@@ -125,4 +125,31 @@ export class PostgresStorage extends StorageService {
 
     await objects.update({ fileKey }, { active: true });
   }
+
+  async deleteExpiredUnconfirmed(
+    olderThanMinutes: number,
+    limit: number,
+  ): Promise<number> {
+    // `document` é conferida por SQL para o storage não depender do módulo de
+    // documentos; documento excluído também protege o arquivo (RN021).
+    const result = await this.objects
+      .createQueryBuilder()
+      .delete()
+      .from(StoredObject)
+      .where(
+        `file_key IN (
+          SELECT stored.file_key FROM stored_object stored
+          WHERE stored.active = false
+            AND stored.created_at < now() - make_interval(mins => :minutes)
+            AND NOT EXISTS (
+              SELECT 1 FROM document WHERE document.file_key = stored.file_key
+            )
+          LIMIT :limit
+        )`,
+        { minutes: olderThanMinutes, limit },
+      )
+      .execute();
+
+    return result.affected ?? 0;
+  }
 }
