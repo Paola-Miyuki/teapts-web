@@ -27,6 +27,7 @@ src/
   common/       pagination, search, swagger, validation
   auth/         guards, SuperTokens, /me, signup e login
   accounts/     patients/     professionals/     pts/     timeline/     health/
+  notifications/ rotina diária do aviso da janela de reavaliação (RFNOT001, 06:00 de Brasília)
   documents/    URL de envio, confirmação do documento, DocumentTimelineService
   storage/      StorageService, driver PostgresStorage, token HMAC
   database/     database.config.ts (conexão e arrays entities/migrations), data-source.ts,
@@ -129,6 +130,35 @@ O seed não cria contatos de suporte, dados clínicos nem eventos de timeline.
 Para testar "Iniciar execução", use o PTS em `planning` do Diego Alves, com a Beatriz Lopes (responsável) ou o admin. Depois de iniciado ele fica em `running`, e o seed não o volta para `planning`.
 
 **Conferir e zerar:** `make db-tables`, `db-account`, `db-patients`, `db-professionals`, `db-pts`, `db-query SQL="..."`, `make psql` e `make health`. Zerar: `make clean`, `make up-d`, `make seed` (apaga também usuários e sessões do SuperTokens).
+
+## Rotinas agendadas
+
+Usam o `@nestjs/schedule` e rodam junto com a API; não têm rota.
+
+**Janela de reavaliação** (RFNOT001, `src/notifications/`): todo dia às 06:00 de Brasília, cria em `notification` o aviso dos PTS em `planning` ou `running` com a próxima revisão em até 30 dias.
+
+- **Recebem:** responsável, membros da equipe e paciente titular, com conta ativa. Não recebem: o admin e quem entrou na equipe depois do aviso. PTS encerrado ou já vencido não gera aviso.
+- **Sem repetir:** um aviso por destinatário e por data máxima (`UQ_notification_recipient_pts_review`); se a data mudar, sai um aviso novo.
+- **Falha:** o erro de um PTS vai para o log, e a rotina segue para os outros.
+
+Para rodar sem esperar o horário (Docker, terminal bash):
+
+```bash
+docker exec -i -e DATABASE_HOST=postgres teapts-backend node <<'E'
+const { NestFactory } = require('@nestjs/core');
+const { AppModule } = require('./dist/app.module');
+const S = './dist/notifications/services/review-window.service';
+const { ReviewWindowService } = require(S);
+(async () => {
+  const opts = { logger: ['error'] };
+  const app = await NestFactory.createApplicationContext(AppModule, opts);
+  const service = app.get(ReviewWindowService, { strict: false });
+  console.log('avisos criados:', await service.notifyReviewWindows());
+  await app.close();
+  process.exit();
+})();
+E
+```
 
 ## Swagger
 
