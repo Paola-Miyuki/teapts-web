@@ -354,6 +354,58 @@ describe('can', () => {
     });
   });
 
+  describe('registerAppointment (RFACT004)', () => {
+    const activity = (status: string) => ({
+      status,
+      authorProfessionalId: null,
+    });
+    const pts = (status: string) => ({ ...draft, status });
+
+    it('abre a página ao profissional e ao admin', () => {
+      expect(can(professional, 'registerAppointment')).toBe(true);
+      expect(can(admin, 'registerAppointment')).toBe(true);
+      expect(can(patient, 'registerAppointment')).toBe(false);
+      expect(can(waiting, 'registerAppointment')).toBe(false);
+    });
+
+    it('equipe e admin, só na em andamento de um PTS ativo', () => {
+      for (const user of [professional, admin]) {
+        for (const status of ['planning', 'running']) {
+          expect(
+            can(user, 'registerAppointment', {
+              pts: pts(status),
+              activity: activity('running'),
+            }),
+          ).toBe(true);
+        }
+        for (const status of ['draft', 'concluded', 'cancelled', 'rejected']) {
+          expect(
+            can(user, 'registerAppointment', {
+              pts: pts(status),
+              activity: activity('running'),
+            }),
+          ).toBe(false);
+        }
+        for (const status of ['suggested', 'suspended', 'concluded']) {
+          expect(
+            can(user, 'registerAppointment', {
+              pts: pts('running'),
+              activity: activity(status),
+            }),
+          ).toBe(false);
+        }
+      }
+      for (const user of [professional, patient]) {
+        expect(
+          can(user, 'registerAppointment', {
+            pts: { ...pts('running'), teamProfessionalIds: [] },
+            activity: activity('running'),
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   describe('archiveActivity (RFACT008)', () => {
     const pts = { ...draft, status: 'running' };
     const activity = (status: string) => ({

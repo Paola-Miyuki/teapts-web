@@ -69,6 +69,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
         canCreate
         canEdit={() => true}
         canArchive={() => true}
+        canRegister={() => false}
         canChangeStatus={() => true}
         team={TEAM}
         goals={GOALS}
@@ -145,6 +146,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
       canCreate: true,
       canEdit: () => true,
       canArchive: () => true,
+      canRegister: () => false,
       canChangeStatus: () => true,
       team: TEAM,
       goals: GOALS,
@@ -926,6 +928,47 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
       );
 
       await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
+  });
+
+  describe('registrar atendimento (RFACT004)', () => {
+    const href = '/appointments/new?pts=pts-1&activity=act-1';
+
+    it('leva à página com a atividade escolhida, pela linha e pelo modal', async () => {
+      fetchMock.mockResolvedValue(
+        respond(200, {
+          ...activity({ status: 'running' }),
+          goal: null,
+          documents: [],
+          appointmentsCount: 0,
+        }),
+      );
+      renderTab({
+        activities: [
+          activity({ status: 'running' }),
+          activity({ id: 'act-2', title: 'Hidroterapia' }),
+        ],
+        canRegister: (item) => item.status === 'running',
+      });
+
+      const items = screen.getAllByRole('menuitem', {
+        name: 'Registrar atendimento',
+        hidden: true,
+      });
+      expect(items).toHaveLength(1);
+      expect(items[0]).toHaveAttribute('href', href);
+
+      fireEvent.click(
+        screen.getAllByRole('menuitem', {
+          name: 'Visualizar',
+          hidden: true,
+        })[0],
+      );
+      expect(
+        await within(screen.getByRole('dialog')).findByRole('link', {
+          name: 'Registrar atendimento',
+        }),
+      ).toHaveAttribute('href', href);
     });
   });
 });

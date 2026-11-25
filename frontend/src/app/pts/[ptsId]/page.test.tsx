@@ -318,6 +318,16 @@ describe('PtsDetail', () => {
       });
     });
 
+    it('ao voltar do registro, confirma o atendimento (RFACT004)', async () => {
+      mockApi(respond(200, PTS), PROFESSIONAL);
+      window.history.replaceState(null, '', '/pts/pts-1#atividades');
+      render(<PtsDetailPage id="pts-1" appointmentRegistered />);
+
+      expect(
+        await screen.findByText('Atendimento registrado'),
+      ).toBeInTheDocument();
+    });
+
     it('mostra todos os status por padrão em um PTS encerrado', async () => {
       await openActivities({ status: 'concluded' }, PROFESSIONAL);
 
