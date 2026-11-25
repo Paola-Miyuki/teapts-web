@@ -110,6 +110,16 @@ export class PtsEntity {
   })
   cancelledAt: Date | null;
 
+  // Data informada no modal de encerramento; volta como 'yyyy-mm-dd'.
+  @Column({ name: 'closing_date', type: 'date', nullable: true })
+  closingDate: string | null;
+
+  @Column({ name: 'closing_reason', type: 'text', nullable: true })
+  closingReason: string | null;
+
+  @Column({ name: 'closed_by_account_id', type: 'uuid', nullable: true })
+  closedByAccountId: string | null;
+
   @Column({ name: 'patient_id' })
   patientId: string;
 

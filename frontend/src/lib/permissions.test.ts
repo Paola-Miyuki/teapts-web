@@ -445,3 +445,37 @@ describe.each([
     ).toBe(true);
   });
 });
+
+describe('closePts', () => {
+  const pts = (
+    status: string,
+    responsibleProfessionalId = 'professional-id',
+  ) => ({
+    pts: {
+      status,
+      responsibleProfessionalId,
+      teamProfessionalIds: ['professional-id'],
+    },
+  });
+
+  it.each(['planning', 'running'])(
+    'libera ao responsável e ao admin em %s',
+    (status) => {
+      expect(can(professional, 'closePts', pts(status))).toBe(true);
+      expect(can(admin, 'closePts', pts(status, 'other-id'))).toBe(true);
+      expect(can(professional, 'closePts', pts(status, 'other-id'))).toBe(
+        false,
+      );
+      expect(can(patient, 'closePts', pts(status))).toBe(false);
+      expect(can(waiting, 'closePts', pts(status))).toBe(false);
+    },
+  );
+
+  it.each(['draft', 'concluded', 'cancelled', 'rejected'])(
+    'nega em %s, inclusive ao admin',
+    (status) => {
+      expect(can(professional, 'closePts', pts(status))).toBe(false);
+      expect(can(admin, 'closePts', pts(status))).toBe(false);
+    },
+  );
+});

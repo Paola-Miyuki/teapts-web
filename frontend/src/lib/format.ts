@@ -23,6 +23,11 @@ export function formatDateTime(iso: string) {
   });
 }
 
+/** Hoje em `AAAA-MM-DD`, no horário de Brasília. */
+export function todayDateOnly() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
+}
+
 /** Data `AAAA-MM-DD` em `dd/mm/aaaa`, sem passar por fuso horário. */
 export function formatDateOnly(date: string) {
   const [year, month, day] = date.split('-');

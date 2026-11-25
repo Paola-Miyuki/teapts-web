@@ -78,6 +78,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
   ['/pts/{id}/start', 'post'],
+  ['/pts/{id}/close', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
@@ -312,6 +313,10 @@ describe('Swagger (e2e)', () => {
     ['/patients/authorized', 'get', '400'],
     ['/patients/authorized', 'get', '500'],
     ['/accounts', 'get', '400'],
+    ['/pts/{id}/close', 'post', '400'],
+    ['/pts/{id}/close', 'post', '403'],
+    ['/pts/{id}/close', 'post', '404'],
+    ['/pts/{id}/close', 'post', '409'],
     ['/pts/{id}/start', 'post', '400'],
     ['/pts/{id}/start', 'post', '403'],
     ['/pts/{id}/start', 'post', '404'],
@@ -616,6 +621,32 @@ describe('Swagger (e2e)', () => {
       'PTS_NOT_ACTIVE',
       'CANNOT_REMOVE_RESPONSIBLE',
     ]);
+  });
+
+  it('documents POST /pts/{id}/close', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/close'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ClosePtsResponseDto',
+    );
+    expect(components.schemas.ClosePtsRequestDto.required).toEqual([
+      'outcome',
+      'closingDate',
+    ]);
+    for (const [status, code] of [
+      ['400', 'VALIDATION_ERROR'],
+      ['403', 'FORBIDDEN'],
+      ['404', 'PTS_NOT_FOUND'],
+      ['409', 'PTS_NOT_ACTIVE'],
+    ]) {
+      expect(
+        Object.keys(
+          operation.responses[status]?.content?.['application/json']
+            ?.examples ?? {},
+        ),
+      ).toEqual([code]);
+    }
   });
 
   it('documents POST /pts/{id}/start', async () => {

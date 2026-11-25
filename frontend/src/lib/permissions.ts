@@ -32,6 +32,7 @@ export type PermissionAction =
   | 'editPtsProposal'
   | 'deletePtsProposal'
   | 'startPts'
+  | 'closePts'
   | 'registerPtsReassessment';
 
 // Mesmos valores do PtsStateEnum da API.
@@ -121,6 +122,7 @@ export function can(
       case 'registerPtsReassessment':
         return pts?.status === 'running';
       case 'editPts':
+      case 'closePts':
         return isActivePts(pts);
       case 'manageGoals':
       case 'createActivity':
@@ -245,6 +247,15 @@ export function can(
         pts?.status === 'planning' &&
         user.professionalProfileIds.includes(
           pts.responsibleProfessionalId ?? '',
+        )
+      );
+    case 'closePts':
+      // RFPTS010 – profissional responsável, em planejamento ou andamento.
+      return (
+        professional &&
+        isActivePts(pts) &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
         )
       );
     case 'registerPtsReassessment':

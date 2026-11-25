@@ -34,6 +34,7 @@ import { PtsGoalEntity as PtsGoal } from '../pts/entities/pts-goal.entity';
 import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
 import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
+import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -133,6 +134,7 @@ describe('getDatabaseOptions', () => {
         CreateDocument1791149050000,
         CreateNotification1791149060000,
         CreateActivity1791149070000,
+        AddPtsClosingColumns1791149080000,
       ],
     });
   });

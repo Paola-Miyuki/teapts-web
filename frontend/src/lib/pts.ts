@@ -136,6 +136,9 @@ export type PtsDetail = {
   beganAt: string | null;
   concludedAt: string | null;
   cancelledAt: string | null;
+  // Data e motivo informados ao encerrar (RFPTS010).
+  closingDate?: string | null;
+  closingReason?: string | null;
   patient: {
     id: string;
     name: string;
@@ -194,6 +197,26 @@ export function getPtsHistory(
 
 export function getPts(id: string, signal?: AbortSignal) {
   return request<PtsDetail>(`/pts/${encodeURIComponent(id)}`, { signal });
+}
+
+export type PtsCloseOutcome = 'concluded' | 'cancelled';
+
+export type ClosePtsResponse = {
+  id: string;
+  status: PtsCloseOutcome;
+  closingDate: string;
+  closingReason: string | null;
+};
+
+export function closePts(
+  id: string,
+  body: { outcome: PtsCloseOutcome; closingDate: string; reason?: string },
+) {
+  return request<ClosePtsResponse>(`/pts/${encodeURIComponent(id)}/close`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export type PtsStartResponse = {
