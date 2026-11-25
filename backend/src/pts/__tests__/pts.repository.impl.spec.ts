@@ -4,6 +4,8 @@ import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
+import { ActivityEntity } from '../../activities/entities/activity.entity';
+import { ActivityState } from '../../activities/enums/activity.enums';
 import { PtsEntity } from '../entities/pts.entity';
 import { PtsRepositoryImpl } from '../repositories/pts.repository.impl';
 import { TimelineRecordEntity } from '../../timeline/entities/timeline-record.entity';
@@ -42,6 +44,7 @@ function createRepository(lockedRows: Partial<PtsEntity>[]) {
       createQueryBuilder: jest.fn(() => query),
       update: jest.fn(async () => ({ affected: 1 })),
       insert: jest.fn(async () => undefined),
+      find: jest.fn(async () => [] as { id: string; title: string }[]),
     },
     connect: jest.fn(async () => undefined),
     startTransaction: jest.fn(async () => {
@@ -772,5 +775,153 @@ describe('PtsRepositoryImpl.startPts', () => {
     expect(queryRunner.manager.update).not.toHaveBeenCalled();
     expect(queryRunner.manager.insert).not.toHaveBeenCalled();
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.closePts (RFPTS010)', () => {
+  const running: Partial<PtsEntity> = {
+    id: 'pts-1',
+    status: PtsStateEnum.RUNNING,
+    responsibleProfessionalId: 'prof-10',
+  };
+  const input = (outcome: 'concluded' | 'cancelled') => ({
+    ptsId: 'pts-1',
+    outcome,
+    closingDate: '2026-12-10',
+    closingReason: 'Motivo',
+    authorProfessionalId: 'prof-10',
+    executedByAccountId: 'account-10',
+    description: 'Ana encerrou',
+    activityDescription: (title: string) => `Ana encerrou ${title}`,
+  });
+
+  it.each([
+    [
+      'concluded' as const,
+      'concludedAt',
+      TimelineRecordType.PtsConcluded,
+      ActivityState.Concluded,
+      TimelineRecordType.ActivityConcluded,
+    ],
+    [
+      'cancelled' as const,
+      'cancelledAt',
+      TimelineRecordType.PtsCancelled,
+      ActivityState.Archived,
+      TimelineRecordType.ActivityArchived,
+    ],
+  ])(
+    '%s: encerra o PTS e as atividades, com um evento de cada',
+    async (outcome, dateField, ptsEvent, activityState, activityEvent) => {
+      const { repository, query, queryRunner } = createRepository([running]);
+      queryRunner.manager.find.mockResolvedValueOnce([
+        { id: 'act-1', title: 'Fono' },
+        { id: 'act-2', title: 'TO' },
+      ]);
+
+      expect(await repository.closePts(input(outcome))).toEqual({
+        id: 'pts-1',
+        status: outcome,
+        closingDate: '2026-12-10',
+        closingReason: 'Motivo',
+      });
+
+      expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(queryRunner.manager.update).toHaveBeenCalledWith(
+        PtsEntity,
+        'pts-1',
+        {
+          status: outcome,
+          [dateField]: expect.any(Date),
+          closingDate: '2026-12-10',
+          closingReason: 'Motivo',
+          closedByAccountId: 'account-10',
+        },
+      );
+      expect(queryRunner.manager.find).toHaveBeenCalledWith(
+        ActivityEntity,
+        expect.objectContaining({
+          where: {
+            ptsId: 'pts-1',
+            status: In([ActivityState.Running, ActivityState.Suspended]),
+          },
+        }),
+      );
+      expect(queryRunner.manager.update).toHaveBeenCalledWith(
+        ActivityEntity,
+        { id: In(['act-1', 'act-2']) },
+        {
+          status: activityState,
+          statusChangedByAccountId: 'account-10',
+          updatedAt: expect.any(Date),
+          [outcome === 'concluded' ? 'concludedAt' : 'archivedAt']:
+            expect.any(Date),
+        },
+      );
+
+      const events = (
+        queryRunner.manager.insert.mock.calls as unknown as [
+          unknown,
+          Record<string, unknown>,
+        ][]
+      ).map(([, event]) => event);
+      expect(events).toMatchObject([
+        { type: ptsEvent, targetType: 'pts', targetId: 'pts-1' },
+        {
+          type: activityEvent,
+          targetType: 'activity',
+          targetId: 'act-1',
+          description: 'Ana encerrou Fono',
+        },
+        { type: activityEvent, targetId: 'act-2' },
+      ]);
+      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+    },
+  );
+
+  it('sem atividades abertas, encerra só o PTS', async () => {
+    const { repository, queryRunner } = createRepository([running]);
+
+    await repository.closePts(input('concluded'));
+
+    expect(queryRunner.manager.update).toHaveBeenCalledTimes(1);
+    expect(queryRunner.manager.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['PTS sumiu', [], 404, 'PTS_NOT_FOUND'],
+    [
+      'PTS já encerrado',
+      [{ ...running, status: PtsStateEnum.CANCELLED }],
+      409,
+      'PTS_NOT_ACTIVE',
+    ],
+    [
+      'responsável transferido',
+      [{ ...running, responsibleProfessionalId: 'prof-99' }],
+      403,
+      'FORBIDDEN',
+    ],
+  ])('não encerra quando: %s', async (_label, rows, status, code) => {
+    const { repository, queryRunner } = createRepository(rows);
+
+    await expectApiError(
+      () => repository.closePts(input('concluded')),
+      status,
+      code,
+    );
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+  });
+
+  it('desfaz tudo quando o evento falha', async () => {
+    const { repository, queryRunner } = createRepository([running]);
+    queryRunner.manager.insert.mockRejectedValueOnce(new Error('falha'));
+
+    await expect(repository.closePts(input('concluded'))).rejects.toThrow(
+      'falha',
+    );
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
   });
 });

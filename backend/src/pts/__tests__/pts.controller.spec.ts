@@ -576,3 +576,35 @@ describe('PtsController POST /pts/:id/start', () => {
     );
   });
 });
+
+describe('PtsController POST /pts/:id/close', () => {
+  it('encerra pela conta da sessão', async () => {
+    const repo = seededRepo();
+    const controller = new PtsController(new PtsService(repo));
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [],
+    });
+
+    const result = await controller.closePts(
+      'pts-100',
+      { outcome: 'cancelled', closingDate: '2026-12-10' },
+      responsibleAccount,
+    );
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: 'cancelled',
+      closingDate: '2026-12-10',
+      closingReason: null,
+    });
+    expect(repo.closedRecords[0].executedByAccountId).toBe('acc-1');
+  });
+});

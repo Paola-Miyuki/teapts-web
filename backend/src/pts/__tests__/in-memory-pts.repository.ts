@@ -22,8 +22,10 @@ import {
   type PtsTeamTarget,
   type ProfessionalAccountRecord,
   type TransferResponsibilityInput,
+  type ClosePtsInput,
   type StartPtsInput,
 } from '../repositories/pts.repository';
+import type { ClosePtsResponseDto } from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
@@ -39,6 +41,7 @@ export class InMemoryPtsRepository extends PtsRepository {
   timelineRecords: RemoveTeamMemberInput[] = [];
   transferredRecords: TransferResponsibilityInput[] = [];
   startedRecords: StartPtsInput[] = [];
+  closedRecords: ClosePtsInput[] = [];
   /** Eventos member_added: um por profissional adicionado. */
   addedRecords: Array<
     Omit<AddTeamMembersInput, 'members'> & {
@@ -380,6 +383,18 @@ export class InMemoryPtsRepository extends PtsRepository {
     this.transferredRecords.push({ ...input });
 
     return { ...pts, team: [...pts.team] };
+  }
+
+  async closePts(input: ClosePtsInput): Promise<ClosePtsResponseDto> {
+    this.ptsTeams.get(input.ptsId)!.status = input.outcome as PtsStateEnum;
+    this.closedRecords.push(input);
+
+    return {
+      id: input.ptsId,
+      status: input.outcome,
+      closingDate: input.closingDate,
+      closingReason: input.closingReason,
+    };
   }
 
   async startPts(input: StartPtsInput): Promise<PtsStartResponseDto> {

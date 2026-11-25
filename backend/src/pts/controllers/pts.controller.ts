@@ -48,11 +48,19 @@ import {
   UpdatePtsSheetResponseDto,
 } from '../dto/update-pts-sheet.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { ClosePtsRequestDto, ClosePtsResponseDto } from '../dto/close-pts.dto';
 import { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
+import {
+  ptsCloseForbidden,
+  ptsCloseNotActive,
+  ptsNotFound,
+  validationError,
+} from '../pts.errors';
+import { errors } from '../swagger-errors';
 import { PtsService } from '../services/pts.service';
 
 const parseUuidParam = (name: string) =>
@@ -325,6 +333,30 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<PtsStartResponseDto> {
     return this.ptsService.startPts(id, account);
+  }
+
+  @Post(':id/close')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Encerra um PTS ativo (RFPTS010)',
+    description:
+      'Só o responsável (ou o admin, RN022), com o PTS em planning ou running. As atividades em running ou suspended são encerradas junto: concluded ou archived. Grava pts_concluded ou pts_cancelled e um evento por atividade na timeline.',
+  })
+  @ApiOkResponse({ type: ClosePtsResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse(errors(ptsCloseForbidden()))
+  @ApiNotFoundResponse(errors(ptsNotFound()))
+  @ApiConflictResponse(errors(ptsCloseNotActive()))
+  async closePts(
+    @Param('id', parseProposalId) id: string,
+    @Body() dto: ClosePtsRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ClosePtsResponseDto> {
+    return this.ptsService.closePts(id, dto, account);
   }
 
   @Post(':id/team')

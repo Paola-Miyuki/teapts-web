@@ -5,6 +5,7 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { CloseOutcome, ClosePtsResponseDto } from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -132,6 +133,19 @@ export interface TransferResponsibilityInput {
   description: string;
 }
 
+export interface ClosePtsInput {
+  ptsId: string;
+  outcome: CloseOutcome;
+  closingDate: string;
+  closingReason: string | null;
+  /** Profissional atribuído aos eventos (RN029); nulo quando o admin age. */
+  authorProfessionalId: string | null;
+  executedByAccountId: string;
+  /** Texto do evento do PTS e de cada atividade encerrada junto. */
+  description: string;
+  activityDescription: (title: string) => string;
+}
+
 export interface StartPtsInput {
   ptsId: string;
   /** Profissional atribuído ao evento (RN029); nulo quando o admin age. */
@@ -222,6 +236,12 @@ export abstract class PtsRepository {
    * mesma transação.
    */
   abstract startPts(input: StartPtsInput): Promise<PtsStartResponseDto>;
+
+  /**
+   * Encerra o PTS e as atividades em running ou suspended, com um evento para
+   * cada, na mesma transação.
+   */
+  abstract closePts(input: ClosePtsInput): Promise<ClosePtsResponseDto>;
 
   abstract rejectProposal(id: string): Promise<PtsDecisionResponseDto>;
 

@@ -30,17 +30,21 @@ import {
   type RemoveTeamMemberInput,
   type AddTeamMembersInput,
   type TransferResponsibilityInput,
+  type ClosePtsInput,
   type StartPtsInput,
   type FindPtsHistoryInput,
   type FindPtsHistoryResult,
 } from './pts.repository';
 import type { PtsHistoryItemDto } from '../dto/pts-history.dto';
+import type { ClosePtsResponseDto } from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { UpdatePtsSheetResponseDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import { ActivityEntity } from '../../activities/entities/activity.entity';
+import { ActivityState } from '../../activities/enums/activity.enums';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsEntity } from '../entities/pts.entity';
 import { Account } from '../../accounts/entities/account.entity';
@@ -53,6 +57,8 @@ import { TimelineRecorderService } from '../../timeline/services/timeline-record
 import {
   activePtsAlreadyExists,
   cannotRemoveResponsible,
+  ptsCloseForbidden,
+  ptsCloseNotActive,
   ptsNotActive,
   ptsNotFound,
   ptsNotPlanning,
@@ -1121,6 +1127,122 @@ export class PtsRepositoryImpl extends PtsRepository {
     }
   }
 
+  async closePts(input: ClosePtsInput): Promise<ClosePtsResponseDto> {
+    const { ptsId, outcome, closingDate, closingReason } = input;
+    const concluded = outcome === 'concluded';
+    const author = {
+      ptsId,
+      authorProfessionalId: input.authorProfessionalId,
+      executedByAccountId: input.executedByAccountId,
+    };
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    await queryRunner.connect();
+
+    try {
+      await queryRunner.startTransaction();
+
+      const { manager } = queryRunner;
+      // Trava o PTS e refaz as checagens: outro encerramento ou uma
+      // transferência simultânea não passam despercebidos.
+      const locked = await manager
+        .createQueryBuilder(PtsEntity, 'pts')
+        .setLock('pessimistic_write')
+        .where('pts.id = :id', { id: ptsId })
+        .getOne();
+
+      if (!locked) {
+        throw ptsNotFound();
+      }
+
+      if (
+        input.authorProfessionalId !== null &&
+        locked.responsibleProfessionalId !== input.authorProfessionalId
+      ) {
+        throw ptsCloseForbidden();
+      }
+
+      if (
+        locked.status !== PtsStateEnum.PLANNING &&
+        locked.status !== PtsStateEnum.RUNNING
+      ) {
+        throw ptsCloseNotActive();
+      }
+
+      const now = new Date();
+
+      await manager.update(PtsEntity, ptsId, {
+        status: concluded ? PtsStateEnum.CONCLUDED : PtsStateEnum.CANCELLED,
+        ...(concluded ? { concludedAt: now } : { cancelledAt: now }),
+        closingDate,
+        closingReason,
+        closedByAccountId: input.executedByAccountId,
+      });
+      await this.timelineRecorder.record(
+        {
+          ...author,
+          type: concluded
+            ? TimelineRecordType.PtsConcluded
+            : TimelineRecordType.PtsCancelled,
+          description: input.description,
+          targetId: ptsId,
+          targetType: TimelineRecordTarget.Pts,
+        },
+        manager,
+      );
+
+      const activities = await manager.find(ActivityEntity, {
+        where: {
+          ptsId,
+          status: In([ActivityState.Running, ActivityState.Suspended]),
+        },
+        select: { id: true, title: true },
+        order: { createdAt: 'ASC', id: 'ASC' },
+      });
+
+      if (activities.length > 0) {
+        await manager.update(
+          ActivityEntity,
+          { id: In(activities.map(({ id }) => id)) },
+          {
+            status: concluded
+              ? ActivityState.Concluded
+              : ActivityState.Archived,
+            statusChangedByAccountId: input.executedByAccountId,
+            updatedAt: now,
+            ...(concluded ? { concludedAt: now } : { archivedAt: now }),
+          },
+        );
+      }
+
+      for (const activity of activities) {
+        await this.timelineRecorder.record(
+          {
+            ...author,
+            type: concluded
+              ? TimelineRecordType.ActivityConcluded
+              : TimelineRecordType.ActivityArchived,
+            description: input.activityDescription(activity.title),
+            targetId: activity.id,
+            targetType: TimelineRecordTarget.Activity,
+          },
+          manager,
+        );
+      }
+
+      await queryRunner.commitTransaction();
+
+      return { id: ptsId, status: outcome, closingDate, closingReason };
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
   async startPts(input: StartPtsInput): Promise<PtsStartResponseDto> {
     const queryRunner = this.dataSource.createQueryRunner();
 
@@ -1243,6 +1365,8 @@ export class PtsRepositoryImpl extends PtsRepository {
       rejectedAt: pts.rejectedAt?.toISOString() ?? null,
       concludedAt: pts.concludedAt?.toISOString() ?? null,
       cancelledAt: pts.cancelledAt?.toISOString() ?? null,
+      closingDate: pts.closingDate ?? null,
+      closingReason: pts.closingReason ?? null,
     };
   }
 
