@@ -6,6 +6,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { getDatabaseOptions } from './database/database.config';
 import { DocumentsModule } from './documents/documents.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { PatientsModule } from './patients/patients.module';
 import { PtsModule } from './pts/pts.module';
@@ -33,6 +34,7 @@ import { TimelineModule } from './timeline/timeline.module';
     AuthModule,
     DocumentsModule,
     HealthModule,
+    NotificationsModule,
     ProfessionalsModule,
     PatientsModule,
     PtsModule,
