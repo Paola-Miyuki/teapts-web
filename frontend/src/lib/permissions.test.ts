@@ -370,4 +370,17 @@ describe.each([
       expect(can(admin, action, pts(status))).toBe(false);
     }
   });
+
+  it('deixa o admin e o paciente enviarem documento, e o profissional só com PTS ativo', () => {
+    expect(can(admin, 'uploadDocument')).toBe(true);
+    expect(can(patient, 'uploadDocument')).toBe(true);
+    expect(can(waiting, 'uploadDocument')).toBe(false);
+    expect(can(professional, 'uploadDocument')).toBe(false);
+    expect(can(professional, 'uploadDocument', { patientReadOnly: true })).toBe(
+      false,
+    );
+    expect(
+      can(professional, 'uploadDocument', { patientReadOnly: false }),
+    ).toBe(true);
+  });
 });

@@ -68,6 +68,7 @@ const glyphs = {
       <path d="M9.6 9a2.4 2.4 0 0 1 4.8 0c0 2-2.4 2-2.4 4M12 16v1" />
     </>
   ),
+  upload: <path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6" />,
   lock: (
     <>
       <rect x="6" y="10" width="12" height="10" rx="2" />

@@ -23,6 +23,8 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { StoredObject } from '../storage/entities/stored-object.entity';
+import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -92,6 +94,7 @@ describe('getDatabaseOptions', () => {
         Professional,
         Pts,
         TimelineRecord,
+        StoredObject,
       ],
       migrations: [
         CreateAccount1791072000000,
@@ -111,6 +114,7 @@ describe('getDatabaseOptions', () => {
         AddAccountStatus1791149000000,
         AddPtsSheetColumns1791149010000,
         AddProfessionalRegistrationFields1791149020000,
+        CreateStoredObject1791149030000,
       ],
     });
   });
