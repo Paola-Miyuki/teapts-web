@@ -8,28 +8,51 @@ import {
 import { ActivityModality } from '../../activities/enums/activity.enums';
 import { ActivitiesRepository } from '../../activities/repositories/activities.repository';
 import { isAdmin } from '../../auth/account-context';
+import { toPagination } from '../../common/pagination/pagination';
 import { REVIEW_TIME_ZONE } from '../../notifications/services/review-window.service';
-import { ownTeamProfile, teamIds } from '../../pts/pts-access';
+import {
+  assertCanViewPts,
+  ownTeamProfile,
+  teamIds,
+} from '../../pts/pts-access';
 import { ptsNotFound } from '../../pts/pts.errors';
 import { PtsGoalsRepository } from '../../pts/repositories/pts-goals.repository';
 import { assertReceivesAppointment } from '../appointment-rules';
 import {
   appointmentForbidden,
+  appointmentNotFound,
+  appointmentsViewForbidden,
   futureAppointment,
   incompleteAppointment,
   invalidAppointmentAuthor,
   invalidAppointmentEnd,
+  rectifyForbidden,
   soapNotAllowed,
 } from '../appointments.errors';
+import type {
+  AppointmentDetailsResponseDto,
+  AppointmentListItemResponseDto,
+  AppointmentListResponseDto,
+  AppointmentRecordResponseDto,
+} from '../dto/appointment-details-response.dto';
 import type { AppointmentResponseDto } from '../dto/appointment-response.dto';
 import type { CreateAppointmentRequestDto } from '../dto/create-appointment.dto';
+import type { GetAppointmentsQueryDto } from '../dto/get-appointments-query.dto';
+import type {
+  RectifyAppointmentRequestDto,
+  RectifyAppointmentResponseDto,
+} from '../dto/rectify-appointment.dto';
 import { Attendance } from '../enums/attendance.enum';
 import {
   AppointmentsRepository,
-  type CreateAppointmentInput,
+  type AppointmentValues,
+  type StoredAppointment,
 } from '../repositories/appointments.repository';
 
 const textOrNull = (value?: string) => value?.trim() || null;
+
+// yyyy-mm-dd → dd/mm/yyyy, para o texto da timeline.
+const toBrazilianDate = (date: string) => date.split('-').reverse().join('/');
 
 @Injectable()
 export class AppointmentsService {
@@ -76,9 +99,7 @@ export class AppointmentsService {
       throw invalidAppointmentAuthor();
     }
 
-    const executorName =
-      (await this.goalsRepository.findAccountDisplayName(account.accountId)) ??
-      (admin ? 'Administrador' : 'Profissional da equipe');
+    const executorName = await this.executorName(account);
 
     return this.appointmentsRepository.create({
       ptsId: pts.id,
@@ -94,10 +115,213 @@ export class AppointmentsService {
     });
   }
 
+  /**
+   * Lista os atendimentos no escopo de quem pede (RFACT006): o admin vê
+   * todos; o profissional, os dos PTS da equipe (RN016); o paciente, os dele.
+   */
+  async findAppointments(
+    query: GetAppointmentsQueryDto,
+    account: AccountContext,
+  ): Promise<AppointmentListResponseDto> {
+    const admin = isAdmin(account);
+    const professional = account.professionalProfileIds.length > 0;
+
+    if (!admin && !professional && !account.patientProfileId) {
+      throw appointmentsViewForbidden();
+    }
+
+    // O paciente não consulta os atendimentos de outro paciente.
+    if (
+      !admin &&
+      !professional &&
+      query.patientId &&
+      query.patientId !== account.patientProfileId
+    ) {
+      throw appointmentsViewForbidden();
+    }
+
+    if (query.activityId) {
+      const activity = await this.activitiesRepository.findById(
+        query.activityId,
+      );
+
+      if (!activity) {
+        throw activityNotFound();
+      }
+
+      await this.assertCanView(activity.ptsId, account);
+    }
+
+    if (query.ptsId) {
+      await this.assertCanView(query.ptsId, account);
+    }
+
+    const { rows, total } = await this.appointmentsRepository.findMany({
+      ...query,
+      scope: admin
+        ? null
+        : {
+            patientId: account.patientProfileId,
+            professionalIds: account.professionalProfileIds,
+          },
+    });
+
+    return {
+      data: rows.map((row) => this.toListItem(row)),
+      pagination: toPagination(query, total),
+    };
+  }
+
+  /** Um atendimento com as retificações; o paciente vê só o plano (RN028). */
+  async findAppointment(
+    id: string,
+    account: AccountContext,
+  ): Promise<AppointmentDetailsResponseDto> {
+    const appointment = await this.appointmentsRepository.findById(id);
+
+    if (!appointment) {
+      throw appointmentNotFound();
+    }
+
+    const pts = await this.assertCanView(appointment.ptsId, account);
+    const team = isAdmin(account) || ownTeamProfile(pts, account) !== undefined;
+    // A retificação não tem retificações: elas ficam todas no original.
+    const rectifications = appointment.rectifiesAppointmentId
+      ? []
+      : await this.appointmentsRepository.findRectifications(id);
+
+    return {
+      ...this.toRecord(appointment, team),
+      patient: appointment.patient,
+      pts: appointment.pts,
+      activity: appointment.activity,
+      rectifiesAppointmentId: appointment.rectifiesAppointmentId,
+      rectified: rectifications.length > 0,
+      rectifications: rectifications.map((item) => this.toRecord(item, team)),
+    };
+  }
+
+  /**
+   * Registra a retificação (RFACT007): só o autor, com justificativa, e o
+   * original não muda (RN020).
+   */
+  async rectifyAppointment(
+    id: string,
+    dto: RectifyAppointmentRequestDto,
+    account: AccountContext,
+    now = new Date(),
+  ): Promise<RectifyAppointmentResponseDto> {
+    const appointment = await this.appointmentsRepository.findById(id);
+
+    if (!appointment) {
+      throw appointmentNotFound();
+    }
+
+    await this.assertCanView(appointment.ptsId, account, rectifyForbidden);
+
+    const authorId = appointment.author?.id;
+
+    if (!authorId || !account.professionalProfileIds.includes(authorId)) {
+      throw rectifyForbidden();
+    }
+
+    const values = this.toValues(dto, now);
+    const executorName = await this.executorName(account);
+
+    return this.appointmentsRepository.rectify({
+      ptsId: appointment.ptsId,
+      // Retificar uma retificação corrige o mesmo original.
+      appointmentId: appointment.rectifiesAppointmentId ?? appointment.id,
+      values,
+      reason: dto.reason.trim(),
+      authorProfessionalId: authorId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} retificou o atendimento de ${toBrazilianDate(appointment.appointmentDate)} da atividade ${appointment.activity.title}`,
+    });
+  }
+
+  private async assertCanView(
+    ptsId: string,
+    account: AccountContext,
+    forbidden = appointmentsViewForbidden,
+  ) {
+    const pts = await this.goalsRepository.findPtsTarget(ptsId);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    assertCanViewPts(pts, account, forbidden);
+
+    return pts;
+  }
+
+  private async executorName(account: AccountContext): Promise<string> {
+    return (
+      (await this.goalsRepository.findAccountDisplayName(account.accountId)) ??
+      (isAdmin(account) ? 'Administrador' : 'Profissional da equipe')
+    );
+  }
+
+  private toListItem(row: StoredAppointment): AppointmentListItemResponseDto {
+    return {
+      id: row.id,
+      appointmentDate: row.appointmentDate,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      patient: row.patient,
+      pts: row.pts,
+      activity: row.activity,
+      author: row.author,
+      modality: row.modality,
+      visitPlace: row.visitPlace,
+      attendance: row.attendance,
+      rectified: row.rectified,
+    };
+  }
+
+  // A equipe vê o SOAP e a justificativa; o paciente, só o plano (RN028).
+  private toRecord(
+    row: StoredAppointment,
+    team: boolean,
+  ): AppointmentRecordResponseDto {
+    const record: AppointmentRecordResponseDto = {
+      id: row.id,
+      appointmentDate: row.appointmentDate,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      modality: row.modality,
+      visitPlace: row.visitPlace,
+      attendance: row.attendance,
+      author: row.author,
+      registeredBy: row.registeredBy,
+      createdAt: row.createdAt,
+      absenceReason: row.absenceReason,
+    };
+
+    if (!team) {
+      return { ...record, plan: row.soapPlan };
+    }
+
+    return {
+      ...record,
+      soap:
+        row.attendance === Attendance.Done
+          ? {
+              subjective: row.soapSubjective ?? '',
+              objective: row.soapObjective ?? '',
+              assessment: row.soapAssessment ?? '',
+              plan: row.soapPlan ?? '',
+            }
+          : null,
+      rectificationReason: row.rectificationReason,
+    };
+  }
+
   private toValues(
     dto: CreateAppointmentRequestDto,
     now: Date,
-  ): CreateAppointmentInput['values'] {
+  ): AppointmentValues {
     const done = dto.attendance === Attendance.Done;
     const soap = {
       soapSubjective: textOrNull(dto.soapSubjective),
