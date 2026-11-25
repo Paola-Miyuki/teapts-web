@@ -29,6 +29,7 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
 import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
@@ -77,6 +78,7 @@ const migrations = [
   CreateDocument1791149050000,
   CreateNotification1791149060000,
   CreateActivity1791149070000,
+  AddPtsClosingColumns1791149080000,
 ];
 
 export function getDatabaseOptions(
