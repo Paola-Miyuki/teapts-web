@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
 import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
 import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
+import { AppointmentEntity as Appointment } from '../appointments/entities/appointment.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Medication } from '../patients/entities/medication.entity';
 import { Patient } from '../patients/entities/patient.entity';
@@ -35,6 +36,7 @@ import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-Ad
 import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
 import { AddPatientProfileFields1791149090000 } from './migrations/1791149090000-AddPatientProfileFields';
+import { CreateAppointment1791149120000 } from './migrations/1791149120000-CreateAppointment';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
@@ -47,6 +49,7 @@ const entities = [
   Account,
   Activity,
   ActivityDocument,
+  Appointment,
   Medication,
   Notification,
   Patient,
@@ -85,6 +88,7 @@ const migrations = [
   AddPatientProfileFields1791149090000,
   AddPtsVersion1791149100000,
   AddPtsReassessmentColumns1791149110000,
+  CreateAppointment1791149120000,
 ];
 
 export function getDatabaseOptions(
