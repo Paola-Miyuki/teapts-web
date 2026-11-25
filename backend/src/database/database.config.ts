@@ -25,6 +25,8 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
+import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
@@ -33,6 +35,7 @@ import { CreateStoredObject1791149030000 } from './migrations/1791149030000-Crea
 const entities = [
   Account,
   Medication,
+  Notification,
   Patient,
   SupportContact,
   Professional,
@@ -59,6 +62,7 @@ const migrations = [
   AddPtsSheetColumns1791149010000,
   AddProfessionalRegistrationFields1791149020000,
   CreateStoredObject1791149030000,
+  CreateNotification1791149060000,
 ];
 
 export function getDatabaseOptions(

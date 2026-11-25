@@ -24,6 +24,8 @@ import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAcc
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
 import { StoredObject } from '../storage/entities/stored-object.entity';
+import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
+import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
@@ -89,6 +91,7 @@ describe('getDatabaseOptions', () => {
       entities: [
         Account,
         Medication,
+        Notification,
         Patient,
         SupportContact,
         Professional,
@@ -115,6 +118,7 @@ describe('getDatabaseOptions', () => {
         AddPtsSheetColumns1791149010000,
         AddProfessionalRegistrationFields1791149020000,
         CreateStoredObject1791149030000,
+        CreateNotification1791149060000,
       ],
     });
   });
