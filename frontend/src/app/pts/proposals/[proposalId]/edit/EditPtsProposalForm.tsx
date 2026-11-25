@@ -134,7 +134,10 @@ export default function EditPtsProposalForm({
     error: goalsLoadError,
     reload: reloadGoals,
   } = useGoals(proposalId);
-  const { activities } = useActivities(proposalId);
+  const { activities } = useActivities(proposalId, {
+    page: 1,
+    limit: 50,
+  });
 
   useEffect(() => {
     initSuperTokens();

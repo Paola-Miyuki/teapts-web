@@ -7,7 +7,26 @@ import {
 } from '../__tests__/activity-fixtures';
 import { ActivityController } from './activity.controller';
 
-describe('ActivityController (RFACT005, RFACT008)', () => {
+describe('ActivityController (RFACT002, RFACT005, RFACT008)', () => {
+  it('consulta uma atividade pelo id e devolve o detalhe', async () => {
+    const repo = new InMemoryActivitiesRepository();
+    repo.activities.push(
+      storedActivity({ goalId: 'goal-1', documentIds: ['doc-1'] }),
+    );
+    const controller = new ActivityController(
+      new ActivitiesService(repo, seededGoalsRepo()),
+    );
+
+    await expect(
+      controller.findActivityById('act-1', member),
+    ).resolves.toMatchObject({
+      id: 'act-1',
+      goal: { id: 'goal-1', title: 'Meta terapêutica' },
+      documents: [{ id: 'doc-1', title: 'Documento doc-1' }],
+      appointmentsCount: 0,
+    });
+  });
+
   it('edita pela conta da sessão e devolve a atividade atualizada', async () => {
     const repo = new InMemoryActivitiesRepository();
     repo.activities.push(storedActivity());

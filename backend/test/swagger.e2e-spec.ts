@@ -79,10 +79,12 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'patch'],
   ['/pts/{id}/start', 'post'],
   ['/pts/{id}/close', 'post'],
+  ['/pts/{id}/reassessment', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
+  ['/activities/{id}', 'get'],
   ['/activities/{id}', 'patch'],
   ['/activities/{id}/archive', 'post'],
   ['/activities/{id}/suspend', 'post'],
@@ -324,6 +326,10 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/close', 'post', '403'],
     ['/pts/{id}/close', 'post', '404'],
     ['/pts/{id}/close', 'post', '409'],
+    ['/pts/{id}/reassessment', 'post', '400'],
+    ['/pts/{id}/reassessment', 'post', '403'],
+    ['/pts/{id}/reassessment', 'post', '404'],
+    ['/pts/{id}/reassessment', 'post', '409'],
     ['/pts/{id}/start', 'post', '400'],
     ['/pts/{id}/start', 'post', '403'],
     ['/pts/{id}/start', 'post', '404'],
@@ -343,6 +349,9 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/activities', 'post', '404'],
     ['/pts/{id}/activities', 'post', '409'],
     ['/pts/{id}/activities', 'post', '422'],
+    ['/activities/{id}', 'get', '400'],
+    ['/activities/{id}', 'get', '403'],
+    ['/activities/{id}', 'get', '404'],
     ['/activities/{id}', 'patch', '400'],
     ['/activities/{id}', 'patch', '403'],
     ['/activities/{id}', 'patch', '404'],
@@ -698,6 +707,38 @@ describe('Swagger (e2e)', () => {
     }
   });
 
+  it('documents POST /pts/{id}/reassessment', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/reassessment'].post;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/RegisterReassessmentResponseDto',
+    );
+    expect(components.schemas.RegisterReassessmentRequestDto.required).toEqual([
+      'meetingDate',
+      'goals',
+      'createNextVersion',
+    ]);
+    expect(components.schemas.RegisterReassessmentResponseDto.required).toEqual(
+      ['id', 'status', 'reassessedAt', 'nextPtsId'],
+    );
+    expect(examples('400')).toEqual([
+      'VALIDATION_ERROR',
+      'GOALS_WITHOUT_RESULT',
+    ]);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual([
+      'PTS_NOT_RUNNING',
+      'DRAFT_ALREADY_EXISTS',
+    ]);
+  });
+
   it('documents POST /pts/{id}/start', async () => {
     const { paths, components } = await getDocument();
     const operation = paths['/pts/{id}/start'].post;
@@ -753,6 +794,23 @@ describe('Swagger (e2e)', () => {
         ),
       ).toEqual([code]);
     }
+  });
+
+  it('documents GET /activities/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const { get } = paths['/activities/{id}'];
+
+    expect(responseSchema(get, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityDetailsResponseDto',
+    );
+    expect(components.schemas.ActivityDetailsResponseDto.required).toEqual(
+      expect.arrayContaining(['goal', 'documents', 'appointmentsCount']),
+    );
+    expect(
+      Object.keys(
+        get.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
   });
 
   it('documents PATCH /activities/{id}', async () => {

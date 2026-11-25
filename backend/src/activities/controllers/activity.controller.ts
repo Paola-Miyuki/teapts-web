@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -35,6 +36,7 @@ import {
 } from '../../pts/pts.errors';
 import { errors } from '../../pts/swagger-errors';
 import {
+  activitiesViewForbidden,
   activityArchiveForbidden,
   activityEditForbidden,
   activityNotArchivable,
@@ -44,7 +46,10 @@ import {
   invalidActivityTransition,
   invalidFrequency,
 } from '../activities.errors';
-import { ActivityResponseDto } from '../dto/activity-response.dto';
+import {
+  ActivityDetailsResponseDto,
+  ActivityResponseDto,
+} from '../dto/activity-response.dto';
 import {
   ArchiveActivityRequestDto,
   ArchiveActivityResponseDto,
@@ -73,6 +78,23 @@ const parseActivityId = new ParseUUIDPipe({
 @Controller('activities')
 export class ActivityController {
   constructor(private readonly activitiesService: ActivitiesService) {}
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Consulta uma atividade (RFACT002)',
+    description:
+      'Retorna os dados da atividade, a meta e os documentos associados. O paciente titular não vê os documentos (RN028).',
+  })
+  @ApiOkResponse({ type: ActivityDetailsResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activitiesViewForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  async findActivityById(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDetailsResponseDto> {
+    return this.activitiesService.findActivityById(id, account);
+  }
 
   @Patch(':id')
   @ApiOperation({

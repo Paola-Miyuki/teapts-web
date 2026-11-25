@@ -10,6 +10,7 @@ import {
 } from '../../pts/__tests__/goal-fixtures';
 import { expectApiError } from '../../pts/__tests__/test-utils';
 import type { CreateActivityRequestDto } from '../dto/create-activity.dto';
+import type { GetActivitiesQueryDto } from '../dto/get-activities-query.dto';
 import type { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import {
   ActivityExecutor,
@@ -41,6 +42,9 @@ describe('ActivitiesService (RFACT001)', () => {
     ptsId = 'pts-1',
   ) =>
     service.createActivity(ptsId, { ...activityBody(), ...changes }, account);
+  const query = (
+    changes: Partial<GetActivitiesQueryDto> = {},
+  ): GetActivitiesQueryDto => ({ page: 1, limit: 20, ...changes });
 
   beforeEach(() => setup());
 
@@ -67,7 +71,6 @@ describe('ActivitiesService (RFACT001)', () => {
         });
       },
     );
-
     it.each([
       undefined,
       null,
@@ -225,7 +228,7 @@ describe('ActivitiesService (RFACT001)', () => {
 
       for (const account of [responsible, member, patient, admin]) {
         expect(
-          (await service.findActivities('pts-1', account)).data,
+          (await service.findActivities('pts-1', query(), account)).data,
         ).toHaveLength(1);
       }
     });
@@ -234,23 +237,29 @@ describe('ActivitiesService (RFACT001)', () => {
       repo.documents = [{ id: 'doc-1', patientId: 'patient-1' }];
       await create({ documentIds: ['doc-1'] });
 
-      const [seenByPatient] = (await service.findActivities('pts-1', patient))
-        .data;
-      const [seenByTeam] = (await service.findActivities('pts-1', member)).data;
+      const [seenByPatient] = (
+        await service.findActivities('pts-1', query(), patient)
+      ).data;
+      const [seenByTeam] = (
+        await service.findActivities('pts-1', query(), member)
+      ).data;
 
       expect(seenByPatient.documentIds).toEqual([]);
       expect(seenByTeam.documentIds).toEqual(['doc-1']);
     });
 
     it('nega a quem não tem vínculo e à equipe do PTS rejeitado (RN016)', async () => {
-      await expectApiError(
-        () => service.findActivities('pts-1', outsider),
+      const forbidden = await expectApiError(
+        () => service.findActivities('pts-1', query(), outsider),
         403,
         'FORBIDDEN',
       );
+      expect(forbidden.message).toBe(
+        'Você não tem acesso às atividades deste PTS.',
+      );
       setup(PtsStateEnum.REJECTED);
       await expectApiError(
-        () => service.findActivities('pts-1', member),
+        () => service.findActivities('pts-1', query(), member),
         403,
         'FORBIDDEN',
       );
@@ -258,9 +267,52 @@ describe('ActivitiesService (RFACT001)', () => {
 
     it('responde 404 quando o PTS não existe', async () => {
       await expectApiError(
-        () => service.findActivities('pts-x', admin),
+        () => service.findActivities('pts-x', query(), admin),
         404,
         'PTS_NOT_FOUND',
+      );
+    });
+
+    it('aplica filtros e paginação e devolve o total', async () => {
+      await create();
+      await create({ title: 'Atividade suspensa' });
+
+      const result = await service.findActivities(
+        'pts-1',
+        query({ status: [ActivityState.Suggested], page: 2, limit: 1 }),
+        member,
+      );
+
+      expect(result).toMatchObject({
+        data: [{ title: 'Atividade suspensa' }],
+        pagination: { page: 2, limit: 1, total: 2, totalPages: 2 },
+      });
+    });
+
+    it('retorna o detalhe autorizado e não revela documentos ao paciente', async () => {
+      repo.documents = [{ id: 'doc-1', patientId: 'patient-1' }];
+      const created = await create({
+        documentIds: ['doc-1'],
+        goalId: 'goal-1',
+      });
+
+      await expect(
+        service.findActivityById(created.id, member),
+      ).resolves.toMatchObject({
+        goal: { id: 'goal-1', title: 'Meta terapêutica' },
+        documents: [{ id: 'doc-1', title: 'Documento doc-1' }],
+        appointmentsCount: 0,
+      });
+      await expect(
+        service.findActivityById(created.id, patient),
+      ).resolves.toMatchObject({ documents: [], documentIds: [] });
+    });
+
+    it('responde ACTIVITY_NOT_FOUND para atividade inexistente', async () => {
+      await expectApiError(
+        () => service.findActivityById('act-x', admin),
+        404,
+        'ACTIVITY_NOT_FOUND',
       );
     });
   });

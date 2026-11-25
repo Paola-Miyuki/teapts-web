@@ -25,6 +25,11 @@ import {
 import GoalsTab from '@/components/pts/GoalsTab';
 import ActivitiesTab from '@/components/pts/ActivitiesTab';
 import { useActivities } from '@/hooks/useActivities';
+import {
+  ACTIVE_ACTIVITY_STATUSES,
+  type ActivityExecutor,
+  type ActivityStatus,
+} from '@/lib/activities';
 import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
@@ -36,6 +41,7 @@ import ClosePtsDialog from '../_components/ClosePtsDialog';
 import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
+const ALL_STATUSES: ActivityStatus[] = [];
 
 type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
 
@@ -160,6 +166,15 @@ function PtsDetailContent({
   const [retryKey, setRetryKey] = useState(0);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
+  // Sem escolha da pessoa: só o que faz parte do plano ou, no PTS encerrado, tudo.
+  const [activityStatuses, setActivityStatuses] = useState<
+    ActivityStatus[] | null
+  >(null);
+  const [activityExecutor, setActivityExecutor] = useState<
+    ActivityExecutor | undefined
+  >();
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityLimit, setActivityLimit] = useState(10);
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient
@@ -168,11 +183,22 @@ function PtsDetailContent({
   );
 
   const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
+  const activityStatusFilter =
+    activityStatuses ??
+    (['concluded', 'cancelled'].includes(pts?.status ?? '')
+      ? ALL_STATUSES
+      : ACTIVE_ACTIVITY_STATUSES);
   const {
     activities,
+    pagination: activitiesPagination,
     error: activitiesError,
     reload: reloadActivities,
-  } = useActivities(id);
+  } = useActivities(id, {
+    status: activityStatusFilter.length > 0 ? activityStatusFilter : undefined,
+    executor: activityExecutor,
+    page: activityPage,
+    limit: activityLimit,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -385,12 +411,15 @@ function PtsDetailContent({
                 Iniciar execução
               </button>
             )}
-            {/* Desabilitado até existir a tela de reavaliação (RFEVA005). */}
+            {/* RFEVA005 – responsável ou admin, com o PTS em andamento. */}
             {canReassess && (
-              <button type="button" className="btn btn-primary" disabled>
+              <Link
+                className="btn btn-primary"
+                href={`/pts/${pts.id}/reassessment`}
+              >
                 <Icon name="checkCircle" className="icon-sm" />
                 Registrar reavaliação
-              </button>
+              </Link>
             )}
             {canClose && (
               <button
@@ -469,7 +498,9 @@ function PtsDetailContent({
           }}
         >
           Atividades
-          {activities && <span className="tab-count">{activities.length}</span>}
+          {activitiesPagination && (
+            <span className="tab-count">{activitiesPagination.total}</span>
+          )}
         </a>
         <a
           href="#timeline"
@@ -502,6 +533,7 @@ function PtsDetailContent({
           <ActivitiesTab
             ptsId={pts.id}
             activities={activities}
+            pagination={activitiesPagination}
             error={activitiesError}
             reload={() => {
               reloadActivities();
@@ -534,6 +566,28 @@ function PtsDetailContent({
             }))}
             goals={goals ?? []}
             isAdmin={isAdmin}
+            statusFilter={activityStatusFilter}
+            onStatusFilterChange={(status) => {
+              setActivityStatuses(status);
+              setActivityPage(1);
+            }}
+            executorFilter={activityExecutor}
+            onExecutorFilterChange={(executor) => {
+              setActivityExecutor(executor);
+              setActivityPage(1);
+            }}
+            onClearFilters={() => {
+              setActivityStatuses(null);
+              setActivityExecutor(undefined);
+              setActivityPage(1);
+            }}
+            page={activityPage}
+            limit={activityLimit}
+            onPageChange={setActivityPage}
+            onLimitChange={(limit) => {
+              setActivityLimit(limit);
+              setActivityPage(1);
+            }}
           />
         </section>
       ) : tab === 'metas' ? (

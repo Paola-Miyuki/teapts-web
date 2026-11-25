@@ -1,11 +1,13 @@
 import { jest } from '@jest/globals';
 import {
   In,
+  IsNull,
   type DataSource,
   type EntityManager,
   type Repository,
 } from 'typeorm';
 
+import { DocumentEntity } from '../../documents/entities/document.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { expectApiError } from '../../pts/__tests__/test-utils';
 import { PtsGoalEntity } from '../../pts/entities/pts-goal.entity';
@@ -133,6 +135,7 @@ function setup({
   const recorder = { record: jest.fn(async () => undefined) };
   const activities = {
     find: jest.fn(async () => [row]),
+    findAndCount: jest.fn(async () => [[row], 1] as const),
     findOne: jest.fn(async () => row),
   };
   const repository = new ActivitiesRepositoryImpl(
@@ -237,15 +240,48 @@ describe('ActivitiesRepositoryImpl', () => {
   it('lista da mais recente para a mais antiga', async () => {
     const { repository, activities } = setup();
 
-    const [activity] = await repository.findByPts('pts-1');
+    const result = await repository.findByPts({
+      ptsId: 'pts-1',
+      page: 1,
+      limit: 20,
+    });
 
-    expect(activities.find).toHaveBeenCalledWith(
+    expect(activities.findAndCount).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { ptsId: 'pts-1' },
         order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 0,
+        take: 20,
       }),
     );
-    expect(activity.frequency).toEqual(activityBody().frequency);
+    expect(result).toMatchObject({
+      total: 1,
+      rows: [{ frequency: activityBody().frequency }],
+    });
+  });
+
+  it('filtra por status e executor em cada página', async () => {
+    const { repository, activities } = setup();
+
+    await repository.findByPts({
+      ptsId: 'pts-1',
+      status: [ActivityState.Running],
+      executor: ActivityExecutor.Team,
+      page: 3,
+      limit: 10,
+    });
+
+    expect(activities.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ptsId: 'pts-1',
+          status: In([ActivityState.Running]),
+          executor: ActivityExecutor.Team,
+        },
+        skip: 20,
+        take: 10,
+      }),
+    );
   });
 
   it('acha a atividade pelo id, com o PTS dela', async () => {
@@ -544,5 +580,28 @@ describe('ActivitiesRepositoryImpl.changeStatus (RFACT009)', () => {
     );
     expect(manager.update).not.toHaveBeenCalled();
     expect(recorder.record).not.toHaveBeenCalled();
+  });
+});
+
+describe('ActivitiesRepositoryImpl.findDetailsById (RFACT002)', () => {
+  it('traz só os documentos não excluídos', async () => {
+    const { activities, recorder } = setup();
+    const find = jest.fn(async () => [{ id: 'doc-1', title: 'Laudo' }]);
+    const findOne = jest.fn(async () => null);
+    const repository = new ActivitiesRepositoryImpl(
+      { manager: { find, findOne } } as unknown as DataSource,
+      activities as unknown as Repository<ActivityEntity>,
+      recorder as unknown as TimelineRecorderService,
+    );
+
+    const details = await repository.findDetailsById('act-1');
+
+    expect(find).toHaveBeenCalledWith(
+      DocumentEntity,
+      expect.objectContaining({
+        where: { id: In(['doc-1']), deletedAt: IsNull() },
+      }),
+    );
+    expect(details?.documents).toEqual([{ id: 'doc-1', title: 'Laudo' }]);
   });
 });
