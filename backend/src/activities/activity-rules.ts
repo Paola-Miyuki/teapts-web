@@ -1,10 +1,18 @@
 import {
   activityEditForbidden,
+  activityNotArchivable,
   activityNotEditable,
 } from './activities.errors';
 import { ActivityState } from './enums/activity.enums';
 
 const LOCKED_STATES = [ActivityState.Rejected, ActivityState.Archived];
+
+// Arquiva só o que ainda faz parte do plano (RFACT008).
+const ARCHIVABLE_STATES = [
+  ActivityState.Suggested,
+  ActivityState.Running,
+  ActivityState.Suspended,
+];
 
 export interface ActivityEditor {
   admin: boolean;
@@ -44,5 +52,12 @@ export function assertActivityEditable(
 
   if (!allowedStates.includes(status)) {
     throw activityEditForbidden();
+  }
+}
+
+/** Rejeitada, concluída ou já arquivada não é arquivada (409). */
+export function assertActivityArchivable(status: ActivityState): void {
+  if (!ARCHIVABLE_STATES.includes(status)) {
+    throw activityNotArchivable();
   }
 }
