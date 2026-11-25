@@ -109,6 +109,27 @@ const GOALS = {
   ],
 };
 
+const ACTIVITIES = {
+  data: [
+    {
+      id: 'act-1',
+      title: 'Integração sensorial',
+      description: 'Circuito sensorial.',
+      type: 'individual_session',
+      specialism: 'occupational_therapist',
+      frequency: { quantity: 1, period: 'weekly', durationMinutes: 45 },
+      modality: 'in_person',
+      visitPlace: null,
+      executor: 'team',
+      executorProfessionalIds: [],
+      goalId: 'goal-1',
+      documentIds: [],
+      status: 'suggested',
+      createdAt: '2026-12-01T13:00:00.000Z',
+    },
+  ],
+};
+
 function mockApi(
   detail: Response,
   account: Account = PROFESSIONAL,
@@ -122,7 +143,9 @@ function mockApi(
           ? respond(200, timeline)
           : url.endsWith('/goals')
             ? respond(200, GOALS)
-            : detail,
+            : url.endsWith('/activities')
+              ? respond(200, ACTIVITIES)
+              : detail,
     ),
   ) as jest.Mock;
 }
@@ -229,6 +252,72 @@ describe('PtsDetail', () => {
     expect(
       await screen.findByText('Ana Souza enviou o documento Laudo neurológico'),
     ).toBeInTheDocument();
+  });
+
+  describe('aba "Atividades" (RFACT001)', () => {
+    async function openActivities(
+      pts: Partial<typeof PTS>,
+      account: Account,
+      readOnly = false,
+    ) {
+      mockApi(respond(200, { ...PTS, ...pts }), account);
+      render(<PtsDetailPage id="pts-1" readOnly={readOnly} />);
+      fireEvent.click(await screen.findByRole('link', { name: /Atividades/ }));
+      await screen.findByText('Integração sensorial');
+    }
+
+    const newButton = () =>
+      screen.queryByRole('button', { name: 'Nova atividade' });
+
+    it.each(['draft', 'planning', 'running'])(
+      'a equipe cria com o PTS em %s, com as metas e a equipe no modal',
+      async (status) => {
+        await openActivities({ status }, PROFESSIONAL);
+        expect(window.location.hash).toBe('#atividades');
+        fireEvent.click(newButton()!);
+
+        expect(
+          screen.getByRole('option', {
+            name: 'Ampliar a comunicação funcional',
+          }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('checkbox', { name: /Beatriz Lopes/ }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      ['paciente', {}, PATIENT, false],
+      ['PTS concluído', { status: 'concluded' }, PROFESSIONAL, false],
+      ['modo somente leitura', {}, PROFESSIONAL, true],
+    ])('só mostra a lista: %s', async (_name, pts, account, readOnly) => {
+      await openActivities(pts, account, readOnly);
+      expect(newButton()).not.toBeInTheDocument();
+    });
+
+    it('recarrega atividades e metas depois de criar', async () => {
+      await openActivities({}, PROFESSIONAL);
+      const loads = (path: string) =>
+        (global.fetch as jest.Mock).mock.calls.filter(
+          ([url, init]) =>
+            url.endsWith(path) && (init?.method ?? 'GET') === 'GET',
+        ).length;
+      const goalsBefore = loads('/goals');
+
+      fireEvent.click(newButton()!);
+      for (const label of [/^Título/, /^Descrição/]) {
+        fireEvent.change(screen.getByLabelText(label), {
+          target: { value: 'Texto' },
+        });
+      }
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Sugerir atividade' }),
+      );
+
+      await waitFor(() => expect(loads('/activities')).toBe(2));
+      expect(loads('/goals')).toBe(goalsBefore + 1);
+    });
   });
 
   describe('aba "Metas terapêuticas" (RFPTS012)', () => {
