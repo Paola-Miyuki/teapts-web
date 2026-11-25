@@ -50,7 +50,7 @@ function respond(status: number, body: unknown) {
   } as unknown as Response;
 }
 
-describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
+describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
   const replace = jest.fn();
   const reload = jest.fn();
   let fetchMock: jest.Mock;
@@ -67,6 +67,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
         canCreate
         canEdit={() => true}
         canArchive={() => true}
+        canChangeStatus={() => true}
         team={TEAM}
         goals={GOALS}
         isAdmin={false}
@@ -131,6 +132,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
       canCreate: true,
       canEdit: () => true,
       canArchive: () => true,
+      canChangeStatus: () => true,
       team: TEAM,
       goals: GOALS,
       isAdmin: false,
@@ -411,6 +413,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
       ],
       canEdit: () => false,
       canArchive: (item) => item.status === 'suggested',
+      canChangeStatus: () => false,
     });
 
     expect(
@@ -495,5 +498,122 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  describe('suspender, retomar e concluir (RFACT009)', () => {
+    const item = (name: string) =>
+      screen.queryByRole('menuitem', { name, hidden: true });
+    const openAction = (name: string, status: Activity['status']) => {
+      renderTab({ activities: [activity({ status })] });
+      fireEvent.click(item(name)!);
+    };
+
+    it('mostra só as ações que a pessoa pode fazer na atividade', () => {
+      renderTab({
+        activities: [activity({ status: 'running' })],
+        canEdit: () => false,
+        canArchive: () => false,
+        canChangeStatus: (_activity, action) => action !== 'resume',
+      });
+
+      expect(item('Suspender')).toBeInTheDocument();
+      expect(item('Concluir')).toBeInTheDocument();
+      expect(item('Retomar')).not.toBeInTheDocument();
+      expect(item('Editar')).not.toBeInTheDocument();
+    });
+
+    it('sem nenhuma ação, a linha fica sem menu', () => {
+      renderTab({
+        canEdit: () => false,
+        canArchive: () => false,
+        canChangeStatus: () => false,
+      });
+
+      expect(
+        screen.queryByRole('button', { name: /^Ações para/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('suspende com o motivo, mostra o carregamento e atualiza a lista', async () => {
+      let finish: (value: Response) => void = () => undefined;
+      fetchMock.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      openAction('Suspender', 'running');
+
+      expect(
+        screen.getByRole('dialog', { name: 'Suspender Integração sensorial?' }),
+      ).toBeInTheDocument();
+      fill(/^Motivo/, '  Reforma da sala. ');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Suspender atividade' }),
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'Suspendendo...' }),
+      ).toBeDisabled();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:3000/activities/act-1/suspend',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+      expect(sentBody()).toEqual({ reason: 'Reforma da sala.' });
+
+      finish(respond(200, { id: 'act-1', status: 'suspended' }));
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      expect(screen.getByText('Atividade suspensa')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['Retomar', 'suspended', 'resume', 'Atividade retomada'],
+      ['Concluir', 'running', 'conclude', 'Atividade concluída'],
+      ['Concluir', 'suspended', 'conclude', 'Atividade concluída'],
+    ] as const)(
+      '%s a %s, sem pedir motivo',
+      async (name, status, path, message) => {
+        openAction(name, status);
+
+        expect(screen.queryByLabelText(/^Motivo/)).not.toBeInTheDocument();
+        const confirm = screen.getByRole('button', {
+          name: `${name} atividade`,
+        });
+        expect(confirm).toHaveClass('btn-primary');
+        fireEvent.click(confirm);
+
+        expect(await screen.findByText(message)).toBeInTheDocument();
+        expect(fetchMock).toHaveBeenCalledWith(
+          `http://localhost:3000/activities/act-1/${path}`,
+          expect.objectContaining({ method: 'POST', credentials: 'include' }),
+        );
+        expect(reload).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('mostra a mensagem de erro da API', async () => {
+      const message =
+        'A atividade não está em um estado que permita esta ação.';
+      fetchMock.mockResolvedValue(
+        respond(409, { status: 'INVALID_ACTIVITY_TRANSITION', message }),
+      );
+      openAction('Concluir', 'running');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Concluir atividade' }),
+      );
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('sem sessão, vai para o login', async () => {
+      fetchMock.mockResolvedValue(respond(401, {}));
+      openAction('Retomar', 'suspended');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Retomar atividade' }),
+      );
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
   });
 });

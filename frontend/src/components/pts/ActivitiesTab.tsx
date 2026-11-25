@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import Icon from '@/components/Icon';
+import Icon, { type IconName } from '@/components/Icon';
 import KebabMenu from '@/components/table/KebabMenu';
 import MultiSelect from '@/components/table/MultiSelect';
 import ui from '@/components/ui.module.css';
@@ -11,8 +11,10 @@ import {
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_TYPE_LABELS,
   archiveActivity,
+  changeActivityStatus,
   formatFrequency,
   type Activity,
+  type ActivityStatusAction,
 } from '@/lib/activities';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -27,7 +29,49 @@ import ConfirmActivityDialog from './ConfirmActivityDialog';
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
 type OpenDialog =
-  { kind: 'add' } | { kind: 'edit' | 'archive'; activity: Activity } | null;
+  | { kind: 'add' }
+  | { kind: 'edit' | 'archive'; activity: Activity }
+  | { kind: 'status'; action: ActivityStatusAction; activity: Activity }
+  | null;
+
+const STATUS_ACTIONS: Record<
+  ActivityStatusAction,
+  {
+    label: string;
+    icon: IconName;
+    description: string;
+    busyLabel: string;
+    errorMessage: string;
+    done: string;
+  }
+> = {
+  suspend: {
+    label: 'Suspender',
+    icon: 'clock',
+    description:
+      'A atividade para de receber atendimentos até ser retomada. O motivo fica na timeline.',
+    busyLabel: 'Suspendendo...',
+    errorMessage: 'Não foi possível suspender a atividade',
+    done: 'Atividade suspensa',
+  },
+  resume: {
+    label: 'Retomar',
+    icon: 'check',
+    description: 'A atividade volta para Em andamento.',
+    busyLabel: 'Retomando...',
+    errorMessage: 'Não foi possível retomar a atividade',
+    done: 'Atividade retomada',
+  },
+  conclude: {
+    label: 'Concluir',
+    icon: 'checkCircle',
+    description:
+      'A atividade sai do plano em andamento. Os atendimentos continuam no histórico.',
+    busyLabel: 'Concluindo...',
+    errorMessage: 'Não foi possível concluir a atividade',
+    done: 'Atividade concluída',
+  },
+};
 
 const STATUS_OPTIONS = Object.entries(ACTIVITY_STATUS_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -45,6 +89,11 @@ type ActivitiesTabProps = {
   canEdit: (activity: Activity) => boolean;
   // RFACT008 – equipe e admin, na sugerida, em andamento ou suspensa.
   canArchive: (activity: Activity) => boolean;
+  // RFACT009 – equipe e admin, conforme o estado da atividade.
+  canChangeStatus: (
+    activity: Activity,
+    action: ActivityStatusAction,
+  ) => boolean;
   team: ActivityTeamMember[];
   goals: ActivityGoalOption[];
   isAdmin: boolean;
@@ -66,6 +115,7 @@ export default function ActivitiesTab({
   canCreate,
   canEdit,
   canArchive,
+  canChangeStatus,
   team,
   goals,
   isAdmin,
@@ -116,6 +166,11 @@ export default function ActivitiesTab({
     statuses.length === 0
       ? activities
       : activities.filter((activity) => statuses.includes(activity.status));
+
+  const statusActions = (activity: Activity) =>
+    (Object.keys(STATUS_ACTIONS) as ActivityStatusAction[]).filter((action) =>
+      canChangeStatus(activity, action),
+    );
 
   function finish(message: string) {
     setDialog(null);
@@ -240,7 +295,9 @@ export default function ActivitiesTab({
                     </td>
                     <td className="num">{formatDate(activity.createdAt)}</td>
                     <td className="actions-col">
-                      {(canEdit(activity) || canArchive(activity)) && (
+                      {(canEdit(activity) ||
+                        canArchive(activity) ||
+                        statusActions(activity).length > 0) && (
                         <KebabMenu label={`Ações para ${activity.title}`}>
                           {canEdit(activity) && (
                             <li>
@@ -256,6 +313,27 @@ export default function ActivitiesTab({
                               </button>
                             </li>
                           )}
+                          {statusActions(activity).map((action) => (
+                            <li key={action}>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() =>
+                                  openDialog({
+                                    kind: 'status',
+                                    action,
+                                    activity,
+                                  })
+                                }
+                              >
+                                <Icon
+                                  name={STATUS_ACTIONS[action].icon}
+                                  className="icon-sm"
+                                />
+                                {STATUS_ACTIONS[action].label}
+                              </button>
+                            </li>
+                          ))}
                           {canArchive(activity) && (
                             <li>
                               <div className="sep" />
@@ -295,6 +373,23 @@ export default function ActivitiesTab({
               dialog.kind === 'edit' ? 'Atividade salva' : 'Atividade sugerida',
             )
           }
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.kind === 'status' && (
+        <ConfirmActivityDialog
+          title={`${STATUS_ACTIONS[dialog.action].label} ${dialog.activity.title}?`}
+          description={STATUS_ACTIONS[dialog.action].description}
+          confirmLabel={`${STATUS_ACTIONS[dialog.action].label} atividade`}
+          busyLabel={STATUS_ACTIONS[dialog.action].busyLabel}
+          errorMessage={STATUS_ACTIONS[dialog.action].errorMessage}
+          danger={dialog.action === 'suspend'}
+          askReason={dialog.action === 'suspend'}
+          onConfirm={(reason) =>
+            changeActivityStatus(dialog.activity.id, dialog.action, reason)
+          }
+          onDone={() => finish(STATUS_ACTIONS[dialog.action].done)}
           onClose={() => setDialog(null)}
         />
       )}

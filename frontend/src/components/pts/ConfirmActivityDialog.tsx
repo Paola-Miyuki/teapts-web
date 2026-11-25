@@ -16,13 +16,15 @@ type ConfirmActivityDialogProps = {
   confirmLabel: string;
   busyLabel: string;
   errorMessage: string;
+  danger?: boolean;
+  askReason?: boolean;
   // Chamada com o motivo já aparado; vazio, vai undefined.
   onConfirm: (reason?: string) => Promise<unknown>;
   onDone: () => void;
   onClose: () => void;
 };
 
-// Confirmação das ações da atividade com motivo opcional (`data-confirm` de
+// Confirmação das ações da atividade, com motivo opcional nas que o pedem (`data-confirm` de
 // `pts-detalhe.html`). Monte só com o diálogo aberto, para o motivo começar
 // vazio.
 export default function ConfirmActivityDialog({
@@ -31,6 +33,8 @@ export default function ConfirmActivityDialog({
   confirmLabel,
   busyLabel,
   errorMessage,
+  danger = true,
+  askReason = true,
   onConfirm,
   onDone,
   onClose,
@@ -87,7 +91,7 @@ export default function ConfirmActivityDialog({
           </button>
           <button
             type="button"
-            className="btn btn-danger"
+            className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`}
             disabled={submitting}
             aria-busy={submitting}
             onClick={confirm}
@@ -103,16 +107,23 @@ export default function ConfirmActivityDialog({
         </div>
       )}
 
-      <FormField id={`${FORM_ID}-reason`} label="Motivo" required={false} full>
-        <textarea
+      {askReason && (
+        <FormField
           id={`${FORM_ID}-reason`}
-          className="input"
-          rows={3}
-          disabled={submitting}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-        />
-      </FormField>
+          label="Motivo"
+          required={false}
+          full
+        >
+          <textarea
+            id={`${FORM_ID}-reason`}
+            className="input"
+            rows={3}
+            disabled={submitting}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </FormField>
+      )}
     </Modal>
   );
 }
