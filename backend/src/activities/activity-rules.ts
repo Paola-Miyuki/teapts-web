@@ -2,6 +2,7 @@ import {
   activityEditForbidden,
   activityNotArchivable,
   activityNotEditable,
+  activityNotSuggested,
   invalidActivityTransition,
 } from './activities.errors';
 import { ActivityState } from './enums/activity.enums';
@@ -89,5 +90,20 @@ export function assertActivityEditable(
 export function assertActivityArchivable(status: ActivityState): void {
   if (!ARCHIVABLE_STATES.includes(status)) {
     throw activityNotArchivable();
+  }
+}
+
+/** Aprovar ou rejeitar a sugerida (RFACT003): aprovada já entra em execução. */
+export const ACTIVITY_DECISIONS = {
+  approve: ActivityState.Running,
+  reject: ActivityState.Rejected,
+} as const;
+
+export type ActivityDecision = keyof typeof ACTIVITY_DECISIONS;
+
+/** Só a sugerida recebe decisão (409). */
+export function assertActivitySuggested(status: ActivityState): void {
+  if (status !== ActivityState.Suggested) {
+    throw activityNotSuggested();
   }
 }

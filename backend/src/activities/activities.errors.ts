@@ -95,3 +95,17 @@ export const invalidActivityAuthor = () =>
 
 export const missingVisitPlace = () =>
   invalidField('Informe o local da visita.');
+
+export const activityDecisionForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem aprovar ou rejeitar atividades.',
+  );
+
+export const activityNotSuggested = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'ACTIVITY_NOT_SUGGESTED',
+    'Só uma atividade sugerida recebe decisão.',
+  );
