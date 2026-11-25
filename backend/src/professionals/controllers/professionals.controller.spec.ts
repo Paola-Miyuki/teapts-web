@@ -52,6 +52,7 @@ describe('GET /professionals', () => {
         data: [
           {
             id: '550e8400-e29b-41d4-a716-446655440000',
+            accountId: null,
             name: 'Maria Silva',
             email: 'maria@example.com',
             specialism: {
@@ -112,6 +113,7 @@ describe('GET /professionals', () => {
       data: [
         {
           id: '550e8400-e29b-41d4-a716-446655440000',
+          accountId: null,
           name: 'Maria Silva',
           email: 'maria@example.com',
           specialism: {

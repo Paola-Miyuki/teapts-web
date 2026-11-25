@@ -4,6 +4,7 @@ import { Account } from '../accounts/entities/account.entity';
 import { Medication } from '../patients/entities/medication.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
+import { StoredObject } from '../storage/entities/stored-object.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
 import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
@@ -24,6 +25,7 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
@@ -36,6 +38,7 @@ const entities = [
   Professional,
   Pts,
   TimelineRecord,
+  StoredObject,
 ];
 const migrations = [
   CreateAccount1791072000000,
@@ -55,6 +58,7 @@ const migrations = [
   AddAccountStatus1791149000000,
   AddPtsSheetColumns1791149010000,
   AddProfessionalRegistrationFields1791149020000,
+  CreateStoredObject1791149030000,
 ];
 
 export function getDatabaseOptions(
