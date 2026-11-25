@@ -29,6 +29,9 @@ export class ProfessionalRegistrationResponseDto {
 /** Dados necessários para identificar e selecionar um profissional. */
 export class ProfessionalSummaryResponseDto {
   id: string;
+  /** Conta do profissional (ex.: `DELETE /accounts/:id`); só para o admin, `null` para os demais. */
+  @ApiProperty({ type: String, nullable: true })
+  accountId: string | null;
   name: string;
   /** Só para o admin e o profissional; `null` para as outras contas (DP011). */
   email: string | null;

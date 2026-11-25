@@ -999,3 +999,215 @@ describe('ProfessionalsPage: editar especialidade', () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
   });
 });
+
+describe('ProfessionalsPage: desativar profissional', () => {
+  const replace = jest.fn();
+  const ADMIN = { ...ACCOUNT, role: 'admin', professionalProfileIds: [] };
+  const person = (name: string, status: 'active' | 'inactive') => ({
+    id: `${name}-uuid`,
+    accountId: `${name}-account`,
+    name,
+    email: `${name.toLowerCase()}@example.com`,
+    specialism: { id: 'psychologist', name: 'Psicólogo' },
+    registration: null,
+    institution: null,
+    cnes: null,
+    status,
+  });
+  const PAGE = {
+    data: {
+      data: [person('Ana', 'active'), person('Bruno', 'inactive')],
+      pagination: { page: 1, limit: 10, total: 2, totalPages: 1 },
+    },
+  };
+
+  // GET /professionals responde com a lista; o DELETE, com `remove`.
+  function mockList(remove?: jest.Mock) {
+    mockApi(
+      jest.fn((url: string, init?: RequestInit) =>
+        init?.method === 'DELETE'
+          ? remove!(url, init)
+          : Promise.resolve(mockResponse(PAGE)),
+      ),
+      ADMIN,
+    );
+  }
+
+  async function openDialog() {
+    render(<ProfessionalsPage />);
+
+    const row = (await screen.findByText('Ana')).closest('tr')!;
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Desativar' }));
+
+    return screen.getByRole('dialog', { name: 'Desativar Ana?' });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedUseRouter.mockReturnValue({ replace });
+    mockedUseSearchParams.mockReturnValue(new URLSearchParams());
+    global.fetch = jest.fn();
+  });
+
+  it('mostra "Desativar" só para o admin e só para conta ativa', async () => {
+    mockList();
+    render(<ProfessionalsPage />);
+
+    const inactive = (await screen.findByText('Bruno')).closest('tr')!;
+
+    fireEvent.click(
+      within(inactive).getByRole('button', { name: 'Ações para Bruno' }),
+    );
+
+    expect(
+      screen.queryByRole('menuitem', { name: 'Desativar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('não mostra a ação a quem não é admin', async () => {
+    mockApi(jest.fn().mockResolvedValue(mockResponse(PAGE)));
+    render(<ProfessionalsPage />);
+
+    await screen.findByText('Ana');
+
+    expect(
+      screen.queryByRole('button', { name: 'Ações para Ana' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('abre a confirmação com o botão de confirmar em vermelho', async () => {
+    mockList();
+    const dialog = await openDialog();
+
+    expect(within(dialog).getByText(/sai das equipes de PTS/)).toBeVisible();
+    expect(
+      within(dialog).getByRole('button', { name: 'Desativar profissional' }),
+    ).toHaveClass('btn-danger');
+  });
+
+  it('desativa pelo modal Visualizar', async () => {
+    mockList();
+    render(<ProfessionalsPage />);
+
+    const row = (await screen.findByText('Ana')).closest('tr')!;
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana' }),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Visualizar' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Ana' })).getByRole('button', {
+        name: 'Desativar',
+      }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Desativar Ana?' }),
+    ).toBeInTheDocument();
+  });
+
+  it('chama DELETE /accounts/:accountId e passa a linha para "Inativo"', async () => {
+    const remove = jest.fn().mockResolvedValue(
+      mockResponse({
+        data: {
+          id: 'Ana-account',
+          status: 'inactive',
+          deactivatedAt: '2026-11-10T15:00:00.000Z',
+        },
+      }),
+    );
+    mockList(remove);
+    const dialog = await openDialog();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Desativar profissional' }),
+    );
+
+    expect(await screen.findByText('Profissional desativado.')).toBeVisible();
+
+    const row = screen.getByText('Ana').closest('tr')!;
+
+    expect(within(row).getByText('Inativo')).toHaveClass('inactive');
+    expect(remove).toHaveBeenCalledWith(
+      expect.stringContaining('/accounts/Ana-account'),
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+    );
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana' }),
+    );
+
+    expect(
+      screen.queryByRole('menuitem', { name: 'Desativar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('desabilita o botão e mostra o carregamento durante o envio', async () => {
+    mockList(jest.fn(() => new Promise(() => {})));
+    const dialog = await openDialog();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Desativar profissional' }),
+    );
+
+    expect(
+      await within(dialog).findByRole('button', { name: 'Desativando...' }),
+    ).toBeDisabled();
+  });
+
+  it('mostra a mensagem do 409 no diálogo e troca o menu pela nota de bloqueio', async () => {
+    const message =
+      'A conta tem perfil responsável por um PTS ativo. Transfira a responsabilidade antes de desativar.';
+    mockList(
+      jest.fn().mockResolvedValue(
+        mockResponse({
+          status: 409,
+          ok: false,
+          data: { status: 'ACCOUNT_IS_PTS_RESPONSIBLE', message },
+        }),
+      ),
+    );
+    const dialog = await openDialog();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Desativar profissional' }),
+    );
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
+    expect(
+      screen.getByRole('dialog', { name: 'Desativar Ana?' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    const row = screen.getByText('Ana').closest('tr')!;
+
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Ações para Ana' }),
+    );
+
+    expect(
+      screen.getByText(/Desativar fica bloqueado: Ana é responsável/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Desativar' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('redireciona para o login quando a sessão expira', async () => {
+    mockList(
+      jest.fn().mockResolvedValue(mockResponse({ status: 401, ok: false })),
+    );
+    const dialog = await openDialog();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Desativar profissional' }),
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+  });
+});

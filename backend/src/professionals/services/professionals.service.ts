@@ -106,12 +106,13 @@ export class ProfessionalsService {
     }
 
     const { rows, total } = page;
-    const canSeeEmail =
-      isAdmin(account) || account.professionalProfileIds.length > 0;
+    const admin = isAdmin(account);
+    const canSeeEmail = admin || account.professionalProfileIds.length > 0;
 
     return {
       data: rows.map((row) => ({
         ...this.toResponse(row),
+        accountId: admin ? row.professional_account_id : null,
         email: canSeeEmail ? row.account_email : null,
       })),
       pagination: {
@@ -321,6 +322,7 @@ export class ProfessionalsService {
   private toResponse(row: ProfessionalRow): ProfessionalSummaryResponseDto {
     return {
       id: row.professional_id,
+      accountId: null,
       name: row.account_name,
       email: row.account_email,
       specialism: {

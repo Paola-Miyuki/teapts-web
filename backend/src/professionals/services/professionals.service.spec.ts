@@ -88,6 +88,7 @@ describe('ProfessionalsService.findAll', () => {
       rows: [
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
           professional_council_state: 'pr',
@@ -107,6 +108,7 @@ describe('ProfessionalsService.findAll', () => {
       data: [
         {
           id: '550e8400-e29b-41d4-a716-446655440000',
+          accountId: null,
           name: 'Maria Silva',
           email: 'maria@example.com',
           specialism: {
@@ -196,6 +198,7 @@ describe('ProfessionalsService.findAll', () => {
       rows: [
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
           professional_council_state: 'pr',
@@ -220,6 +223,7 @@ describe('ProfessionalsService.findAll', () => {
       rows: [
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
           professional_specialism: Specialism.Psychologist,
           professional_council_number: '12345',
           professional_council_state: 'pr',
@@ -239,6 +243,9 @@ describe('ProfessionalsService.findAll', () => {
     );
 
     expect(result.data[0].email).toBe('maria@example.com');
+    expect(result.data[0].accountId).toBe(
+      '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
+    );
   });
 
   it('returns an empty page when there are no matches', async () => {
