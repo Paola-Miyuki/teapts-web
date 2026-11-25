@@ -29,6 +29,8 @@ export type PermissionAction =
   | 'createActivity'
   | 'editActivity'
   | 'archiveActivity'
+  | 'approveActivity'
+  | 'rejectActivity'
   | 'suspendActivity'
   | 'resumeActivity'
   | 'concludeActivity'
@@ -105,8 +107,11 @@ function isArchivableActivity(activity?: ActivityPermissionData) {
   return ['suggested', 'running', 'suspended'].includes(activity?.status ?? '');
 }
 
-// Estados de onde cada ação sai; a concluída não volta (RFACT009).
+// Estados de onde cada ação sai: só a sugerida recebe decisão (RFACT003); a
+// concluída não volta (RFACT009).
 const ACTIVITY_TRANSITIONS = {
+  approveActivity: ['suggested'],
+  rejectActivity: ['suggested'],
   suspendActivity: ['running'],
   resumeActivity: ['suspended'],
   concludeActivity: ['running', 'suspended'],
@@ -172,6 +177,8 @@ export function can(
         );
       case 'archiveActivity':
         return isEditablePts(pts) && isArchivableActivity(activity);
+      case 'approveActivity':
+      case 'rejectActivity':
       case 'suspendActivity':
       case 'resumeActivity':
       case 'concludeActivity':
@@ -306,10 +313,13 @@ export function can(
         isArchivableActivity(activity)
       );
 
+    case 'approveActivity':
+    case 'rejectActivity':
     case 'suspendActivity':
     case 'resumeActivity':
     case 'concludeActivity':
-      // RFACT009 – qualquer profissional da equipe do PTS.
+      // RFACT003 e RFACT009 – qualquer profissional da equipe do PTS, autor e
+      // responsável inclusive.
       return (
         professional &&
         pts !== undefined &&

@@ -204,15 +204,20 @@ export function archiveActivity(activityId: string, reason?: string) {
   );
 }
 
-export type ActivityStatusAction = 'suspend' | 'resume' | 'conclude';
+// Aprovar e rejeitar a sugerida (RFACT003); suspender, retomar e concluir
+// (RFACT009). Todas são `POST /activities/:id/<ação>`.
+export type ActivityStatusAction =
+  'approve' | 'reject' | 'suspend' | 'resume' | 'conclude';
 
 export type ActivityStatusResponse = {
   id: string;
-  status: 'suspended' | 'running' | 'concluded';
-  changedAt: string;
+  status: 'suspended' | 'running' | 'concluded' | 'rejected';
+  // `changedAt` no RFACT009; `decidedAt` na aprovação e na rejeição.
+  changedAt?: string;
+  decidedAt?: string;
 };
 
-// O motivo só vale na suspensão (RFACT009).
+// O motivo só vale na rejeição e na suspensão.
 export function changeActivityStatus(
   activityId: string,
   action: ActivityStatusAction,
