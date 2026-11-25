@@ -8,6 +8,7 @@ import {
   type EntityManager,
 } from 'typeorm';
 
+import { AppointmentEntity } from '../../appointments/entities/appointment.entity';
 import { DocumentEntity } from '../../documents/entities/document.entity';
 import { PtsGoalEntity } from '../../pts/entities/pts-goal.entity';
 import { PtsEntity } from '../../pts/entities/pts.entity';
@@ -163,8 +164,11 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
         const document = documentsById.get(id);
         return document ? [{ id: document.id, title: document.title }] : [];
       }),
-      // O backend ainda não tem entidade/tabela de atendimentos.
-      appointmentsCount: 0,
+      // A retificação não conta como outro atendimento (RN020).
+      appointmentsCount: await this.dataSource.manager.countBy(
+        AppointmentEntity,
+        { activityId, rectifiesAppointmentId: IsNull() },
+      ),
     };
   }
 

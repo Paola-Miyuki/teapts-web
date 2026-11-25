@@ -5,7 +5,11 @@ export default async function PtsPage({
   searchParams,
 }: {
   params: Promise<{ ptsId: string }>;
-  searchParams: Promise<{ readonly?: string; version?: string }>;
+  searchParams: Promise<{
+    readonly?: string;
+    version?: string;
+    appointment?: string;
+  }>;
 }) {
   const [{ ptsId }, query] = await Promise.all([params, searchParams]);
   const version = Number(query.version);
@@ -14,6 +18,7 @@ export default async function PtsPage({
     <PtsDetailPage
       id={ptsId}
       readOnly={query.readonly === '1'}
+      appointmentRegistered={query.appointment === 'registered'}
       version={Number.isInteger(version) && version > 0 ? version : undefined}
     />
   );

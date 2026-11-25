@@ -34,6 +34,7 @@ export type PermissionAction =
   | 'suspendActivity'
   | 'resumeActivity'
   | 'concludeActivity'
+  | 'registerAppointment'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -183,6 +184,8 @@ export function can(
       case 'resumeActivity':
       case 'concludeActivity':
         return isEditablePts(pts) && allowsTransition(action, activity);
+      case 'registerAppointment':
+        return !pts || (isActivePts(pts) && activity?.status === 'running');
       default:
         return true;
     }
@@ -326,6 +329,17 @@ export function can(
         isEditablePts(pts) &&
         isProposalMember(user, pts) &&
         allowsTransition(action, activity)
+      );
+
+    case 'registerAppointment':
+      // RFACT004 – profissional da equipe de um PTS ativo, em atividade em
+      // andamento; sem o PTS, só abre a página.
+      return (
+        professional &&
+        (!pts ||
+          (isActivePts(pts) &&
+            isProposalMember(user, pts) &&
+            activity?.status === 'running'))
       );
 
     case 'removePtsTeamMember':

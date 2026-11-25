@@ -105,6 +105,11 @@ export class ActivityDetailsResponseDto extends ActivityResponseDto {
   })
   documents!: { id: string; title: string }[];
 
-  @ApiProperty({ type: 'integer', minimum: 0, example: 0 })
+  @ApiProperty({
+    type: 'integer',
+    minimum: 0,
+    example: 0,
+    description: 'Atendimentos registrados; a retificação não conta.',
+  })
   appointmentsCount!: number;
 }

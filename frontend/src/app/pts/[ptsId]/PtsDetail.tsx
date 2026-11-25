@@ -101,10 +101,13 @@ export default function PtsDetailPage({
   id,
   readOnly = false,
   version,
+  appointmentRegistered = false,
 }: {
   id: string;
   readOnly?: boolean;
   version?: number;
+  // Voltando de "Registrar atendimento" (RFACT004).
+  appointmentRegistered?: boolean;
 }) {
   const [patientName, setPatientName] = useState('');
 
@@ -136,6 +139,7 @@ export default function PtsDetailPage({
           account={account}
           readOnly={readOnly}
           version={version}
+          appointmentRegistered={appointmentRegistered}
         />
       )}
     </AuthenticatedPage>
@@ -149,6 +153,7 @@ function PtsDetailContent({
   account,
   readOnly,
   version,
+  appointmentRegistered,
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
@@ -156,6 +161,7 @@ function PtsDetailContent({
   account: Account;
   readOnly: boolean;
   version?: number;
+  appointmentRegistered: boolean;
 }) {
   const router = useRouter();
   const canOpenRecord = can(account, 'viewAuthorizedPatients');
@@ -530,6 +536,14 @@ function PtsDetailContent({
         </section>
       ) : tab === 'atividades' ? (
         <section data-panel="atividades" id="atividades">
+          {appointmentRegistered && (
+            <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
+              <div className={ui.alertIcon}>
+                <Icon name="checkCircle" />
+              </div>
+              <span>Atendimento registrado</span>
+            </div>
+          )}
           <ActivitiesTab
             ptsId={pts.id}
             activities={activities}
@@ -550,6 +564,14 @@ function PtsDetailContent({
               !readOnly &&
               !isPatient &&
               can(account, 'archiveActivity', { pts: permissionPts, activity })
+            }
+            canRegister={(activity) =>
+              !readOnly &&
+              !isPatient &&
+              can(account, 'registerAppointment', {
+                pts: permissionPts,
+                activity,
+              })
             }
             canChangeStatus={(activity, action) =>
               !readOnly &&
