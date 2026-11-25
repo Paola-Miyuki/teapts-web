@@ -42,3 +42,24 @@ export const invalidAppointmentEnd = () =>
 
 export const futureAppointment = () =>
   invalidField('Atendimento realizado ou falta não pode ter data futura.');
+
+export const appointmentNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'APPOINTMENT_NOT_FOUND',
+    'Atendimento não encontrado.',
+  );
+
+export const appointmentsViewForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso a estes atendimentos.',
+  );
+
+export const rectifyForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Só o autor do atendimento pode retificá-lo.',
+  );
