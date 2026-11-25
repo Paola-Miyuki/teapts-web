@@ -63,6 +63,22 @@ describe('can', () => {
     }
   });
 
+  it('permite editar documentos ao admin e ao profissional com acesso de escrita', () => {
+    expect(can(admin, 'editDocument')).toBe(true);
+    expect(can(professional, 'editDocument', { patientReadOnly: false })).toBe(
+      true,
+    );
+    expect(can(professional, 'editDocument', { patientReadOnly: true })).toBe(
+      false,
+    );
+    expect(can(patient, 'editDocument', { patientReadOnly: false })).toBe(
+      false,
+    );
+    expect(can(waiting, 'editDocument', { patientReadOnly: false })).toBe(
+      false,
+    );
+  });
+
   it('abre o PTS e a timeline para a equipe, o paciente e o admin', () => {
     expect(can(admin, 'viewPts')).toBe(true);
     expect(can(professional, 'viewPts')).toBe(true);

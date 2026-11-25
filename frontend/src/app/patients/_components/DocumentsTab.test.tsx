@@ -21,6 +21,7 @@ const API = 'http://localhost:3000';
 const LAUDO = {
   id: 'doc-1',
   title: 'Laudo neurológico',
+  description: 'Avaliação inicial.',
   category: 'medical_report',
   issuer: {
     name: 'Dra. Marta Reis',
@@ -139,6 +140,63 @@ describe('DocumentsTab', () => {
     expect(
       screen.queryByRole('link', { name: 'Enviar documento' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('edits document metadata from the row and updates the table', async () => {
+    const user = userEvent.setup();
+    const updated = {
+      id: 'doc-1',
+      title: 'Laudo neurológico (2026)',
+      description: 'Avaliação de novembro.',
+      updatedAt: '2026-12-09T12:00:00.000Z',
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(respond(200, list([LAUDO])))
+      .mockResolvedValueOnce(respond(200, updated));
+
+    render(
+      <DocumentsTab patientId="patient-1" canUpload={false} canEditDocuments />,
+    );
+
+    await screen.findByText('Laudo neurológico');
+    await user.click(
+      screen.getByRole('button', { name: 'Ações para Laudo neurológico' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Editar' }));
+
+    const dialog = screen.getByRole('dialog');
+    const title = within(dialog).getByRole('textbox', { name: /Título/ });
+    const description = within(dialog).getByRole('textbox', {
+      name: 'Descrição',
+    });
+
+    expect(title).toHaveValue('Laudo neurológico');
+    expect(description).toHaveValue('Avaliação inicial.');
+
+    await user.clear(title);
+    await user.type(title, updated.title);
+    await user.clear(description);
+    await user.type(description, updated.description);
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Salvar alterações' }),
+    );
+
+    expect(
+      await screen.findByText('Laudo neurológico (2026)'),
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      `${API}/documents/doc-1`,
+      expect.objectContaining({
+        method: 'PATCH',
+        credentials: 'include',
+        body: JSON.stringify({
+          title: updated.title,
+          description: updated.description,
+        }),
+      }),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('searches by the title and goes back to the first page', async () => {
@@ -283,6 +341,9 @@ describe('DocumentsTab', () => {
       await user.click(
         screen.getByRole('button', { name: 'Ações para Laudo neurológico' }),
       );
+      expect(
+        screen.queryByRole('menuitem', { name: 'Editar' }),
+      ).not.toBeInTheDocument();
       await user.click(screen.getByRole('menuitem', { name: 'Visualizar' }));
 
       await waitFor(() =>

@@ -23,6 +23,7 @@ import {
 import { formatDate, formatDateOnly } from '@/lib/format';
 import { SPECIALISMS } from '@/lib/professionals';
 import DocumentViewer, { useDocumentViewer } from './DocumentViewer';
+import EditDocumentDialog from '@/app/patients/_components/EditDocumentDialog';
 
 type CategoryOption = { value: DocumentCategory; label: string };
 
@@ -39,6 +40,8 @@ type DocumentsTableProps = {
   load: (query: DocumentsQuery, signal: AbortSignal) => Promise<DocumentList>;
   // Link "Enviar documento" do cabeçalho.
   action?: ReactNode;
+  // A edição só é habilitada nas tabelas do prontuário e para quem tem acesso.
+  canEditDocuments?: boolean;
   // Muda para a tabela recarregar (ex.: depois de uma ação fora dela).
   reloadKey?: number;
   // Chamado a cada carga bem-sucedida.
@@ -79,7 +82,8 @@ function Issuer({ issuer }: { issuer: DocumentListItem['issuer'] }) {
 
 // Tabela de documentos de `paciente.html` (abas Documentos e Termos e
 // consentimentos) e de `meus-documentos.html`: busca pelo título, filtro de
-// categoria, paginação e as ações Visualizar e Baixar (RFDOC003, RFDOC007).
+// categoria, paginação e ações de consulta; Editar aparece só no prontuário
+// para contas autorizadas (RFDOC003, RFDOC005, RFDOC007).
 export default function DocumentsTable({
   id,
   title,
@@ -89,6 +93,7 @@ export default function DocumentsTable({
   showUploader,
   load,
   action,
+  canEditDocuments = false,
   reloadKey = 0,
   onLoaded,
 }: DocumentsTableProps) {
@@ -100,6 +105,7 @@ export default function DocumentsTable({
   const [limit, setLimit] = useState(PER_PAGE_OPTIONS[0]);
   const [retryKey, setRetryKey] = useState(0);
   const [result, setResult] = useState<DocumentList | null>(null);
+  const [editing, setEditing] = useState<DocumentListItem | null>(null);
   const [error, setError] = useState('');
   const viewer = useDocumentViewer();
 
@@ -335,6 +341,18 @@ export default function DocumentsTable({
                     <td className="actions-col">
                       <KebabMenu label={`Ações para ${document.title}`}>
                         <DocumentViewer document={document} viewer={viewer} />
+                        {canEditDocuments && (
+                          <li>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => setEditing(document)}
+                            >
+                              <Icon name="edit" className="icon-sm" />
+                              Editar
+                            </button>
+                          </li>
+                        )}
                       </KebabMenu>
                     </td>
                   </tr>
@@ -356,6 +374,31 @@ export default function DocumentsTable({
             }}
           />
         </>
+      )}
+      {editing && (
+        <EditDocumentDialog
+          document={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => {
+            setResult((current) =>
+              current
+                ? {
+                    ...current,
+                    data: current.data.map((item) =>
+                      item.id === updated.id
+                        ? {
+                            ...item,
+                            title: updated.title,
+                            description: updated.description,
+                          }
+                        : item,
+                    ),
+                  }
+                : current,
+            );
+            setEditing(null);
+          }}
+        />
       )}
     </div>
   );

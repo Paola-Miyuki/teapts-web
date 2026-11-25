@@ -323,3 +323,8 @@
   width: 20px;
   height: 20px;
 }
+
+.documentEditNote {
+  margin: 0;
+  font-size: 12px;
+}

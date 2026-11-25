@@ -15,6 +15,7 @@ export type PermissionAction =
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
   | 'uploadDocument'
+  | 'editDocument'
   | 'viewPatientDocuments'
   | 'createProfessional'
   | 'manageAccounts'
@@ -195,6 +196,9 @@ export function can(
       // RFDOC001, RN028 – o paciente envia os próprios documentos (a API
       // confere o id); o profissional, só com PTS ativo do paciente.
       return patient || (professional && context.patientReadOnly === false);
+    case 'editDocument':
+      // RFDOC005 – admin ou profissional com acesso de escrita ao paciente.
+      return professional && context.patientReadOnly === false;
     case 'viewPatientDocuments':
       // RFDOC003, RN028 – admin (RN022) e profissional vinculado (a API
       // confere o vínculo); o paciente não vê os documentos da equipe.

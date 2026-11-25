@@ -21,6 +21,7 @@ import { formatDate } from '@/lib/format';
 type TermsTabProps = {
   patientId: string;
   canUpload: boolean;
+  canEditDocuments?: boolean;
 };
 
 const TERMS: {
@@ -47,7 +48,11 @@ type Situation = Partial<Record<DocumentCategory, DocumentListItem | null>>;
 
 // Aba "Termos e consentimentos" de `paciente.html` (RFDOC003): a situação do
 // TCLE e da autorização de imagem (enviado ou pendente) e a tabela dos termos.
-export default function TermsTab({ patientId, canUpload }: TermsTabProps) {
+export default function TermsTab({
+  patientId,
+  canUpload,
+  canEditDocuments = false,
+}: TermsTabProps) {
   const router = useRouter();
   const viewer = useDocumentViewer();
   const [situation, setSituation] = useState<Situation | null>(null);
@@ -182,6 +187,7 @@ export default function TermsTab({ patientId, canUpload }: TermsTabProps) {
         plural="termos"
         categories={TERM_CATEGORY_OPTIONS}
         showUploader
+        canEditDocuments={canEditDocuments}
         load={(query: DocumentsQuery, signal) =>
           getDocuments(patientId, query, signal)
         }

@@ -123,6 +123,32 @@ export type ConfirmedDocument = {
   createdAt: string;
 };
 
+export type UpdatedDocument = {
+  id: string;
+  title: string;
+  description: string | null;
+  updatedAt: string;
+};
+
+export type DocumentMetadata = Pick<
+  UpdatedDocument,
+  'id' | 'title' | 'description'
+>;
+
+export function updateDocument(
+  documentId: string,
+  input: { title: string; description: string | null },
+) {
+  return request<UpdatedDocument>(
+    `/documents/${encodeURIComponent(documentId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 // POST /patients/:id/documents: confirma o envio e cria o documento. Repetir a
 // `fileKey` devolve o documento já criado.
 export function confirmDocument(
@@ -172,6 +198,7 @@ export type DocumentIssuer = {
 export type DocumentListItem = {
   id: string;
   title: string;
+  description: string | null;
   category: DocumentCategory;
   issuer: DocumentIssuer | null;
   // `AAAA-MM-DD`.

@@ -31,6 +31,9 @@ export class DocumentUploaderResponseDto {
 export class DocumentListItemResponseDto {
   id: string;
   title: string;
+  /** Descrição do documento; `null` quando não informada. */
+  @ApiProperty({ type: String, nullable: true })
+  description: string | null;
   category: DocumentCategory;
   @ApiProperty({ type: DocumentIssuerResponseDto, nullable: true })
   issuer: DocumentIssuerResponseDto | null;

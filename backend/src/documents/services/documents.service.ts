@@ -3,19 +3,22 @@
 // mesma transação (o storage é o próprio Postgres). Repetir a `file_key` do
 // mesmo paciente devolve o registro existente (RN015).
 
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError } from 'typeorm';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { StorageService } from '../../storage/storage.service';
+import { isAdmin } from '../../auth/account-context';
 import type { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
 import { toPagination } from '../../common/pagination/pagination';
 import type {
   DocumentListItemResponseDto,
   DocumentListResponseDto,
 } from '../dto/document-list-response.dto';
+import type { UpdateDocumentResponseDto } from '../dto/update-document-response.dto';
 import type { DocumentResponseDto } from '../dto/document-response.dto';
+import type { UpdateDocumentRequestDto } from '../dto/update-document-request.dto';
 import type { DocumentUrlResponseDto } from '../dto/document-url-response.dto';
 import type { GetDocumentsQueryDto } from '../dto/get-documents-query.dto';
 import type { DocumentEntity } from '../entities/document.entity';
@@ -70,6 +73,7 @@ function toListItem(row: DocumentListRow): DocumentListItemResponseDto {
   return {
     id: row.id,
     title: row.title,
+    description: row.description,
     category: row.category,
     issuer,
     issueDate: row.issue_date,
@@ -255,5 +259,73 @@ export class DocumentsService {
 
       throw error;
     }
+  }
+
+  async update(
+    account: AccountContext,
+    documentId: string,
+    request: UpdateDocumentRequestDto,
+  ): Promise<UpdateDocumentResponseDto> {
+    if (request.title === undefined && request.description === undefined) {
+      throw new BadRequestException({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o título ou a descrição.',
+      });
+    }
+
+    if (request.title !== undefined && !request.title.trim()) {
+      throw new BadRequestException({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o título.',
+      });
+    }
+
+    const existing = await this.documents.findActiveById(documentId);
+
+    if (!existing) {
+      throw documentNotFound();
+    }
+
+    if (!isAdmin(account) && account.professionalProfileIds.length === 0) {
+      throw documentForbidden();
+    }
+
+    await this.access.assertAccess(account, existing.patientId, 'write');
+
+    const updated = await this.dataSource.transaction(async (manager) => {
+      const document = await this.documents.findActiveById(documentId, manager);
+
+      if (!document) {
+        throw documentNotFound();
+      }
+
+      if (request.title !== undefined) {
+        document.title = request.title.trim();
+      }
+
+      if (request.description !== undefined) {
+        document.description = request.description?.trim() || null;
+      }
+
+      document.updatedAt = new Date();
+      document.updatedByAccountId = account.accountId;
+
+      const saved = await this.documents.save(document, manager);
+
+      await this.timeline.recordUpdated(saved, account, manager);
+
+      return saved;
+    });
+
+    if (!updated.updatedAt) {
+      throw new Error('A atualização do documento não retornou updatedAt.');
+    }
+
+    return {
+      id: updated.id,
+      title: updated.title,
+      description: updated.description,
+      updatedAt: updated.updatedAt.toISOString(),
+    };
   }
 }

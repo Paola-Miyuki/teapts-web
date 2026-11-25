@@ -36,10 +36,16 @@ const stored = {
   id: 'doc-1',
   patientId,
   title: 'Laudo neurológico',
+  fileKey: `${patientId}/original.pdf`,
   category: DocumentCategory.MEDICAL_REPORT,
   mimeType: 'application/pdf',
   sizeBytes: 1024,
+  description: 'Avaliação inicial',
+  issueDate: null,
   createdAt: new Date('2026-12-01T12:00:00.000Z'),
+  updatedAt: null,
+  updatedByAccountId: null,
+  deletedAt: null,
 } as DocumentEntity;
 const response = {
   id: 'doc-1',
@@ -75,8 +81,9 @@ function createService() {
   const documents = {
     findByFileKey: jest.fn<DocumentsRepository['findByFileKey']>(),
     create: jest.fn<DocumentsRepository['create']>(),
-    findPage: jest.fn<DocumentsRepository['findPage']>(),
     findActiveById: jest.fn<DocumentsRepository['findActiveById']>(),
+    save: jest.fn<DocumentsRepository['save']>(),
+    findPage: jest.fn<DocumentsRepository['findPage']>(),
   };
   const storage = {
     headObject: jest.fn<StorageService['headObject']>(),
@@ -85,6 +92,7 @@ function createService() {
   };
   const timeline = {
     recordUploaded: jest.fn<DocumentTimelineService['recordUploaded']>(),
+    recordUpdated: jest.fn<DocumentTimelineService['recordUpdated']>(),
   };
 
   access.assertAccess.mockResolvedValue();
@@ -92,6 +100,8 @@ function createService() {
   access.assertDocumentRead.mockResolvedValue();
   documents.findByFileKey.mockResolvedValue(null);
   documents.create.mockResolvedValue(stored);
+  documents.findActiveById.mockImplementation(async () => ({ ...stored }));
+  documents.save.mockImplementation(async (document) => document);
   storage.headObject.mockResolvedValue({
     mimeType: 'application/pdf',
     sizeBytes: 1024,
@@ -102,6 +112,7 @@ function createService() {
     expiresAt: new Date('2026-12-01T12:05:00.000Z'),
   });
   timeline.recordUploaded.mockResolvedValue();
+  timeline.recordUpdated.mockResolvedValue();
 
   return {
     manager,
@@ -159,6 +170,107 @@ describe('DocumentsService.confirm', () => {
       account,
       ctx.manager,
     );
+  });
+
+  describe('DocumentsService.update', () => {
+    it('updates only metadata and records the event in the same transaction', async () => {
+      const ctx = createService();
+      const saved = {
+        ...stored,
+        title: 'Laudo neurológico (2026)',
+        description: 'Avaliação de novembro.',
+        updatedAt: new Date('2026-12-09T12:00:00.000Z'),
+        updatedByAccountId: account.accountId,
+      };
+      ctx.documents.save.mockResolvedValue(saved);
+
+      await expect(
+        ctx.service.update(account, stored.id, {
+          title: ' Laudo neurológico (2026) ',
+          description: ' Avaliação de novembro. ',
+        }),
+      ).resolves.toEqual({
+        id: stored.id,
+        title: 'Laudo neurológico (2026)',
+        description: 'Avaliação de novembro.',
+        updatedAt: '2026-12-09T12:00:00.000Z',
+      });
+
+      expect(ctx.access.assertAccess).toHaveBeenCalledWith(
+        account,
+        patientId,
+        'write',
+      );
+      expect(ctx.documents.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fileKey: stored.fileKey,
+          title: 'Laudo neurológico (2026)',
+          description: 'Avaliação de novembro.',
+          updatedByAccountId: account.accountId,
+        }),
+        ctx.manager,
+      );
+      expect(ctx.timeline.recordUpdated).toHaveBeenCalledWith(
+        saved,
+        account,
+        ctx.manager,
+      );
+    });
+
+    it('allows clearing the description without changing the file', async () => {
+      const ctx = createService();
+      ctx.documents.save.mockImplementation(async (document) => document);
+
+      const updated = await ctx.service.update(account, stored.id, {
+        description: null,
+      });
+
+      expect(ctx.documents.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: null,
+          fileKey: stored.fileKey,
+        }),
+        ctx.manager,
+      );
+      expect(updated.description).toBeNull();
+    });
+
+    it('rejects an empty patch', async () => {
+      const ctx = createService();
+
+      await expect(
+        ctx.service.update(account, stored.id, {}),
+      ).rejects.toMatchObject({
+        response: { status: 'VALIDATION_ERROR' },
+      });
+      expect(ctx.documents.save).not.toHaveBeenCalled();
+    });
+
+    it('returns DOCUMENT_NOT_FOUND for missing or deleted documents', async () => {
+      const ctx = createService();
+      ctx.documents.findActiveById.mockResolvedValue(null);
+
+      await expect(
+        ctx.service.update(account, stored.id, { title: 'Novo título' }),
+      ).rejects.toMatchObject({
+        response: { status: 'DOCUMENT_NOT_FOUND' },
+      });
+      expect(ctx.access.assertAccess).not.toHaveBeenCalled();
+    });
+
+    it('forbids accounts that are not administrators or professionals', async () => {
+      const ctx = createService();
+      const patientAccount: AccountContext = {
+        ...account,
+        role: AccountRole.User,
+        patientProfileId: patientId,
+      };
+
+      await expect(
+        ctx.service.update(patientAccount, stored.id, { title: 'Novo título' }),
+      ).rejects.toMatchObject({ response: { status: 'FORBIDDEN' } });
+      expect(ctx.access.assertAccess).not.toHaveBeenCalled();
+    });
   });
 
   it('takes the type and size from the storage, not from the client', async () => {
@@ -320,6 +432,7 @@ describe('DocumentsService.list', () => {
   const row: DocumentListRow = {
     id: 'doc-1',
     title: 'Laudo neurológico',
+    description: 'Avaliação inicial',
     category: DocumentCategory.MEDICAL_REPORT,
     mime_type: 'application/pdf',
     size_bytes: 1024,
@@ -348,6 +461,7 @@ describe('DocumentsService.list', () => {
         {
           id: 'doc-1',
           title: 'Laudo neurológico',
+          description: 'Avaliação inicial',
           category: 'medical_report',
           issuer: null,
           issueDate: '2026-11-20',

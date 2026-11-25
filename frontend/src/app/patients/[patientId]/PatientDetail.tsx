@@ -138,6 +138,9 @@ function PatientDetailContent({
   }
 
   const canViewDocuments = can(account, 'viewPatientDocuments');
+  const canEditDocuments = can(account, 'editDocument', {
+    patientReadOnly: patient.readOnly,
+  });
   const canUpload = can(account, 'uploadDocument', {
     patientReadOnly: patient.readOnly,
   });
@@ -348,13 +351,21 @@ function PatientDetailContent({
 
       {canViewDocuments && activeTab === 'documentos' && (
         <section data-panel="documentos" id="documentos">
-          <DocumentsTab patientId={patient.id} canUpload={canUpload} />
+          <DocumentsTab
+            patientId={patient.id}
+            canUpload={canUpload}
+            canEditDocuments={canEditDocuments}
+          />
         </section>
       )}
 
       {canViewDocuments && activeTab === 'termos' && (
         <section data-panel="termos" id="termos">
-          <TermsTab patientId={patient.id} canUpload={canUpload} />
+          <TermsTab
+            patientId={patient.id}
+            canUpload={canUpload}
+            canEditDocuments={canEditDocuments}
+          />
         </section>
       )}
 

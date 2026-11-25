@@ -42,6 +42,7 @@ export interface DocumentListFilters {
 export interface DocumentListRow {
   id: string;
   title: string;
+  description: string | null;
   category: DocumentCategory;
   /** Data de emissão, `YYYY-MM-DD`. */
   issue_date: string | null;
@@ -87,17 +88,30 @@ export class DocumentsRepository {
     return this.documents.findOne({ where: { fileKey } });
   }
 
-  /** Busca o documento ativo (não excluído); `null` se não houver. */
-  findActiveById(id: string): Promise<DocumentEntity | null> {
-    return this.documents.findOne({ where: { id, deletedAt: IsNull() } });
+  /** Busca documento ativo por id, usando a transação quando fornecida. */
+  findActiveById(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<DocumentEntity | null> {
+    const documents = manager?.getRepository(DocumentEntity) ?? this.documents;
+
+    return documents.findOne({ where: { id, deletedAt: IsNull() } });
+  }
+
+  /** Persiste alterações na transação informada. */
+  save(
+    document: DocumentEntity,
+    manager: EntityManager,
+  ): Promise<DocumentEntity> {
+    return manager.getRepository(DocumentEntity).save(document);
   }
 
   /**
-   * Lista os documentos ativos do paciente, do mais recente ao mais antigo.
+   * Lista documentos ativos do paciente em ordem decrescente de envio.
    *
    * @param patientId paciente dono dos documentos
    * @param filters busca pelo título, categorias e paginação
-   * @returns a página de linhas e o total que atende aos filtros
+   * @returns as linhas e o total correspondente aos filtros
    */
   async findPage(
     patientId: string,
@@ -126,6 +140,7 @@ export class DocumentsRepository {
       .select([
         'document.id AS id',
         'document.title AS title',
+        'document.description AS description',
         'document.category AS category',
         `to_char(document.issueDate, 'YYYY-MM-DD') AS issue_date`,
         'document.mimeType AS mime_type',
