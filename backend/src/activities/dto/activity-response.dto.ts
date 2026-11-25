@@ -57,8 +57,20 @@ export class ActivityResponseDto {
   @ApiProperty({ enum: ActivityState, example: ActivityState.Suggested })
   status!: ActivityState;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: null,
+    description:
+      'Profissional autor (RN029); nulo quando o admin cria sem atribuir.',
+  })
+  authorProfessionalId!: string | null;
+
   @ApiProperty({ example: '2026-12-01T13:00:00.000Z' })
   createdAt!: string;
+
+  @ApiProperty({ type: String, nullable: true, example: null })
+  updatedAt!: string | null;
 }
 
 export class GetActivitiesResponseDto {

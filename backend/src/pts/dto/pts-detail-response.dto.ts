@@ -32,6 +32,16 @@ export class PtsDetailResponseDto extends PtsSheetViewDto {
   @ApiProperty({ nullable: true, example: null })
   cancelledAt!: string | null;
 
+  @ApiProperty({ type: String, nullable: true, example: '2027-04-15' })
+  closingDate!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Metas do ciclo atingidas.',
+  })
+  closingReason!: string | null;
+
   @ApiProperty({ type: PtsProposalPatientResponseDto })
   patient!: PtsProposalPatientResponseDto;
 

@@ -29,7 +29,9 @@ const activity = (overrides: Partial<Activity> = {}): Activity => ({
   goalId: null,
   documentIds: [],
   status: 'suggested',
+  authorProfessionalId: 'prof-2',
   createdAt: '2026-12-01T13:00:00.000Z',
+  updatedAt: null,
   ...overrides,
 });
 
@@ -48,7 +50,7 @@ function respond(status: number, body: unknown) {
   } as unknown as Response;
 }
 
-describe('ActivitiesTab (RFACT001)', () => {
+describe('ActivitiesTab (RFACT001, RFACT005)', () => {
   const replace = jest.fn();
   const reload = jest.fn();
   let fetchMock: jest.Mock;
@@ -63,6 +65,7 @@ describe('ActivitiesTab (RFACT001)', () => {
         error={null}
         reload={reload}
         canCreate
+        canEdit={() => true}
         team={TEAM}
         goals={GOALS}
         isAdmin={false}
@@ -80,6 +83,13 @@ describe('ActivitiesTab (RFACT001)', () => {
   function openForm(props = {}) {
     renderTab(props);
     fireEvent.click(screen.getByRole('button', { name: 'Nova atividade' }));
+  }
+
+  function openEdit(props = {}) {
+    renderTab(props);
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Editar', hidden: true }),
+    );
   }
 
   function fillRequired() {
@@ -118,6 +128,7 @@ describe('ActivitiesTab (RFACT001)', () => {
       ptsId: 'pts-1',
       reload,
       canCreate: true,
+      canEdit: () => true,
       team: TEAM,
       goals: GOALS,
       isAdmin: false,
@@ -277,5 +288,91 @@ describe('ActivitiesTab (RFACT001)', () => {
     submit();
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+  });
+
+  it('mostra "Editar" só na atividade que a pessoa pode editar', () => {
+    renderTab({
+      activities: [
+        activity(),
+        activity({ id: 'act-2', title: 'Arquivada', status: 'archived' }),
+      ],
+      canEdit: (item) => item.status !== 'archived',
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Ações para Integração sensorial' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Ações para Arquivada' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('edita com o formulário preenchido e atualiza a lista', async () => {
+    let finish: (value: Response) => void = () => undefined;
+    fetchMock.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    openEdit({
+      activities: [
+        activity({
+          goalId: 'goal-1',
+          modality: 'external_visit',
+          visitPlace: 'school',
+        }),
+      ],
+    });
+
+    expect(
+      screen.getByRole('dialog', { name: 'Editar atividade' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Título/)).toHaveValue(
+      'Integração sensorial',
+    );
+    expect(screen.getByLabelText(/^Local da visita/)).toHaveValue('school');
+    expect(screen.getByLabelText(/^Meta/)).toHaveValue('goal-1');
+    // Especialidade e quem executa não mudam na edição.
+    expect(screen.getByLabelText(/^Especialidade/)).toBeDisabled();
+    expect(screen.getByLabelText(/^Quem executa/)).toBeDisabled();
+    expect(screen.queryByLabelText(/^Autor/)).not.toBeInTheDocument();
+
+    fill(/^Título/, ' Circuito sensorial ');
+    fill('Quantidade', '2');
+    fill(/^Meta/, '');
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    expect(screen.getByRole('button', { name: 'Salvando...' })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/activities/act-1',
+      expect.objectContaining({ method: 'PATCH', credentials: 'include' }),
+    );
+    expect(sentBody()).toEqual({
+      title: 'Circuito sensorial',
+      description: 'Circuito sensorial.',
+      type: 'individual_session',
+      frequency: { quantity: 2, period: 'weekly', durationMinutes: 45 },
+      modality: 'external_visit',
+      visitPlace: 'school',
+      goalId: null,
+    });
+
+    finish(respond(200, activity({ title: 'Circuito sensorial' })));
+
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Atividade salva')).toBeInTheDocument();
+  });
+
+  it('na edição, mostra a mensagem de erro da API', async () => {
+    const message = 'Atividade rejeitada ou arquivada não pode ser editada.';
+    fetchMock.mockResolvedValue(
+      respond(409, { status: 'ACTIVITY_NOT_EDITABLE', message }),
+    );
+    openEdit();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
   });
 });

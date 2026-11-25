@@ -8,20 +8,24 @@ import {
   ownTeamProfile,
   teamIds,
 } from '../../pts/pts-access';
-import { ptsNotFound } from '../../pts/pts.errors';
+import { ptsNotFound, validationError } from '../../pts/pts.errors';
 import {
   PtsGoalsRepository,
   type GoalPtsTarget,
 } from '../../pts/repositories/pts-goals.repository';
 import {
+  activityEditForbidden,
   activityForbidden,
+  activityNotFound,
   executorsNotAllowed,
   invalidActivityAuthor,
   invalidActivityDocuments,
   invalidActivityExecutors,
   invalidActivityGoal,
   invalidFrequency,
+  missingVisitPlace,
 } from '../activities.errors';
+import { assertActivityEditable, editableStates } from '../activity-rules';
 import type {
   ActivityResponseDto,
   GetActivitiesResponseDto,
@@ -30,6 +34,7 @@ import type {
   ActivityFrequencyDto,
   CreateActivityRequestDto,
 } from '../dto/create-activity.dto';
+import type { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import {
   ActivityExecutor,
   ActivityModality,
@@ -115,9 +120,7 @@ export class ActivitiesService {
       throw invalidActivityAuthor();
     }
 
-    const executorName =
-      (await this.goalsRepository.findAccountDisplayName(account.accountId)) ??
-      (admin ? 'Administrador' : 'Profissional da equipe');
+    const executorName = await this.executorName(account, admin);
 
     return this.activitiesRepository.create({
       ptsId,
@@ -143,6 +146,114 @@ export class ActivitiesService {
       executedByAccountId: account.accountId,
       description: `${executorName} sugeriu a atividade ${dto.title}`,
     });
+  }
+
+  async updateActivity(
+    activityId: string,
+    dto: UpdateActivityRequestDto,
+    account: AccountContext,
+  ): Promise<ActivityResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+    const admin = isAdmin(account);
+    // Perfil da conta na equipe do PTS: quem sai da equipe perde a edição.
+    const isOwnTeamProfile = (id: string | null) =>
+      id !== null &&
+      teamIds(pts).includes(id) &&
+      account.professionalProfileIds.includes(id);
+    const allowedStates = editableStates({
+      admin,
+      author: isOwnTeamProfile(activity.authorProfessionalId),
+      responsible: isOwnTeamProfile(pts.responsibleProfessionalId),
+    });
+
+    if (allowedStates.length === 0) {
+      throw activityEditForbidden();
+    }
+
+    assertActivityEditable(activity.status, allowedStates);
+    assertPtsEditable(pts.status);
+
+    const changes = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    ) as UpdateActivityRequestDto;
+
+    if (Object.keys(changes).length === 0) {
+      throw validationError([
+        { field: 'body', message: 'Informe ao menos um campo da atividade.' },
+      ]);
+    }
+
+    const frequency =
+      changes.frequency === undefined
+        ? activity.frequency
+        : parseFrequency(changes.frequency);
+    const modality = changes.modality ?? activity.modality;
+    const visitPlace =
+      modality === ActivityModality.ExternalVisit
+        ? (changes.visitPlace ?? activity.visitPlace)
+        : null;
+
+    if (modality === ActivityModality.ExternalVisit && !visitPlace) {
+      throw missingVisitPlace();
+    }
+
+    const goalId =
+      changes.goalId === undefined ? activity.goalId : changes.goalId;
+
+    if (goalId && goalId !== activity.goalId) {
+      await this.assertGoal(pts, goalId);
+    }
+
+    const documentIds =
+      changes.documentIds === undefined
+        ? undefined
+        : [...new Set(changes.documentIds ?? [])];
+
+    if (documentIds) {
+      await this.assertDocuments(pts, documentIds);
+    }
+
+    const title = changes.title ?? activity.title;
+    const executorName = await this.executorName(account, admin);
+
+    return this.activitiesRepository.update({
+      ptsId: pts.id,
+      activityId,
+      values: {
+        title,
+        description: changes.description ?? activity.description,
+        type: changes.type ?? activity.type,
+        frequency,
+        modality,
+        visitPlace,
+        goalId,
+      },
+      documentIds,
+      allowedStates,
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: admin
+        ? null
+        : (ownTeamProfile(pts, account) ?? null),
+      executedByAccountId: account.accountId,
+      description: `${executorName} atualizou a atividade ${title}`,
+      goalUnlinkedDescription: `${executorName} desligou a atividade ${title} da meta`,
+    });
+  }
+
+  private async executorName(
+    account: AccountContext,
+    admin: boolean,
+  ): Promise<string> {
+    return (
+      (await this.goalsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : 'Profissional da equipe')
+    );
   }
 
   private async findPts(ptsId: string): Promise<GoalPtsTarget> {
@@ -173,11 +284,15 @@ export class ActivitiesService {
     }
 
     if (dto.goalId) {
-      const goals = await this.goalsRepository.findByPts(pts.id);
+      await this.assertGoal(pts, dto.goalId);
+    }
+  }
 
-      if (!goals.some((goal) => goal.id === dto.goalId)) {
-        throw invalidActivityGoal();
-      }
+  private async assertGoal(pts: GoalPtsTarget, goalId: string): Promise<void> {
+    const goals = await this.goalsRepository.findByPts(pts.id);
+
+    if (!goals.some((goal) => goal.id === goalId)) {
+      throw invalidActivityGoal();
     }
   }
 

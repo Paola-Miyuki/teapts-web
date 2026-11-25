@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
+import MedicationsTable from '@/components/medications/MedicationsTable';
 import Icon from '@/components/Icon';
-import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import type { Account } from '@/lib/account';
-import { formatDate, formatPhone } from '@/lib/format';
+import { formatDate, formatDateOnly, formatPhone } from '@/lib/format';
 import { can } from '@/lib/permissions';
 import PtsHistoryTab from '@/components/pts/PtsHistoryTab';
 import {
@@ -20,8 +20,11 @@ import {
 } from '@/lib/patients';
 import ClinicalDataCard from '../_components/ClinicalDataCard';
 import DeletePatientDialog from '../_components/DeletePatientDialog';
-import MedicationsCard from '../_components/MedicationsCard';
+import DiagnosisCard from '../_components/DiagnosisCard';
+import DocumentsTab from '../_components/DocumentsTab';
+import PersonalDataCard from '../_components/PersonalDataCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
+import TermsTab from '../_components/TermsTab';
 import styles from '../patients.module.css';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
@@ -30,24 +33,6 @@ function initials(name: string) {
   const parts = name.trim().split(/\s+/);
 
   return `${parts[0]?.charAt(0) ?? ''}${parts.length > 1 ? parts[parts.length - 1].charAt(0) : ''}`.toUpperCase();
-}
-
-function formatCpf(cpf: string) {
-  return cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
-}
-
-function formatCns(cns: string) {
-  return cns.replace(/^(\d{3})(\d{4})(\d{4})(\d{4})$/, '$1 $2 $3 $4');
-}
-
-function Value({ children }: { children: React.ReactNode }) {
-  return children ? (
-    <>{children}</>
-  ) : (
-    <span className="empty-cell" aria-label="Não informado">
-      —
-    </span>
-  );
 }
 
 // Detalhe do paciente (`paciente.html`, aba Dados do paciente): admin ou
@@ -74,7 +59,7 @@ function PatientDetailContent({
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'dados' | 'historico' | 'medicacoes'
+    'dados' | 'historico' | 'medicacoes' | 'documentos' | 'termos'
   >('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -152,6 +137,14 @@ function PatientDetailContent({
     );
   }
 
+  const canViewDocuments = can(account, 'viewPatientDocuments');
+  const canEditDocuments = can(account, 'editDocument', {
+    patientReadOnly: patient.readOnly,
+  });
+  const canUpload = can(account, 'uploadDocument', {
+    patientReadOnly: patient.readOnly,
+  });
+
   return (
     <section>
       <nav className="tabs ux-ptabs" aria-label="Seções do paciente">
@@ -187,6 +180,32 @@ function PatientDetailContent({
         >
           Medicações
         </a>
+
+        {canViewDocuments && (
+          <>
+            <a
+              href="#documentos"
+              aria-current={activeTab === 'documentos' ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setActiveTab('documentos');
+              }}
+            >
+              Documentos
+            </a>
+
+            <a
+              href="#termos"
+              aria-current={activeTab === 'termos' ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setActiveTab('termos');
+              }}
+            >
+              Termos e consentimentos
+            </a>
+          </>
+        )}
       </nav>
 
       {activeTab === 'dados' && (
@@ -200,7 +219,24 @@ function PatientDetailContent({
                   </span>
                   <h2 id="pat-id">{patient.name}</h2>
                   <div className="ux-badges">
-                    <PtsStatusBadge status={patient.ptsStatus} />
+                    {patient.reassessment && (
+                      <span
+                        className={`badge ${patient.reassessment.status === 'open' ? 'draft' : 'rejected'}`}
+                        tabIndex={0}
+                        data-tip={
+                          patient.reassessment.status === 'open'
+                            ? `Próxima revisão do PTS em ${formatDateOnly(patient.reassessment.nextReviewAt)}. A janela de reavaliação abriu 30 dias antes.`
+                            : `A revisão do PTS venceu em ${formatDateOnly(patient.reassessment.nextReviewAt)}.`
+                        }
+                      >
+                        {patient.reassessment.status === 'open'
+                          ? 'Reavaliação aberta'
+                          : 'Reavaliação vencida'}
+                      </span>
+                    )}
+                    {!patient.hasTcle && (
+                      <span className="badge none">Sem TCLE</span>
+                    )}
                   </div>
                 </div>
 
@@ -220,9 +256,16 @@ function PatientDetailContent({
                       </span>
                       <dt>Telefone</dt>
                       <dd>
-                        <Value>
-                          {patient.phone && formatPhone(patient.phone)}
-                        </Value>
+                        {patient.phone ? (
+                          formatPhone(patient.phone)
+                        ) : (
+                          <span
+                            className="empty-cell"
+                            aria-label="Não informado"
+                          >
+                            —
+                          </span>
+                        )}
                       </dd>
                     </div>
                     <div>
@@ -255,53 +298,17 @@ function PatientDetailContent({
             </div>
 
             <div className="ux-profile-main">
-              <section className="ux-card" aria-labelledby="d-personal">
-                <div className="ux-card-head">
-                  <div>
-                    <h2 id="d-personal">Dados pessoais</h2>
-                  </div>
-                </div>
+              <PersonalDataCard patient={patient} />
 
-                <div className="ux-psec">
-                  <h3>Identificação</h3>
-                  <dl className="ux-dl">
-                    <div>
-                      <dt>Nome completo</dt>
-                      <dd>{patient.name}</dd>
-                    </div>
-                    <div>
-                      <dt>Nome social</dt>
-                      <dd>
-                        <Value>{patient.socialName}</Value>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>CPF</dt>
-                      <dd>
-                        <Value>{patient.cpf && formatCpf(patient.cpf)}</Value>
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>CNS (Cartão SUS)</dt>
-                      <dd>
-                        <Value>{patient.cns && formatCns(patient.cns)}</Value>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <div className="ux-psec">
-                  <h3>Responsável tutelar</h3>
-                  <dl className="ux-dl">
-                    <div>
-                      <dt>Responsável tutelar</dt>
-                      <dd>
-                        <Value>{patient.guardianName}</Value>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              </section>
+              <SupportContactsCard
+                patientId={patient.id}
+                patientName={patient.name}
+                contacts={supportContacts}
+                canEdit={can(account, 'manageSupportContacts', {
+                  patientReadOnly: patient.readOnly,
+                })}
+                onChange={setSupportContacts}
+              />
 
               <ClinicalDataCard
                 patientId={patient.id}
@@ -321,15 +328,9 @@ function PatientDetailContent({
                 }
               />
 
-              <SupportContactsCard
-                patientId={patient.id}
-                patientName={patient.name}
-                contacts={supportContacts}
-                canEdit={can(account, 'manageSupportContacts', {
-                  patientReadOnly: patient.readOnly,
-                })}
-                onChange={setSupportContacts}
-              />
+              {patient.diagnosis && (
+                <DiagnosisCard diagnosis={patient.diagnosis} />
+              )}
             </div>
           </div>
         </section>
@@ -337,11 +338,33 @@ function PatientDetailContent({
 
       {activeTab === 'medicacoes' && (
         <section data-panel="medicacoes" id="medicacoes">
-          <MedicationsCard
+          <MedicationsTable
+            title="Medicações"
             patientId={patient.id}
+            patientName={patient.name}
             canEdit={can(account, 'manageMedications', {
               patientReadOnly: patient.readOnly,
             })}
+          />
+        </section>
+      )}
+
+      {canViewDocuments && activeTab === 'documentos' && (
+        <section data-panel="documentos" id="documentos">
+          <DocumentsTab
+            patientId={patient.id}
+            canUpload={canUpload}
+            canEditDocuments={canEditDocuments}
+          />
+        </section>
+      )}
+
+      {canViewDocuments && activeTab === 'termos' && (
+        <section data-panel="termos" id="termos">
+          <TermsTab
+            patientId={patient.id}
+            canUpload={canUpload}
+            canEditDocuments={canEditDocuments}
           />
         </section>
       )}

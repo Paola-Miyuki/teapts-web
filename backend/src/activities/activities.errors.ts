@@ -16,6 +16,27 @@ export const activityForbidden = () =>
     'Somente a equipe do PTS e o administrador podem criar atividades.',
   );
 
+export const activityEditForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o autor da atividade sugerida, o responsável do PTS e o administrador podem editá-la.',
+  );
+
+export const activityNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'ACTIVITY_NOT_FOUND',
+    'Atividade não encontrada.',
+  );
+
+export const activityNotEditable = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'ACTIVITY_NOT_EDITABLE',
+    'Atividade rejeitada ou arquivada não pode ser editada.',
+  );
+
 // Nas recusas abaixo a mensagem vai no próprio erro, que a tela mostra.
 const invalidField = (message: string) =>
   new PtsApiError(HttpStatus.BAD_REQUEST, 'VALIDATION_ERROR', message);
@@ -36,3 +57,6 @@ export const invalidActivityDocuments = () =>
 
 export const invalidActivityAuthor = () =>
   invalidField('O autor da atividade precisa ser da equipe do PTS.');
+
+export const missingVisitPlace = () =>
+  invalidField('Informe o local da visita.');

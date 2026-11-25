@@ -8,6 +8,7 @@ import {
   type PutObjectInput,
   StorageObjectAlreadyExistsError,
   StorageService,
+  type StoredObjectContent,
 } from '../storage.service';
 import { StorageObjectsController } from './storage-objects.controller';
 
@@ -125,5 +126,97 @@ describe('PUT /storage/objects/:fileKey', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.status).toBe('FILE_ALREADY_UPLOADED');
+  });
+});
+
+describe('GET /storage/objects/:fileKey', () => {
+  let app: INestApplication;
+  let storage: {
+    getObject: jest.Mock<(key: string) => Promise<StoredObjectContent | null>>;
+  };
+
+  const readToken = (options: { expired?: boolean; key?: string } = {}) =>
+    tokens.sign(
+      options.key ?? fileKey,
+      'read',
+      new Date(Date.now() + (options.expired ? -1000 : 60_000)),
+    );
+
+  beforeEach(async () => {
+    storage = {
+      getObject: jest.fn(async () => ({
+        mimeType: 'application/pdf',
+        sizeBytes: 8,
+        content: Buffer.from('conteudo'),
+      })),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [StorageObjectsController],
+      providers: [
+        { provide: StorageTokenService, useValue: tokens },
+        { provide: StorageService, useValue: storage },
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useLogger(false);
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  const get = (query: string) =>
+    request(app.getHttpServer()).get(
+      `/storage/objects/${encodeURIComponent(fileKey)}${query}`,
+    );
+
+  it('serves the content with the stored type and an inline disposition', async () => {
+    const response = await get(`?token=${readToken()}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/pdf');
+    expect(response.headers['content-disposition']).toBe(
+      "inline; filename*=UTF-8''abc-laudo.pdf",
+    );
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.body.toString()).toBe('conteudo');
+    expect(storage.getObject).toHaveBeenCalledWith(fileKey);
+  });
+
+  it('forces the download with download=1', async () => {
+    const response = await get(`?token=${readToken()}&download=1`);
+
+    expect(response.headers['content-disposition']).toBe(
+      "attachment; filename*=UTF-8''abc-laudo.pdf",
+    );
+  });
+
+  it.each([
+    ['without a token', ''],
+    ['with an expired token', `?token=${readToken({ expired: true })}`],
+    [
+      'with a token for another object',
+      `?token=${readToken({ key: 'patient-1/other.pdf' })}`,
+    ],
+    ['with a write token', `?token=${token()}`],
+    ['with a forged token', '?token=abc.def'],
+  ])('answers 403 READ_URL_INVALID %s', async (_name, query) => {
+    const response = await get(query);
+
+    expect(response.status).toBe(403);
+    expect(response.body.status).toBe('READ_URL_INVALID');
+    expect(storage.getObject).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 FILE_NOT_FOUND when the object does not exist', async () => {
+    storage.getObject.mockResolvedValue(null);
+
+    const response = await get(`?token=${readToken()}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.status).toBe('FILE_NOT_FOUND');
   });
 });

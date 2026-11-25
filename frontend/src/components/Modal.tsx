@@ -3,13 +3,15 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
-import Icon from '@/components/Icon';
+import Icon, { type IconName } from '@/components/Icon';
 
 type ModalProps = {
   open: boolean;
   id: string;
   title: string;
   description?: string;
+  // Ícone redondo antes do título (`span.avatar` do mockup).
+  icon?: IconName;
   size?: 'sm' | 'md';
   // Enquanto true, o Esc, o clique no fundo e o X não fecham.
   busy?: boolean;
@@ -25,6 +27,7 @@ export default function Modal({
   id,
   title,
   description,
+  icon,
   size = 'md',
   busy = false,
   footer,
@@ -71,6 +74,11 @@ export default function Modal({
       {open && (
         <>
           <header className="modal-head">
+            {icon && (
+              <span className="avatar" aria-hidden="true">
+                <Icon name={icon} className="icon" />
+              </span>
+            )}
             <div>
               <h2 id={`${id}-title`}>{title}</h2>
               {description && <p>{description}</p>}

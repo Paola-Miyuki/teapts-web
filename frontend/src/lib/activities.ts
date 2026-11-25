@@ -73,7 +73,9 @@ export type Activity = {
   goalId: string | null;
   documentIds: string[];
   status: ActivityStatus;
+  authorProfessionalId: string | null;
   createdAt: string;
+  updatedAt: string | null;
 };
 
 export type ActivityInput = Pick<
@@ -90,6 +92,15 @@ export type ActivityInput = Pick<
   executorProfessionalIds?: string[];
   goalId?: string;
   authorProfessionalId?: string;
+};
+
+// Campos que a edição altera (RFACT005); goalId null desliga a meta.
+export type ActivityUpdateInput = Partial<
+  Pick<Activity, 'title' | 'description' | 'type' | 'frequency' | 'modality'>
+> & {
+  visitPlace?: VisitPlace;
+  goalId?: string | null;
+  documentIds?: string[];
 };
 
 /** Ex.: "1x por semana, 45 min". */
@@ -110,5 +121,16 @@ export function createActivity(ptsId: string, activity: ActivityInput) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(activity),
+  });
+}
+
+export function updateActivity(
+  activityId: string,
+  changes: ActivityUpdateInput,
+) {
+  return request<Activity>(`/activities/${encodeURIComponent(activityId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
   });
 }

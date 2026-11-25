@@ -29,3 +29,15 @@ export const documentNotFound = () =>
     status: 'DOCUMENT_NOT_FOUND',
     message: 'Documento não encontrado.',
   });
+
+export const onlyOwnDocuments = () =>
+  new ForbiddenException({
+    status: 'FORBIDDEN',
+    message: 'Você só acessa os documentos que enviou.',
+  });
+
+export const onlyPatients = () =>
+  new ForbiddenException({
+    status: 'FORBIDDEN',
+    message: 'Só o paciente consulta os próprios documentos.',
+  });

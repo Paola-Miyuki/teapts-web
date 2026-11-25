@@ -9,6 +9,7 @@ import { createValidationPipe } from '../../common/validation/create-validation-
 import type { DocumentResponseDto } from '../dto/document-response.dto';
 import type { UpdateDocumentResponseDto } from '../dto/update-document-response.dto';
 import { DocumentsService } from '../services/documents.service';
+import type { DocumentListResponseDto } from '../dto/document-list-response.dto';
 import type { CreateUploadUrlResponseDto } from '../dto/create-upload-url-response.dto';
 import { DocumentUploadService } from '../services/document-upload.service';
 import { PatientDocumentsController } from './patient-documents.controller';
@@ -53,6 +54,11 @@ const updated: UpdateDocumentResponseDto = {
   updatedAt: '2026-12-09T12:00:00.000Z',
 };
 
+const page: DocumentListResponseDto = {
+  data: [],
+  pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+};
+
 describe('PatientDocumentsController', () => {
   let app: INestApplication;
   let uploads: {
@@ -79,15 +85,25 @@ describe('PatientDocumentsController', () => {
         input: unknown,
       ) => Promise<UpdateDocumentResponseDto>
     >;
+    list: typeof list;
   };
+  let list: jest.Mock<
+    (
+      account: AccountContext,
+      patientId: string,
+      query: unknown,
+    ) => Promise<DocumentListResponseDto>
+  >;
   let allowed: boolean;
 
   beforeEach(async () => {
     allowed = true;
     uploads = { createUploadUrl: jest.fn(async () => created) };
+    list = jest.fn(async () => page);
     documents = {
       confirm: jest.fn(async () => confirmed),
       update: jest.fn(async () => updated),
+      list,
     };
 
     const moduleRef = await Test.createTestingModule({
@@ -270,14 +286,82 @@ describe('PatientDocumentsController', () => {
       expect(documents.update).not.toHaveBeenCalled();
     });
 
-    it('answers 400 VALIDATION_ERROR for an invalid document id', async () => {
+    it('does not call the service when the guard blocks the request', async () => {
+      allowed = false;
+
       const response = await request(app.getHttpServer())
-        .patch('/documents/not-a-uuid')
+        .patch(`/documents/${confirmed.id}`)
         .send({ title: 'Novo título' });
 
-      expect(response.status).toBe(400);
-      expect(response.body.status).toBe('VALIDATION_ERROR');
+      expect(response.status).toBe(403);
       expect(documents.update).not.toHaveBeenCalled();
+    });
+  });
+
+  it('answers 400 VALIDATION_ERROR for an invalid document id', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/documents/not-a-uuid')
+      .send({ title: 'Novo título' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.status).toBe('VALIDATION_ERROR');
+    expect(documents.update).not.toHaveBeenCalled();
+  });
+
+  describe('GET /patients/:id/documents', () => {
+    it('answers 200 with the page and passes the normalized query', async () => {
+      const response = await request(app.getHttpServer()).get(
+        `/patients/${patientId}/documents?q=%20laudo%20&category=tcle,exam&page=2&limit=10`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(page);
+      expect(list).toHaveBeenCalledWith(
+        account,
+        patientId,
+        expect.objectContaining({
+          q: 'laudo',
+          category: ['tcle', 'exam'],
+          page: 2,
+          limit: 10,
+        }),
+      );
+    });
+
+    it('answers 400 ERROR for an invalid parameter', async () => {
+      const response = await request(app.getHttpServer()).get(
+        `/patients/${patientId}/documents?limit=51`,
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'ERROR',
+        message: 'Parâmetro inválido: limit',
+      });
+      expect(list).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR for an id that is not a UUID', async () => {
+      const response = await request(app.getHttpServer()).get(
+        '/patients/123/documents',
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: id',
+      });
+    });
+
+    it('does not call the service when the guard blocks the request', async () => {
+      allowed = false;
+
+      const response = await request(app.getHttpServer()).get(
+        `/patients/${patientId}/documents`,
+      );
+
+      expect(response.status).toBe(403);
+      expect(list).not.toHaveBeenCalled();
     });
   });
 });

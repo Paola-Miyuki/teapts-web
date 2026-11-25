@@ -13,7 +13,9 @@ import {
   ACTIVITY_PERIOD_LABELS,
   ACTIVITY_TYPE_LABELS,
   createActivity,
+  updateActivity,
   VISIT_PLACE_LABELS,
+  type Activity,
   type ActivityExecutor,
   type ActivityModality,
   type ActivityPeriod,
@@ -23,10 +25,8 @@ import {
 import { ApiError } from '@/lib/api';
 import { SPECIALISMS } from '@/lib/professionals';
 
-const SAVE_ERROR = 'Não foi possível criar a atividade';
-const FORM_ID = 'activity-new';
-// Prefixo próprio: `activity-new-title` é o título do Modal.
-const FIELD_ID = `${FORM_ID}-field`;
+const CREATE_ERROR = 'Não foi possível criar a atividade';
+const UPDATE_ERROR = 'Não foi possível salvar a atividade';
 
 export type ActivityTeamMember = {
   id: string;
@@ -38,11 +38,13 @@ export type ActivityGoalOption = { id: string; title: string };
 
 type ActivityFormDialogProps = {
   ptsId: string;
+  // Com a atividade, edita (RFACT005); sem, cria.
+  activity?: Activity;
   team: ActivityTeamMember[];
   goals: ActivityGoalOption[];
   // Só o admin atribui a autoria (RN029).
   isAdmin: boolean;
-  onCreated: () => void;
+  onSaved: () => void;
   onClose: () => void;
 };
 
@@ -60,29 +62,53 @@ function options(labels: Record<string, string>) {
   ));
 }
 
-// Modal "Nova atividade" (`act-new` de `pts-detalhe.html`). Monte só com o
-// diálogo aberto, para os campos começarem vazios.
+// Modais "Nova atividade" e "Editar atividade" (`act-new` e `act-edit-*` de
+// `pts-detalhe.html`). Monte só com o diálogo aberto, para os campos começarem
+// vazios ou com os valores da atividade.
 export default function ActivityFormDialog({
   ptsId,
+  activity,
   team,
   goals,
   isAdmin,
-  onCreated,
+  onSaved,
   onClose,
 }: ActivityFormDialogProps) {
   const router = useRouter();
-  const [title, setTitle] = useState('');
-  const [type, setType] = useState<ActivityType>('individual_session');
-  const [specialism, setSpecialism] = useState<string>('psychologist');
-  const [quantity, setQuantity] = useState('1');
-  const [period, setPeriod] = useState<ActivityPeriod>('weekly');
-  const [duration, setDuration] = useState('45');
-  const [modality, setModality] = useState<ActivityModality>('in_person');
-  const [visitPlace, setVisitPlace] = useState<VisitPlace>('home');
-  const [executor, setExecutor] = useState<ActivityExecutor>('team');
-  const [executorIds, setExecutorIds] = useState<string[]>([]);
-  const [goalId, setGoalId] = useState('');
-  const [description, setDescription] = useState('');
+  const isEdit = activity !== undefined;
+  const formId = isEdit ? 'activity-edit' : 'activity-new';
+  // Prefixo próprio: `${formId}-title` é o título do Modal.
+  const fieldId = `${formId}-field`;
+  const [title, setTitle] = useState(activity?.title ?? '');
+  const [type, setType] = useState<ActivityType>(
+    activity?.type ?? 'individual_session',
+  );
+  const [specialism, setSpecialism] = useState<string>(
+    activity?.specialism ?? 'psychologist',
+  );
+  const [quantity, setQuantity] = useState(
+    String(activity?.frequency.quantity ?? 1),
+  );
+  const [period, setPeriod] = useState<ActivityPeriod>(
+    activity?.frequency.period ?? 'weekly',
+  );
+  const [duration, setDuration] = useState(
+    String(activity?.frequency.durationMinutes ?? 45),
+  );
+  const [modality, setModality] = useState<ActivityModality>(
+    activity?.modality ?? 'in_person',
+  );
+  const [visitPlace, setVisitPlace] = useState<VisitPlace>(
+    activity?.visitPlace ?? 'home',
+  );
+  const [executor, setExecutor] = useState<ActivityExecutor>(
+    activity?.executor ?? 'team',
+  );
+  const [executorIds, setExecutorIds] = useState<string[]>(
+    activity?.executorProfessionalIds ?? [],
+  );
+  const [goalId, setGoalId] = useState(activity?.goalId ?? '');
+  const [description, setDescription] = useState(activity?.description ?? '');
   const [authorId, setAuthorId] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [apiError, setApiError] = useState('');
@@ -124,27 +150,42 @@ export default function ActivityFormDialog({
 
     setSubmitting(true);
 
-    try {
-      await createActivity(ptsId, {
-        title: title.trim(),
-        description: description.trim(),
-        type,
-        specialism,
-        frequency: {
-          quantity: quantityValue,
-          period,
-          durationMinutes: durationValue,
-        },
-        modality,
-        executor,
-        ...(modality === 'external_visit' && { visitPlace }),
-        ...(executor === 'team' &&
-          executorIds.length > 0 && { executorProfessionalIds: executorIds }),
-        ...(goalId && { goalId }),
-        ...(authorId && { authorProfessionalId: authorId }),
-      });
+    const fields = {
+      title: title.trim(),
+      description: description.trim(),
+      type,
+      frequency: {
+        quantity: quantityValue,
+        period,
+        durationMinutes: durationValue,
+      },
+      modality,
+      ...(modality === 'external_visit' && { visitPlace }),
+    };
 
-      onCreated();
+    try {
+      if (activity) {
+        // Especialidade, quem executa e autoria não mudam na edição; sem
+        // documentIds, os documentos ficam como estão.
+        await updateActivity(activity.id, {
+          ...fields,
+          goalId: goalId || null,
+        });
+      } else {
+        await createActivity(ptsId, {
+          ...fields,
+          specialism,
+          executor,
+          ...(executor === 'team' &&
+            executorIds.length > 0 && {
+              executorProfessionalIds: executorIds,
+            }),
+          ...(goalId && { goalId }),
+          ...(authorId && { authorProfessionalId: authorId }),
+        });
+      }
+
+      onSaved();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) {
         router.replace('/login');
@@ -154,7 +195,9 @@ export default function ActivityFormDialog({
       const message =
         failure instanceof ApiError && failure.apiMessage
           ? failure.apiMessage
-          : SAVE_ERROR;
+          : isEdit
+            ? UPDATE_ERROR
+            : CREATE_ERROR;
 
       if (failure instanceof ApiError && failure.status === 422) {
         setErrors({ frequency: message });
@@ -171,15 +214,16 @@ export default function ActivityFormDialog({
     'aria-required': true,
     'aria-invalid': Boolean(errors.frequency),
     'aria-describedby': errors.frequency
-      ? `${FIELD_ID}-frequency-error`
+      ? `${fieldId}-frequency-error`
       : undefined,
   };
 
   return (
     <Modal
       open
-      id={FORM_ID}
-      title="Nova atividade"
+      id={formId}
+      title={isEdit ? 'Editar atividade' : 'Nova atividade'}
+      description={activity?.title}
       busy={submitting}
       onClose={onClose}
       footer={
@@ -194,17 +238,21 @@ export default function ActivityFormDialog({
           </button>
           <button
             type="submit"
-            form={FORM_ID}
+            form={formId}
             className="btn btn-primary"
             disabled={submitting}
             aria-busy={submitting}
           >
-            {submitting ? 'Salvando...' : 'Sugerir atividade'}
+            {submitting
+              ? 'Salvando...'
+              : isEdit
+                ? 'Salvar alterações'
+                : 'Sugerir atividade'}
           </button>
         </>
       }
     >
-      <form id={FORM_ID} noValidate onSubmit={handleSubmit}>
+      <form id={formId} noValidate onSubmit={handleSubmit}>
         {apiError && (
           <div className={`${ui.alert} ${ui.alertError}`} role="alert">
             <p>{apiError}</p>
@@ -213,19 +261,19 @@ export default function ActivityFormDialog({
 
         <div className="form-grid">
           <FormField
-            id={`${FIELD_ID}-title`}
+            id={`${fieldId}-title`}
             label="Título"
             error={errors.title}
             full
           >
             <input
-              id={`${FIELD_ID}-title`}
+              id={`${fieldId}-title`}
               className="input"
               type="text"
               aria-required
               aria-invalid={Boolean(errors.title)}
               aria-describedby={
-                errors.title ? `${FIELD_ID}-title-error` : undefined
+                errors.title ? `${fieldId}-title-error` : undefined
               }
               disabled={submitting}
               value={title}
@@ -233,9 +281,9 @@ export default function ActivityFormDialog({
             />
           </FormField>
 
-          <FormField id={`${FIELD_ID}-type`} label="Tipo">
+          <FormField id={`${fieldId}-type`} label="Tipo">
             <select
-              id={`${FIELD_ID}-type`}
+              id={`${fieldId}-type`}
               className="select"
               aria-required
               disabled={submitting}
@@ -246,12 +294,12 @@ export default function ActivityFormDialog({
             </select>
           </FormField>
 
-          <FormField id={`${FIELD_ID}-specialism`} label="Especialidade">
+          <FormField id={`${fieldId}-specialism`} label="Especialidade">
             <select
-              id={`${FIELD_ID}-specialism`}
+              id={`${fieldId}-specialism`}
               className="select"
               aria-required
-              disabled={submitting}
+              disabled={submitting || isEdit}
               value={specialism}
               onChange={(event) => setSpecialism(event.target.value)}
             >
@@ -266,9 +314,9 @@ export default function ActivityFormDialog({
           <div
             className="field full"
             role="group"
-            aria-labelledby={`${FIELD_ID}-frequency-label`}
+            aria-labelledby={`${fieldId}-frequency-label`}
           >
-            <span className="field-label" id={`${FIELD_ID}-frequency-label`}>
+            <span className="field-label" id={`${fieldId}-frequency-label`}>
               Frequência
               <span className="ux-req" aria-hidden="true">
                 {' '}
@@ -308,7 +356,7 @@ export default function ActivityFormDialog({
             </div>
             {errors.frequency && (
               <p
-                id={`${FIELD_ID}-frequency-error`}
+                id={`${fieldId}-frequency-error`}
                 className={ui.fieldError}
                 role="alert"
               >
@@ -317,9 +365,9 @@ export default function ActivityFormDialog({
             )}
           </div>
 
-          <FormField id={`${FIELD_ID}-modality`} label="Modalidade">
+          <FormField id={`${fieldId}-modality`} label="Modalidade">
             <select
-              id={`${FIELD_ID}-modality`}
+              id={`${fieldId}-modality`}
               className="select"
               aria-required
               disabled={submitting}
@@ -334,15 +382,15 @@ export default function ActivityFormDialog({
 
           {modality === 'external_visit' && (
             <FormField
-              id={`${FIELD_ID}-place`}
+              id={`${fieldId}-place`}
               label="Local da visita"
               help="Obrigatório na visita externa."
             >
               <select
-                id={`${FIELD_ID}-place`}
+                id={`${fieldId}-place`}
                 className="select"
                 aria-required
-                aria-describedby={`${FIELD_ID}-place-tip`}
+                aria-describedby={`${fieldId}-place-tip`}
                 disabled={submitting}
                 value={visitPlace}
                 onChange={(event) =>
@@ -354,12 +402,12 @@ export default function ActivityFormDialog({
             </FormField>
           )}
 
-          <FormField id={`${FIELD_ID}-executor`} label="Quem executa">
+          <FormField id={`${fieldId}-executor`} label="Quem executa">
             <select
-              id={`${FIELD_ID}-executor`}
+              id={`${fieldId}-executor`}
               className="select"
               aria-required
-              disabled={submitting}
+              disabled={submitting || isEdit}
               value={executor}
               onChange={(event) =>
                 setExecutor(event.target.value as ActivityExecutor)
@@ -373,18 +421,15 @@ export default function ActivityFormDialog({
             <div
               className="field full"
               role="group"
-              aria-labelledby={`${FIELD_ID}-executors-label`}
-              aria-describedby={`${FIELD_ID}-executors-tip`}
+              aria-labelledby={`${fieldId}-executors-label`}
+              aria-describedby={`${fieldId}-executors-tip`}
             >
               <span className="ux-labeltip">
-                <span
-                  className="field-label"
-                  id={`${FIELD_ID}-executors-label`}
-                >
+                <span className="field-label" id={`${fieldId}-executors-label`}>
                   Profissionais executores
                 </span>
                 <HelpTooltip
-                  id={`${FIELD_ID}-executors-tip`}
+                  id={`${fieldId}-executors-tip`}
                   label="Profissionais executores"
                 >
                   Mais de um em co-terapia; vazio, vale o autor.
@@ -395,7 +440,7 @@ export default function ActivityFormDialog({
                   <label className="ux-pick" key={member.id}>
                     <input
                       type="checkbox"
-                      disabled={submitting}
+                      disabled={submitting || isEdit}
                       checked={executorIds.includes(member.id)}
                       onChange={() => toggleExecutor(member.id)}
                     />
@@ -410,16 +455,16 @@ export default function ActivityFormDialog({
           )}
 
           <FormField
-            id={`${FIELD_ID}-goal`}
+            id={`${fieldId}-goal`}
             label="Meta"
             help="A meta do PTS que a atividade busca atingir."
             required={false}
             full
           >
             <select
-              id={`${FIELD_ID}-goal`}
+              id={`${fieldId}-goal`}
               className="select"
-              aria-describedby={`${FIELD_ID}-goal-tip`}
+              aria-describedby={`${fieldId}-goal-tip`}
               disabled={submitting}
               value={goalId}
               onChange={(event) => setGoalId(event.target.value)}
@@ -434,20 +479,20 @@ export default function ActivityFormDialog({
           </FormField>
 
           <FormField
-            id={`${FIELD_ID}-description`}
+            id={`${fieldId}-description`}
             label="Descrição"
             help="Como a atividade vai ser feita."
             error={errors.description}
             full
           >
             <textarea
-              id={`${FIELD_ID}-description`}
+              id={`${fieldId}-description`}
               className="input"
               rows={3}
               aria-required
               aria-invalid={Boolean(errors.description)}
-              aria-describedby={`${FIELD_ID}-description-tip${
-                errors.description ? ` ${FIELD_ID}-description-error` : ''
+              aria-describedby={`${fieldId}-description-tip${
+                errors.description ? ` ${fieldId}-description-error` : ''
               }`}
               disabled={submitting}
               value={description}
@@ -455,17 +500,17 @@ export default function ActivityFormDialog({
             />
           </FormField>
 
-          {isAdmin && (
+          {isAdmin && !isEdit && (
             <FormField
-              id={`${FIELD_ID}-author`}
+              id={`${fieldId}-author`}
               label="Autor"
               help="Profissional da equipe do PTS."
               required={false}
             >
               <select
-                id={`${FIELD_ID}-author`}
+                id={`${fieldId}-author`}
                 className="select"
-                aria-describedby={`${FIELD_ID}-author-tip`}
+                aria-describedby={`${fieldId}-author-tip`}
                 disabled={submitting}
                 value={authorId}
                 onChange={(event) => setAuthorId(event.target.value)}

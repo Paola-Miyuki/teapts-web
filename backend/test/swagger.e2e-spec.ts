@@ -78,10 +78,16 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/active', 'get'],
   ['/pts/proposals/{id}', 'patch'],
   ['/pts/{id}/start', 'post'],
+  ['/pts/{id}/close', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
+  ['/activities/{id}', 'patch'],
+  ['/notifications', 'get'],
+  ['/notifications/unread-count', 'get'],
+  ['/notifications/{id}/read', 'post'],
+  ['/notifications/read-all', 'post'],
   ['/pts/{id}/goals', 'get'],
   ['/pts/{id}/goals', 'post'],
   ['/pts/{id}/goals/{goalId}', 'patch'],
@@ -310,6 +316,10 @@ describe('Swagger (e2e)', () => {
     ['/patients/authorized', 'get', '400'],
     ['/patients/authorized', 'get', '500'],
     ['/accounts', 'get', '400'],
+    ['/pts/{id}/close', 'post', '400'],
+    ['/pts/{id}/close', 'post', '403'],
+    ['/pts/{id}/close', 'post', '404'],
+    ['/pts/{id}/close', 'post', '409'],
     ['/pts/{id}/start', 'post', '400'],
     ['/pts/{id}/start', 'post', '403'],
     ['/pts/{id}/start', 'post', '404'],
@@ -329,6 +339,14 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/activities', 'post', '404'],
     ['/pts/{id}/activities', 'post', '409'],
     ['/pts/{id}/activities', 'post', '422'],
+    ['/activities/{id}', 'patch', '400'],
+    ['/activities/{id}', 'patch', '403'],
+    ['/activities/{id}', 'patch', '404'],
+    ['/activities/{id}', 'patch', '409'],
+    ['/activities/{id}', 'patch', '422'],
+    ['/notifications', 'get', '400'],
+    ['/notifications/{id}/read', 'post', '400'],
+    ['/notifications/{id}/read', 'post', '404'],
     ['/pts/{id}/goals', 'get', '400'],
     ['/pts/{id}/goals', 'get', '403'],
     ['/pts/{id}/goals', 'get', '404'],
@@ -613,6 +631,32 @@ describe('Swagger (e2e)', () => {
     ]);
   });
 
+  it('documents POST /pts/{id}/close', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/close'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ClosePtsResponseDto',
+    );
+    expect(components.schemas.ClosePtsRequestDto.required).toEqual([
+      'outcome',
+      'closingDate',
+    ]);
+    for (const [status, code] of [
+      ['400', 'VALIDATION_ERROR'],
+      ['403', 'FORBIDDEN'],
+      ['404', 'PTS_NOT_FOUND'],
+      ['409', 'PTS_NOT_ACTIVE'],
+    ]) {
+      expect(
+        Object.keys(
+          operation.responses[status]?.content?.['application/json']
+            ?.examples ?? {},
+        ),
+      ).toEqual([code]);
+    }
+  });
+
   it('documents POST /pts/{id}/start', async () => {
     const { paths, components } = await getDocument();
     const operation = paths['/pts/{id}/start'].post;
@@ -668,6 +712,56 @@ describe('Swagger (e2e)', () => {
         ),
       ).toEqual([code]);
     }
+  });
+
+  it('documents PATCH /activities/{id}', async () => {
+    const { paths } = await getDocument();
+    const { patch } = paths['/activities/{id}'];
+
+    expect(responseSchema(patch, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityResponseDto',
+    );
+    for (const [status, codes] of [
+      ['400', ['VALIDATION_ERROR']],
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_EDITABLE', 'PTS_NOT_EDITABLE']],
+      ['422', ['INVALID_FREQUENCY']],
+    ] as const) {
+      expect(
+        Object.keys(
+          patch.responses[status]?.content?.['application/json']?.examples ??
+            {},
+        ),
+      ).toEqual(codes);
+    }
+  });
+
+  it('documents the /notifications routes', async () => {
+    const { paths, components } = await getDocument();
+    const read = paths['/notifications/{id}/read'].post;
+
+    expect(responseSchema(paths['/notifications'].get, '200')?.$ref).toBe(
+      '#/components/schemas/GetNotificationsResponseDto',
+    );
+    expect(components.schemas.GetNotificationsResponseDto.required).toEqual([
+      'data',
+      'pagination',
+      'unreadCount',
+    ]);
+    expect(components.schemas.NotificationResponseDto.required).toEqual([
+      'id',
+      'type',
+      'message',
+      'ptsId',
+      'createdAt',
+      'readAt',
+    ]);
+    expect(
+      Object.keys(
+        read.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['NOTIFICATION_NOT_FOUND']);
   });
 
   it('documents the /pts/{id}/goals routes', async () => {
