@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import Icon from '@/components/Icon';
+import KebabMenu from '@/components/table/KebabMenu';
 import ui from '@/components/ui.module.css';
 import {
   ACTIVITY_STATUS_LABELS,
@@ -21,6 +22,8 @@ import ActivityFormDialog, {
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
+type OpenDialog = { kind: 'add' } | { kind: 'edit'; activity: Activity } | null;
+
 type ActivitiesTabProps = {
   ptsId: string;
   // null enquanto carrega.
@@ -28,6 +31,9 @@ type ActivitiesTabProps = {
   error: unknown;
   reload: () => void;
   canCreate: boolean;
+  // RFACT005 – autor na sugerida, responsável na sugerida ou em andamento,
+  // admin (menos rejeitada ou arquivada).
+  canEdit: (activity: Activity) => boolean;
   team: ActivityTeamMember[];
   goals: ActivityGoalOption[];
   isAdmin: boolean;
@@ -37,20 +43,26 @@ function specialismLabel(value: string) {
   return SPECIALISMS.find((item) => item.value === value)?.label ?? value;
 }
 
-// Aba "Atividades" de `pts-detalhe.html`; paginação, filtros e as ações de cada
-// linha entram com as tasks deles (RFACT002 em diante).
+// Aba "Atividades" de `pts-detalhe.html`; paginação, filtros e as outras ações
+// de cada linha entram com as tasks delas (RFACT002 em diante).
 export default function ActivitiesTab({
   ptsId,
   activities,
   error,
   reload,
   canCreate,
+  canEdit,
   team,
   goals,
   isAdmin,
 }: ActivitiesTabProps) {
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [dialog, setDialog] = useState<OpenDialog>(null);
   const [feedback, setFeedback] = useState('');
+
+  function openDialog(next: Exclude<OpenDialog, null>) {
+    setFeedback('');
+    setDialog(next);
+  }
 
   if (error) {
     return (
@@ -108,10 +120,7 @@ export default function ActivitiesTab({
             <button
               type="button"
               className="btn btn-sm btn-primary"
-              onClick={() => {
-                setFeedback('');
-                setIsFormOpen(true);
-              }}
+              onClick={() => openDialog({ kind: 'add' })}
             >
               <Icon name="plus" className="icon-sm" />
               Nova atividade
@@ -138,6 +147,9 @@ export default function ActivitiesTab({
                   <th scope="col">Frequência</th>
                   <th scope="col">Status</th>
                   <th scope="col">Criada em</th>
+                  <th scope="col" className="actions-col">
+                    <span className="sr-only">Ações</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +171,24 @@ export default function ActivitiesTab({
                       </span>
                     </td>
                     <td className="num">{formatDate(activity.createdAt)}</td>
+                    <td className="actions-col">
+                      {canEdit(activity) && (
+                        <KebabMenu label={`Ações para ${activity.title}`}>
+                          <li>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() =>
+                                openDialog({ kind: 'edit', activity })
+                              }
+                            >
+                              <Icon name="edit" className="icon-sm" />
+                              Editar
+                            </button>
+                          </li>
+                        </KebabMenu>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -167,18 +197,21 @@ export default function ActivitiesTab({
         )}
       </div>
 
-      {isFormOpen && (
+      {dialog && (
         <ActivityFormDialog
           ptsId={ptsId}
+          activity={dialog.kind === 'edit' ? dialog.activity : undefined}
           team={team}
           goals={goals}
           isAdmin={isAdmin}
-          onCreated={() => {
-            setIsFormOpen(false);
-            setFeedback('Atividade sugerida');
+          onSaved={() => {
+            setDialog(null);
+            setFeedback(
+              dialog.kind === 'edit' ? 'Atividade salva' : 'Atividade sugerida',
+            );
             reload();
           }}
-          onClose={() => setIsFormOpen(false)}
+          onClose={() => setDialog(null)}
         />
       )}
     </>

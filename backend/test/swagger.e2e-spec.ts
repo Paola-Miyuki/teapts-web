@@ -83,6 +83,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
+  ['/activities/{id}', 'patch'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -336,6 +337,11 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/activities', 'post', '404'],
     ['/pts/{id}/activities', 'post', '409'],
     ['/pts/{id}/activities', 'post', '422'],
+    ['/activities/{id}', 'patch', '400'],
+    ['/activities/{id}', 'patch', '403'],
+    ['/activities/{id}', 'patch', '404'],
+    ['/activities/{id}', 'patch', '409'],
+    ['/activities/{id}', 'patch', '422'],
     ['/notifications', 'get', '400'],
     ['/notifications/{id}/read', 'post', '400'],
     ['/notifications/{id}/read', 'post', '404'],
@@ -703,6 +709,29 @@ describe('Swagger (e2e)', () => {
           post.responses[status]?.content?.['application/json']?.examples ?? {},
         ),
       ).toEqual([code]);
+    }
+  });
+
+  it('documents PATCH /activities/{id}', async () => {
+    const { paths } = await getDocument();
+    const { patch } = paths['/activities/{id}'];
+
+    expect(responseSchema(patch, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityResponseDto',
+    );
+    for (const [status, codes] of [
+      ['400', ['VALIDATION_ERROR']],
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_EDITABLE', 'PTS_NOT_EDITABLE']],
+      ['422', ['INVALID_FREQUENCY']],
+    ] as const) {
+      expect(
+        Object.keys(
+          patch.responses[status]?.content?.['application/json']?.examples ??
+            {},
+        ),
+      ).toEqual(codes);
     }
   });
 
