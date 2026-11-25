@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
+
+import { NotificationEntity } from '../entities/notification.entity';
 
 export interface ReviewWindowPts {
   ptsId: string;
@@ -14,9 +16,74 @@ export interface ReviewWindowNotice {
   message: string;
 }
 
+export interface FindNotificationsInput {
+  accountId: string;
+  unread: boolean;
+  page: number;
+  limit: number;
+}
+
+export type NotificationRow = Pick<
+  NotificationEntity,
+  'id' | 'type' | 'message' | 'ptsId' | 'createdAt' | 'readAt'
+>;
+
 @Injectable()
 export class NotificationsRepository {
   constructor(private readonly dataSource: DataSource) {}
+
+  async findByAccount({
+    accountId,
+    unread,
+    page,
+    limit,
+  }: FindNotificationsInput): Promise<{
+    rows: NotificationRow[];
+    total: number;
+  }> {
+    const [rows, total] = await this.notifications.findAndCount({
+      where: {
+        recipientAccountId: accountId,
+        ...(unread && { readAt: IsNull() }),
+      },
+      order: { createdAt: 'DESC', id: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { rows, total };
+  }
+
+  async countUnread(accountId: string): Promise<number> {
+    return this.notifications.countBy({
+      recipientAccountId: accountId,
+      readAt: IsNull(),
+    });
+  }
+
+  /** Devolve null quando a notificação não existe ou é de outra conta. */
+  async markAsRead(
+    accountId: string,
+    id: string,
+  ): Promise<NotificationRow | null> {
+    await this.notifications.update(
+      { id, recipientAccountId: accountId, readAt: IsNull() },
+      { readAt: () => 'now()' },
+    );
+
+    return this.notifications.findOneBy({ id, recipientAccountId: accountId });
+  }
+
+  async markAllAsRead(accountId: string): Promise<void> {
+    await this.notifications.update(
+      { recipientAccountId: accountId, readAt: IsNull() },
+      { readAt: () => 'now()' },
+    );
+  }
+
+  private get notifications() {
+    return this.dataSource.getRepository(NotificationEntity);
+  }
 
   async findPtsInReviewWindow(
     from: string,
