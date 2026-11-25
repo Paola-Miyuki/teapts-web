@@ -52,21 +52,26 @@ describe('getStorageConfig', () => {
     ).toBe(30);
   });
 
-  it.each(['STORAGE_TOKEN_SECRET', 'API_DOMAIN'])(
-    'throws when %s is missing',
-    (missing) => {
-      const env = { ...validEnv };
-      delete env[missing];
+  it('throws when API_DOMAIN is missing', () => {
+    const env = { ...validEnv };
+    delete env.API_DOMAIN;
 
-      expect(() => configFrom(env)).toThrow(missing);
+    expect(() => configFrom(env)).toThrow('API_DOMAIN');
+  });
+
+  it.each([undefined, '', '   '])(
+    'generates a random secret when STORAGE_TOKEN_SECRET is %j',
+    (value) => {
+      const env: Record<string, string> = { API_DOMAIN: validEnv.API_DOMAIN };
+      if (value !== undefined) env.STORAGE_TOKEN_SECRET = value;
+
+      const first = configFrom(env).tokenSecret;
+      const second = configFrom(env).tokenSecret;
+
+      expect(first).toMatch(/^[0-9a-f]{64}$/);
+      expect(second).not.toBe(first);
     },
   );
-
-  it('rejects a blank secret without exposing it', () => {
-    expect(() =>
-      configFrom({ ...validEnv, STORAGE_TOKEN_SECRET: '   ' }),
-    ).toThrow('STORAGE_TOKEN_SECRET must not be empty');
-  });
 
   it.each(['0', '-5', 'abc', '1.5'])('rejects %s as the expiry', (ttl) => {
     expect(() =>

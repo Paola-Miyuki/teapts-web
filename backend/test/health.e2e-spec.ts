@@ -45,7 +45,8 @@ describe('AppModule (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
       .useValue({})
-      // O storage lê STORAGE_TOKEN_SECRET e usa o repositório de objetos.
+      // O storage usa o repositório de objetos e a config fixa abaixo (sem
+      // depender do ambiente nem de segredo gerado).
       .overrideProvider(getRepositoryToken(StoredObject))
       .useValue({})
       .overrideProvider(STORAGE_CONFIG)

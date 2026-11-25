@@ -1,7 +1,9 @@
 // Configuração tipada do storage, lida das variáveis de ambiente pelo
-// ConfigService. A falta de STORAGE_TOKEN_SECRET derruba a subida, sem expor
-// o valor de nenhum segredo.
+// ConfigService. Sem STORAGE_TOKEN_SECRET (ausente ou vazio), gera um segredo
+// aleatório a cada subida: as URLs de envio ainda abertas deixam de valer ao
+// reiniciar, e com mais de uma instância é preciso definir o mesmo valor.
 
+import { randomBytes } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 
 export const STORAGE_CONFIG = Symbol('STORAGE_CONFIG');
@@ -18,11 +20,9 @@ export type StorageConfig = {
 };
 
 export function getStorageConfig(configService: ConfigService): StorageConfig {
-  const tokenSecret = configService.getOrThrow<string>('STORAGE_TOKEN_SECRET');
-
-  if (!tokenSecret.trim()) {
-    throw new Error('STORAGE_TOKEN_SECRET must not be empty');
-  }
+  const tokenSecret =
+    configService.get<string>('STORAGE_TOKEN_SECRET')?.trim() ||
+    randomBytes(32).toString('hex');
 
   const rawTtl = configService.get<string>('STORAGE_UPLOAD_URL_TTL_MINUTES');
   const uploadUrlTtlMinutes =

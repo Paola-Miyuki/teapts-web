@@ -16,7 +16,7 @@ Da raiz: `pnpm --dir backend run <script>`.
 
 ## Variáveis de ambiente
 
-`make env` cria o `.env`; só falta preencher `DATABASE_PASSWORD`. Variáveis: `PORT` (3000), `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_NAME`, `DATABASE_PASSWORD`, `WEBSITE_DOMAIN` (origem do frontend, `http://localhost:3001`), `API_DOMAIN` (base das URLs de envio de arquivo), `STORAGE_TOKEN_SECRET` (segredo do token dessas URLs), `STORAGE_UPLOAD_URL_TTL_MINUTES` (validade, padrão 15), `SUPERTOKENS_CONNECTION_URI`, `SUPERTOKENS_API_KEY` e `SUPERTOKENS_VERSION` (fixe uma). No Docker, o Compose troca o host do banco por `postgres` e o do SuperTokens por `supertokens`.
+`make env` cria o `.env`; só falta preencher `DATABASE_PASSWORD`. Variáveis: `PORT` (3000), `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_NAME`, `DATABASE_PASSWORD`, `WEBSITE_DOMAIN` (origem do frontend, `http://localhost:3001`), `API_DOMAIN` (base das URLs de envio de arquivo), `STORAGE_TOKEN_SECRET` (opcional e fora do `.env.example`: segredo do token dessas URLs; sem ele, o backend gera um aleatório a cada subida), `STORAGE_UPLOAD_URL_TTL_MINUTES` (validade, padrão 15), `SUPERTOKENS_CONNECTION_URI` e `SUPERTOKENS_VERSION` (fixe uma). No Docker, o Compose troca o host do banco por `postgres` e o do SuperTokens por `supertokens`.
 
 ## Estrutura
 
