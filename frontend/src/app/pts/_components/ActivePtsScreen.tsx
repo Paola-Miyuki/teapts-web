@@ -75,11 +75,7 @@ function PatientPtsTabs({
     <>
       <div className={`${ui.heading} ${styles.header}`}>
         <div>
-          <p className={ui.eyebrow}>Acompanhamento</p>
           <h1>Programa Terapêutico Singular</h1>
-          <p>
-            Uma visão compartilhada das atividades, da equipe e dos documentos.
-          </p>
         </div>
       </div>
 
