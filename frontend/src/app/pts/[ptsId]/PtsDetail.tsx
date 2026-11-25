@@ -21,6 +21,8 @@ import {
   type PtsProfessional,
   type PtsStartResponse,
 } from '@/lib/pts';
+import GoalsTab from '@/components/pts/GoalsTab';
+import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
 import {
@@ -31,7 +33,7 @@ import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
-type Tab = 'visao' | 'equipe' | 'timeline';
+type Tab = 'visao' | 'metas' | 'equipe' | 'timeline';
 
 // Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
 function currentHash() {
@@ -84,7 +86,7 @@ function professionalLabel(professional: PtsProfessional) {
 }
 
 // Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
-// Metas, atividades, atendimentos e as ações do PTS entram com as tasks deles.
+// Atividades, atendimentos e as ações do PTS entram com as tasks deles.
 export default function PtsDetailPage({
   id,
   readOnly = false,
@@ -155,8 +157,12 @@ function PtsDetailContent({
   const [isStartOpen, setIsStartOpen] = useState(false);
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
-    isPatient ? ['equipe', 'timeline'] : ['visao', 'equipe', 'timeline'],
+    isPatient
+      ? ['metas', 'equipe', 'timeline']
+      : ['visao', 'metas', 'equipe', 'timeline'],
   );
+
+  const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -253,6 +259,7 @@ function PtsDetailContent({
   const permissionPts = {
     status: pts.status,
     responsibleProfessionalId: pts.responsible.id,
+    teamProfessionalIds: pts.team.map((member) => member.id),
   };
   const canStart =
     !readOnly && can(account, 'startPts', { pts: permissionPts });
@@ -261,6 +268,11 @@ function PtsDetailContent({
     can(account, 'registerPtsReassessment', {
       pts: permissionPts,
     });
+
+  const canManageGoals =
+    !readOnly &&
+    !isPatient &&
+    can(account, 'manageGoals', { pts: permissionPts });
 
   const handleStarted = ({ status, beganAt }: PtsStartResponse) => {
     setPts((prev) => (prev ? { ...prev, status, beganAt } : prev));
@@ -372,6 +384,17 @@ function PtsDetailContent({
           </a>
         )}
         <a
+          href="#metas"
+          aria-current={tab === 'metas' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setTab('metas');
+          }}
+        >
+          Metas terapêuticas
+          {goals && <span className="tab-count">{goals.length}</span>}
+        </a>
+        <a
           href="#equipe"
           aria-current={tab === 'equipe' ? 'page' : undefined}
           onClick={(event) => {
@@ -406,6 +429,25 @@ function PtsDetailContent({
               name,
             }))}
             isPatient={isPatient}
+          />
+        </section>
+      ) : tab === 'metas' ? (
+        <section data-panel="metas" id="metas">
+          <GoalsTab
+            ptsId={pts.id}
+            goals={goals}
+            error={goalsError}
+            reload={reloadGoals}
+            nextReviewAt={pts.nextReviewAt}
+            canManage={canManageGoals}
+            authors={
+              isAdmin
+                ? members.map((member) => ({
+                    id: member.id,
+                    name: professionalLabel(member),
+                  }))
+                : undefined
+            }
           />
         </section>
       ) : tab === 'visao' && !isPatient ? (

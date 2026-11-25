@@ -10,6 +10,7 @@ import { Professional } from '../src/professionals/entities/professional.entity'
 import { PtsEntity } from '../src/pts/entities/pts.entity';
 import { StoredObject } from '../src/storage/entities/stored-object.entity';
 import { STORAGE_CONFIG } from '../src/storage/storage.config';
+import { PtsGoalEntity } from '../src/pts/entities/pts-goal.entity';
 import { TimelineRecordEntity } from '../src/timeline/entities/timeline-record.entity';
 import { AppModule } from '../src/app.module';
 import { setupSwagger } from '../src/common/swagger/setup-swagger';
@@ -78,6 +79,10 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/start', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
+  ['/pts/{id}/goals', 'get'],
+  ['/pts/{id}/goals', 'post'],
+  ['/pts/{id}/goals/{goalId}', 'patch'],
+  ['/pts/{id}/goals/{goalId}', 'delete'],
   ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
@@ -119,6 +124,8 @@ describe('Swagger (e2e)', () => {
       .overrideProvider(getRepositoryToken(Patient))
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PtsGoalEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(TimelineRecordEntity))
       .useValue({})
@@ -250,6 +257,7 @@ describe('Swagger (e2e)', () => {
         '/patients',
         '/professionals',
         '/patients/{patientId}/support-contacts',
+        '/pts/{id}/goals',
         '/patients/{id}/documents/upload-url',
       ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
@@ -305,6 +313,21 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/timeline', 'get', '400'],
     ['/pts/{id}/timeline', 'get', '403'],
     ['/pts/{id}/timeline', 'get', '404'],
+    ['/pts/{id}/goals', 'get', '400'],
+    ['/pts/{id}/goals', 'get', '403'],
+    ['/pts/{id}/goals', 'get', '404'],
+    ['/pts/{id}/goals', 'post', '400'],
+    ['/pts/{id}/goals', 'post', '403'],
+    ['/pts/{id}/goals', 'post', '404'],
+    ['/pts/{id}/goals', 'post', '409'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '400'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '403'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '404'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '409'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '400'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '403'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '404'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '409'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
     ['/accounts/{id}', 'get', '400'],
@@ -596,6 +619,49 @@ describe('Swagger (e2e)', () => {
     expect(examples('403')).toEqual(['FORBIDDEN']);
     expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
     expect(examples('409')).toEqual(['PTS_NOT_PLANNING']);
+  });
+
+  it('documents the /pts/{id}/goals routes', async () => {
+    const { paths, components } = await getDocument();
+    const list = paths['/pts/{id}/goals'];
+    const item = paths['/pts/{id}/goals/{goalId}'];
+    const examples = (operation: OpenApiOperation, status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(responseSchema(list.get, '200')?.$ref).toBe(
+      '#/components/schemas/GetGoalsResponseDto',
+    );
+    expect(responseSchema(list.post, '201')?.$ref).toBe(
+      '#/components/schemas/GoalResponseDto',
+    );
+    expect(responseSchema(item.patch, '200')?.$ref).toBe(
+      '#/components/schemas/GoalResponseDto',
+    );
+    expect(responseSchema(item.delete, '200')?.$ref).toBe(
+      '#/components/schemas/DeleteGoalResponseDto',
+    );
+    expect(components.schemas.CreateGoalRequestDto.required).toEqual([
+      'title',
+      'description',
+      'term',
+      'area',
+      'measureCriterion',
+      'targetDate',
+    ]);
+    expect(components.schemas.UpdateGoalRequestDto.required).toBeUndefined();
+    expect(examples(list.post, '409')).toEqual(['PTS_NOT_EDITABLE']);
+    expect(examples(item.patch, '404')).toEqual([
+      'PTS_NOT_FOUND',
+      'GOAL_NOT_FOUND',
+    ]);
+    expect(examples(item.delete, '409')).toEqual([
+      'PTS_NOT_EDITABLE',
+      'LAST_GOAL',
+      'GOAL_HAS_ACTIVITIES',
+    ]);
   });
 
   it('documents GET /pts/{id}/timeline', async () => {

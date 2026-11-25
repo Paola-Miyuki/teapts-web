@@ -22,6 +22,7 @@ export type PermissionAction =
   | 'viewActivePts'
   | 'viewPtsSheet'
   | 'editPts'
+  | 'manageGoals'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -74,6 +75,10 @@ function isActivePts(pts?: PtsPermissionData) {
   return ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '');
 }
 
+function hasEditableGoals(pts?: PtsPermissionData) {
+  return pts?.status?.toLowerCase() === 'draft' || isActivePts(pts);
+}
+
 function isProposalMember(user: PermissionUser, pts: PtsPermissionData) {
   const memberIds = [
     pts.responsibleProfessionalId,
@@ -114,6 +119,8 @@ export function can(
         return pts?.status === 'running';
       case 'editPts':
         return isActivePts(pts);
+      case 'manageGoals':
+        return hasEditableGoals(pts);
       default:
         return true;
     }
@@ -183,6 +190,16 @@ export function can(
         professional &&
         pts !== undefined &&
         isActivePts(pts) &&
+        isProposalMember(user, pts)
+      );
+
+    case 'manageGoals':
+      // RFPTS012 – equipe do PTS, em proposta, planejamento ou andamento; o
+      // paciente só vê as metas.
+      return (
+        professional &&
+        pts !== undefined &&
+        hasEditableGoals(pts) &&
         isProposalMember(user, pts)
       );
 

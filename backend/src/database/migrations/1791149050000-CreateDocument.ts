@@ -3,8 +3,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // Documentos do paciente (RFDOC002), com os nomes do propriedades-back.md.
 // `file_key` é única (RN014) e liga o documento ao objeto do storage; o
 // emissor é uma conta ou um texto, nunca os dois.
-export class CreateDocument1791149040000 implements MigrationInterface {
-  name = 'CreateDocument1791149040000';
+export class CreateDocument1791149050000 implements MigrationInterface {
+  name = 'CreateDocument1791149050000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

@@ -89,6 +89,26 @@ const TIMELINE = {
   pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
 };
 
+const GOALS = {
+  data: [
+    {
+      id: 'goal-1',
+      title: 'Ampliar a comunicação funcional',
+      description: 'Fazer pedidos simples.',
+      term: 'short',
+      area: 'communication',
+      measureCriterion: '5 pedidos por dia',
+      targetDate: '2099-11-30',
+      status: 'in_progress',
+      resultNote: null,
+      origin: 'new',
+      activitiesCount: 0,
+      registeredBy: { id: 'prof-1', name: 'Ana Souza' },
+      createdAt: '2026-02-14T12:00:00.000Z',
+    },
+  ],
+};
+
 function mockApi(
   detail: Response,
   account: Account = PROFESSIONAL,
@@ -100,7 +120,9 @@ function mockApi(
         ? respond(200, account)
         : url.includes('/timeline')
           ? respond(200, timeline)
-          : detail,
+          : url.endsWith('/goals')
+            ? respond(200, GOALS)
+            : detail,
     ),
   ) as jest.Mock;
 }
@@ -209,6 +231,104 @@ describe('PtsDetail', () => {
     ).toBeInTheDocument();
   });
 
+  describe('aba "Metas terapêuticas" (RFPTS012)', () => {
+    const MEMBER = { ...PROFESSIONAL, professionalProfileIds: ['prof-2'] };
+    const OUTSIDER = { ...PROFESSIONAL, professionalProfileIds: ['prof-9'] };
+    const ADMIN: Account = {
+      ...PROFESSIONAL,
+      role: 'admin',
+      professionalProfileIds: [],
+    };
+
+    async function openGoals(
+      pts: Partial<typeof PTS>,
+      account: Account,
+      readOnly = false,
+    ) {
+      mockApi(respond(200, { ...PTS, ...pts }), account);
+      render(<PtsDetailPage id="pts-1" readOnly={readOnly} />);
+      fireEvent.click(await screen.findByRole('link', { name: /Metas/ }));
+      await screen.findByText('Ampliar a comunicação funcional');
+    }
+
+    const addButton = () =>
+      screen.queryByRole('button', { name: 'Adicionar meta' });
+
+    it('abre as metas com a quantidade na aba e o #metas da timeline', async () => {
+      await openGoals({}, PROFESSIONAL);
+
+      expect(window.location.hash).toBe('#metas');
+      expect(
+        screen.getByRole('link', { name: /^Metas terapêuticas\s*1$/ }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/pts/pts-1/goals',
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+
+    it.each(['draft', 'planning', 'running'])(
+      'a equipe e o admin editam com o PTS em %s',
+      async (status) => {
+        await openGoals({ status }, MEMBER);
+        expect(addButton()).toBeInTheDocument();
+      },
+    );
+
+    it('o admin escolhe o autor entre a equipe (RN029)', async () => {
+      await openGoals({}, ADMIN);
+      fireEvent.click(addButton()!);
+
+      const author = screen.getByLabelText(/^Autor/);
+      expect(
+        within(author)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual([
+        'Sem atribuir (fica com a sua conta)',
+        'Ana Souza, Psicologia',
+        'Beatriz Lopes, Fisioterapia',
+      ]);
+    });
+
+    it.each([
+      ['paciente', {}, PATIENT, false],
+      ['profissional de fora', {}, OUTSIDER, false],
+      ['PTS concluído', { status: 'concluded' }, ADMIN, false],
+      ['modo somente leitura', {}, PROFESSIONAL, true],
+    ])('não deixa editar: %s', async (_name, pts, account, readOnly) => {
+      await openGoals(pts, account, readOnly);
+      expect(addButton()).not.toBeInTheDocument();
+    });
+
+    it('recarrega a lista depois de cadastrar', async () => {
+      await openGoals({}, PROFESSIONAL);
+      const loads = () =>
+        (global.fetch as jest.Mock).mock.calls.filter(
+          ([url, init]) =>
+            url.endsWith('/goals') && (init?.method ?? 'GET') === 'GET',
+        ).length;
+      expect(loads()).toBe(1);
+
+      fireEvent.click(addButton()!);
+      for (const [label, value] of [
+        [/^Meta \(título\)/, 'Nova'],
+        [/^Meta \(descrição\)/, 'Descrição'],
+        [/^Critério de medida/, 'Critério'],
+        [/^Data-alvo/, '2027-01-10'],
+      ] as const) {
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      }
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Adicionar meta',
+        }),
+      );
+
+      await waitFor(() => expect(loads()).toBe(2));
+    });
+  });
+
   it('abre direto na Timeline pelo atalho #timeline', async () => {
     window.location.hash = '#timeline';
     mockApi(respond(200, PTS));
@@ -242,7 +362,9 @@ describe('PtsDetail', () => {
     expect(
       screen.queryByRole('link', { name: 'Prontuário' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('2 profissionais')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Ampliar a comunicação funcional'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: 'Timeline' }));
 
