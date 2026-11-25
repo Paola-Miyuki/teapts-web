@@ -7,6 +7,7 @@ import { SupportContact } from '../patients/entities/support-contact.entity';
 import { StoredObject } from '../storage/entities/stored-object.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
+import { PtsGoalEntity as PtsGoal } from '../pts/entities/pts-goal.entity';
 import { TimelineRecordEntity as TimelineRecord } from '../timeline/entities/timeline-record.entity';
 import { CreateAccount1791072000000 } from './migrations/1791072000000-CreateAccount';
 import { LinkAccountToSupertokens1791148800000 } from './migrations/1791148800000-LinkAccountToSupertokens';
@@ -26,6 +27,7 @@ import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAcc
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
+import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
@@ -37,6 +39,7 @@ const entities = [
   SupportContact,
   Professional,
   Pts,
+  PtsGoal,
   TimelineRecord,
   StoredObject,
 ];
@@ -59,6 +62,7 @@ const migrations = [
   AddPtsSheetColumns1791149010000,
   AddProfessionalRegistrationFields1791149020000,
   CreateStoredObject1791149030000,
+  CreatePtsGoal1791149040000,
 ];
 
 export function getDatabaseOptions(
