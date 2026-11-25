@@ -92,7 +92,7 @@ describe('ProfessionalsPage', () => {
 
     expect(menu.getByRole('link', { name: 'PTS' })).toHaveAttribute(
       'href',
-      '/pts/proposals',
+      '/pts',
     );
     expect(menu.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
       'href',

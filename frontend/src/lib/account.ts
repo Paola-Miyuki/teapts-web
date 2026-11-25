@@ -160,8 +160,9 @@ export function getNavigation(account: Account, currentHref: string) {
     });
   }
 
-  if (can(account, 'viewPtsProposals') && !ownPts) {
-    items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
+  // Admin e profissional: lista de PTS; as propostas ficam no botão da lista.
+  if (can(account, 'viewPtsList')) {
+    items.push({ href: '/pts', icon: 'clipboard', label: 'PTS' });
   }
 
   if (can(account, 'viewAuthorizedPatients')) {

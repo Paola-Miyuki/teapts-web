@@ -4,6 +4,9 @@ import { CreatePtsRequestDto } from '../dto/create-pts.dto';
 import type { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
 import type { TransferPtsResponsibilityRequestDto } from '../dto/transfer-pts-responsibility.dto';
 import type { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
+import type { GetPtsListQueryDto } from '../dto/get-pts-list-query.dto';
+import type { GetPtsListResponseDto } from '../dto/pts-list-response.dto';
+import { toPagination } from '../../common/pagination/pagination';
 import type {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
@@ -195,6 +198,42 @@ export class PtsService {
         total: result.total,
         totalPages: Math.ceil(result.total / query.limit),
       },
+    };
+  }
+
+  /**
+   * Lista os PTS de todos os estados (lista de PTS): o admin vê todos (RN022)
+   * e o profissional, só os de que é responsável ou membro da equipe.
+   *
+   * @throws PtsApiError `FORBIDDEN` para quem não é admin nem profissional
+   */
+  async findPtsList(
+    query: GetPtsListQueryDto,
+    account: AccountContext,
+  ): Promise<GetPtsListResponseDto> {
+    const admin = isAdmin(account);
+
+    if (!admin && account.professionalProfileIds.length === 0) {
+      throw ptsForbidden();
+    }
+
+    const result = await this.ptsRepository.findPtsList({
+      q: query.q ?? null,
+      status: query.status ?? null,
+      responsibleId: query.responsibleId ?? null,
+      memberId: query.memberId ?? null,
+      createdFrom: query.createdFrom ?? null,
+      createdTo: query.createdTo ?? null,
+      sort: query.sort ?? 'createdAt',
+      order: query.order ?? 'desc',
+      professionalProfileIds: admin ? null : account.professionalProfileIds,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    return {
+      data: result.rows,
+      pagination: toPagination(query, result.total),
     };
   }
 

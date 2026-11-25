@@ -102,6 +102,13 @@ describe('can', () => {
     expect(can(waiting, 'viewProfessionalDirectory')).toBe(false);
   });
 
+  it('mostra a lista de PTS só ao admin e ao profissional', () => {
+    expect(can(admin, 'viewPtsList')).toBe(true);
+    expect(can(professional, 'viewPtsList')).toBe(true);
+    expect(can(patient, 'viewPtsList')).toBe(false);
+    expect(can(waiting, 'viewPtsList')).toBe(false);
+  });
+
   it('mostra propostas ao paciente e aos profissionais da proposta', () => {
     expect(can(patient, 'viewPtsProposals')).toBe(true);
     expect(can(professional, 'viewPtsProposals', { pts: draft })).toBe(true);

@@ -9,6 +9,11 @@ import type { CloseOutcome, ClosePtsResponseDto } from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsStateEnum } from '../../database/enums/pts-state.enum';
+import type { PtsListItemResponseDto } from '../dto/pts-list-response.dto';
+import type {
+  PtsListOrder,
+  PtsListSortField,
+} from '../dto/get-pts-list-query.dto';
 
 export interface ProfessionalRecord {
   id: string;
@@ -37,6 +42,27 @@ export interface FindPtsProposalsInput {
 
 export interface FindPtsProposalsResult {
   rows: PtsProposalResponseDto[];
+  total: number;
+}
+
+export interface FindPtsListInput {
+  q: string | null;
+  status: PtsStateEnum[] | null;
+  responsibleId: string | null;
+  memberId: string | null;
+  /** AAAA-MM-DD, inclusive. */
+  createdFrom: string | null;
+  createdTo: string | null;
+  sort: PtsListSortField;
+  order: PtsListOrder;
+  /** null: admin, que vê todos os PTS (RN022). */
+  professionalProfileIds: string[] | null;
+  page: number;
+  limit: number;
+}
+
+export interface FindPtsListResult {
+  rows: PtsListItemResponseDto[];
   total: number;
 }
 
@@ -171,6 +197,9 @@ export abstract class PtsRepository {
   abstract findDraftProposals(
     input: FindPtsProposalsInput,
   ): Promise<FindPtsProposalsResult>;
+
+  /** PTS de todos os estados, filtrados e paginados (lista de PTS). */
+  abstract findPtsList(input: FindPtsListInput): Promise<FindPtsListResult>;
 
   abstract findDraftProposalById(
     id: string,

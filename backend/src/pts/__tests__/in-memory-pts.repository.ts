@@ -13,6 +13,8 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type FindPtsListInput,
+  type FindPtsListResult,
   type FindPtsHistoryInput,
   type FindPtsHistoryResult,
   type RemoveTeamMemberInput,
@@ -89,6 +91,16 @@ export class InMemoryPtsRepository extends PtsRepository {
       profileIds.includes(proposal.responsible.id) ||
       proposal.team.some((member) => profileIds.includes(member.id))
     );
+  }
+
+  /** Último filtro recebido pela lista de PTS. */
+  ptsListInputs: FindPtsListInput[] = [];
+  ptsListResult: FindPtsListResult = { rows: [], total: 0 };
+
+  findPtsList(input: FindPtsListInput): Promise<FindPtsListResult> {
+    this.ptsListInputs.push(input);
+
+    return Promise.resolve(this.ptsListResult);
   }
 
   async findDraftProposals(

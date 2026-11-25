@@ -9,6 +9,8 @@ import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
 
 import styles from '../pts.module.css';
+import { can } from '@/lib/permissions';
+import PtsList from './PtsList';
 import PtsOverview from './PtsOverview';
 
 type ActivePtsScreenProps = {
@@ -24,9 +26,18 @@ export default function ActivePtsScreen({
   return (
     <AuthenticatedPage
       currentHref={currentHref}
-      breadcrumb="Programa Terapêutico Singular"
+      breadcrumb={(kind) =>
+        routePatientId === undefined && kind !== 'patient'
+          ? 'PTS'
+          : 'Programa Terapêutico Singular'
+      }
     >
       {(account) => {
+        // RFPTS002/004/009 – admin e profissional abrem a lista de PTS em /pts.
+        if (routePatientId === undefined && can(account, 'viewPtsList')) {
+          return <PtsList account={account} />;
+        }
+
         const patientId = routePatientId ?? account.patientProfileId;
         const isOwnPts =
           account.patientProfileId !== null &&

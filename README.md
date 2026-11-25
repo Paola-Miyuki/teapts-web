@@ -1,5 +1,7 @@
 # teapts-web
 
+TEA-PTS: web app para equipes de saúde montarem e acompanharem o Projeto Terapêutico Singular (PTS) de pacientes com TEA, com prontuário, metas, atividades, documentos e timeline.
+
 | Serviço       | Tecnologia                      | Porta |
 | ------------- | ------------------------------- | ----- |
 | `backend`     | NestJS + TypeORM                | 3000  |
@@ -7,14 +9,6 @@
 | `postgres`    | PostgreSQL 16                   | 5432  |
 | `supertokens` | SuperTokens Core (autenticação) | 3567  |
 
-Dois modos de trabalho, que usam o mesmo `.env` e o mesmo banco (dá para alternar):
-
-- **Local** ([seção 3](#3-rodar-local)): backend e frontend na máquina com `pnpm`; Postgres e SuperTokens no Docker.
-- **Docker** ([seção 4](#4-rodar-no-docker)): tudo em containers, via `make`.
-
-Testes, lint e `typecheck` rodam sempre **na máquina**, então Node e pnpm são pré-requisito nos dois modos.
-
-**Primeira vez?** [Pré-requisitos](#1-pré-requisitos) → [Setup](#2-setup) → suba a stack (local ou Docker) → `make seed` para as contas de teste → teste a API pelo [Swagger](#6-api-e-swagger).
 
 ---
 

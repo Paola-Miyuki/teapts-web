@@ -86,7 +86,7 @@ describe('getNavigation', () => {
     );
   });
 
-  it('mostra o link para propostas nos outros perfis, mas não para conta sem perfil', () => {
+  it('mostra o item PTS ao admin e ao profissional, mas não à conta sem perfil', () => {
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
     ).toContain('PTS');
@@ -94,7 +94,7 @@ describe('getNavigation', () => {
     expect(labels(account({}))).not.toContain('PTS');
   });
 
-  it('leva o paciente ao PTS em /pts e os outros perfis a /pts/proposals (RFPTS004)', () => {
+  it('leva o paciente ao PTS em /pts e o admin e o profissional à lista de PTS, também em /pts (RFPTS004)', () => {
     expect(
       getNavigation(account({ patientProfileId: 'patient' }), '/pts').map(
         (item) => item.href,
@@ -107,8 +107,8 @@ describe('getNavigation', () => {
     ]) {
       const hrefs = getNavigation(other, '/pts').map((item) => item.href);
 
-      expect(hrefs).toContain('/pts/proposals');
-      expect(hrefs).not.toContain('/pts');
+      expect(hrefs).toContain('/pts');
+      expect(hrefs).not.toContain('/pts/proposals');
     }
   });
 

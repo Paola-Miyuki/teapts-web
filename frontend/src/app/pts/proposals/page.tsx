@@ -54,7 +54,7 @@ function ProposalsContent({ account }: { account: Account }) {
 export default function PtsProposalsPage() {
   return (
     <AuthenticatedPage
-      currentHref="/pts/proposals"
+      currentHref="/pts"
       breadcrumb="Propostas de PTS"
       requiredAction="viewPtsProposals"
     >

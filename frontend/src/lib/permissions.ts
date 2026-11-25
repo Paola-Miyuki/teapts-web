@@ -21,6 +21,7 @@ export type PermissionAction =
   | 'createProfessional'
   | 'manageAccounts'
   | 'viewNotifications'
+  | 'viewPtsList'
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
@@ -210,6 +211,10 @@ export function can(
     case 'viewProfessionalDirectory':
       // RFPRO001 – profissional; administrador só para seleção.
       return admin || professional;
+    case 'viewPtsList':
+      // RFPTS002, RFPTS004, RFPTS009 – a lista de PTS é do admin (RN022, todos)
+      // e do profissional (só os da equipe; a API confere).
+      return professional;
     case 'viewPtsProposals':
       // RFPTS002 – paciente titular ou profissional da proposta.
       return patient || (professional && (!pts || isProposalMember(user, pts)));
