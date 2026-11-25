@@ -26,6 +26,7 @@ import {
   type ProfessionalsResponse,
   type UpdatedProfessional,
 } from '@/lib/professionals';
+import DeactivateProfessionalDialog from './DeactivateProfessionalDialog';
 import EditSpecialismDialog from './EditSpecialismDialog';
 import LoadingState from './LoadingState';
 
@@ -72,16 +73,29 @@ function EmptyCell() {
   );
 }
 
+// "Desativar" só para conta ativa com `accountId` (só o admin recebe).
+function canDeactivate(professional: Professional) {
+  return professional.status === 'active' && Boolean(professional.accountId);
+}
+
+function blockedNote(name: string) {
+  return `Desativar fica bloqueado: ${name} é responsável por PTS ativo. Transfira a responsabilidade antes.`;
+}
+
 // "Visualizar" do admin: perfil profissional e conta, com "Editar
-// especialidade". Telefone, PTS ativos e desativar entram com a #55 e a #108.
+// especialidade" e "Desativar". Telefone e PTS ativos entram com a #108.
 function ProfessionalViewDialog({
   professional,
+  blocked,
   onClose,
   onEdit,
+  onDeactivate,
 }: {
   professional: Professional | null;
+  blocked: boolean;
   onClose: () => void;
   onEdit: (professional: Professional) => void;
+  onDeactivate: (professional: Professional) => void;
 }) {
   const item = (label: string, value: ReactNode) => (
     <div>
@@ -98,6 +112,24 @@ function ProfessionalViewDialog({
       onClose={onClose}
       footer={
         <>
+          {professional && canDeactivate(professional) && (
+            <>
+              {blocked ? (
+                <span className="muted spacer" style={{ fontSize: 12 }}>
+                  Desativar bloqueado: é responsável por PTS ativo.
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-danger spacer"
+                  onClick={() => onDeactivate(professional)}
+                >
+                  <Icon name="lock" className="icon-sm" />
+                  Desativar
+                </button>
+              )}
+            </>
+          )}
           <button type="button" className="btn" onClick={onClose}>
             Fechar
           </button>
@@ -191,7 +223,11 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
   const [error, setError] = useState('');
   const [viewing, setViewing] = useState<Professional | null>(null);
   const [editing, setEditing] = useState<Professional | null>(null);
-  const [savedNotice, setSavedNotice] = useState(false);
+  const [deactivating, setDeactivating] = useState<Professional | null>(null);
+  // Aviso de sucesso da última ação (editar ou desativar).
+  const [notice, setNotice] = useState('');
+  // Perfis que a API recusou desativar por serem responsáveis por PTS ativo.
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
 
   const term = search.term;
   const specialismKey = specialism.join(',');
@@ -292,7 +328,25 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         : current,
     );
     setEditing(null);
-    setSavedNotice(true);
+    setNotice('Especialidade atualizada.');
+  }
+
+  // A linha passa para "Inativo" sem recarregar a lista.
+  function handleDeactivated(professional: Professional) {
+    setResult((current) =>
+      current
+        ? {
+            ...current,
+            data: current.data.map((item) =>
+              item.id === professional.id
+                ? { ...item, status: 'inactive' as const }
+                : item,
+            ),
+          }
+        : current,
+    );
+    setDeactivating(null);
+    setNotice('Profissional desativado.');
   }
 
   const hasFilters = Boolean(specialismKey || councilKey || uf || statusKey);
@@ -440,12 +494,12 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         </label>
       </div>
 
-      {savedNotice && (
+      {notice && (
         <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
           <div className={ui.alertIcon}>
             <Icon name="checkCircle" />
           </div>
-          <span>Especialidade atualizada.</span>
+          <span>{notice}</span>
         </div>
       )}
 
@@ -545,7 +599,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
                                 type="button"
                                 role="menuitem"
                                 onClick={() => {
-                                  setSavedNotice(false);
+                                  setNotice('');
                                   setEditing(professional);
                                 }}
                               >
@@ -553,6 +607,31 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
                                 Editar especialidade
                               </button>
                             </li>
+                            {canDeactivate(professional) && (
+                              <li>
+                                {blockedIds.includes(professional.id) ? (
+                                  <p className="note">
+                                    {blockedNote(professional.name)}
+                                  </p>
+                                ) : (
+                                  <>
+                                    <div className="sep" />
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="danger"
+                                      onClick={() => {
+                                        setNotice('');
+                                        setDeactivating(professional);
+                                      }}
+                                    >
+                                      <Icon name="lock" className="icon-sm" />
+                                      Desativar
+                                    </button>
+                                  </>
+                                )}
+                              </li>
+                            )}
                           </KebabMenu>
                         </td>
                       </>
@@ -580,12 +659,28 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
 
       <ProfessionalViewDialog
         professional={viewing}
+        blocked={viewing ? blockedIds.includes(viewing.id) : false}
         onClose={() => setViewing(null)}
         onEdit={(professional) => {
           setViewing(null);
-          setSavedNotice(false);
+          setNotice('');
           setEditing(professional);
         }}
+        onDeactivate={(professional) => {
+          setViewing(null);
+          setNotice('');
+          setDeactivating(professional);
+        }}
+      />
+
+      <DeactivateProfessionalDialog
+        professional={deactivating}
+        onClose={() => setDeactivating(null)}
+        onDeactivated={handleDeactivated}
+        onBlocked={(professional) =>
+          setBlockedIds((current) => [...current, professional.id])
+        }
+        onUnauthorized={() => router.replace('/login')}
       />
 
       <EditSpecialismDialog

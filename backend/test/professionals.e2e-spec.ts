@@ -332,6 +332,7 @@ describe('professional profile (e2e)', () => {
       rows: [
         {
           professional_id: professionalId,
+          professional_account_id: accountId,
           account_name: 'João Lima',
           account_email: 'joao.lima@exemplo.com',
           account_status: 'active',
@@ -350,6 +351,7 @@ describe('professional profile (e2e)', () => {
     expect(response.body.data).toEqual([
       {
         id: professionalId,
+        accountId,
         name: 'João Lima',
         email: 'joao.lima@exemplo.com',
         specialism: { id: 'speech_therapist', name: 'Fonoaudiólogo' },

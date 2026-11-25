@@ -45,6 +45,7 @@ export type FindProfessionalsQuery = {
 /** Linha projetada pela consulta, só com os campos públicos. */
 export type ProfessionalRow = {
   professional_id: string;
+  professional_account_id: string;
   professional_specialism: Specialism;
   professional_council_number: string | null;
   professional_council_state: Uf | null;
@@ -89,6 +90,7 @@ export class ProfessionalsRepository {
       .innerJoin(Account, 'account', 'account.id = professional.accountId')
       .select([
         'professional.id AS professional_id',
+        'professional.accountId AS professional_account_id',
         'professional.specialism AS professional_specialism',
         'professional.councilNumber AS professional_council_number',
         'professional.councilState AS professional_council_state',

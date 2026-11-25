@@ -79,6 +79,8 @@ export type ProfessionalStatus = 'active' | 'inactive';
 
 export type Professional = {
   id: string;
+  // Conta do profissional (`DELETE /accounts/:id`); só o admin recebe.
+  accountId?: string | null;
   name: string;
   // Só vem para o admin e o profissional (DP011).
   email: string | null;
