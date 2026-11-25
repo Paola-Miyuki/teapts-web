@@ -195,6 +195,93 @@ describe('can', () => {
     },
   );
 
+  describe('editActivity (RFACT005)', () => {
+    const pts = { ...draft, status: 'running' };
+    const responsible: PermissionUser = {
+      ...professional,
+      professionalProfileIds: ['responsible-id'],
+    };
+    const activity = (
+      status: string,
+      authorProfessionalId = 'professional-id',
+    ) => ({
+      status,
+      authorProfessionalId,
+    });
+
+    it('deixa o autor editar só a sugerida', () => {
+      expect(
+        can(professional, 'editActivity', {
+          pts,
+          activity: activity('suggested'),
+        }),
+      ).toBe(true);
+      expect(
+        can(professional, 'editActivity', {
+          pts,
+          activity: activity('running'),
+        }),
+      ).toBe(false);
+      expect(
+        can(professional, 'editActivity', {
+          pts,
+          activity: activity('suggested', 'outro-id'),
+        }),
+      ).toBe(false);
+    });
+
+    it('deixa o responsável editar a sugerida e a em andamento', () => {
+      for (const status of ['suggested', 'running']) {
+        expect(
+          can(responsible, 'editActivity', {
+            pts,
+            activity: activity(status, 'outro-id'),
+          }),
+        ).toBe(true);
+      }
+      for (const status of ['suspended', 'concluded', 'rejected', 'archived']) {
+        expect(
+          can(responsible, 'editActivity', { pts, activity: activity(status) }),
+        ).toBe(false);
+      }
+    });
+
+    it('deixa o admin editar menos a rejeitada e a arquivada (RN022)', () => {
+      for (const status of ['suggested', 'running', 'suspended', 'concluded']) {
+        expect(
+          can(admin, 'editActivity', { pts, activity: activity(status) }),
+        ).toBe(true);
+      }
+      for (const status of ['rejected', 'archived']) {
+        expect(
+          can(admin, 'editActivity', { pts, activity: activity(status) }),
+        ).toBe(false);
+      }
+    });
+
+    it('nega fora da equipe, ao paciente e com o PTS encerrado', () => {
+      const suggested = activity('suggested');
+
+      expect(
+        can(professional, 'editActivity', {
+          pts: { ...pts, teamProfessionalIds: [] },
+          activity: suggested,
+        }),
+      ).toBe(false);
+      expect(can(patient, 'editActivity', { pts, activity: suggested })).toBe(
+        false,
+      );
+      for (const user of [professional, responsible, admin]) {
+        expect(
+          can(user, 'editActivity', {
+            pts: { ...pts, status: 'concluded' },
+            activity: suggested,
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
       expect(can(patient, action, { pts: draft })).toBe(true);
