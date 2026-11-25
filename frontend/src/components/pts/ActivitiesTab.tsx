@@ -49,6 +49,23 @@ const STATUS_ACTIONS: Record<
     done: string;
   }
 > = {
+  approve: {
+    label: 'Aprovar',
+    icon: 'check',
+    description:
+      'A atividade passa para Em andamento e já pode receber atendimentos.',
+    busyLabel: 'Aprovando...',
+    errorMessage: 'Não foi possível aprovar a atividade',
+    done: 'Atividade aprovada',
+  },
+  reject: {
+    label: 'Rejeitar',
+    icon: 'close',
+    description: 'A atividade não entra no plano. O motivo fica na timeline.',
+    busyLabel: 'Rejeitando...',
+    errorMessage: 'Não foi possível rejeitar a atividade',
+    done: 'Atividade rejeitada',
+  },
   suspend: {
     label: 'Suspender',
     icon: 'clock',
@@ -443,8 +460,8 @@ export default function ActivitiesTab({
           confirmLabel={`${STATUS_ACTIONS[dialog.action].label} atividade`}
           busyLabel={STATUS_ACTIONS[dialog.action].busyLabel}
           errorMessage={STATUS_ACTIONS[dialog.action].errorMessage}
-          danger={dialog.action === 'suspend'}
-          askReason={dialog.action === 'suspend'}
+          danger={['reject', 'suspend'].includes(dialog.action)}
+          askReason={['reject', 'suspend'].includes(dialog.action)}
           onConfirm={(reason) =>
             changeActivityStatus(dialog.activity.id, dialog.action, reason)
           }

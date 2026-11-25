@@ -583,6 +583,81 @@ describe('ActivitiesRepositoryImpl.changeStatus (RFACT009)', () => {
   });
 });
 
+describe('ActivitiesRepositoryImpl.decide (RFACT003)', () => {
+  const decide = (decision: 'approve' | 'reject') => ({
+    ptsId: 'pts-1',
+    activityId: 'act-1',
+    decision,
+    reason: decision === 'reject' ? 'Repetida' : null,
+    authorProfessionalId: 'prof-2',
+    executedByAccountId: 'acc-2',
+    description: 'João Lima decidiu',
+  });
+
+  it.each([
+    [
+      'approve',
+      { status: 'running', approvedAt: expect.any(Date), statusReason: null },
+      'activity_approved',
+    ],
+    [
+      'reject',
+      {
+        status: 'rejected',
+        rejectedAt: expect.any(Date),
+        statusReason: 'Repetida',
+      },
+      'activity_rejected',
+    ],
+  ] as const)(
+    '%s: grava o estado, a data, quem decidiu e o evento na mesma transação',
+    async (decision, values, type) => {
+      const { repository, query, manager, recorder } = setup({
+        activity: { id: 'act-1', status: ActivityState.Suggested },
+      });
+
+      expect(await repository.decide(decide(decision))).toEqual({
+        id: 'act-1',
+        status: values.status,
+        decidedAt: expect.any(String),
+      });
+      expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(manager.update).toHaveBeenCalledWith(
+        ActivityEntity,
+        { id: 'act-1', ptsId: 'pts-1' },
+        {
+          ...values,
+          statusChangedByAccountId: 'acc-2',
+          updatedAt: expect.any(Date),
+        },
+      );
+      expect(recorder.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type,
+          targetType: 'activity',
+          targetId: 'act-1',
+          description: 'João Lima decidiu',
+        }),
+        manager,
+      );
+    },
+  );
+
+  it('refaz a checagem com a atividade travada e não grava na recusa', async () => {
+    const { repository, manager, recorder } = setup({
+      activity: { id: 'act-1', status: ActivityState.Running },
+    });
+
+    await expectApiError(
+      () => repository.decide(decide('approve')),
+      409,
+      'ACTIVITY_NOT_SUGGESTED',
+    );
+    expect(manager.update).not.toHaveBeenCalled();
+    expect(recorder.record).not.toHaveBeenCalled();
+  });
+});
+
 describe('ActivitiesRepositoryImpl.findDetailsById (RFACT002)', () => {
   it('traz só os documentos não excluídos', async () => {
     const { activities, recorder } = setup();

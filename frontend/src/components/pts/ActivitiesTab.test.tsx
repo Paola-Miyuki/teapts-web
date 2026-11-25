@@ -700,6 +700,130 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  describe('aprovar e rejeitar (RFACT003)', () => {
+    const item = (name: string) =>
+      screen.queryByRole('menuitem', { name, hidden: true });
+    const openAction = (name: string) => {
+      renderTab({ activities: [activity({ status: 'suggested' })] });
+      fireEvent.click(item(name)!);
+    };
+    const decisionOnly = (
+      current: Activity,
+      action: 'approve' | 'reject' | 'suspend' | 'resume' | 'conclude',
+    ) =>
+      current.status === 'suggested' &&
+      (action === 'approve' || action === 'reject');
+
+    it('mostra "Aprovar" e "Rejeitar" só na sugerida', () => {
+      renderTab({
+        activities: [
+          activity(),
+          activity({ id: 'act-2', title: 'Em execução', status: 'running' }),
+        ],
+        canEdit: () => false,
+        canArchive: () => false,
+        canChangeStatus: decisionOnly,
+      });
+
+      expect(
+        screen.getAllByRole('menuitem', { name: 'Aprovar', hidden: true }),
+      ).toHaveLength(1);
+      expect(
+        screen.getAllByRole('menuitem', { name: 'Rejeitar', hidden: true }),
+      ).toHaveLength(1);
+      expect(
+        screen.queryByRole('button', { name: 'Ações para Em execução' }),
+      ).toBeInTheDocument();
+      const running = within(screen.getByText('Em execução').closest('tr')!);
+      expect(
+        running.queryByRole('menuitem', { name: 'Aprovar', hidden: true }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('aprova sem pedir motivo e atualiza a lista', async () => {
+      let finish: (value: Response) => void = () => undefined;
+      fetchMock.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      openAction('Aprovar');
+
+      expect(
+        screen.getByRole('dialog', { name: 'Aprovar Integração sensorial?' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Motivo/)).not.toBeInTheDocument();
+      const confirm = screen.getByRole('button', { name: 'Aprovar atividade' });
+      expect(confirm).toHaveClass('btn-primary');
+      fireEvent.click(confirm);
+
+      expect(
+        screen.getByRole('button', { name: 'Aprovando...' }),
+      ).toBeDisabled();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:3000/activities/act-1/approve',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+      expect(sentBody()).toEqual({});
+
+      finish(
+        respond(200, {
+          id: 'act-1',
+          status: 'running',
+          decidedAt: '2026-12-02T12:00:00.000Z',
+        }),
+      );
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      expect(screen.getByText('Atividade aprovada')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('rejeita com o motivo', async () => {
+      fetchMock.mockResolvedValue(
+        respond(200, {
+          id: 'act-1',
+          status: 'rejected',
+          decidedAt: '2026-12-02T12:00:00.000Z',
+        }),
+      );
+      openAction('Rejeitar');
+
+      expect(
+        screen.getByRole('dialog', { name: 'Rejeitar Integração sensorial?' }),
+      ).toBeInTheDocument();
+      fill(/^Motivo/, '  Já existe atividade equivalente. ');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Rejeitar atividade' }),
+      );
+
+      expect(
+        await screen.findByText('Atividade rejeitada'),
+      ).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:3000/activities/act-1/reject',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+      expect(sentBody()).toEqual({
+        reason: 'Já existe atividade equivalente.',
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('mostra a mensagem de erro da API', async () => {
+      const message = 'Só uma atividade sugerida recebe decisão.';
+      fetchMock.mockResolvedValue(
+        respond(409, { status: 'ACTIVITY_NOT_SUGGESTED', message }),
+      );
+      openAction('Aprovar');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Aprovar atividade' }),
+      );
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(reload).not.toHaveBeenCalled();
+    });
+  });
+
   describe('suspender, retomar e concluir (RFACT009)', () => {
     const item = (name: string) =>
       screen.queryByRole('menuitem', { name, hidden: true });

@@ -87,6 +87,8 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/activities/{id}', 'get'],
   ['/activities/{id}', 'patch'],
   ['/activities/{id}/archive', 'post'],
+  ['/activities/{id}/approve', 'post'],
+  ['/activities/{id}/reject', 'post'],
   ['/activities/{id}/suspend', 'post'],
   ['/activities/{id}/resume', 'post'],
   ['/activities/{id}/conclude', 'post'],
@@ -373,6 +375,14 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}/archive', 'post', '403'],
     ['/activities/{id}/archive', 'post', '404'],
     ['/activities/{id}/archive', 'post', '409'],
+    ['/activities/{id}/approve', 'post', '400'],
+    ['/activities/{id}/approve', 'post', '403'],
+    ['/activities/{id}/approve', 'post', '404'],
+    ['/activities/{id}/approve', 'post', '409'],
+    ['/activities/{id}/reject', 'post', '400'],
+    ['/activities/{id}/reject', 'post', '403'],
+    ['/activities/{id}/reject', 'post', '404'],
+    ['/activities/{id}/reject', 'post', '409'],
     ['/notifications', 'get', '400'],
     ['/notifications/{id}/read', 'post', '400'],
     ['/notifications/{id}/read', 'post', '404'],
@@ -858,6 +868,33 @@ describe('Swagger (e2e)', () => {
       expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
       expect(examples('409')).toEqual([
         'INVALID_ACTIVITY_TRANSITION',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
+
+  it.each(['approve', 'reject'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityDecisionResponseDto',
+      );
+      expect(components.schemas.ActivityDecisionResponseDto.required).toEqual([
+        'id',
+        'status',
+        'decidedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'ACTIVITY_NOT_SUGGESTED',
         'PTS_NOT_EDITABLE',
       ]);
     },

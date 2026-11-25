@@ -16,6 +16,7 @@ import {
 import {
   activitiesViewForbidden,
   activityArchiveForbidden,
+  activityDecisionForbidden,
   activityEditForbidden,
   activityForbidden,
   activityNotFound,
@@ -31,10 +32,16 @@ import {
 import {
   assertActivityArchivable,
   assertActivityEditable,
+  assertActivitySuggested,
   assertActivityTransition,
   editableStates,
+  type ActivityDecision,
   type ActivityStatusAction,
 } from '../activity-rules';
+import type {
+  ActivityDecisionResponseDto,
+  RejectActivityRequestDto,
+} from '../dto/activity-decision.dto';
 import type {
   ActivityDetailsResponseDto,
   ActivityResponseDto,
@@ -384,6 +391,49 @@ export class ActivitiesService {
       description: `${executorName} ${STATUS_VERBS[action]} a atividade ${activity.title}${
         reason ? ` (${reason})` : ''
       }`,
+    });
+  }
+
+  async decideActivity(
+    activityId: string,
+    decision: ActivityDecision,
+    dto: RejectActivityRequestDto,
+    account: AccountContext,
+  ): Promise<ActivityDecisionResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+    const admin = isAdmin(account);
+    // Qualquer profissional da equipe do PTS, autor e responsável inclusive,
+    // ou o admin (RFACT003).
+    const profileId = admin ? null : (ownTeamProfile(pts, account) ?? null);
+
+    if (!admin && !profileId) {
+      throw activityDecisionForbidden();
+    }
+
+    assertActivitySuggested(activity.status);
+    assertPtsEditable(pts.status);
+
+    // Só a rejeição tem motivo.
+    const reason = decision === 'reject' ? dto.reason?.trim() || null : null;
+    const executorName = await this.executorName(account, admin);
+
+    return this.activitiesRepository.decide({
+      ptsId: pts.id,
+      activityId,
+      decision,
+      reason,
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: profileId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} ${
+        decision === 'approve' ? 'aprovou' : 'rejeitou'
+      } a atividade ${activity.title}${reason ? ` (${reason})` : ''}`,
     });
   }
 

@@ -298,9 +298,11 @@ describe('can', () => {
     });
   });
 
-  describe('suspender, retomar e concluir atividade (RFACT009)', () => {
+  describe('aprovar/rejeitar (RFACT003), suspender, retomar e concluir (RFACT009)', () => {
     const pts = { ...draft, status: 'running' };
     const ALLOWED = {
+      approveActivity: ['suggested'],
+      rejectActivity: ['suggested'],
       suspendActivity: ['running'],
       resumeActivity: ['suspended'],
       concludeActivity: ['running', 'suspended'],
