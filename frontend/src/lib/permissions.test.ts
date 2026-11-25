@@ -410,4 +410,11 @@ describe.each([
       can(professional, 'uploadDocument', { patientReadOnly: false }),
     ).toBe(true);
   });
+
+  it('deixa só o admin e o profissional consultarem os documentos do paciente', () => {
+    expect(can(admin, 'viewPatientDocuments')).toBe(true);
+    expect(can(professional, 'viewPatientDocuments')).toBe(true);
+    expect(can(patient, 'viewPatientDocuments')).toBe(false);
+    expect(can(waiting, 'viewPatientDocuments')).toBe(false);
+  });
 });

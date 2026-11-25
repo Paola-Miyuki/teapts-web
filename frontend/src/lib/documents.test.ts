@@ -1,6 +1,12 @@
 import { ApiError } from './api';
 import {
+  categoryLabel,
   createUploadUrl,
+  downloadUrlOf,
+  formatFileInfo,
+  getDocumentUrl,
+  getDocuments,
+  getMyDocuments,
   FILE_SIZE_ERROR,
   FILE_TYPE_ERROR,
   MAX_FILE_SIZE_BYTES,
@@ -102,6 +108,104 @@ describe('createUploadUrl', () => {
         credentials: 'include',
       },
     );
+  });
+});
+
+describe('listing and reading documents', () => {
+  const page = {
+    data: [],
+    pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+  };
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => page,
+    });
+  });
+
+  it('lists the documents of a patient with the session cookies', async () => {
+    await expect(
+      getDocuments('patient-1', { page: 1, limit: 10 }),
+    ).resolves.toEqual(page);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/patients/patient-1/documents?page=1&limit=10',
+      { signal: undefined, credentials: 'include' },
+    );
+  });
+
+  it('sends the trimmed search and the categories, and skips the empty filters', async () => {
+    await getDocuments('patient-1', {
+      page: 2,
+      limit: 25,
+      q: '  laudo ',
+      category: ['tcle', 'image_authorization'],
+    });
+    await getDocuments('patient-1', {
+      page: 1,
+      limit: 10,
+      q: '  ',
+      category: [],
+    });
+
+    const urls = jest.mocked(global.fetch).mock.calls.map(([url]) => url);
+
+    expect(urls[0]).toBe(
+      'http://localhost:3000/patients/patient-1/documents?page=2&limit=25&q=laudo&category=tcle%2Cimage_authorization',
+    );
+    expect(urls[1]).toBe(
+      'http://localhost:3000/patients/patient-1/documents?page=1&limit=10',
+    );
+  });
+
+  it('lists only what the patient sent', async () => {
+    await getMyDocuments({ page: 1, limit: 10, q: 'laudo' });
+
+    expect(jest.mocked(global.fetch).mock.calls[0][0]).toBe(
+      'http://localhost:3000/me/documents?page=1&limit=10&q=laudo',
+    );
+  });
+
+  it('asks for the temporary read url of a document', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        url: 'http://api/storage/objects/k?token=t',
+        expiresAt: 'e',
+      }),
+    });
+
+    await expect(getDocumentUrl('doc-1')).resolves.toEqual({
+      url: 'http://api/storage/objects/k?token=t',
+      expiresAt: 'e',
+    });
+    expect(jest.mocked(global.fetch).mock.calls[0][0]).toBe(
+      'http://localhost:3000/documents/doc-1/url',
+    );
+  });
+
+  it('turns the read url into a download url', () => {
+    expect(downloadUrlOf('http://api/storage/objects/k?token=t')).toBe(
+      'http://api/storage/objects/k?token=t&download=1',
+    );
+    expect(downloadUrlOf('http://api/x')).toBe('http://api/x?download=1');
+  });
+
+  it.each([
+    ['application/pdf', 1_258_291, 'PDF · 1,2 MB'],
+    ['image/jpeg', 215_040, 'Imagem JPG · 210 KB'],
+    ['application/msword', 10, 'DOC · 1 KB'],
+    ['text/plain', 2_097_152, 'Arquivo · 2,0 MB'],
+  ])('describes %s with %i bytes as "%s"', (mimeType, size, expected) => {
+    expect(formatFileInfo(mimeType, size)).toBe(expected);
+  });
+
+  it('labels the categories', () => {
+    expect(categoryLabel('medical_report')).toBe('Laudo médico');
+    expect(categoryLabel('unknown')).toBe('unknown');
   });
 });
 

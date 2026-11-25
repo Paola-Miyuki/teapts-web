@@ -20,8 +20,10 @@ import {
 } from '@/lib/patients';
 import ClinicalDataCard from '../_components/ClinicalDataCard';
 import DeletePatientDialog from '../_components/DeletePatientDialog';
+import DocumentsTab from '../_components/DocumentsTab';
 import MedicationsCard from '../_components/MedicationsCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
+import TermsTab from '../_components/TermsTab';
 import styles from '../patients.module.css';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
@@ -74,7 +76,7 @@ function PatientDetailContent({
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'dados' | 'historico' | 'medicacoes'
+    'dados' | 'historico' | 'medicacoes' | 'documentos' | 'termos'
   >('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -152,6 +154,11 @@ function PatientDetailContent({
     );
   }
 
+  const canViewDocuments = can(account, 'viewPatientDocuments');
+  const canUpload = can(account, 'uploadDocument', {
+    patientReadOnly: patient.readOnly,
+  });
+
   return (
     <section>
       <nav className="tabs ux-ptabs" aria-label="Seções do paciente">
@@ -187,6 +194,32 @@ function PatientDetailContent({
         >
           Medicações
         </a>
+
+        {canViewDocuments && (
+          <>
+            <a
+              href="#documentos"
+              aria-current={activeTab === 'documentos' ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setActiveTab('documentos');
+              }}
+            >
+              Documentos
+            </a>
+
+            <a
+              href="#termos"
+              aria-current={activeTab === 'termos' ? 'page' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setActiveTab('termos');
+              }}
+            >
+              Termos e consentimentos
+            </a>
+          </>
+        )}
       </nav>
 
       {activeTab === 'dados' && (
@@ -343,6 +376,18 @@ function PatientDetailContent({
               patientReadOnly: patient.readOnly,
             })}
           />
+        </section>
+      )}
+
+      {canViewDocuments && activeTab === 'documentos' && (
+        <section data-panel="documentos" id="documentos">
+          <DocumentsTab patientId={patient.id} canUpload={canUpload} />
+        </section>
+      )}
+
+      {canViewDocuments && activeTab === 'termos' && (
+        <section data-panel="termos" id="termos">
+          <TermsTab patientId={patient.id} canUpload={canUpload} />
         </section>
       )}
 

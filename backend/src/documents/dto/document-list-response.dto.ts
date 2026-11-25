@@ -34,6 +34,9 @@ export class DocumentListItemResponseDto {
   category: DocumentCategory;
   @ApiProperty({ type: DocumentIssuerResponseDto, nullable: true })
   issuer: DocumentIssuerResponseDto | null;
+  /** Data de emissão, `YYYY-MM-DD`; `null` quando não informada. */
+  @ApiProperty({ type: String, nullable: true, example: '2026-11-20' })
+  issueDate: string | null;
   /** @example application/pdf */
   mimeType: string;
   /** Tamanho em bytes. */

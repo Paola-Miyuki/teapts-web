@@ -16,11 +16,14 @@ import type {
   DocumentListResponseDto,
 } from '../dto/document-list-response.dto';
 import type { DocumentResponseDto } from '../dto/document-response.dto';
+import type { DocumentUrlResponseDto } from '../dto/document-url-response.dto';
 import type { GetDocumentsQueryDto } from '../dto/get-documents-query.dto';
 import type { DocumentEntity } from '../entities/document.entity';
 import {
   documentForbidden,
+  documentNotFound,
   invalidIssuerAccount,
+  onlyPatients,
   uploadNotFound,
 } from '../documents.errors';
 import {
@@ -69,6 +72,7 @@ function toListItem(row: DocumentListRow): DocumentListItemResponseDto {
     title: row.title,
     category: row.category,
     issuer,
+    issueDate: row.issue_date,
     mimeType: row.mime_type,
     sizeBytes: row.size_bytes,
     uploadedBy: {
@@ -111,6 +115,54 @@ export class DocumentsService {
       data: rows.map(toListItem),
       pagination: toPagination(query, total),
     };
+  }
+
+  /**
+   * Lista só os documentos que o paciente titular enviou (RFDOC007).
+   *
+   * @throws ForbiddenException `FORBIDDEN` quando a conta não é de paciente
+   */
+  async listMine(
+    account: AccountContext,
+    query: GetDocumentsQueryDto,
+  ): Promise<DocumentListResponseDto> {
+    if (account.patientProfileId === null) {
+      throw onlyPatients();
+    }
+
+    const { rows, total } = await this.documents.findPage(
+      account.patientProfileId,
+      { ...query, uploadedByAccountId: account.accountId },
+    );
+
+    return {
+      data: rows.map(toListItem),
+      pagination: toPagination(query, total),
+    };
+  }
+
+  /**
+   * Gera a URL temporária de leitura do arquivo do documento (RFDOC003).
+   *
+   * @throws NotFoundException `DOCUMENT_NOT_FOUND` quando não existe ou foi
+   *   excluído
+   * @throws ForbiddenException `FORBIDDEN` sem acesso ao documento
+   */
+  async getUrl(
+    account: AccountContext,
+    documentId: string,
+  ): Promise<DocumentUrlResponseDto> {
+    const document = await this.documents.findActiveById(documentId);
+
+    if (!document) {
+      throw documentNotFound();
+    }
+
+    await this.access.assertDocumentRead(account, document);
+
+    const { url, expiresAt } = this.storage.createReadUrl(document.fileKey);
+
+    return { url, expiresAt: expiresAt.toISOString() };
   }
 
   /**

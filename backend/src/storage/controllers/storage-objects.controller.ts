@@ -1,5 +1,6 @@
 // Este arquivo expõe o envio do arquivo ao storage simulado no Postgres
-// (`PUT /storage/objects/:fileKey?token=...`). Não usa o AuthGuard: a
+// (`PUT /storage/objects/:fileKey?token=...`) e a leitura dele
+// (`GET /storage/objects/:fileKey?token=...`). Não usa o AuthGuard: a
 // autorização é o token assinado da URL, válido só para aquele objeto, aquele
 // tipo de arquivo e até o vencimento.
 
@@ -8,22 +9,27 @@ import {
   ConflictException,
   Controller,
   ForbiddenException,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Put,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ErrorResponseDto } from '../../common/swagger/error-response.dto';
 import {
   fileTooLarge,
@@ -157,5 +163,67 @@ export class StorageObjectsController {
 
       throw error;
     }
+  }
+
+  /**
+   * Serve o arquivo pela `url` de leitura (RFDOC003). O token de leitura vale
+   * só para este objeto e até o vencimento.
+   *
+   * @param fileKey chave do objeto, igual à do token
+   * @param token token assinado da URL
+   * @param download `1` ou `true` força o download (`attachment`)
+   */
+  @Get('storage/objects/:fileKey')
+  @ApiOkResponse({ description: 'Conteúdo do arquivo.' })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'READ_URL_INVALID',
+      message: 'A URL de leitura é inválida ou venceu.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FILE_NOT_FOUND',
+      message: 'Arquivo não encontrado.',
+    },
+  })
+  async get(
+    @Param('fileKey') fileKey: string,
+    @Query('token') token: string | undefined,
+    @Query('download') download: string | undefined,
+    @Res() response: Response,
+  ): Promise<void> {
+    if (!token || !this.tokens.verify(token, fileKey, 'read')) {
+      throw new ForbiddenException({
+        status: 'READ_URL_INVALID',
+        message: 'A URL de leitura é inválida ou venceu.',
+      });
+    }
+
+    const object = await this.storage.getObject(fileKey);
+
+    if (!object) {
+      throw new NotFoundException({
+        status: 'FILE_NOT_FOUND',
+        message: 'Arquivo não encontrado.',
+      });
+    }
+
+    const fileName = fileKey.slice(fileKey.lastIndexOf('/') + 1);
+    const disposition =
+      download === '1' || download === 'true' ? 'attachment' : 'inline';
+
+    response
+      .status(200)
+      .set({
+        'Content-Type': object.mimeType,
+        'Content-Length': String(object.content.length),
+        'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'private, no-store',
+      })
+      .send(object.content);
   }
 }

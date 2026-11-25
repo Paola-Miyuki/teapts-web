@@ -2,7 +2,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { type EntityManager, Repository } from 'typeorm';
+import { type EntityManager, IsNull, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
 import { escapeLike } from '../../common/search/escape-like';
 import { Patient } from '../../patients/entities/patient.entity';
@@ -32,6 +32,8 @@ export type NewDocument = Pick<
 export interface DocumentListFilters {
   q?: string;
   category?: DocumentCategory[];
+  /** Só os documentos enviados por esta conta (RFDOC007). */
+  uploadedByAccountId?: string;
   page: number;
   limit: number;
 }
@@ -41,6 +43,8 @@ export interface DocumentListRow {
   id: string;
   title: string;
   category: DocumentCategory;
+  /** Data de emissão, `YYYY-MM-DD`. */
+  issue_date: string | null;
   mime_type: string;
   size_bytes: number;
   created_at: Date;
@@ -83,6 +87,11 @@ export class DocumentsRepository {
     return this.documents.findOne({ where: { fileKey } });
   }
 
+  /** Busca o documento ativo (não excluído); `null` se não houver. */
+  findActiveById(id: string): Promise<DocumentEntity | null> {
+    return this.documents.findOne({ where: { id, deletedAt: IsNull() } });
+  }
+
   /**
    * Lista os documentos ativos do paciente, do mais recente ao mais antigo.
    *
@@ -101,7 +110,7 @@ export class DocumentsRepository {
         'uploader',
         'uploader.id = document.uploadedByAccountId',
       )
-      .innerJoin(Patient, 'patient', 'patient.id = document.patientId')
+      .innerJoin(Patient, 'patient', 'patient.accountId = document.patientId')
       .leftJoin(
         Account,
         'issuerAccount',
@@ -118,6 +127,7 @@ export class DocumentsRepository {
         'document.id AS id',
         'document.title AS title',
         'document.category AS category',
+        `to_char(document.issueDate, 'YYYY-MM-DD') AS issue_date`,
         'document.mimeType AS mime_type',
         'document.sizeBytes AS size_bytes',
         'document.createdAt AS created_at',
@@ -133,6 +143,12 @@ export class DocumentsRepository {
     if (filters.q !== undefined) {
       query.andWhere(`document.title ILIKE :q ESCAPE '\\'`, {
         q: `%${escapeLike(filters.q)}%`,
+      });
+    }
+
+    if (filters.uploadedByAccountId !== undefined) {
+      query.andWhere('document.uploadedByAccountId = :uploadedByAccountId', {
+        uploadedByAccountId: filters.uploadedByAccountId,
       });
     }
 

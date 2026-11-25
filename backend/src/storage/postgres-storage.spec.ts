@@ -158,3 +158,65 @@ describe('PostgresStorage.activateObject', () => {
     expect(objects.update).not.toHaveBeenCalled();
   });
 });
+
+describe('PostgresStorage.createReadUrl', () => {
+  it('points at the backend with a read token limited to the object, valid for 5 minutes', () => {
+    const { storage, tokens } = createStorage();
+    const now = new Date('2026-12-01T12:00:00.000Z');
+
+    const { url, expiresAt } = storage.createReadUrl(fileKey, now);
+
+    expect(expiresAt).toEqual(new Date('2026-12-01T12:05:00.000Z'));
+
+    const parsed = new URL(url);
+    const token = parsed.searchParams.get('token') ?? '';
+
+    expect(parsed.origin).toBe('http://localhost:3000');
+    expect(decodeURIComponent(parsed.pathname)).toBe(
+      `/storage/objects/${fileKey}`,
+    );
+    expect(tokens.verify(token, fileKey, 'read', { now })).toBe(true);
+    expect(tokens.verify(token, fileKey, 'write', { now })).toBe(false);
+    expect(tokens.verify(token, 'patient-1/other.pdf', 'read', { now })).toBe(
+      false,
+    );
+    expect(tokens.verify(token, fileKey, 'read', { now: expiresAt })).toBe(
+      false,
+    );
+  });
+});
+
+describe('PostgresStorage.getObject', () => {
+  it('returns the type, size and content of the object', async () => {
+    const { objects, storage } = createStorage();
+    const content = Buffer.from('conteudo');
+    objects.findOne.mockResolvedValue({
+      fileKey,
+      mimeType: 'application/pdf',
+      sizeBytes: 8,
+      content,
+    });
+
+    await expect(storage.getObject(fileKey)).resolves.toEqual({
+      mimeType: 'application/pdf',
+      sizeBytes: 8,
+      content,
+    });
+    expect(objects.findOne).toHaveBeenCalledWith({
+      where: { fileKey },
+      select: {
+        fileKey: true,
+        mimeType: true,
+        sizeBytes: true,
+        content: true,
+      },
+    });
+  });
+
+  it('returns null when the object does not exist', async () => {
+    const { objects, storage } = createStorage();
+    objects.findOne.mockResolvedValue(null);
+
+    await expect(storage.getObject(fileKey)).resolves.toBeNull();
+  });
+});

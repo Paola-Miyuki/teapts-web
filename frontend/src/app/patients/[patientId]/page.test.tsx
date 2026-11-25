@@ -171,6 +171,50 @@ describe('PatientDetail', () => {
     );
   });
 
+  it('abre as abas Documentos e Termos e consentimentos e lista os documentos', async () => {
+    const document = {
+      id: 'doc-1',
+      title: 'Laudo neurológico',
+      category: 'medical_report',
+      issuer: null,
+      issueDate: null,
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+      uploadedBy: { id: 'a1', name: 'Paula Profissional', isPatient: false },
+      createdAt: '2026-02-14T12:00:00.000Z',
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/me')
+          ? respond(200, PROFESSIONAL)
+          : url.includes('/patients/patient-1/documents')
+            ? respond(200, {
+                data: url.includes('limit=1&') ? [] : [document],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+              })
+            : respond(200, PATIENT),
+      ),
+    ) as jest.Mock;
+    const user = userEvent.setup();
+
+    render(<PatientDetail id="patient-1" />);
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    await user.click(screen.getByRole('link', { name: 'Documentos' }));
+
+    expect(await screen.findByText('Laudo neurológico')).toBeInTheDocument();
+    // Paciente com PTS encerrado: leitura sem prazo, mas sem enviar.
+    expect(
+      screen.queryByRole('link', { name: 'Enviar documento' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('link', { name: 'Termos e consentimentos' }),
+    );
+
+    expect(await screen.findByText('Situação dos termos')).toBeInTheDocument();
+    expect(await screen.findByText('Termos enviados')).toBeInTheDocument();
+  });
+
   it('não mostra o link para o PTS no perfil, nem com PTS ativo', async () => {
     mockApi(
       respond(200, {

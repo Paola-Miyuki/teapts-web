@@ -1,5 +1,9 @@
 import { jest } from '@jest/globals';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { type DataSource, type EntityManager, QueryFailedError } from 'typeorm';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
@@ -66,15 +70,18 @@ function createService() {
   const access = {
     assertAccess: jest.fn<DocumentAccessService['assertAccess']>(),
     assertTeamRead: jest.fn<DocumentAccessService['assertTeamRead']>(),
+    assertDocumentRead: jest.fn<DocumentAccessService['assertDocumentRead']>(),
   };
   const documents = {
     findByFileKey: jest.fn<DocumentsRepository['findByFileKey']>(),
     create: jest.fn<DocumentsRepository['create']>(),
     findPage: jest.fn<DocumentsRepository['findPage']>(),
+    findActiveById: jest.fn<DocumentsRepository['findActiveById']>(),
   };
   const storage = {
     headObject: jest.fn<StorageService['headObject']>(),
     activateObject: jest.fn<StorageService['activateObject']>(),
+    createReadUrl: jest.fn<StorageService['createReadUrl']>(),
   };
   const timeline = {
     recordUploaded: jest.fn<DocumentTimelineService['recordUploaded']>(),
@@ -82,6 +89,7 @@ function createService() {
 
   access.assertAccess.mockResolvedValue();
   access.assertTeamRead.mockResolvedValue();
+  access.assertDocumentRead.mockResolvedValue();
   documents.findByFileKey.mockResolvedValue(null);
   documents.create.mockResolvedValue(stored);
   storage.headObject.mockResolvedValue({
@@ -89,6 +97,10 @@ function createService() {
     sizeBytes: 1024,
   });
   storage.activateObject.mockResolvedValue();
+  storage.createReadUrl.mockReturnValue({
+    url: 'http://localhost:3000/storage/objects/k?token=t',
+    expiresAt: new Date('2026-12-01T12:05:00.000Z'),
+  });
   timeline.recordUploaded.mockResolvedValue();
 
   return {
@@ -311,6 +323,7 @@ describe('DocumentsService.list', () => {
     category: DocumentCategory.MEDICAL_REPORT,
     mime_type: 'application/pdf',
     size_bytes: 1024,
+    issue_date: '2026-11-20',
     created_at: new Date('2026-12-01T12:00:00.000Z'),
     uploader_id: 'account-9',
     uploader_name: 'Ana Souza',
@@ -337,6 +350,7 @@ describe('DocumentsService.list', () => {
           title: 'Laudo neurológico',
           category: 'medical_report',
           issuer: null,
+          issueDate: '2026-11-20',
           mimeType: 'application/pdf',
           sizeBytes: 1024,
           uploadedBy: { id: 'account-9', name: 'Ana Souza', isPatient: false },
@@ -407,5 +421,54 @@ describe('DocumentsService.list', () => {
       ctx.service.list(account, patientId, query),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(ctx.documents.findPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('DocumentsService.getUrl', () => {
+  const document = {
+    ...stored,
+    fileKey: `${patientId}/abc-laudo.pdf`,
+    uploadedByAccountId: 'account-9',
+  } as DocumentEntity;
+
+  it('checks the access to the document and returns the read URL of its object', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(document);
+
+    await expect(ctx.service.getUrl(account, 'doc-1')).resolves.toEqual({
+      url: 'http://localhost:3000/storage/objects/k?token=t',
+      expiresAt: '2026-12-01T12:05:00.000Z',
+    });
+    expect(ctx.access.assertDocumentRead).toHaveBeenCalledWith(
+      account,
+      document,
+    );
+    expect(ctx.storage.createReadUrl).toHaveBeenCalledWith(document.fileKey);
+  });
+
+  it('answers 404 DOCUMENT_NOT_FOUND for a missing or deleted document', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(null);
+
+    const error: unknown = await ctx.service
+      .getUrl(account, 'doc-1')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toMatchObject({
+      status: 'DOCUMENT_NOT_FOUND',
+    });
+    expect(ctx.access.assertDocumentRead).not.toHaveBeenCalled();
+  });
+
+  it('does not sign a URL when the access is denied', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(document);
+    ctx.access.assertDocumentRead.mockRejectedValue(new ForbiddenException());
+
+    await expect(ctx.service.getUrl(account, 'doc-1')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(ctx.storage.createReadUrl).not.toHaveBeenCalled();
   });
 });

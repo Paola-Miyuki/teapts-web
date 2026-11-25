@@ -109,6 +109,22 @@ describe('DocumentsRepository', () => {
     await expect(repository.findByFileKey('k')).resolves.toBeNull();
   });
 
+  describe('findActiveById', () => {
+    it('looks the document up leaving the deleted ones out', async () => {
+      const { repository, typeormRepository } = createRepository();
+      typeormRepository.findOne.mockResolvedValue({
+        id: 'doc-1',
+      } as DocumentEntity);
+
+      await expect(repository.findActiveById('doc-1')).resolves.toEqual({
+        id: 'doc-1',
+      });
+      expect(typeormRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'doc-1', deletedAt: expect.objectContaining({}) },
+      });
+    });
+  });
+
   describe('findPage', () => {
     it('filters by the patient and leaves the deleted ones out, newest first', async () => {
       builder = createBuilder([{ id: 'doc-1' }], 1);
@@ -132,6 +148,22 @@ describe('DocumentsRepository', () => {
       );
       expect(builder.offset).toHaveBeenCalledWith(0);
       expect(builder.limit).toHaveBeenCalledWith(20);
+    });
+
+    it('keeps only what the given account uploaded', async () => {
+      builder = createBuilder();
+      const { repository } = createRepository();
+
+      await repository.findPage('patient-1', {
+        uploadedByAccountId: 'account-9',
+        page: 1,
+        limit: 20,
+      });
+
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        'document.uploadedByAccountId = :uploadedByAccountId',
+        { uploadedByAccountId: 'account-9' },
+      );
     });
 
     it('searches the title escaping %, _ and \\ and filters by category', async () => {
