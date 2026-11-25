@@ -8,6 +8,7 @@ import {
   Controller,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -29,9 +31,11 @@ import {
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
+import { UpdateDocumentResponseDto } from '../dto/update-document-response.dto';
 import { DocumentResponseDto } from '../dto/document-response.dto';
 import { CreateUploadUrlRequestDto } from '../dto/create-upload-url-request.dto';
 import { CreateUploadUrlResponseDto } from '../dto/create-upload-url-response.dto';
+import { UpdateDocumentRequestDto } from '../dto/update-document-request.dto';
 import { DocumentUploadService } from '../services/document-upload.service';
 import { DocumentsService } from '../services/documents.service';
 
@@ -160,5 +164,40 @@ export class PatientDocumentsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<DocumentResponseDto> {
     return this.documents.confirm(account, patientId, body);
+  }
+
+  @Patch('documents/:id')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: UpdateDocumentResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o título.',
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Você não tem acesso aos documentos deste paciente.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'DOCUMENT_NOT_FOUND',
+      message: 'Documento não encontrado.',
+    },
+  })
+  async updateDocument(
+    @Param('id', parsePatientId) documentId: string,
+    @Body() body: UpdateDocumentRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<UpdateDocumentResponseDto> {
+    return this.documents.update(account, documentId, body);
   }
 }

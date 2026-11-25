@@ -2,7 +2,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { type EntityManager, Repository } from 'typeorm';
+import { IsNull, type EntityManager, Repository } from 'typeorm';
 import { DocumentEntity } from '../entities/document.entity';
 
 /** Campos que o chamador informa ao criar um documento. */
@@ -51,5 +51,23 @@ export class DocumentsRepository {
   /** Busca pela chave do objeto, que é única (RN014); `null` se não houver. */
   findByFileKey(fileKey: string): Promise<DocumentEntity | null> {
     return this.documents.findOne({ where: { fileKey } });
+  }
+
+  /** Busca documento ativo por id, usando a transação quando fornecida. */
+  findActiveById(
+    id: string,
+    manager?: EntityManager,
+  ): Promise<DocumentEntity | null> {
+    const documents = manager?.getRepository(DocumentEntity) ?? this.documents;
+
+    return documents.findOne({ where: { id, deletedAt: IsNull() } });
+  }
+
+  /** Persiste alterações na transação informada. */
+  save(
+    document: DocumentEntity,
+    manager: EntityManager,
+  ): Promise<DocumentEntity> {
+    return manager.getRepository(DocumentEntity).save(document);
   }
 }

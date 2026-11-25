@@ -7,6 +7,7 @@ import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
 import type { DocumentResponseDto } from '../dto/document-response.dto';
+import type { UpdateDocumentResponseDto } from '../dto/update-document-response.dto';
 import { DocumentsService } from '../services/documents.service';
 import type { CreateUploadUrlResponseDto } from '../dto/create-upload-url-response.dto';
 import { DocumentUploadService } from '../services/document-upload.service';
@@ -45,6 +46,12 @@ const confirmed: DocumentResponseDto = {
   sizeBytes: 1024,
   createdAt: '2026-12-01T12:00:00.000Z',
 };
+const updated: UpdateDocumentResponseDto = {
+  id: confirmed.id,
+  title: 'Laudo neurológico (2026)',
+  description: 'Avaliação de novembro.',
+  updatedAt: '2026-12-09T12:00:00.000Z',
+};
 
 describe('PatientDocumentsController', () => {
   let app: INestApplication;
@@ -65,13 +72,23 @@ describe('PatientDocumentsController', () => {
         input: unknown,
       ) => Promise<DocumentResponseDto>
     >;
+    update: jest.Mock<
+      (
+        account: AccountContext,
+        documentId: string,
+        input: unknown,
+      ) => Promise<UpdateDocumentResponseDto>
+    >;
   };
   let allowed: boolean;
 
   beforeEach(async () => {
     allowed = true;
     uploads = { createUploadUrl: jest.fn(async () => created) };
-    documents = { confirm: jest.fn(async () => confirmed) };
+    documents = {
+      confirm: jest.fn(async () => confirmed),
+      update: jest.fn(async () => updated),
+    };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [PatientDocumentsController],
@@ -220,6 +237,47 @@ describe('PatientDocumentsController', () => {
 
       expect(response.status).toBe(403);
       expect(documents.confirm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /documents/:id', () => {
+    it('answers 200 with the updated metadata', async () => {
+      const input = {
+        title: 'Laudo neurológico (2026)',
+        description: 'Avaliação de novembro.',
+      };
+
+      const response = await request(app.getHttpServer())
+        .patch(`/documents/${confirmed.id}`)
+        .send(input);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(updated);
+      expect(documents.update).toHaveBeenCalledWith(
+        account,
+        confirmed.id,
+        input,
+      );
+    });
+
+    it('answers 400 VALIDATION_ERROR when the title is empty', async () => {
+      const response = await request(app.getHttpServer())
+        .patch(`/documents/${confirmed.id}`)
+        .send({ title: '' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.status).toBe('VALIDATION_ERROR');
+      expect(documents.update).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR for an invalid document id', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/documents/not-a-uuid')
+        .send({ title: 'Novo título' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.status).toBe('VALIDATION_ERROR');
+      expect(documents.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,10 @@
 // Erros de negócio dos documentos, no formato `{ status, message }` da API.
 
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 export const uploadNotFound = () =>
   new BadRequestException({
@@ -18,4 +22,10 @@ export const documentForbidden = () =>
   new ForbiddenException({
     status: 'FORBIDDEN',
     message: 'Você não tem acesso aos documentos deste paciente.',
+  });
+
+export const documentNotFound = () =>
+  new NotFoundException({
+    status: 'DOCUMENT_NOT_FOUND',
+    message: 'Documento não encontrado.',
   });

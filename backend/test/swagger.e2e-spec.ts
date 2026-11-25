@@ -98,6 +98,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/patients/{patientId}/support-contacts/{contactId}', 'patch'],
   ['/professionals', 'post'],
   ['/patients/{id}/documents/upload-url', 'post'],
+  ['/documents/{id}', 'patch'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -182,6 +183,7 @@ describe('Swagger (e2e)', () => {
     expect(paths['/accounts']).toHaveProperty('get');
     expect(paths['/patients']).toHaveProperty('post');
     expect(paths['/professionals']).toHaveProperty('post');
+    expect(paths['/documents/{id}']).toHaveProperty('patch');
   });
 
   it('declares the cookie and bearer session schemes', async () => {

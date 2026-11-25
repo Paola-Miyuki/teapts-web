@@ -67,6 +67,43 @@ describe('DocumentTimelineService.recordUploaded', () => {
     );
   });
 
+  describe('DocumentTimelineService.recordUpdated', () => {
+    it('records document_updated with the document and actor on the active PTS', async () => {
+      const { service, recorder, manager } = createService({ id: 'pts-1' });
+
+      await service.recordUpdated(
+        { ...document, title: 'Laudo atualizado' },
+        professional,
+        manager as unknown as EntityManager,
+      );
+
+      expect(recorder.record).toHaveBeenCalledWith(
+        {
+          ptsId: 'pts-1',
+          type: TimelineRecordType.DocumentUpdated,
+          description: 'Dados do documento "Laudo atualizado" atualizados.',
+          targetId: 'doc-1',
+          targetType: TimelineRecordTarget.Document,
+          authorProfessionalId: 'professional-1',
+          executedByAccountId: 'account-1',
+        },
+        manager,
+      );
+    });
+
+    it('does not record an event when there is no active PTS', async () => {
+      const { service, recorder, manager } = createService(null);
+
+      await service.recordUpdated(
+        document,
+        admin,
+        manager as unknown as EntityManager,
+      );
+
+      expect(recorder.record).not.toHaveBeenCalled();
+    });
+  });
+
   it('leaves the author empty when the admin uploads', async () => {
     const { service, recorder, manager } = createService({ id: 'pts-1' });
 
