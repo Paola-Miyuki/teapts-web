@@ -136,6 +136,8 @@ export type PtsDetail = {
   beganAt: string | null;
   concludedAt: string | null;
   cancelledAt: string | null;
+  version?: number;
+  previousPts?: { id: string; version: number } | null;
   // Data e motivo informados ao encerrar (RFPTS010).
   closingDate?: string | null;
   closingReason?: string | null;

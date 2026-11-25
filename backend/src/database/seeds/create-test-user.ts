@@ -16,6 +16,7 @@ import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { Uf } from '../../professionals/enums/uf.enum';
+import { nextPtsVersion } from '../../pts/pts-version';
 import { PtsEntity } from '../../pts/entities/pts.entity';
 import { StoredObject } from '../../storage/entities/stored-object.entity';
 import { PtsStateEnum } from '../enums/pts-state.enum';
@@ -726,6 +727,7 @@ async function ensureTestPts(
       await ptsRepository.save(
         ptsRepository.create({
           patientId,
+          version: await nextPtsVersion(dataSource.manager, patientId),
           responsibleProfessionalId: professionals.get(pts.responsible)!.id,
           team: pts.team.map((key) => professionals.get(key)!),
           status: pts.status,

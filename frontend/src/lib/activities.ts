@@ -53,6 +53,14 @@ export type VisitPlace = keyof typeof VISIT_PLACE_LABELS;
 export type ActivityExecutor = keyof typeof ACTIVITY_EXECUTOR_LABELS;
 export type ActivityStatus = keyof typeof ACTIVITY_STATUS_LABELS;
 
+// Filtro padrão da lista: o que ainda faz parte do plano (`pts-detalhe.html`).
+// São também os estados que podem ser arquivados (RFACT008).
+export const ACTIVE_ACTIVITY_STATUSES: ActivityStatus[] = [
+  'suggested',
+  'running',
+  'suspended',
+];
+
 export type ActivityFrequency = {
   quantity: number;
   period: ActivityPeriod;
@@ -177,4 +185,21 @@ export function updateActivity(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(changes),
   });
+}
+
+export type ArchiveActivityResponse = {
+  id: string;
+  status: 'archived';
+  archivedAt: string;
+};
+
+export function archiveActivity(activityId: string, reason?: string) {
+  return request<ArchiveActivityResponse>(
+    `/activities/${encodeURIComponent(activityId)}/archive`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
 }

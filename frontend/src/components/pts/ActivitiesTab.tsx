@@ -8,9 +8,11 @@ import MultiSelect from '@/components/table/MultiSelect';
 import Pagination from '@/components/table/Pagination';
 import ui from '@/components/ui.module.css';
 import {
+  ACTIVE_ACTIVITY_STATUSES,
   ACTIVITY_EXECUTOR_LABELS,
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_TYPE_LABELS,
+  archiveActivity,
   formatFrequency,
   type ActivityExecutor,
   type ActivityPagination,
@@ -26,6 +28,7 @@ import ActivityFormDialog, {
   type ActivityTeamMember,
 } from './ActivityFormDialog';
 import ActivityViewDialog from './ActivityViewDialog';
+import ConfirmActivityDialog from './ConfirmActivityDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
@@ -33,11 +36,15 @@ const STATUS_OPTIONS = Object.entries(ACTIVITY_STATUS_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
 const EXECUTOR_OPTIONS = Object.entries(ACTIVITY_EXECUTOR_LABELS);
+const ACTIVE_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
+  ACTIVE_ACTIVITY_STATUSES.includes(value as ActivityStatus),
+);
 
 type OpenDialog =
   | { kind: 'add' }
   | { kind: 'edit'; activity: Activity }
   | { kind: 'view'; activity: Activity }
+  | { kind: 'archive'; activity: Activity }
   | null;
 
 type ActivitiesTabProps = {
@@ -51,6 +58,8 @@ type ActivitiesTabProps = {
   // RFACT005 – autor na sugerida, responsável na sugerida ou em andamento,
   // admin (menos rejeitada ou arquivada).
   canEdit: (activity: Activity) => boolean;
+  // RFACT008 – equipe e admin, na sugerida, em andamento ou suspensa.
+  canArchive: (activity: Activity) => boolean;
   team: ActivityTeamMember[];
   goals: ActivityGoalOption[];
   isAdmin: boolean;
@@ -77,6 +86,7 @@ export default function ActivitiesTab({
   reload,
   canCreate,
   canEdit,
+  canArchive,
   team,
   goals,
   isAdmin,
@@ -91,6 +101,8 @@ export default function ActivitiesTab({
 }: ActivitiesTabProps) {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [feedback, setFeedback] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statuses, setStatuses] = useState<string[]>(ACTIVE_ACTIVITY_STATUSES);
 
   function openDialog(next: Exclude<OpenDialog, null>) {
     setFeedback('');
@@ -128,6 +140,21 @@ export default function ActivitiesTab({
     );
   }
 
+  function finish(message: string) {
+    setDialog(null);
+    setFeedback(message);
+    reload();
+  }
+
+  const shown =
+    statuses.length === 0
+      ? activities
+      : activities.filter(
+          (activity) =>
+            statuses.includes(activity.status) ||
+            (activity.status === 'archived' && !canEdit(activity)),
+        );
+
   return (
     <>
       {feedback && (
@@ -144,8 +171,8 @@ export default function ActivitiesTab({
           <div>
             <h2>Atividades</h2>
             <p className="count" aria-live="polite">
-              {`${pagination.total} ${
-                pagination.total === 1 ? 'atividade' : 'atividades'
+              {`${shown.length} ${
+                shown.length === 1 ? 'atividade' : 'atividades'
               }`}
             </p>
           </div>
@@ -162,13 +189,35 @@ export default function ActivitiesTab({
         </div>
 
         <div className="ux-toolbar">
+          <button
+            type="button"
+            className="btn filter-toggle"
+            aria-expanded={filtersOpen}
+            aria-controls="acts-more"
+            onClick={() => setFiltersOpen((current) => !current)}
+          >
+            <Icon name="filter" className="icon-sm" />
+            Filtros
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setStatuses(ACTIVE_ACTIVITY_STATUSES);
+              onStatusFilterChange(ACTIVE_ACTIVITY_STATUSES);
+            }}
+          >
+            <Icon name="close" className="icon-sm" />
+            Limpar
+          </button>
           <MultiSelect
             label="Status"
-            options={STATUS_OPTIONS}
-            value={statusFilter ?? STATUS_OPTIONS.map(({ value }) => value)}
+            options={ACTIVE_STATUS_OPTIONS}
+            value={statusFilter ?? [...ACTIVE_ACTIVITY_STATUSES]}
             onChange={(values) =>
               onStatusFilterChange(
-                values.length === 0 || values.length === STATUS_OPTIONS.length
+                values.length === 0 ||
+                  values.length === ACTIVE_ACTIVITY_STATUSES.length
                   ? undefined
                   : (values as ActivityStatus[]),
               )
@@ -195,6 +244,22 @@ export default function ActivitiesTab({
               ))}
             </select>
           </label>
+        </div>
+
+        <div className="filter-more" id="acts-more" hidden={!filtersOpen}>
+          <MultiSelect
+            label="Status adicionais"
+            options={STATUS_OPTIONS}
+            value={statuses}
+            onChange={(values) => {
+              setStatuses(values);
+              onStatusFilterChange(
+                values.length === 0 || values.length === STATUS_OPTIONS.length
+                  ? undefined
+                  : (values as ActivityStatus[]),
+              );
+            }}
+          />
         </div>
 
         {activities.length === 0 ? (
@@ -231,7 +296,7 @@ export default function ActivitiesTab({
                   </tr>
                 </thead>
                 <tbody>
-                  {activities.map((activity) => (
+                  {shown.map((activity) => (
                     <tr key={activity.id}>
                       <td className="ux-wide">
                         <strong>{activity.title}</strong>
@@ -250,34 +315,52 @@ export default function ActivitiesTab({
                       </td>
                       <td className="num">{formatDate(activity.createdAt)}</td>
                       <td className="actions-col">
-                        <KebabMenu label={`Ações para ${activity.title}`}>
-                          <li>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() =>
-                                openDialog({ kind: 'view', activity })
-                              }
-                            >
-                              <Icon name="eye" className="icon-sm" />
-                              Visualizar
-                            </button>
-                          </li>
-                          {canEdit(activity) && (
+                        {(canEdit(activity) || canArchive(activity)) && (
+                          <KebabMenu label={`Ações para ${activity.title}`}>
                             <li>
                               <button
                                 type="button"
                                 role="menuitem"
                                 onClick={() =>
-                                  openDialog({ kind: 'edit', activity })
+                                  openDialog({ kind: 'view', activity })
                                 }
                               >
-                                <Icon name="edit" className="icon-sm" />
-                                Editar
+                                <Icon name="eye" className="icon-sm" />
+                                Visualizar
                               </button>
                             </li>
-                          )}
-                        </KebabMenu>
+                            {canEdit(activity) && (
+                              <li>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() =>
+                                    openDialog({ kind: 'edit', activity })
+                                  }
+                                >
+                                  <Icon name="edit" className="icon-sm" />
+                                  Editar
+                                </button>
+                              </li>
+                            )}
+                            {canArchive(activity) && (
+                              <li>
+                                <div className="sep" />
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="danger"
+                                  onClick={() =>
+                                    openDialog({ kind: 'archive', activity })
+                                  }
+                                >
+                                  <Icon name="lock" className="icon-sm" />
+                                  Arquivar
+                                </button>
+                              </li>
+                            )}
+                          </KebabMenu>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -304,13 +387,24 @@ export default function ActivitiesTab({
           team={team}
           goals={goals}
           isAdmin={isAdmin}
-          onSaved={() => {
-            setDialog(null);
-            setFeedback(
+          onSaved={() =>
+            finish(
               dialog.kind === 'edit' ? 'Atividade salva' : 'Atividade sugerida',
-            );
-            reload();
-          }}
+            )
+          }
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.kind === 'archive' && (
+        <ConfirmActivityDialog
+          title={`Arquivar ${dialog.activity.title}?`}
+          description="A atividade sai do plano. Os atendimentos já registrados continuam no histórico."
+          confirmLabel="Arquivar atividade"
+          busyLabel="Arquivando..."
+          errorMessage="Não foi possível arquivar a atividade"
+          onConfirm={(reason) => archiveActivity(dialog.activity.id, reason)}
+          onDone={() => finish('Atividade arquivada')}
           onClose={() => setDialog(null)}
         />
       )}

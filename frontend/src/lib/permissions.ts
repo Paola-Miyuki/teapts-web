@@ -28,6 +28,7 @@ export type PermissionAction =
   | 'manageGoals'
   | 'createActivity'
   | 'editActivity'
+  | 'archiveActivity'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -96,6 +97,11 @@ function isLockedActivity(activity?: ActivityPermissionData) {
   return ['rejected', 'archived'].includes(activity?.status ?? '');
 }
 
+// Arquiva só o que ainda faz parte do plano (RFACT008).
+function isArchivableActivity(activity?: ActivityPermissionData) {
+  return ['suggested', 'running', 'suspended'].includes(activity?.status ?? '');
+}
+
 function isProposalMember(user: PermissionUser, pts: PtsPermissionData) {
   const memberIds = [
     pts.responsibleProfessionalId,
@@ -147,6 +153,8 @@ export function can(
           activity !== undefined &&
           !isLockedActivity(activity)
         );
+      case 'archiveActivity':
+        return isEditablePts(pts) && isArchivableActivity(activity);
       default:
         return true;
     }
@@ -266,6 +274,16 @@ export function can(
         ? responsible || isOwn(activity.authorProfessionalId)
         : activity.status === 'running' && responsible;
     }
+
+    case 'archiveActivity':
+      // RFACT008 – qualquer profissional da equipe do PTS.
+      return (
+        professional &&
+        pts !== undefined &&
+        isEditablePts(pts) &&
+        isProposalMember(user, pts) &&
+        isArchivableActivity(activity)
+      );
 
     case 'removePtsTeamMember':
       // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.

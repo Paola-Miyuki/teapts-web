@@ -3,15 +3,17 @@ import Modal from '@/components/Modal';
 import { formatDate, formatDateOnly } from '@/lib/format';
 import {
   GOAL_AREA_LABELS,
-  GOAL_ORIGIN_LABELS,
   GOAL_STATUS_BADGES,
   GOAL_STATUS_LABELS,
   GOAL_TERM_LABELS,
+  goalOriginLabel,
   type Goal,
 } from '@/lib/goals';
 
 type GoalViewDialogProps = {
   goal: Goal;
+  // Versão de onde a meta mantida veio.
+  previousVersion?: number;
   canManage: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -21,6 +23,7 @@ type GoalViewDialogProps = {
 // Modal Visualizar da meta (`goal-view` de `pts-detalhe.html` e `pts.html`).
 export default function GoalViewDialog({
   goal,
+  previousVersion,
   canManage,
   onEdit,
   onDelete,
@@ -83,7 +86,7 @@ export default function GoalViewDialog({
         </div>
         <div>
           <dt>Origem</dt>
-          <dd>{GOAL_ORIGIN_LABELS[goal.origin]}</dd>
+          <dd>{goalOriginLabel(goal.origin, previousVersion)}</dd>
         </div>
         <div>
           <dt>Resultado</dt>

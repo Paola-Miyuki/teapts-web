@@ -1,4 +1,4 @@
-import { formatAge, formatCep, formatDate } from './format';
+import { addMonths, formatAge, formatCep, formatDate } from './format';
 
 describe('formatDate', () => {
   it('usa o dia do horário de Brasília', () => {
@@ -30,5 +30,15 @@ describe('formatAge', () => {
     const [year, month, day] = today.split('-').map(Number);
 
     expect(formatAge(birth, new Date(year, month - 1, day))).toBe(expected);
+  });
+});
+
+describe('addMonths', () => {
+  it.each([
+    ['2026-12-15', 6, '2027-06-15'],
+    ['2026-08-31', 6, '2027-02-28'],
+    ['2026-01-10', 12, '2027-01-10'],
+  ])('%s + %s meses = %s', (date, months, expected) => {
+    expect(addMonths(date, months)).toBe(expected);
   });
 });

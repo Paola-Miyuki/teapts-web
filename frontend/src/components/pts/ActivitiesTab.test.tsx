@@ -51,7 +51,7 @@ function respond(status: number, body: unknown) {
   } as unknown as Response;
 }
 
-describe('ActivitiesTab (RFACT001, RFACT005)', () => {
+describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
   const replace = jest.fn();
   const reload = jest.fn();
   let fetchMock: jest.Mock;
@@ -68,6 +68,7 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
         reload={reload}
         canCreate
         canEdit={() => true}
+        canArchive={() => true}
         team={TEAM}
         goals={GOALS}
         isAdmin={false}
@@ -139,6 +140,7 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
       reload,
       canCreate: true,
       canEdit: () => true,
+      canArchive: () => true,
       team: TEAM,
       goals: GOALS,
       isAdmin: false,
@@ -467,6 +469,125 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
     );
     openEdit();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('por padrão esconde a arquivada, que aparece marcando "Arquivada"', () => {
+    renderTab({
+      activities: [
+        activity(),
+        activity({ id: 'act-2', title: 'Hidroterapia', status: 'archived' }),
+        activity({ id: 'act-3', title: 'Grupo de pais', status: 'rejected' }),
+      ],
+    });
+
+    expect(screen.getByText('Integração sensorial')).toBeInTheDocument();
+    expect(screen.queryByText('Hidroterapia')).not.toBeInTheDocument();
+    expect(screen.queryByText('Grupo de pais')).not.toBeInTheDocument();
+    expect(screen.getByText('1 atividade')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    fireEvent.click(screen.getByLabelText('Arquivada'));
+
+    const row = within(screen.getByText('Hidroterapia').closest('tr')!);
+    expect(row.getByText('Arquivada')).toHaveClass('badge', 'archived');
+    expect(screen.getByText('2 atividades')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+    expect(screen.queryByText('Hidroterapia')).not.toBeInTheDocument();
+  });
+
+  it('mostra "Arquivar" só na atividade que a pessoa pode arquivar', () => {
+    renderTab({
+      activities: [
+        activity(),
+        activity({ id: 'act-2', title: 'Suspensa', status: 'suspended' }),
+      ],
+      canEdit: () => false,
+      canArchive: (item) => item.status === 'suggested',
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Ações para Integração sensorial' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Ações para Suspensa' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('arquiva com o motivo, mostra o carregamento e tira da lista', async () => {
+    let finish: (value: Response) => void = () => undefined;
+    fetchMock.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderTab();
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Arquivar', hidden: true }),
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: 'Arquivar Integração sensorial?' }),
+    ).toBeInTheDocument();
+    fill(/^Motivo/, '  Família assumiu a atividade em casa.  ');
+    fireEvent.click(screen.getByRole('button', { name: 'Arquivar atividade' }));
+
+    expect(
+      screen.getByRole('button', { name: 'Arquivando...' }),
+    ).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/activities/act-1/archive',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    );
+    expect(sentBody()).toEqual({
+      reason: 'Família assumiu a atividade em casa.',
+    });
+
+    finish(
+      respond(200, {
+        id: 'act-1',
+        status: 'archived',
+        archivedAt: '2026-12-06T12:00:00.000Z',
+      }),
+    );
+
+    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Atividade arquivada')).toBeInTheDocument();
+  });
+
+  it('arquiva sem motivo', async () => {
+    fetchMock.mockResolvedValue(
+      respond(200, {
+        id: 'act-1',
+        status: 'archived',
+        archivedAt: '2026-12-06T12:00:00.000Z',
+      }),
+    );
+    renderTab();
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Arquivar', hidden: true }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Arquivar atividade' }));
+
+    await waitFor(() => expect(reload).toHaveBeenCalled());
+    expect(sentBody()).toEqual({});
+  });
+
+  it('no arquivamento, mostra a mensagem de erro da API', async () => {
+    const message =
+      'Atividade rejeitada, concluída ou já arquivada não pode ser arquivada.';
+    fetchMock.mockResolvedValue(
+      respond(409, { status: 'ACTIVITY_NOT_ARCHIVABLE', message }),
+    );
+    renderTab();
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Arquivar', hidden: true }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Arquivar atividade' }));
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { Patient } from '../../patients/entities/patient.entity';
@@ -7,6 +7,7 @@ import { Professional } from '../../professionals/entities/professional.entity';
 import { ActivityEntity } from '../../activities/entities/activity.entity';
 import { ActivityState } from '../../activities/enums/activity.enums';
 import { PtsEntity } from '../entities/pts.entity';
+import { PtsGoalEntity } from '../entities/pts-goal.entity';
 import { PtsRepositoryImpl } from '../repositories/pts.repository.impl';
 import { TimelineRecordEntity } from '../../timeline/entities/timeline-record.entity';
 import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
@@ -45,6 +46,7 @@ function createRepository(lockedRows: Partial<PtsEntity>[]) {
       update: jest.fn(async () => ({ affected: 1 })),
       insert: jest.fn(async () => undefined),
       find: jest.fn(async () => [] as { id: string; title: string }[]),
+      countBy: jest.fn(async () => 0),
     },
     connect: jest.fn(async () => undefined),
     startTransaction: jest.fn(async () => {
@@ -923,5 +925,26 @@ describe('PtsRepositoryImpl.closePts (RFPTS010)', () => {
     );
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
     expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('PtsRepositoryImpl.approveProposal: metas (RFPTS013)', () => {
+  it('refaz a checagem das metas com os PTS travados', async () => {
+    const { repository, queryRunner } = createRepository([draft('a')]);
+    queryRunner.manager.countBy.mockResolvedValueOnce(3);
+
+    const error = await expectApiError(
+      () => repository.approveProposal('a', 'patient-1'),
+      409,
+      'GOALS_INCOMPLETE',
+    );
+
+    expect(error.pendingGoals).toBe(3);
+    expect(queryRunner.manager.countBy).toHaveBeenCalledWith(PtsGoalEntity, [
+      { ptsId: 'a', term: IsNull() },
+      { ptsId: 'a', targetDate: IsNull() },
+    ]);
+    expect(queryRunner.manager.update).not.toHaveBeenCalled();
+    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });
 });

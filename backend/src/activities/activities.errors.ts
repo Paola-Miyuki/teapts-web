@@ -37,6 +37,20 @@ export const activityNotFound = () =>
     'Atividade não encontrada.',
   );
 
+export const activityArchiveForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem arquivar atividades.',
+  );
+
+export const activityNotArchivable = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'ACTIVITY_NOT_ARCHIVABLE',
+    'Atividade rejeitada, concluída ou já arquivada não pode ser arquivada.',
+  );
+
 export const activityNotEditable = () =>
   new PtsApiError(
     HttpStatus.CONFLICT,

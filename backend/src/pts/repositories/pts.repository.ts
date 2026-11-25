@@ -54,7 +54,8 @@ export interface FindPtsHistoryResult {
 
 export interface UpdatePtsProposalInput {
   id: string;
-  socialSituation?: string;
+  /** Campos da ficha a alterar, já aparados. */
+  sheet: Partial<Omit<UpdatePtsSheetResponseDto, 'id'>>;
   teamProfessionalIds?: string[];
 }
 
@@ -230,6 +231,12 @@ export abstract class PtsRepository {
   abstract transferResponsibility(
     input: TransferResponsibilityInput,
   ): Promise<PtsTeamResponseDto>;
+
+  /** Metas da proposta sem prazo ou sem data-alvo (RFPTS013). */
+  abstract countPendingGoals(ptsId: string): Promise<number>;
+
+  /** Maior data-alvo das metas do PTS, em yyyy-mm-dd. */
+  abstract findLatestGoalTarget(ptsId: string): Promise<string | null>;
 
   /**
    * Passa o PTS de planning para running e grava o evento na timeline, na
