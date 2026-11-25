@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { QueryFailedError, type Repository } from 'typeorm';
+import { type EntityManager, QueryFailedError, type Repository } from 'typeorm';
 import { PostgresStorage } from './postgres-storage';
 import { StorageTokenService } from './services/storage-token.service';
 import { StorageObjectAlreadyExistsError } from './storage.service';
@@ -15,6 +15,8 @@ const fileKey = 'patient-1/abc-laudo escolar.pdf';
 function createStorage() {
   const objects = {
     insert: jest.fn<(values: unknown) => Promise<unknown>>(),
+    findOne: jest.fn<(options: unknown) => Promise<unknown>>(),
+    update: jest.fn<(criteria: unknown, values: unknown) => Promise<unknown>>(),
   };
   const tokens = new StorageTokenService(config);
   const storage = new PostgresStorage(
@@ -100,5 +102,59 @@ describe('PostgresStorage.putObject', () => {
     await expect(
       storage.putObject({ fileKey, mimeType: 'application/pdf', content }),
     ).rejects.toBe(failure);
+  });
+});
+
+describe('PostgresStorage.headObject', () => {
+  it('returns the type and size stored with the object', async () => {
+    const { objects, storage } = createStorage();
+    objects.findOne.mockResolvedValue({
+      fileKey,
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+    });
+
+    await expect(storage.headObject(fileKey)).resolves.toEqual({
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+    });
+    expect(objects.findOne).toHaveBeenCalledWith({
+      where: { fileKey },
+      select: { fileKey: true, mimeType: true, sizeBytes: true },
+    });
+  });
+
+  it('returns null when the object does not exist', async () => {
+    const { objects, storage } = createStorage();
+    objects.findOne.mockResolvedValue(null);
+
+    await expect(storage.headObject(fileKey)).resolves.toBeNull();
+  });
+});
+
+describe('PostgresStorage.activateObject', () => {
+  it('marks the object as active', async () => {
+    const { objects, storage } = createStorage();
+    objects.update.mockResolvedValue({});
+
+    await storage.activateObject(fileKey);
+
+    expect(objects.update).toHaveBeenCalledWith({ fileKey }, { active: true });
+  });
+
+  it('uses the repository of the transaction manager when given', async () => {
+    const { objects, storage } = createStorage();
+    const transactional = { update: jest.fn() };
+    const manager = {
+      getRepository: jest.fn(() => transactional),
+    } as unknown as EntityManager;
+
+    await storage.activateObject(fileKey, manager);
+
+    expect(transactional.update).toHaveBeenCalledWith(
+      { fileKey },
+      { active: true },
+    );
+    expect(objects.update).not.toHaveBeenCalled();
   });
 });

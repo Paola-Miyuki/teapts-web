@@ -2,6 +2,8 @@
 // PostgresStorage (decisoes-aprovadas.md §20); um driver S3 pode trocá-lo sem
 // mudar quem usa esta classe.
 
+import type { EntityManager } from 'typeorm';
+
 export type SignedUrl = {
   url: string;
   expiresAt: Date;
@@ -11,6 +13,12 @@ export type PutObjectInput = {
   fileKey: string;
   mimeType: string;
   content: Buffer;
+};
+
+/** Dados do objeto gravado, lidos do storage e não do cliente. */
+export type StoredObjectInfo = {
+  mimeType: string;
+  sizeBytes: number;
 };
 
 /** O objeto já existe: o envio não sobrescreve. */
@@ -38,4 +46,21 @@ export abstract class StorageService {
    * @throws StorageObjectAlreadyExistsError quando a chave já existe
    */
   abstract putObject(input: PutObjectInput): Promise<void>;
+
+  /**
+   * Confere se o objeto existe e devolve o tipo e o tamanho gravados.
+   *
+   * @returns os dados do objeto, ou `null` quando ele não existe
+   */
+  abstract headObject(fileKey: string): Promise<StoredObjectInfo | null>;
+
+  /**
+   * Marca o objeto como ativo (documento confirmado). Para ficar na mesma
+   * transação do documento, passe o `manager` dela; drivers que não usam o
+   * banco ignoram o parâmetro.
+   */
+  abstract activateObject(
+    fileKey: string,
+    manager?: EntityManager,
+  ): Promise<void>;
 }

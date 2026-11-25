@@ -28,6 +28,7 @@ src/
   auth/         guards, SuperTokens, /me, signup e login
   accounts/     patients/     professionals/     pts/     timeline/     health/
   documents/    storage/ (StorageService, driver PostgresStorage, token HMAC)
+                (documents/: URL de envio, confirmação, DocumentTimelineService)
   database/     database.config.ts (conexão e arrays entities/migrations), data-source.ts,
                 migrations/, seeds/, enums/
 test/           e2e (*.e2e-spec.ts)
@@ -55,6 +56,7 @@ Todas exigem sessão, exceto `GET /health` e `/auth/signup|signin|session/refres
 | `POST /professionals`                                                                        | admin: `accountId`, `specialism`, `councilNumber`, `councilState`; opcionais `institution`, `cnes`                                              |
 | `PATCH /professionals/:id`                                                                   | admin: `specialism`; com outro conselho, `councilNumber` e `councilState` (mesmo conselho mantém o registro)                                    |
 | `POST /patients/:id/documents/upload-url`                                                    | admin, profissional com PTS ativo ou o paciente: `fileName`, `mimeType`, `sizeBytes` (5 MB)                                                     |
+| `POST /patients/:id/documents`                                                               | mesma autorização: `fileKey` (devolvida pela `uploadUrl`, com o prefixo do paciente), `title`, `category`, `issueDate?`, `issuerAccountId?` (conta de profissional) ou `issuerName?` (no máximo um), `description?`; ativa o objeto e registra `document_uploaded` no PTS ativo; repetir a `fileKey` devolve o documento (`400 UPLOAD_NOT_FOUND`, `403`, `404`) |
 | `PUT /storage/objects/:fileKey?token=`                                                       | sem sessão: o token da `uploadUrl` vale só para o objeto e o tipo (`409` se já enviado)                                                         |
 | `POST /pts`                                                                                  | profissional (vira o responsável) ou admin                                                                                                      |
 | `GET /pts/proposals[/:id]`                                                                   | paciente titular, profissional da proposta ou admin                                                                                             |
@@ -79,7 +81,7 @@ O schema só muda por migration (`synchronize` é `false`). Entidade ou migratio
 
 Nunca edite migration já aplicada. No Docker, migration nova só vale depois do `make rebuild-backend`. Nomes: colunas em snake_case, enums com sufixo `_e` e restrições com `PK_`, `FK_`, `UQ_`, `IDX_` e `CHK_`.
 
-**Regras do modelo:** uma conta tem no máximo um perfil profissional e um de paciente (RN002), e admin, paciente e profissional usam contas separadas. Excluir é lógico: `account.status = 'inactive'` (RN021) e `deleted_at` na proposta de PTS. O conselho e o nome da especialidade vêm do código (`professionals/professional-registration.ts`); a UF do registro é `uf_e`, em minúsculas. O storage de arquivos é simulado no Postgres (`stored_object`, `bytea`, até 5 MB; só para a demonstração): o `StorageService` é a única porta e aceita um driver S3 depois.
+**Regras do modelo:** uma conta tem no máximo um perfil profissional e um de paciente (RN002), e admin, paciente e profissional usam contas separadas. Excluir é lógico: `account.status = 'inactive'` (RN021) e `deleted_at` na proposta de PTS. O conselho e o nome da especialidade vêm do código (`professionals/professional-registration.ts`); a UF do registro é `uf_e`, em minúsculas. O storage de arquivos é simulado no Postgres (`stored_object`, `bytea`, até 5 MB; só para a demonstração); o documento confirmado vive em `document` (`file_key` única, emissor conta ou texto, `CHK_document_issuer`) e ativa o objeto na mesma transação: o `StorageService` é a única porta e aceita um driver S3 depois.
 
 **O que o seed cria** (`make seed`, ou `pnpm --dir backend run seed:test-user`; precisa do PostgreSQL e do SuperTokens no ar e das migrations aplicadas). Só para desenvolvimento. As contas são criadas ou reaproveitadas a cada execução; a senha de quem já existe no SuperTokens não é redefinida.
 

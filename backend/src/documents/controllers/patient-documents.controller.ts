@@ -1,6 +1,6 @@
-// Este arquivo expõe as rotas de documentos de um paciente: por enquanto, o
-// pedido da URL de envio (RFDOC001). O ValidationPipe global valida o corpo e
-// o controller delega ao DocumentUploadService.
+// Este arquivo expõe as rotas de documentos de um paciente: o pedido da URL
+// de envio (RFDOC001) e a confirmação do documento (RFDOC002). O
+// ValidationPipe global valida o corpo e o controller delega aos services.
 
 import {
   BadRequestException,
@@ -28,9 +28,12 @@ import {
   ErrorResponseDto,
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
+import { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
+import { DocumentResponseDto } from '../dto/document-response.dto';
 import { CreateUploadUrlRequestDto } from '../dto/create-upload-url-request.dto';
 import { CreateUploadUrlResponseDto } from '../dto/create-upload-url-response.dto';
 import { DocumentUploadService } from '../services/document-upload.service';
+import { DocumentsService } from '../services/documents.service';
 
 const parsePatientId = new ParseUUIDPipe({
   exceptionFactory: () =>
@@ -43,7 +46,10 @@ const parsePatientId = new ParseUUIDPipe({
 @ApiTags('documents')
 @Controller()
 export class PatientDocumentsController {
-  constructor(private readonly uploads: DocumentUploadService) {}
+  constructor(
+    private readonly uploads: DocumentUploadService,
+    private readonly documents: DocumentsService,
+  ) {}
 
   /**
    * Pede a URL temporária para enviar um documento do paciente (RFDOC001).
@@ -98,5 +104,61 @@ export class PatientDocumentsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<CreateUploadUrlResponseDto> {
     return this.uploads.createUploadUrl(account, patientId, body);
+  }
+
+  /**
+   * Confirma o documento depois do envio (RFDOC002): grava os metadados e
+   * ativa o objeto. Repetir a `fileKey` devolve o documento já criado.
+   *
+   * @param patientId paciente dono do documento
+   * @param body `fileKey` e metadados
+   * @returns o documento confirmado
+   */
+  @Post('patients/:id/documents')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiCreatedResponse({ type: DocumentResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      VALIDATION_ERROR: {
+        summary: 'VALIDATION_ERROR',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Informe o título.',
+        },
+      },
+      UPLOAD_NOT_FOUND: {
+        summary: 'UPLOAD_NOT_FOUND',
+        value: {
+          status: 'UPLOAD_NOT_FOUND',
+          message:
+            'O arquivo não foi encontrado no storage. Envie-o novamente.',
+        },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Você não tem acesso aos documentos deste paciente.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    },
+  })
+  async confirmDocument(
+    @Param('id', parsePatientId) patientId: string,
+    @Body() body: ConfirmDocumentRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<DocumentResponseDto> {
+    return this.documents.confirm(account, patientId, body);
   }
 }

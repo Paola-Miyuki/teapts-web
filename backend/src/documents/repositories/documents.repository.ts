@@ -2,7 +2,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { type EntityManager, Repository } from 'typeorm';
 import { DocumentEntity } from '../entities/document.entity';
 
 /** Campos que o chamador informa ao criar um documento. */
@@ -30,10 +30,15 @@ export class DocumentsRepository {
     private readonly documents: Repository<DocumentEntity>,
   ) {}
 
-  /** Grava o documento; campos opcionais ausentes viram `null`. */
-  create(data: NewDocument): Promise<DocumentEntity> {
-    return this.documents.save(
-      this.documents.create({
+  /**
+   * Grava o documento; campos opcionais ausentes viram `null`. Com `manager`,
+   * grava na transação dele.
+   */
+  create(data: NewDocument, manager?: EntityManager): Promise<DocumentEntity> {
+    const documents = manager?.getRepository(DocumentEntity) ?? this.documents;
+
+    return documents.save(
+      documents.create({
         description: null,
         issueDate: null,
         issuerAccountId: null,
