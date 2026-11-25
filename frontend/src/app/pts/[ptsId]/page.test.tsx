@@ -489,7 +489,7 @@ describe('PtsDetail', () => {
 
     render(<PtsDetailPage id="pts-1" />);
 
-    expect(await screen.findByText('Concluído em')).toBeInTheDocument();
+    expect(await screen.findByText('Encerrado em')).toBeInTheDocument();
     expect(screen.getByText('30/05/2026')).toBeInTheDocument();
   });
 
