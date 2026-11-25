@@ -434,6 +434,31 @@ describe('can', () => {
     });
   });
 
+  describe('atendimentos (RFACT006 e RFACT007)', () => {
+    it('abre a lista de atendimentos à equipe e ao admin', () => {
+      expect(can(professional, 'viewAppointments')).toBe(true);
+      expect(can(admin, 'viewAppointments')).toBe(true);
+      expect(can(patient, 'viewAppointments')).toBe(false);
+      expect(can(waiting, 'viewAppointments')).toBe(false);
+    });
+
+    it('deixa só o profissional autor retificar', () => {
+      const own = { appointment: { author: { id: 'professional-id' } } };
+      const other = { appointment: { author: { id: 'responsible-id' } } };
+
+      expect(can(professional, 'rectifyAppointment', own)).toBe(true);
+      expect(can(professional, 'rectifyAppointment', other)).toBe(false);
+      expect(
+        can(professional, 'rectifyAppointment', {
+          appointment: { author: null },
+        }),
+      ).toBe(false);
+      expect(can(professional, 'rectifyAppointment')).toBe(false);
+      expect(can(admin, 'rectifyAppointment', own)).toBe(false);
+      expect(can(patient, 'rectifyAppointment', own)).toBe(false);
+    });
+  });
+
   describe('archiveActivity (RFACT008)', () => {
     const pts = { ...draft, status: 'running' };
     const activity = (status: string) => ({
