@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import PtsHistoryTab from '@/components/pts/PtsHistoryTab';
+import PatientProposals from '@/app/pts/proposals/_components/PatientProposals';
 import ui from '@/components/ui.module.css';
 import type { Account } from '@/lib/account';
 
@@ -52,7 +53,23 @@ function PatientPtsTabs({
   account: Account;
   patientId: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<'atual' | 'historico'>('atual');
+  const [activeTab, setActiveTab] = useState<
+    'atual' | 'propostas' | 'historico'
+  >('atual');
+
+  // Links de fora (ex.: "Ver propostas de PTS") abrem a aba por `/pts#propostas`.
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === '#propostas') {
+        setActiveTab('propostas');
+      }
+    };
+
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, []);
 
   return (
     <>
@@ -78,6 +95,16 @@ function PatientPtsTabs({
           Meu PTS
         </a>
         <a
+          href="#propostas"
+          aria-current={activeTab === 'propostas' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('propostas');
+          }}
+        >
+          Propostas de PTS
+        </a>
+        <a
           href="#historico-pts"
           aria-current={activeTab === 'historico' ? 'page' : undefined}
           onClick={(event) => {
@@ -95,6 +122,8 @@ function PatientPtsTabs({
           account={account}
           patientId={patientId}
         />
+      ) : activeTab === 'propostas' ? (
+        <PatientProposals />
       ) : patientId ? (
         <PtsHistoryTab patientId={patientId} />
       ) : null}

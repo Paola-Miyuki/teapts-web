@@ -1,4 +1,10 @@
-﻿import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+﻿import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 
 import MedicationsCard from './MedicationsCard';
@@ -361,5 +367,47 @@ describe('MedicationsCard', () => {
         name: 'Adicionar medicação',
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it('filtra as medicações pelas abas Todas, Em uso e Suspensas', async () => {
+    const stopped = {
+      ...MEDICATION,
+      id: 'medication-2',
+      drugName: 'Melatonina',
+      endDate: '2026-12-01',
+    };
+
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(respond(200, { data: [MEDICATION, stopped] }));
+
+    render(<MedicationsCard patientId="patient-1" canEdit={false} />);
+
+    await screen.findByText('Risperidona');
+
+    const tabs = screen.getByRole('navigation', {
+      name: 'Situação das medicações',
+    });
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(tabs).getByText('Todas')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByText('Melatonina')).toBeInTheDocument();
+
+    fireEvent.click(within(tabs).getByText('Em uso'));
+
+    expect(screen.getByText('Risperidona')).toBeInTheDocument();
+    expect(screen.queryByText('Melatonina')).not.toBeInTheDocument();
+    expect(within(tabs).getByText('Em uso')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    fireEvent.click(within(tabs).getByText('Suspensas'));
+
+    expect(screen.queryByText('Risperidona')).not.toBeInTheDocument();
+    expect(screen.getByText('Melatonina')).toBeInTheDocument();
   });
 });

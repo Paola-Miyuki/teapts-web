@@ -17,7 +17,7 @@ src/
   app/            rotas; `_components/` guarda os componentes de cada tela
     login/ signup/ home/ profile/ accounts/ professionals/ medications/
     patients/     lista e [patientId]/ (+ pts/, documents/new/)
-    pts/          Meu PTS, [ptsId]/ (+ edit/), novo/, proposals/ ([proposalId]/edit/)
+    pts/          /pts do paciente (abas Meu PTS, Propostas de PTS e Histórico de PTS), [ptsId]/ (+ edit/), novo/, proposals/ ([proposalId]/edit/)
   components/     AppShell, AuthenticatedPage, Modal, ... (+ pts/, table/)
   hooks/  lib/    lib: clientes da API, permissions.ts, supertokens.ts
   styles/         cópias de design/assets/
@@ -38,14 +38,14 @@ Toda tela autenticada usa `AuthenticatedPage`: sem sessão vai para `/login`; se
 | `/patients/:id`             | Dados, Medicações e contatos de suporte                                                                   | admin e profissional com acesso                | `paciente`                                       |
 | `/patients/:id/pts`         | PTS ativo do paciente                                                                                     | equipe e admin                                 | `pts-detalhe`                                    |
 | `/patients/:id/documents/new` | Enviar documento: arquivo (PDF, PNG, JPG, DOC, DOCX; até 5 MB) com progresso e dados (título, categoria, data de emissão, emissor, descrição); "Enviar documento" confirma e volta ao paciente (ao início, para o paciente); só o admin escolhe emissor "Profissional" | admin, profissional com PTS ativo e o próprio paciente | `enviar-documento` |
-| `/medications`              | Minhas medicações                                                                                         | paciente                                       | `paciente`                                       |
+| `/medications`              | Minhas medicações, em abas Todas, Em uso e Suspensas                                                      | paciente                                       | `paciente`                                       |
 | `/professionals`            | Profissionais (botão "Adicionar profissional" e ações "Editar especialidade" e "Desativar" só para o admin)| admin e profissional                           | `profissionais`                                  |
 | `/professionals/new`        | Adicionar profissional: conta sem perfil, profissão (20), registro, instituição e CNES                    | admin                                          | `criar-profissional`                             |
-| `/pts`                      | Meu PTS: PTS ativo, equipe e Timeline                                                                     | paciente titular e equipe                      | `pts`                                            |
+| `/pts`                      | PTS do paciente, em abas: Meu PTS (PTS ativo, equipe e Timeline), Propostas de PTS e Histórico de PTS               | paciente titular e equipe                      | `pts`                                            |
 | `/pts/:id`                  | Detalhe: Visão geral (ficha), Equipe e Timeline; "Iniciar execução" em planejamento (responsável e admin) | admin, equipe e paciente titular (sem a ficha) | `pts-detalhe`, `pts`                             |
 | `/pts/:id/edit`             | Editar PTS em 3 passos                                                                                    | equipe e admin, PTS ativo                      | `editar-pts`                                     |
 | `/pts/novo`                 | Criar proposta                                                                                            | profissional e admin                           | `criar-pts`                                      |
-| `/pts/proposals`            | Propostas                                                                                                 | paciente, profissional da proposta e admin     | `propostas-pts`                                  |
+| `/pts/proposals`            | Propostas (tabela; o paciente decide na aba de `/pts`, que `/pts/proposals` abre por redirect)             | paciente, profissional da proposta e admin     | `propostas-pts`                                  |
 | `/pts/proposals/:id/edit`   | Editar proposta                                                                                           | responsável ou admin, `draft`                  | `editar-proposta`                                |
 
 ## Convenções

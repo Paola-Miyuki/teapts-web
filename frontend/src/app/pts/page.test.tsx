@@ -180,7 +180,7 @@ describe('PtsOverview', () => {
     expect(await screen.findByText('Nenhum PTS ativo')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Ver propostas de PTS' }),
-    ).toHaveAttribute('href', '/pts/proposals');
+    ).toHaveAttribute('href', '/pts#propostas');
   });
 
   it('não mostra o link das propostas no 404 para o profissional', async () => {

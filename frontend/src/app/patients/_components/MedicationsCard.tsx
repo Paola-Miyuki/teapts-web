@@ -35,6 +35,12 @@ type Editor = { kind: 'add' } | { kind: 'edit'; medication: Medication } | null;
 
 type Filter = 'active' | 'stopped' | 'all';
 
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Todas' },
+  { value: 'active', label: 'Em uso' },
+  { value: 'stopped', label: 'Suspensas' },
+];
+
 const EMPTY_FORM: MedicationForm = {
   drugName: '',
   dose: '',
@@ -329,19 +335,21 @@ export default function MedicationsCard({
         </div>
       ) : (
         <>
-          <div className={styles.field}>
-            <label htmlFor="medication-filter">Mostrar</label>
-            <select
-              id="medication-filter"
-              className={ui.input}
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as Filter)}
-            >
-              <option value="all">Todas</option>
-              <option value="active">Em uso</option>
-              <option value="stopped">Suspensas</option>
-            </select>
-          </div>
+          <nav className="tabs ux-ptabs" aria-label="Situação das medicações">
+            {FILTERS.map(({ value, label }) => (
+              <a
+                key={value}
+                href={`#${value}`}
+                aria-current={filter === value ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setFilter(value);
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
 
           {visibleMedications.length === 0 ? (
             <p className="hint">Nenhuma medicação encontrada.</p>

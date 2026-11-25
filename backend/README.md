@@ -10,7 +10,7 @@ Da raiz: `pnpm --dir backend run <script>`.
 | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `start:dev` / `build` / `start:prod`                       | API em watch (porta `PORT`, padrão 3000) / compila / roda o `dist/`      |
 | `migration:show` / `run` / `revert` / `generate <caminho>` | lista / aplica / desfaz a última / gera a partir das entidades           |
-| `seed:test-user`                                           | contas e PTS de teste (precisa do SuperTokens no ar)                     |
+| `seed:test-user`                                           | contas, PTS, medicações e documentos de teste (precisa do SuperTokens no ar) |
 | `test` / `test:cov` / `test:e2e`                           | unitários / cobertura / e2e (sem banco nem SuperTokens: ambos são mocks) |
 | `lint` / `typecheck` / `format`                            | ESLint / `tsc --noEmit` / Prettier                                       |
 
@@ -120,7 +120,9 @@ Nunca edite migration já aplicada. No Docker, migration nova só vale depois do
 | Diego Alves       | `cancelled`                              | Profissional de Teste | —                     |
 | Diego Alves       | `planning`                               | Beatriz Lopes         | Profissional de Teste |
 
-O seed não cria medicações, contatos de suporte, dados clínicos nem eventos de timeline.
+**Medicações e documentos:** o paciente de teste, Luna e Diego recebem medicações (ativas e suspensas) e documentos em PDF (laudo, exame, relatório, TCLE, autorização de imagem), já ativos no storage. Cada paciente só os recebe se ainda não tiver medicação ou se o documento (`file_key` `<patientId>/seed-<nome>.pdf`) ainda não existir, então o seed pode rodar de novo.
+
+O seed não cria contatos de suporte, dados clínicos nem eventos de timeline.
 
 Para testar "Iniciar execução", use o PTS em `planning` do Diego Alves, com a Beatriz Lopes (responsável) ou o admin. Depois de iniciado ele fica em `running`, e o seed não o volta para `planning`.
 
