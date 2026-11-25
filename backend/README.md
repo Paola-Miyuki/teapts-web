@@ -26,7 +26,7 @@ Cada módulo separa `controllers/`, `services/` e `repositories/` (mais `dto/`, 
 src/
   common/       pagination, search, swagger, validation
   auth/         guards, SuperTokens, /me, signup e login
-  accounts/     patients/     professionals/     pts/     timeline/     health/
+  accounts/     activities/   patients/     professionals/     pts/     timeline/     health/
   notifications/ rotina diária do aviso da janela de reavaliação (RFNOT001, 06:00 de Brasília)
   documents/    URL de envio, confirmação do documento, DocumentTimelineService
   storage/      StorageService, driver PostgresStorage, token HMAC
@@ -68,6 +68,8 @@ Todas exigem sessão, exceto `GET /health` e `/auth/signup|signin|session/refres
 | `PATCH /pts/:id/sheet`                                                                       | equipe ou admin, PTS ativo; grava `pts_updated` na timeline                                                                                                                                                                                                                                                                                                     |
 | `POST /pts/:id/start`                                                                        | responsável ou admin, PTS em `planning`; passa para `running`, grava `began_at` e `pts_started` na timeline (`409 PTS_NOT_PLANNING` fora disso)                                                                                                                                                                                                                 |
 | `POST /pts/:id/team`, `DELETE …/team/:professionalId`, `POST …/team/transfer-responsibility` | responsável ou admin, PTS ativo                                                                                                                                                                                                                                                                                                                                 |
+| `GET /pts/:id/activities`                                                                    | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                                                                                                                                                                                                                                         |
+| `POST /pts/:id/activities`                                                                   | equipe ou admin, PTS em `draft`, `planning` ou `running`; nasce `suggested` e grava `activity_suggested` na timeline (`422 INVALID_FREQUENCY`)                                                                                                                                                                                                                  |
 | `GET /pts/:id/goals`                                                                         | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                                                                                                                                                                                                                                         |
 | `POST /pts/:id/goals`, `PATCH, DELETE …/goals/:goalId`                                       | equipe ou admin, PTS em `draft`, `planning` ou `running`; grava `goal_added`, `goal_updated` e `goal_removed` na timeline (`409 LAST_GOAL`, `409 GOAL_HAS_ACTIVITIES` na exclusão)                                                                                                                                                                              |
 | `GET /pts/:id/timeline`                                                                      | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                                                                                                                                                                                                                                         |
@@ -125,7 +127,7 @@ Nunca edite migration já aplicada. No Docker, migration nova só vale depois do
 
 **Medicações e documentos:** o paciente de teste, Luna e Diego recebem medicações (ativas e suspensas) e documentos em PDF (laudo, exame, relatório, TCLE, autorização de imagem), já ativos no storage. Cada paciente só os recebe se ainda não tiver medicação ou se o documento (`file_key` `<patientId>/seed-<nome>.pdf`) ainda não existir, então o seed pode rodar de novo.
 
-O seed não cria contatos de suporte, dados clínicos nem eventos de timeline.
+O seed não cria contatos de suporte, dados clínicos, metas, atividades nem eventos de timeline.
 
 Para testar "Iniciar execução", use o PTS em `planning` do Diego Alves, com a Beatriz Lopes (responsável) ou o admin. Depois de iniciado ele fica em `running`, e o seed não o volta para `planning`.
 

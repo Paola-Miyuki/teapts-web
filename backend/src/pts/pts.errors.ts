@@ -233,7 +233,7 @@ export const ptsNotEditable = () =>
   new PtsApiError(
     HttpStatus.CONFLICT,
     'PTS_NOT_EDITABLE',
-    'As metas só mudam com o PTS em proposta, em planejamento ou em andamento.',
+    'O PTS só pode ser alterado em proposta, em planejamento ou em andamento.',
   );
 
 export const lastGoal = () =>

@@ -42,6 +42,7 @@ function setup({
   } as Partial<PtsEntity> | null,
   goal = goalRow() as unknown,
   total = 2,
+  activities = [] as { goalId: string }[],
 } = {}) {
   const query = {
     setLock: jest.fn(),
@@ -58,13 +59,14 @@ function setup({
     softDelete: jest.fn(async () => ({ affected: 1 })),
     findOne: jest.fn(async () => goal),
     count: jest.fn(async () => total),
+    find: jest.fn(async () => activities),
   };
   const dataSource = {
     transaction: (run: (m: EntityManager) => Promise<unknown>) =>
       run(manager as unknown as EntityManager),
   };
   const recorder = { record: jest.fn(async () => undefined) };
-  const goals = { find: jest.fn(async () => [goal]) };
+  const goals = { find: jest.fn(async () => [goal]), manager };
   const repository = new PtsGoalsRepositoryImpl(
     dataSource as unknown as DataSource,
     goals as unknown as Repository<PtsGoalEntity>,
@@ -97,6 +99,23 @@ describe('PtsGoalsRepositoryImpl', () => {
       registeredBy: { id: 'prof-2', name: 'João Lima' },
       createdAt: '2026-11-25T12:00:00.000Z',
     });
+  });
+
+  it('conta as atividades ligadas e recusa excluir a meta (GOAL_HAS_ACTIVITIES)', async () => {
+    const { repository, manager } = setup({
+      activities: [{ goalId: 'goal-1' }, { goalId: 'goal-1' }],
+    });
+
+    const [goal] = await repository.findByPts('pts-1');
+    expect(goal.activitiesCount).toBe(2);
+
+    await expectApiError(
+      () =>
+        repository.remove({ ptsId: 'pts-1', goalId: 'goal-1', ...executor }),
+      409,
+      'GOAL_HAS_ACTIVITIES',
+    );
+    expect(manager.softDelete).not.toHaveBeenCalled();
   });
 
   it('sem profissional atribuído, a meta é da conta que registrou (RN029)', async () => {
