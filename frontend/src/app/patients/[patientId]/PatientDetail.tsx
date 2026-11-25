@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
+import MedicationsTable from '@/components/medications/MedicationsTable';
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
@@ -22,7 +23,6 @@ import DeletePatientDialog from '../_components/DeletePatientDialog';
 import DiagnosisCard from '../_components/DiagnosisCard';
 import DocumentsTab from '../_components/DocumentsTab';
 import PersonalDataCard from '../_components/PersonalDataCard';
-import MedicationsCard from '../_components/MedicationsCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import TermsTab from '../_components/TermsTab';
 import styles from '../patients.module.css';
@@ -335,8 +335,10 @@ function PatientDetailContent({
 
       {activeTab === 'medicacoes' && (
         <section data-panel="medicacoes" id="medicacoes">
-          <MedicationsCard
+          <MedicationsTable
+            title="Medicações"
             patientId={patient.id}
+            patientName={patient.name}
             canEdit={can(account, 'manageMedications', {
               patientReadOnly: patient.readOnly,
             })}

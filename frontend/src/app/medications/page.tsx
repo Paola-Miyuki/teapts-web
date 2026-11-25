@@ -2,7 +2,7 @@
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 
-import PatientMedications from './_components/PatientMedications';
+import MedicationsTable from '@/components/medications/MedicationsTable';
 
 // "Medicações" de `minhas-medicacoes.html` (RFPAC007): o paciente consulta as
 // próprias medicações, só para leitura.
@@ -22,7 +22,7 @@ export default function MedicationsPage() {
               </div>
             </div>
 
-            <PatientMedications patientId={account.patientProfileId} />
+            <MedicationsTable patientId={account.patientProfileId} />
           </>
         ) : (
           <p>Perfil de paciente não encontrado</p>
