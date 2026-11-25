@@ -38,6 +38,8 @@ export type PermissionAction =
   | 'resumeActivity'
   | 'concludeActivity'
   | 'registerAppointment'
+  | 'viewAppointments'
+  | 'rectifyAppointment'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -63,9 +65,14 @@ export type ActivityPermissionData = {
   authorProfessionalId: string | null;
 };
 
+export type AppointmentPermissionData = {
+  author: { id: string } | null;
+};
+
 export type PermissionContext = {
   pts?: PtsPermissionData;
   activity?: ActivityPermissionData;
+  appointment?: AppointmentPermissionData;
   // O profissional só tem PTS encerrado com o paciente (`readOnly` da API).
   patientReadOnly?: boolean;
 };
@@ -189,6 +196,9 @@ export function can(
         return isEditablePts(pts) && allowsTransition(action, activity);
       case 'registerAppointment':
         return !pts || (isActivePts(pts) && activity?.status === 'running');
+      case 'rectifyAppointment':
+        // RFACT007 – só o autor retifica; o admin não é autor.
+        return false;
       default:
         return true;
     }
@@ -355,6 +365,20 @@ export function can(
           (isActivePts(pts) &&
             isProposalMember(user, pts) &&
             activity?.status === 'running'))
+      );
+
+    case 'viewAppointments':
+      // RFACT006 – profissional (a API filtra os PTS da equipe, RN016); o
+      // paciente vê os próprios em /my-appointments.
+      return professional;
+
+    case 'rectifyAppointment':
+      // RFACT007 – só o profissional autor do atendimento.
+      return (
+        professional &&
+        user.professionalProfileIds.includes(
+          context.appointment?.author?.id ?? '',
+        )
       );
 
     case 'removePtsTeamMember':

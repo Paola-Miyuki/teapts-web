@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import AppointmentsTable from '@/components/appointments/AppointmentsTable';
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import MedicationsTable from '@/components/medications/MedicationsTable';
 import Icon from '@/components/Icon';
@@ -60,7 +61,12 @@ function PatientDetailContent({
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'dados' | 'historico' | 'medicacoes' | 'documentos' | 'termos'
+    | 'dados'
+    | 'historico'
+    | 'atendimentos'
+    | 'medicacoes'
+    | 'documentos'
+    | 'termos'
   >('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -175,6 +181,17 @@ function PatientDetailContent({
           }}
         >
           Histórico de PTS
+        </a>
+
+        <a
+          href="#atendimentos"
+          aria-current={activeTab === 'atendimentos' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('atendimentos');
+          }}
+        >
+          Atendimentos
         </a>
 
         <a
@@ -373,6 +390,17 @@ function PatientDetailContent({
             canUpload={canUpload}
             canEditDocuments={canEditDocuments}
             canDeleteDocuments={canDeleteDocuments}
+          />
+        </section>
+      )}
+
+      {activeTab === 'atendimentos' && (
+        <section data-panel="atendimentos" id="atendimentos">
+          <AppointmentsTable
+            id="patient-appointments"
+            title="Atendimentos"
+            account={account}
+            scope={{ patientId: patient.id }}
           />
         </section>
       )}

@@ -93,6 +93,9 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/activities/{id}/suspend', 'post'],
   ['/activities/{id}/resume', 'post'],
   ['/activities/{id}/conclude', 'post'],
+  ['/appointments', 'get'],
+  ['/appointments/{id}', 'get'],
+  ['/appointments/{id}/rectify', 'post'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -282,6 +285,7 @@ describe('Swagger (e2e)', () => {
         '/pts/{id}/goals',
         '/pts/{id}/activities',
         '/activities/{id}/appointments',
+        '/appointments/{id}/rectify',
         '/patients/{id}/documents/upload-url',
       ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
@@ -377,6 +381,15 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}/appointments', 'post', '403'],
     ['/activities/{id}/appointments', 'post', '404'],
     ['/activities/{id}/appointments', 'post', '409'],
+    ['/appointments', 'get', '400'],
+    ['/appointments', 'get', '403'],
+    ['/appointments', 'get', '404'],
+    ['/appointments/{id}', 'get', '400'],
+    ['/appointments/{id}', 'get', '403'],
+    ['/appointments/{id}', 'get', '404'],
+    ['/appointments/{id}/rectify', 'post', '400'],
+    ['/appointments/{id}/rectify', 'post', '403'],
+    ['/appointments/{id}/rectify', 'post', '404'],
     ['/activities/{id}/archive', 'post', '400'],
     ['/activities/{id}/archive', 'post', '403'],
     ['/activities/{id}/archive', 'post', '404'],
@@ -943,6 +956,66 @@ describe('Swagger (e2e)', () => {
     for (const [name, property] of Object.entries(properties)) {
       expect([name, property.description]).toEqual([name, expect.any(String)]);
     }
+  });
+
+  it('documents GET /appointments and GET /appointments/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const list = paths['/appointments'].get;
+    const details = paths['/appointments/{id}'].get;
+    const names = (list.parameters ?? []).map(({ name }) => name);
+
+    expect(responseSchema(list, '200')?.$ref).toBe(
+      '#/components/schemas/AppointmentListResponseDto',
+    );
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'patientId',
+        'ptsId',
+        'activityId',
+        'attendance',
+        'specialism',
+        'modality',
+        'from',
+        'to',
+        'page',
+        'limit',
+      ]),
+    );
+    expect(responseSchema(details, '200')?.$ref).toBe(
+      '#/components/schemas/AppointmentDetailsResponseDto',
+    );
+    expect(components.schemas.AppointmentDetailsResponseDto.required).toEqual(
+      expect.arrayContaining(['rectified', 'rectifications', 'registeredBy']),
+    );
+    expect(
+      Object.keys(
+        details.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['APPOINTMENT_NOT_FOUND', 'PTS_NOT_FOUND']);
+  });
+
+  it('documents POST /appointments/{id}/rectify', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/appointments/{id}/rectify'];
+    const examples = (status: string) =>
+      Object.keys(
+        post.responses[status]?.content?.['application/json']?.examples ?? {},
+      );
+
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/RectifyAppointmentResponseDto',
+    );
+    expect(components.schemas.RectifyAppointmentRequestDto.required).toEqual(
+      expect.arrayContaining(['reason', 'appointmentDate', 'attendance']),
+    );
+    expect(components.schemas.RectifyAppointmentResponseDto.required).toEqual([
+      'id',
+      'rectifiesAppointmentId',
+      'createdAt',
+    ]);
+    expect(examples('400')).toEqual(['REASON', 'INVALID_ID']);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['APPOINTMENT_NOT_FOUND', 'PTS_NOT_FOUND']);
   });
 
   it('documents POST /activities/{id}/archive', async () => {

@@ -41,7 +41,7 @@ describe('getNavigation', () => {
   it('mostra profissionais e PTS no menu do profissional', () => {
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes', 'Atendimentos']);
   });
 
   it('mantém os itens compartilhados no menu do admin', () => {
@@ -51,6 +51,7 @@ describe('getNavigation', () => {
       'Profissionais',
       'PTS',
       'Pacientes',
+      'Atendimentos',
     ]);
   });
 
@@ -119,15 +120,17 @@ describe('getNavigation', () => {
       'Profissionais',
       'PTS',
       'Pacientes',
+      'Atendimentos',
     ]);
 
     expect(
       labels(account({ professionalProfileIds: ['professional'] })),
-    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes']);
+    ).toEqual(['Início', 'Profissionais', 'PTS', 'Pacientes', 'Atendimentos']);
 
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Início',
       'PTS',
+      'Atendimentos',
       'Medicações',
       'Documentos',
     ]);

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import AppointmentsTable from '@/components/appointments/AppointmentsTable';
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import PtsStatusBadge from '@/components/table/PtsStatusBadge';
@@ -43,7 +44,8 @@ import StartPtsDialog from '../_components/StartPtsDialog';
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 const ALL_STATUSES: ActivityStatus[] = [];
 
-type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
+type Tab =
+  'visao' | 'metas' | 'equipe' | 'atividades' | 'atendimentos' | 'timeline';
 
 // Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
 function currentHash() {
@@ -184,8 +186,8 @@ function PtsDetailContent({
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient
-      ? ['metas', 'equipe', 'atividades', 'timeline']
-      : ['visao', 'metas', 'equipe', 'atividades', 'timeline'],
+      ? ['metas', 'equipe', 'atividades', 'atendimentos', 'timeline']
+      : ['visao', 'metas', 'equipe', 'atividades', 'atendimentos', 'timeline'],
   );
 
   const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
@@ -509,6 +511,16 @@ function PtsDetailContent({
           )}
         </a>
         <a
+          href="#atendimentos"
+          aria-current={tab === 'atendimentos' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setTab('atendimentos');
+          }}
+        >
+          Atendimentos
+        </a>
+        <a
           href="#timeline"
           aria-current={tab === 'timeline' ? 'page' : undefined}
           onClick={(event) => {
@@ -532,6 +544,15 @@ function PtsDetailContent({
               name,
             }))}
             isPatient={isPatient}
+          />
+        </section>
+      ) : tab === 'atendimentos' ? (
+        <section data-panel="atendimentos" id="atendimentos">
+          <AppointmentsTable
+            id="pts-appointments"
+            title="Atendimentos"
+            account={account}
+            scope={{ ptsId: pts.id }}
           />
         </section>
       ) : tab === 'atividades' ? (
