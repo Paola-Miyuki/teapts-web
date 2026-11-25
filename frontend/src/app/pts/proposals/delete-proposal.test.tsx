@@ -70,6 +70,9 @@ function mockApi(
     const url = new URL(String(input));
 
     if (url.pathname === '/me') return json(200, me);
+    if (url.pathname === '/notifications/unread-count') {
+      return json(200, { unreadCount: 0 });
+    }
     if (init?.method === 'DELETE') return json(remove.status, remove.body);
 
     const data = lists[Math.min(call++, lists.length - 1)];
