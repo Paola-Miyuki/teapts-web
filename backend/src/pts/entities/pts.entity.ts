@@ -123,6 +123,13 @@ export class PtsEntity {
   @Column({ name: 'closed_by_account_id', type: 'uuid', nullable: true })
   closedByAccountId: string | null;
 
+  // Data do encontro de reavaliação (RFEVA005); volta como 'yyyy-mm-dd'.
+  @Column({ name: 'reassessed_at', type: 'date', nullable: true })
+  reassessedAt: string | null;
+
+  @Column({ name: 'reassessed_by_account_id', type: 'uuid', nullable: true })
+  reassessedByAccountId: string | null;
+
   // Versão do paciente (1, 2, 3…); toda criação usa nextPtsVersion.
   @Column({ type: 'integer', default: 1 })
   version: number;
