@@ -136,3 +136,52 @@ describe('DocumentAccessService.assertAccess', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
+
+describe('DocumentAccessService.assertTeamRead', () => {
+  it('lets the admin and a linked professional read', async () => {
+    const { repository, service } = createService();
+    repository.findPatient.mockResolvedValue(linked(true));
+
+    await expect(
+      service.assertTeamRead(account({ role: AccountRole.Admin }), patientId),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertTeamRead(
+        account({ professionalProfileIds: ['pro-1'] }),
+        patientId,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('blocks the patient, even for their own id (RN028)', async () => {
+    const { repository, service } = createService();
+
+    const error: unknown = await service
+      .assertTeamRead(account({ patientProfileId: patientId }), patientId)
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect((error as ForbiddenException).getResponse()).toMatchObject({
+      status: 'FORBIDDEN',
+    });
+    expect(repository.patientExists).not.toHaveBeenCalled();
+  });
+
+  it('blocks a professional without a link and returns 404 for an unknown patient', async () => {
+    const { repository, service } = createService();
+    repository.findPatient.mockResolvedValue(null);
+
+    await expect(
+      service.assertTeamRead(
+        account({ professionalProfileIds: ['pro-1'] }),
+        patientId,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    repository.patientExists.mockResolvedValue(false);
+
+    await expect(
+      service.assertTeamRead(account({ role: AccountRole.Admin }), patientId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

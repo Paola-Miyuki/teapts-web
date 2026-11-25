@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
+import { documentForbidden } from '../documents.errors';
 import { PatientsRepository } from '../../patients/repositories/patients.repository';
 
 @Injectable()
@@ -57,5 +58,24 @@ export class DocumentAccessService {
     if (!row || (mode === 'write' && row.read_only)) {
       throw forbidden();
     }
+  }
+
+  /**
+   * Confere o acesso da equipe (admin ou profissional vinculado) à consulta
+   * dos documentos: o paciente, inclusive o titular, não consulta (RN028).
+   *
+   * @throws ForbiddenException `FORBIDDEN` para o paciente e para quem não
+   *   tem vínculo
+   * @throws NotFoundException `PATIENT_NOT_FOUND` quando o paciente não existe
+   */
+  async assertTeamRead(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<void> {
+    if (!isAdmin(account) && account.patientProfileId !== null) {
+      throw documentForbidden();
+    }
+
+    await this.assertAccess(account, patientId, 'read');
   }
 }

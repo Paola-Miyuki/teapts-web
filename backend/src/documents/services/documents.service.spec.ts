@@ -8,7 +8,10 @@ import type { StorageService } from '../../storage/storage.service';
 import type { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
 import type { DocumentEntity } from '../entities/document.entity';
 import { DocumentCategory } from '../enums/document-category.enum';
-import type { DocumentsRepository } from '../repositories/documents.repository';
+import type {
+  DocumentListRow,
+  DocumentsRepository,
+} from '../repositories/documents.repository';
 import type { DocumentAccessService } from './document-access.service';
 import type { DocumentTimelineService } from './document-timeline.service';
 import { DocumentsService } from './documents.service';
@@ -62,10 +65,12 @@ function createService() {
   };
   const access = {
     assertAccess: jest.fn<DocumentAccessService['assertAccess']>(),
+    assertTeamRead: jest.fn<DocumentAccessService['assertTeamRead']>(),
   };
   const documents = {
     findByFileKey: jest.fn<DocumentsRepository['findByFileKey']>(),
     create: jest.fn<DocumentsRepository['create']>(),
+    findPage: jest.fn<DocumentsRepository['findPage']>(),
   };
   const storage = {
     headObject: jest.fn<StorageService['headObject']>(),
@@ -76,6 +81,7 @@ function createService() {
   };
 
   access.assertAccess.mockResolvedValue();
+  access.assertTeamRead.mockResolvedValue();
   documents.findByFileKey.mockResolvedValue(null);
   documents.create.mockResolvedValue(stored);
   storage.headObject.mockResolvedValue({
@@ -295,5 +301,111 @@ describe('DocumentsService.confirm', () => {
     await expect(
       ctx.service.confirm(account, patientId, request),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('DocumentsService.list', () => {
+  const row: DocumentListRow = {
+    id: 'doc-1',
+    title: 'Laudo neurológico',
+    category: DocumentCategory.MEDICAL_REPORT,
+    mime_type: 'application/pdf',
+    size_bytes: 1024,
+    created_at: new Date('2026-12-01T12:00:00.000Z'),
+    uploader_id: 'account-9',
+    uploader_name: 'Ana Souza',
+    uploaded_by_patient: false,
+    issuer_account_name: null,
+    issuer_specialism: null,
+    issuer_institution: null,
+    issuer_name: null,
+  };
+  const query = { page: 2, limit: 10 };
+
+  it('checks the team access and returns the page with the pagination', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({ rows: [row], total: 11 });
+
+    const result = await ctx.service.list(account, patientId, query);
+
+    expect(ctx.access.assertTeamRead).toHaveBeenCalledWith(account, patientId);
+    expect(ctx.documents.findPage).toHaveBeenCalledWith(patientId, query);
+    expect(result).toEqual({
+      data: [
+        {
+          id: 'doc-1',
+          title: 'Laudo neurológico',
+          category: 'medical_report',
+          issuer: null,
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          uploadedBy: { id: 'account-9', name: 'Ana Souza', isPatient: false },
+          createdAt: '2026-12-01T12:00:00.000Z',
+        },
+      ],
+      pagination: { page: 2, limit: 10, total: 11, totalPages: 2 },
+    });
+  });
+
+  it('shows a system professional as issuer, with the specialism and institution', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({
+      rows: [
+        {
+          ...row,
+          issuer_account_name: 'Dra. Marta Reis',
+          issuer_specialism: 'neurologist',
+          issuer_institution: 'IMA',
+        },
+        {
+          ...row,
+          issuer_account_name: 'Dr. João',
+          issuer_specialism: 'doctor',
+        },
+      ],
+      total: 2,
+    });
+
+    const { data } = await ctx.service.list(account, patientId, query);
+
+    expect(data[0].issuer).toEqual({
+      name: 'Dra. Marta Reis',
+      specialism: 'neurologist',
+      institution: 'IMA',
+      outsideSystem: false,
+    });
+    expect(data[1].issuer).toEqual({
+      name: 'Dr. João',
+      specialism: 'doctor',
+      outsideSystem: false,
+    });
+  });
+
+  it('shows the free-text issuer as outside the system and flags the patient upload', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({
+      rows: [
+        { ...row, issuer_name: 'Dra. Marta Reis', uploaded_by_patient: true },
+      ],
+      total: 1,
+    });
+
+    const { data } = await ctx.service.list(account, patientId, query);
+
+    expect(data[0].issuer).toEqual({
+      name: 'Dra. Marta Reis',
+      outsideSystem: true,
+    });
+    expect(data[0].uploadedBy.isPatient).toBe(true);
+  });
+
+  it('does not query when the access is denied', async () => {
+    const ctx = createService();
+    ctx.access.assertTeamRead.mockRejectedValue(new ForbiddenException());
+
+    await expect(
+      ctx.service.list(account, patientId, query),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ctx.documents.findPage).not.toHaveBeenCalled();
   });
 });

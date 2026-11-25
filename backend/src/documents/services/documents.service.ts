@@ -10,14 +10,23 @@ import type { AccountContext } from '../../accounts/services/accounts.service';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { StorageService } from '../../storage/storage.service';
 import type { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
+import { toPagination } from '../../common/pagination/pagination';
+import type {
+  DocumentListItemResponseDto,
+  DocumentListResponseDto,
+} from '../dto/document-list-response.dto';
 import type { DocumentResponseDto } from '../dto/document-response.dto';
+import type { GetDocumentsQueryDto } from '../dto/get-documents-query.dto';
 import type { DocumentEntity } from '../entities/document.entity';
 import {
   documentForbidden,
   invalidIssuerAccount,
   uploadNotFound,
 } from '../documents.errors';
-import { DocumentsRepository } from '../repositories/documents.repository';
+import {
+  DocumentsRepository,
+  type DocumentListRow,
+} from '../repositories/documents.repository';
 import { DocumentAccessService } from './document-access.service';
 import { DocumentTimelineService } from './document-timeline.service';
 
@@ -37,6 +46,40 @@ export function toDocumentResponse(
   };
 }
 
+function toListItem(row: DocumentListRow): DocumentListItemResponseDto {
+  let issuer: DocumentListItemResponseDto['issuer'] = null;
+
+  if (row.issuer_account_name !== null) {
+    issuer = {
+      name: row.issuer_account_name,
+      ...(row.issuer_specialism !== null && {
+        specialism: row.issuer_specialism,
+      }),
+      ...(row.issuer_institution !== null && {
+        institution: row.issuer_institution,
+      }),
+      outsideSystem: false,
+    };
+  } else if (row.issuer_name !== null) {
+    issuer = { name: row.issuer_name, outsideSystem: true };
+  }
+
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    issuer,
+    mimeType: row.mime_type,
+    sizeBytes: row.size_bytes,
+    uploadedBy: {
+      id: row.uploader_id,
+      name: row.uploader_name,
+      isPatient: row.uploaded_by_patient,
+    },
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -46,6 +89,29 @@ export class DocumentsService {
     private readonly storage: StorageService,
     private readonly timeline: DocumentTimelineService,
   ) {}
+
+  /**
+   * Lista os documentos ativos do paciente (RFDOC003), do mais recente ao
+   * mais antigo.
+   *
+   * @throws NotFoundException `PATIENT_NOT_FOUND`
+   * @throws ForbiddenException `FORBIDDEN` para o paciente e para o
+   *   profissional sem vínculo
+   */
+  async list(
+    account: AccountContext,
+    patientId: string,
+    query: GetDocumentsQueryDto,
+  ): Promise<DocumentListResponseDto> {
+    await this.access.assertTeamRead(account, patientId);
+
+    const { rows, total } = await this.documents.findPage(patientId, query);
+
+    return {
+      data: rows.map(toListItem),
+      pagination: toPagination(query, total),
+    };
+  }
 
   /**
    * Confirma o envio e devolve o documento.
