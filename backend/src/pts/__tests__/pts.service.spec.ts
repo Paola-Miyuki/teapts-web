@@ -1329,6 +1329,8 @@ describe('PtsService.findPtsById', () => {
     cancelledAt: null,
     closingDate: null,
     closingReason: null,
+    version: 1,
+    previousPts: null,
     patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
     responsible: {
       id: 'prof-10',
@@ -1439,6 +1441,8 @@ describe('PtsService.findPtsHistory', () => {
       cancelledAt: null,
       closingDate: null,
       closingReason: null,
+      version: 1,
+      previousPts: null,
       patient: { id: 'patient-25', name: 'Paciente' },
       responsible: {
         id: 'prof-10',
@@ -2548,5 +2552,105 @@ describe('PtsService.closePts (RFPTS010)', () => {
       404,
       'PTS_NOT_FOUND',
     );
+  });
+});
+
+describe('PtsService: proposta da nova versão (RFPTS013, RFPTS007)', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const seedDraft = async () =>
+    service.createPts(
+      {
+        professionalId: 'prof-10',
+        patientId: 'patient-25',
+        socialSituation: 'Situação',
+        teamProfessionalIds: [],
+      },
+      responsibleAccount,
+    );
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+  });
+
+  it('recusa aprovar com meta sem prazo ou data-alvo', async () => {
+    const proposal = await seedDraft();
+    repo.pendingGoals.set(proposal.id, 2);
+
+    const error = await expectApiError(
+      () => service.approveProposal(proposal.id, adminAccount),
+      409,
+      'GOALS_INCOMPLETE',
+    );
+    expect(error).toEqual({
+      status: 'GOALS_INCOMPLETE',
+      message:
+        'Defina o prazo e a data-alvo de todas as metas antes de aprovar.',
+      pendingGoals: 2,
+    });
+  });
+
+  it('aprova com todas as metas completas', async () => {
+    const proposal = await seedDraft();
+
+    expect(
+      (await service.approveProposal(proposal.id, adminAccount)).status,
+    ).toBe(PtsStateEnum.PLANNING);
+  });
+
+  it('edita a ficha e a data máxima da proposta', async () => {
+    const proposal = await seedDraft();
+
+    await service.updatePtsProposal(
+      proposal.id,
+      {
+        caseStudyDate: '2026-12-15',
+        diagnosisSummary: '  Síntese  ',
+        cid: '  ',
+        supportLevel: 2,
+        priorityNeeds: [' Comunicação ', ' '],
+        nextReviewAt: '2027-12-15',
+      },
+      responsibleAccount,
+    );
+
+    expect(repo.proposalUpdates).toEqual([
+      {
+        id: proposal.id,
+        sheet: {
+          caseStudyDate: '2026-12-15',
+          diagnosisSummary: 'Síntese',
+          cid: null,
+          supportLevel: 2,
+          priorityNeeds: ['Comunicação'],
+          nextReviewAt: '2027-12-15',
+        },
+        teamProfessionalIds: undefined,
+      },
+    ]);
+  });
+
+  it('a data máxima não fica antes da data-alvo das metas', async () => {
+    const proposal = await seedDraft();
+    repo.latestGoalTargets.set(proposal.id, '2027-06-01');
+
+    await expectApiError(
+      () =>
+        service.updatePtsProposal(
+          proposal.id,
+          { nextReviewAt: '2027-05-31' },
+          responsibleAccount,
+        ),
+      400,
+      'VALIDATION_ERROR',
+    );
+    await service.updatePtsProposal(
+      proposal.id,
+      { nextReviewAt: '2027-06-01' },
+      responsibleAccount,
+    );
+    expect(repo.proposalUpdates).toHaveLength(1);
   });
 });

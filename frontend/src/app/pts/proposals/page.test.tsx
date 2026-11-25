@@ -201,6 +201,32 @@ describe('PtsProposalsPage para o admin', () => {
     );
     await waitFor(() => expect(proposalsCalls()).toHaveLength(2));
   });
+
+  it('mostra a mensagem da API quando faltam prazo ou data-alvo (RFPTS013)', async () => {
+    const message =
+      'Defina o prazo e a data-alvo de todas as metas antes de aprovar.';
+    mockApi(account({ role: 'admin' }), [proposal], {
+      status: 409,
+      body: { status: 'GOALS_INCOMPLETE', message, pendingGoals: 2 },
+    });
+
+    render(<PtsProposalsPage />);
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Aprovar em nome do paciente' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Aprovar proposta' }),
+    );
+
+    expect(await within(dialog).findByText(message)).toBeInTheDocument();
+  });
 });
 
 describe('PtsProposalsPage para o paciente', () => {

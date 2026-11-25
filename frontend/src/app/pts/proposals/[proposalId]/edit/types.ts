@@ -1,33 +1,8 @@
+import type { PtsSheetInput } from '@/lib/pts';
+
 export type Specialism = {
   id: string;
   name: string;
-};
-
-export type ProposalPatient = {
-  id: string;
-  name: string;
-};
-
-export type ProposalProfessional = {
-  id: string;
-  name: string;
-  specialism: Specialism;
-};
-
-export type ProposalTeamMember = {
-  id: string;
-  name: string;
-  specialism: Specialism;
-};
-
-export type PtsProposal = {
-  id: string;
-  status: string;
-  socialSituation: string;
-  createdAt: string;
-  patient: ProposalPatient;
-  responsible: ProposalProfessional;
-  team: ProposalTeamMember[];
 };
 
 export type Professional = {
@@ -47,8 +22,7 @@ export type ProfessionalsResponse = {
   };
 };
 
-export type UpdatePtsProposalPayload = {
-  socialSituation: string;
+export type UpdatePtsProposalPayload = PtsSheetInput & {
   teamProfessionalIds: string[];
 };
 

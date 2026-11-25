@@ -41,6 +41,7 @@ type GoalsTabProps = {
   error: unknown;
   reload: () => void;
   nextReviewAt?: string;
+  previousVersion?: number;
   canManage: boolean;
   authors?: { id: string; name: string }[];
 };
@@ -76,6 +77,7 @@ export default function GoalsTab({
   error,
   reload,
   nextReviewAt,
+  previousVersion,
   canManage,
   authors,
 }: GoalsTabProps) {
@@ -361,6 +363,7 @@ export default function GoalsTab({
       {dialog?.kind === 'view' && (
         <GoalViewDialog
           goal={dialog.goal}
+          previousVersion={previousVersion}
           canManage={canManage}
           onEdit={() => openDialog({ kind: 'edit', goal: dialog.goal })}
           onDelete={() => openDialog({ kind: 'delete', goal: dialog.goal })}
