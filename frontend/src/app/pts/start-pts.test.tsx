@@ -79,6 +79,10 @@ const TIMELINE = {
   data: [],
   pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
 };
+const ACTIVITIES = {
+  data: [],
+  pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+};
 
 function mockApi(
   account: Account,
@@ -95,14 +99,16 @@ function mockApi(
         ? respond(200, account)
         : url.includes('/timeline')
           ? respond(200, TIMELINE)
-          : respond(200, pts),
+          : url.split('?')[0].endsWith('/activities')
+            ? respond(200, ACTIVITIES)
+            : respond(200, pts),
     );
   }) as jest.Mock;
 }
 
 const callsTo = (part: string) =>
   (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
-    (url as string).includes(part),
+    new URL(url as string).pathname.endsWith(part),
   );
 
 async function renderPts() {
@@ -223,7 +229,7 @@ describe('iniciar execução do PTS (RFPTS006)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(startButton()).not.toBeInTheDocument();
     expect(reassessButton()).toBeInTheDocument();
-    expect(callsTo('/pts/pts-1')).toHaveLength(loads + 1);
+    expect(callsTo('/pts/pts-1')).toHaveLength(loads);
   });
 
   it('mostra o Início no horário de Brasília, como a timeline', async () => {

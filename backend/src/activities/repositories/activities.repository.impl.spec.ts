@@ -122,6 +122,7 @@ function setup({
   const recorder = { record: jest.fn(async () => undefined) };
   const activities = {
     find: jest.fn(async () => [row]),
+    findAndCount: jest.fn(async () => [[row], 1] as const),
     findOne: jest.fn(async () => row),
   };
   const repository = new ActivitiesRepositoryImpl(
@@ -226,15 +227,48 @@ describe('ActivitiesRepositoryImpl', () => {
   it('lista da mais recente para a mais antiga', async () => {
     const { repository, activities } = setup();
 
-    const [activity] = await repository.findByPts('pts-1');
+    const result = await repository.findByPts({
+      ptsId: 'pts-1',
+      page: 1,
+      limit: 20,
+    });
 
-    expect(activities.find).toHaveBeenCalledWith(
+    expect(activities.findAndCount).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { ptsId: 'pts-1' },
         order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 0,
+        take: 20,
       }),
     );
-    expect(activity.frequency).toEqual(activityBody().frequency);
+    expect(result).toMatchObject({
+      total: 1,
+      rows: [{ frequency: activityBody().frequency }],
+    });
+  });
+
+  it('filtra por status e executor em cada página', async () => {
+    const { repository, activities } = setup();
+
+    await repository.findByPts({
+      ptsId: 'pts-1',
+      status: [ActivityState.Running],
+      executor: ActivityExecutor.Team,
+      page: 3,
+      limit: 10,
+    });
+
+    expect(activities.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ptsId: 'pts-1',
+          status: In([ActivityState.Running]),
+          executor: ActivityExecutor.Team,
+        },
+        skip: 20,
+        take: 10,
+      }),
+    );
   });
 
   it('acha a atividade pelo id, com o PTS dela', async () => {

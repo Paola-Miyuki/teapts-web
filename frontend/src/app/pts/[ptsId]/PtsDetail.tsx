@@ -25,6 +25,7 @@ import {
 import GoalsTab from '@/components/pts/GoalsTab';
 import ActivitiesTab from '@/components/pts/ActivitiesTab';
 import { useActivities } from '@/hooks/useActivities';
+import { type ActivityExecutor, type ActivityStatus } from '@/lib/activities';
 import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
@@ -36,6 +37,17 @@ import ClosePtsDialog from '../_components/ClosePtsDialog';
 import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
+const DEFAULT_ACTIVITY_STATUSES: ActivityStatus[] = [
+  'suggested',
+  'running',
+  'suspended',
+];
+const ALL_ACTIVITY_STATUSES: ActivityStatus[] = [
+  ...DEFAULT_ACTIVITY_STATUSES,
+  'concluded',
+  'rejected',
+  'archived',
+];
 
 type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
 
@@ -160,6 +172,14 @@ function PtsDetailContent({
   const [retryKey, setRetryKey] = useState(0);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
+  const [activityStatuses, setActivityStatuses] = useState<
+    ActivityStatus[] | undefined
+  >();
+  const [activityExecutor, setActivityExecutor] = useState<
+    ActivityExecutor | undefined
+  >();
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityLimit, setActivityLimit] = useState(10);
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient
@@ -168,11 +188,22 @@ function PtsDetailContent({
   );
 
   const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
+  const activityStatusFilter =
+    activityStatuses ??
+    (['concluded', 'cancelled'].includes(pts?.status ?? '')
+      ? undefined
+      : DEFAULT_ACTIVITY_STATUSES);
   const {
     activities,
+    pagination: activitiesPagination,
     error: activitiesError,
     reload: reloadActivities,
-  } = useActivities(id);
+  } = useActivities(id, {
+    status: activityStatusFilter,
+    executor: activityExecutor,
+    page: activityPage,
+    limit: activityLimit,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -469,7 +500,9 @@ function PtsDetailContent({
           }}
         >
           Atividades
-          {activities && <span className="tab-count">{activities.length}</span>}
+          {activitiesPagination && (
+            <span className="tab-count">{activitiesPagination.total}</span>
+          )}
         </a>
         <a
           href="#timeline"
@@ -502,6 +535,7 @@ function PtsDetailContent({
           <ActivitiesTab
             ptsId={pts.id}
             activities={activities}
+            pagination={activitiesPagination}
             error={activitiesError}
             reload={() => {
               reloadActivities();
@@ -521,6 +555,23 @@ function PtsDetailContent({
             }))}
             goals={goals ?? []}
             isAdmin={isAdmin}
+            statusFilter={activityStatusFilter}
+            onStatusFilterChange={(status) => {
+              setActivityStatuses(status ?? ALL_ACTIVITY_STATUSES);
+              setActivityPage(1);
+            }}
+            executorFilter={activityExecutor}
+            onExecutorFilterChange={(executor) => {
+              setActivityExecutor(executor);
+              setActivityPage(1);
+            }}
+            page={activityPage}
+            limit={activityLimit}
+            onPageChange={setActivityPage}
+            onLimitChange={(limit) => {
+              setActivityLimit(limit);
+              setActivityPage(1);
+            }}
           />
         </section>
       ) : tab === 'metas' ? (

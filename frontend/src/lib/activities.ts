@@ -78,6 +78,26 @@ export type Activity = {
   updatedAt: string | null;
 };
 
+export type ActivityPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ActivityListQuery = {
+  status?: ActivityStatus[];
+  executor?: ActivityExecutor;
+  page: number;
+  limit: number;
+};
+
+export type ActivityDetails = Activity & {
+  goal: { id: string; title: string } | null;
+  documents: { id: string; title: string }[];
+  appointmentsCount: number;
+};
+
 export type ActivityInput = Pick<
   Activity,
   | 'title'
@@ -112,8 +132,32 @@ function activitiesPath(ptsId: string) {
   return `/pts/${encodeURIComponent(ptsId)}/activities`;
 }
 
-export function getActivities(ptsId: string, signal?: AbortSignal) {
-  return request<{ data: Activity[] }>(activitiesPath(ptsId), { signal });
+export function getActivities(
+  ptsId: string,
+  query: ActivityListQuery,
+  signal?: AbortSignal,
+) {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    limit: String(query.limit),
+  });
+  query.status?.forEach((status) => search.append('status', status));
+
+  if (query.executor) {
+    search.set('executor', query.executor);
+  }
+
+  return request<{ data: Activity[]; pagination: ActivityPagination }>(
+    `${activitiesPath(ptsId)}?${search.toString()}`,
+    { signal },
+  );
+}
+
+export function getActivity(activityId: string, signal?: AbortSignal) {
+  return request<ActivityDetails>(
+    `/activities/${encodeURIComponent(activityId)}`,
+    { signal },
+  );
 }
 
 export function createActivity(ptsId: string, activity: ActivityInput) {

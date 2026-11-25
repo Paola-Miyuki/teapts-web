@@ -14,6 +14,7 @@ import {
   type GoalPtsTarget,
 } from '../../pts/repositories/pts-goals.repository';
 import {
+  activitiesViewForbidden,
   activityEditForbidden,
   activityForbidden,
   activityNotFound,
@@ -27,9 +28,11 @@ import {
 } from '../activities.errors';
 import { assertActivityEditable, editableStates } from '../activity-rules';
 import type {
+  ActivityDetailsResponseDto,
   ActivityResponseDto,
   GetActivitiesResponseDto,
 } from '../dto/activity-response.dto';
+import type { GetActivitiesQueryDto } from '../dto/get-activities-query.dto';
 import type {
   ActivityFrequencyDto,
   CreateActivityRequestDto,
@@ -41,6 +44,7 @@ import {
   ActivityPeriod,
 } from '../enums/activity.enums';
 import { ActivitiesRepository } from '../repositories/activities.repository';
+import { toPagination } from '../../common/pagination/pagination';
 
 function isPositiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) > 0;
@@ -70,21 +74,56 @@ export class ActivitiesService {
 
   async findActivities(
     ptsId: string,
+    query: GetActivitiesQueryDto,
     account: AccountContext,
   ): Promise<GetActivitiesResponseDto> {
     const pts = await this.findPts(ptsId);
 
-    assertCanViewPts(pts, account);
+    assertCanViewPts(pts, account, activitiesViewForbidden);
 
-    const activities = await this.activitiesRepository.findByPts(ptsId);
+    const { rows, total } = await this.activitiesRepository.findByPts({
+      ptsId,
+      ...query,
+    });
     const seesDocuments =
       isAdmin(account) || ownTeamProfile(pts, account) !== undefined;
 
     return {
       data: seesDocuments
-        ? activities
-        : activities.map((activity) => ({ ...activity, documentIds: [] })),
+        ? rows
+        : rows.map((activity) => ({ ...activity, documentIds: [] })),
+      pagination: toPagination(query, total),
     };
+  }
+
+  async findActivityById(
+    activityId: string,
+    account: AccountContext,
+  ): Promise<ActivityDetailsResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+
+    assertCanViewPts(pts, account, activitiesViewForbidden);
+
+    const details = await this.activitiesRepository.findDetailsById(activityId);
+
+    if (!details) {
+      throw activityNotFound();
+    }
+
+    const seesDocuments =
+      isAdmin(account) || ownTeamProfile(pts, account) !== undefined;
+
+    if (seesDocuments) {
+      return details;
+    }
+
+    return { ...details, documentIds: [], documents: [] };
   }
 
   async createActivity(

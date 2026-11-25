@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 
-import type { Activity } from '@/lib/activities';
+import type { Activity, ActivityStatus } from '@/lib/activities';
 
 import ActivitiesTab from './ActivitiesTab';
 
@@ -41,6 +41,7 @@ const TEAM = [
 ];
 const GOALS = [{ id: 'goal-1', title: 'Ampliar a comunicação' }];
 const API = 'http://localhost:3000/pts/pts-1/activities';
+const PAGINATION = { page: 1, limit: 10, total: 1, totalPages: 1 };
 
 function respond(status: number, body: unknown) {
   return {
@@ -62,6 +63,7 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
       <ActivitiesTab
         ptsId="pts-1"
         activities={[activity()]}
+        pagination={PAGINATION}
         error={null}
         reload={reload}
         canCreate
@@ -69,6 +71,14 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
         team={TEAM}
         goals={GOALS}
         isAdmin={false}
+        statusFilter={['suggested', 'running', 'suspended']}
+        onStatusFilterChange={jest.fn()}
+        executorFilter={undefined}
+        onExecutorFilterChange={jest.fn()}
+        page={1}
+        limit={10}
+        onPageChange={jest.fn()}
+        onLimitChange={jest.fn()}
         {...props}
       />,
     );
@@ -132,6 +142,15 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
       team: TEAM,
       goals: GOALS,
       isAdmin: false,
+      pagination: { ...PAGINATION, total: 0, totalPages: 0 },
+      statusFilter: ['suggested', 'running', 'suspended'] as ActivityStatus[],
+      onStatusFilterChange: jest.fn(),
+      executorFilter: undefined,
+      onExecutorFilterChange: jest.fn(),
+      page: 1,
+      limit: 10,
+      onPageChange: jest.fn(),
+      onLimitChange: jest.fn(),
     };
     rerender(<ActivitiesTab {...props} activities={[]} error={null} />);
     expect(screen.getByText('Nenhuma atividade')).toBeInTheDocument();
@@ -229,7 +248,9 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
     fillRequired();
     fireEvent.click(screen.getByRole('checkbox', { name: /Ana Souza/ }));
     fill(/^Quem executa/, 'family');
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('dialog')).queryByRole('checkbox'),
+    ).not.toBeInTheDocument();
     submit();
 
     await waitFor(() => expect(reload).toHaveBeenCalled());
@@ -302,9 +323,84 @@ describe('ActivitiesTab (RFACT001, RFACT005)', () => {
     expect(
       screen.getByRole('button', { name: 'Ações para Integração sensorial' }),
     ).toBeInTheDocument();
+    const archivedRow = screen.getByRole('row', { name: /Arquivada/ });
+    fireEvent.click(
+      within(archivedRow).getByRole('button', {
+        name: 'Ações para Arquivada',
+      }),
+    );
     expect(
-      screen.queryByRole('button', { name: 'Ações para Arquivada' }),
+      within(archivedRow).getByRole('menuitem', {
+        name: 'Visualizar',
+        hidden: true,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(archivedRow).queryByRole('menuitem', {
+        name: 'Editar',
+        hidden: true,
+      }),
     ).not.toBeInTheDocument();
+  });
+
+  it('filtra por status e executor e permite paginar', () => {
+    const onStatusFilterChange = jest.fn();
+    const onExecutorFilterChange = jest.fn();
+    const onPageChange = jest.fn();
+
+    renderTab({
+      pagination: { page: 1, limit: 10, total: 21, totalPages: 3 },
+      statusFilter: ['suggested', 'running', 'suspended'] as ActivityStatus[],
+      onStatusFilterChange,
+      onExecutorFilterChange,
+      onPageChange,
+    });
+
+    expect(screen.getByRole('checkbox', { name: 'Sugerida' })).toBeChecked();
+    fireEvent.click(
+      screen.getByLabelText('Status: Sugerida, Em andamento, Suspensa'),
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sugerida' }));
+    expect(onStatusFilterChange).toHaveBeenCalledWith(['running', 'suspended']);
+    fireEvent.change(screen.getByLabelText('Executor'), {
+      target: { value: 'family' },
+    });
+    expect(onExecutorFilterChange).toHaveBeenCalledWith('family');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('abre o detalhe em modo somente leitura', async () => {
+    fetchMock.mockResolvedValue(
+      respond(200, {
+        ...activity(),
+        goal: null,
+        documents: [{ id: 'doc-1', title: 'Laudo terapêutico' }],
+        appointmentsCount: 2,
+      }),
+    );
+    renderTab({ canEdit: () => false });
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Ações para Integração sensorial',
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: 'Visualizar', hidden: true }),
+    );
+
+    expect(await screen.findByText('Como é feita')).toBeInTheDocument();
+    expect(screen.getByText('Laudo terapêutico')).toBeInTheDocument();
+    expect(screen.getByText('2', { selector: 'dd' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Editar', hidden: true }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3000/activities/act-1',
+      expect.objectContaining({ credentials: 'include' }),
+    );
   });
 
   it('edita com o formulário preenchido e atualiza a lista', async () => {

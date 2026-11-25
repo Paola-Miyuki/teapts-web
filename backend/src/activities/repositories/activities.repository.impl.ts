@@ -32,7 +32,10 @@ import {
 import {
   ActivitiesRepository,
   type CreateActivityInput,
+  type FindActivitiesInput,
+  type FindActivitiesResult,
   type StoredActivity,
+  type StoredActivityDetails,
   type UpdateActivityInput,
 } from './activities.repository';
 
@@ -70,14 +73,23 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
     super();
   }
 
-  async findByPts(ptsId: string): Promise<ActivityResponseDto[]> {
-    const activities = await this.activities.find({
-      where: { ptsId },
+  async findByPts(input: FindActivitiesInput): Promise<FindActivitiesResult> {
+    const [activities, total] = await this.activities.findAndCount({
+      where: {
+        ptsId: input.ptsId,
+        ...(input.status && { status: In(input.status) }),
+        ...(input.executor && { executor: input.executor }),
+      },
       relations: LINKS,
       order: { createdAt: 'DESC', id: 'DESC' },
+      skip: (input.page - 1) * input.limit,
+      take: input.limit,
     });
 
-    return activities.map((activity) => this.toResponse(activity));
+    return {
+      rows: activities.map((activity) => this.toResponse(activity)),
+      total,
+    };
   }
 
   async findById(activityId: string): Promise<StoredActivity | null> {
@@ -89,6 +101,50 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
     return activity
       ? { ...this.toResponse(activity), ptsId: activity.ptsId }
       : null;
+  }
+
+  async findDetailsById(
+    activityId: string,
+  ): Promise<StoredActivityDetails | null> {
+    const activity = await this.activities.findOne({
+      where: { id: activityId },
+      relations: LINKS,
+    });
+
+    if (!activity) {
+      return null;
+    }
+
+    const goal = activity.goalId
+      ? await this.dataSource.manager.findOne(PtsGoalEntity, {
+          where: { id: activity.goalId, ptsId: activity.ptsId },
+          select: { id: true, title: true },
+        })
+      : null;
+    const documentIds = (activity.documents ?? []).map(
+      ({ documentId }) => documentId,
+    );
+    const documents =
+      documentIds.length > 0
+        ? await this.dataSource.manager.find(DocumentEntity, {
+            where: { id: In(documentIds) },
+            select: { id: true, title: true },
+          })
+        : [];
+    const documentsById = new Map(
+      documents.map((document) => [document.id, document]),
+    );
+
+    return {
+      ...this.toResponse(activity),
+      goal: goal ? { id: goal.id, title: goal.title } : null,
+      documents: documentIds.flatMap((id) => {
+        const document = documentsById.get(id);
+        return document ? [{ id: document.id, title: document.title }] : [];
+      }),
+      // O backend ainda não tem entidade/tabela de atendimentos.
+      appointmentsCount: 0,
+    };
   }
 
   async findPatientDocumentIds(

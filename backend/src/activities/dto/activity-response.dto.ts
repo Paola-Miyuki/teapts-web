@@ -9,6 +9,7 @@ import {
   VisitPlace,
 } from '../enums/activity.enums';
 import { ActivityFrequencyDto } from './create-activity.dto';
+import { PaginationResponseDto } from '../../common/pagination/pagination-response.dto';
 
 export class ActivityResponseDto {
   @ApiProperty({ example: '9c8b7a65-4d3e-4f21-8a9b-0c1d2e3f4a5b' })
@@ -76,4 +77,34 @@ export class ActivityResponseDto {
 export class GetActivitiesResponseDto {
   @ApiProperty({ type: ActivityResponseDto, isArray: true })
   data!: ActivityResponseDto[];
+
+  @ApiProperty({ type: PaginationResponseDto })
+  pagination!: PaginationResponseDto;
+}
+
+export class ActivityDetailsResponseDto extends ActivityResponseDto {
+  @ApiProperty({
+    type: 'object',
+    nullable: true,
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      title: { type: 'string' },
+    },
+  })
+  goal!: { id: string; title: string } | null;
+
+  @ApiProperty({
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        title: { type: 'string' },
+      },
+    },
+  })
+  documents!: { id: string; title: string }[];
+
+  @ApiProperty({ type: 'integer', minimum: 0, example: 0 })
+  appointmentsCount!: number;
 }

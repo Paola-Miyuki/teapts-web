@@ -1,6 +1,7 @@
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { ActivityResponseDto } from '../dto/activity-response.dto';
 import type { CreateActivityRequestDto } from '../dto/create-activity.dto';
+import type { FindActivitiesInput } from '../repositories/activities.repository';
 import {
   ActivityExecutor,
   ActivityModality,
@@ -69,16 +70,50 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
       .map((item) => item.id);
   }
 
-  async findByPts(ptsId: string): Promise<ActivityResponseDto[]> {
-    return this.activities
-      .filter((activity) => activity.ptsId === ptsId)
-      .map(toResponse);
+  async findByPts({
+    ptsId,
+    status,
+    executor,
+    page,
+    limit,
+  }: FindActivitiesInput) {
+    const found = this.activities
+      .filter(
+        (activity) =>
+          activity.ptsId === ptsId &&
+          (!status || status.includes(activity.status)) &&
+          (!executor || activity.executor === executor),
+      )
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return {
+      rows: found.slice((page - 1) * limit, page * limit).map(toResponse),
+      total: found.length,
+    };
   }
 
   async findById(activityId: string): Promise<StoredActivity | null> {
     const activity = this.activities.find((item) => item.id === activityId);
 
     return activity ? { ...activity } : null;
+  }
+
+  async findDetailsById(activityId: string) {
+    const activity = this.activities.find((item) => item.id === activityId);
+
+    return activity
+      ? {
+          ...activity,
+          goal: activity.goalId
+            ? { id: activity.goalId, title: 'Meta terapêutica' }
+            : null,
+          documents: activity.documentIds.map((id) => ({
+            id,
+            title: `Documento ${id}`,
+          })),
+          appointmentsCount: 0,
+        }
+      : null;
   }
 
   async create(input: CreateActivityInput): Promise<ActivityResponseDto> {
