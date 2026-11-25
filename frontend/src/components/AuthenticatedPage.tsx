@@ -86,6 +86,7 @@ export default function AuthenticatedPage({
       roleLabel={ROLE_LABELS[kind]}
       navItems={getNavigation(account, resolvedCurrentHref)}
       currentHref={resolvedCurrentHref}
+      showNotifications={can(account, 'viewNotifications')}
       breadcrumb={
         typeof breadcrumb === 'function' ? breadcrumb(kind) : breadcrumb
       }

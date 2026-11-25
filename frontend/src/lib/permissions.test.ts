@@ -195,6 +195,13 @@ describe('can', () => {
     },
   );
 
+  it('mostra as notificações ao profissional e ao paciente, não ao admin', () => {
+    expect(can(professional, 'viewNotifications')).toBe(true);
+    expect(can(patient, 'viewNotifications')).toBe(true);
+    expect(can(admin, 'viewNotifications')).toBe(false);
+    expect(can(waiting, 'viewNotifications')).toBe(false);
+  });
+
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
       expect(can(patient, action, { pts: draft })).toBe(true);

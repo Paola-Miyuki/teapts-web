@@ -11,6 +11,18 @@ export function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR', { timeZone: TIME_ZONE });
 }
 
+/** Data e hora ISO em `dd/mm/aaaa, hh:mm`, no horário de Brasília. */
+export function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('pt-BR', {
+    timeZone: TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /** Data `AAAA-MM-DD` em `dd/mm/aaaa`, sem passar por fuso horário. */
 export function formatDateOnly(date: string) {
   const [year, month, day] = date.split('-');

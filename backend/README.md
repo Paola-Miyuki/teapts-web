@@ -27,7 +27,7 @@ src/
   common/       pagination, search, swagger, validation
   auth/         guards, SuperTokens, /me, signup e login
   accounts/     activities/   patients/     professionals/     pts/     timeline/     health/
-  notifications/ rotina diária do aviso da janela de reavaliação (RFNOT001, 06:00 de Brasília)
+  notifications/ avisos da conta (RFNOT002) e rotina diária da janela de reavaliação (RFNOT001)
   documents/    URL de envio, confirmação do documento, DocumentTimelineService
   storage/      StorageService, driver PostgresStorage, token HMAC
   database/     database.config.ts (conexão e arrays entities/migrations), data-source.ts,
@@ -73,6 +73,7 @@ Todas exigem sessão, exceto `GET /health` e `/auth/signup|signin|session/refres
 | `GET /pts/:id/goals`                                                                         | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                                                                                                                                                                                                                                         |
 | `POST /pts/:id/goals`, `PATCH, DELETE …/goals/:goalId`                                       | equipe ou admin, PTS em `draft`, `planning` ou `running`; grava `goal_added`, `goal_updated` e `goal_removed` na timeline (`409 LAST_GOAL`, `409 GOAL_HAS_ACTIVITIES` na exclusão)                                                                                                                                                                              |
 | `GET /pts/:id/timeline`                                                                      | paciente titular, equipe (menos PTS rejeitado) ou admin                                                                                                                                                                                                                                                                                                         |
+| `GET /notifications`, `GET …/unread-count`, `POST …/:id/read`, `POST …/read-all`             | conta da sessão, só as próprias (a de outra conta responde `404`); o admin não recebe                                                                                                                                                                                                                                                                           |
 | `GET /health`                                                                                | público (`200` ou `503` com o banco fora)                                                                                                                                                                                                                                                                                                                       |
 
 ## Banco de dados

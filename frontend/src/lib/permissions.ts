@@ -17,6 +17,7 @@ export type PermissionAction =
   | 'uploadDocument'
   | 'createProfessional'
   | 'manageAccounts'
+  | 'viewNotifications'
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
@@ -108,6 +109,7 @@ export function can(
     switch (action) {
       case 'viewOwnCare':
       case 'viewWaitingHome':
+      case 'viewNotifications':
         return false;
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
@@ -162,6 +164,9 @@ export function can(
     case 'manageAccounts':
       // RN032 – só o administrador lista, consulta e desativa contas.
       return admin;
+    case 'viewNotifications':
+      // RFNOT002 – profissional e paciente; o admin não recebe.
+      return professional || patient;
     case 'createProfessional':
       // RFPRO002 – só o administrador cria o perfil profissional.
       return admin;

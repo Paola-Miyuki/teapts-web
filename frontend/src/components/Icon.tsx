@@ -42,6 +42,12 @@ const glyphs = {
   chevronRight: <path d="m9 6 6 6-6 6" />,
   up: <path d="m6 15 6-6 6 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
+  bell: (
+    <>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />
