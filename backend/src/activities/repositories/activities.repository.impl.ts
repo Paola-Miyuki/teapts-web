@@ -21,16 +21,22 @@ import {
   invalidActivityDocuments,
   invalidActivityGoal,
 } from '../activities.errors';
-import { assertActivityEditable } from '../activity-rules';
+import {
+  assertActivityArchivable,
+  assertActivityEditable,
+} from '../activity-rules';
 import type { ActivityResponseDto } from '../dto/activity-response.dto';
+import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
 import type { ActivityFrequencyDto } from '../dto/create-activity.dto';
 import { ActivityDocumentEntity } from '../entities/activity-document.entity';
 import {
   ActivityEntity,
   type StoredFrequency,
 } from '../entities/activity.entity';
+import { ActivityState } from '../enums/activity.enums';
 import {
   ActivitiesRepository,
+  type ArchiveActivityInput,
   type CreateActivityInput,
   type StoredActivity,
   type UpdateActivityInput,
@@ -154,16 +160,7 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
 
     return this.dataSource.transaction(async (manager) => {
       const pts = await this.lockPts(manager, ptsId);
-      // Trava a atividade e refaz a checagem: mudança de estado ao mesmo
-      // tempo (rejeitar, arquivar, aprovar) não passa.
-      const activity = await manager.findOne(ActivityEntity, {
-        where: { id: activityId, ptsId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!activity) {
-        throw activityNotFound();
-      }
+      const activity = await this.lockActivity(manager, ptsId, activityId);
 
       assertActivityEditable(activity.status, input.allowedStates);
 
@@ -214,6 +211,45 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
     });
   }
 
+  async archive(
+    input: ArchiveActivityInput,
+  ): Promise<ArchiveActivityResponseDto> {
+    const { ptsId, activityId } = input;
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockPts(manager, ptsId);
+      const activity = await this.lockActivity(manager, ptsId, activityId);
+
+      assertActivityArchivable(activity.status);
+
+      // Exclusão lógica (RN021): a linha e os atendimentos continuam.
+      const archivedAt = new Date();
+      await manager.update(
+        ActivityEntity,
+        { id: activityId, ptsId },
+        {
+          status: ActivityState.Archived,
+          archivedAt,
+          statusReason: input.reason,
+          statusChangedByAccountId: input.executedByAccountId,
+          updatedAt: archivedAt,
+        },
+      );
+      await this.record(
+        manager,
+        TimelineRecordType.ActivityArchived,
+        input,
+        input.description,
+      );
+
+      return {
+        id: activityId,
+        status: ActivityState.Archived,
+        archivedAt: archivedAt.toISOString(),
+      };
+    });
+  }
+
   // Trava o PTS e refaz as checagens: encerramento do PTS ou exclusão da
   // meta ao mesmo tempo não passa.
   private async lockPts(
@@ -233,6 +269,25 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
     assertPtsEditable(pts.status);
 
     return pts;
+  }
+
+  // Trava a atividade e refaz a checagem: mudança de estado ao mesmo tempo
+  // (rejeitar, arquivar, aprovar) não passa.
+  private async lockActivity(
+    manager: EntityManager,
+    ptsId: string,
+    activityId: string,
+  ): Promise<ActivityEntity> {
+    const activity = await manager.findOne(ActivityEntity, {
+      where: { id: activityId, ptsId },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    return activity;
   }
 
   private async assertDocuments(
