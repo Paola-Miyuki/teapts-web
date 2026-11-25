@@ -23,15 +23,17 @@ import type { Patient } from '../entities/patient.entity';
 import type { NewPatient } from '../repositories/patients.repository';
 import type { SupportContact } from '../entities/support-contact.entity';
 import type {
+  CurrentPtsRow,
   EligiblePatientsPage,
   EligiblePatientsQuery,
+  PatientDetailRow,
   PatientRow,
   PatientScope,
   PatientsPage,
   PatientsRepository,
   SupportContactValues,
 } from '../repositories/patients.repository';
-import { PatientsService } from './patients.service';
+import { PatientsService, toReassessment } from './patients.service';
 
 function createService() {
   const repository = {
@@ -50,6 +52,9 @@ function createService() {
     patientExists: jest.fn<(patientId: string) => Promise<boolean>>(),
     findSupportContacts:
       jest.fn<(patientId: string) => Promise<SupportContact[]>>(),
+    findCurrentPts:
+      jest.fn<(patientId: string) => Promise<CurrentPtsRow | null>>(),
+    hasTcle: jest.fn<(patientId: string) => Promise<boolean>>(),
     insertSupportContact:
       jest.fn<
         (
@@ -79,6 +84,9 @@ function createService() {
   const accountRepository = {
     findOne: jest.fn<(options: unknown) => Promise<Partial<Account> | null>>(),
   };
+  repository.findCurrentPts.mockResolvedValue(null);
+  repository.hasTcle.mockResolvedValue(false);
+
   const service = new PatientsService(
     repository as unknown as PatientsRepository,
     accountRepository as unknown as Repository<Account>,
@@ -311,10 +319,52 @@ describe('PatientsService.findAuthorized', () => {
 });
 
 describe('PatientsService.findOne', () => {
-  it('returns the patient with CPF and support contacts to the team', async () => {
+  const detailRow: PatientDetailRow = {
+    ...row,
+    birth_date: '2019-04-18',
+    sex: 'female' as PatientDetailRow['sex'],
+    gender: 'cis_woman' as PatientDetailRow['gender'],
+    guardian_phone: '41997015522',
+    address_zip_code: '80045140',
+    address_street: 'Rua Itupava',
+    address_number: '1240',
+    address_complement: 'ap. 32',
+    address_district: 'Alto da XV',
+    address_city: 'Curitiba',
+    address_state: 'pr',
+    filiation_1: 'Juliana Ribeiro',
+    filiation_2: 'Não declarado',
+    education_level:
+      'elementary_ongoing' as PatientDetailRow['education_level'],
+    school_name: 'Escola Municipal Papa João XXIII',
+    reference_unit: 'UBS Bairro Alto',
+    clinical_history: null,
+    surgical_history: null,
+    family_history: null,
+    habits: null,
+    developmental_milestones: null,
+    allergies: null,
+    no_known_allergies: false,
+  };
+  const currentPts: CurrentPtsRow = {
+    id: 'pts-1',
+    status: PtsStateEnum.RUNNING,
+    caseStudyDate: '2026-02-27',
+    diagnosisSummary: 'Transtorno do espectro autista.',
+    cid: 'F84.0',
+    supportLevel: 2,
+    strengths: 'Boa imitação motora.',
+    priorityNeeds: ['Comunicação funcional'],
+    socialSituation: 'Mora com a mãe e a avó.',
+    nextReviewAt: '2099-12-03',
+  };
+
+  it('returns the patient with the registration data, diagnosis and support contacts to the team', async () => {
     const { repository, service } = createService();
     repository.patientExists.mockResolvedValue(true);
-    repository.findPatient.mockResolvedValue(row);
+    repository.findPatient.mockResolvedValue(detailRow);
+    repository.findCurrentPts.mockResolvedValue(currentPts);
+    repository.hasTcle.mockResolvedValue(true);
     repository.findSupportContacts.mockResolvedValue([
       {
         id: 'contact-1',
@@ -332,6 +382,31 @@ describe('PatientsService.findOne', () => {
       ...listed,
       phone: '41991002030',
       cpf: '11144477735',
+      birthDate: '2019-04-18',
+      sex: 'female',
+      gender: 'cis_woman',
+      filiation1: 'Juliana Ribeiro',
+      filiation2: 'Não declarado',
+      address: {
+        zipCode: '80045140',
+        street: 'Rua Itupava',
+        number: '1240',
+        complement: 'ap. 32',
+        district: 'Alto da XV',
+        city: 'Curitiba',
+        state: 'pr',
+      },
+      guardianPhone: '41997015522',
+      educationLevel: 'elementary_ongoing',
+      schoolName: 'Escola Municipal Papa João XXIII',
+      referenceUnit: 'UBS Bairro Alto',
+      clinicalHistory: null,
+      surgicalHistory: null,
+      familyHistory: null,
+      habits: null,
+      developmentalMilestones: null,
+      allergies: null,
+      noKnownAllergies: false,
       supportContacts: [
         {
           id: 'contact-1',
@@ -342,11 +417,38 @@ describe('PatientsService.findOne', () => {
           isEmergency: true,
         },
       ],
+      diagnosis: {
+        ptsId: 'pts-1',
+        ptsStatus: 'running',
+        caseStudyDate: '2026-02-27',
+        cid: 'F84.0',
+        supportLevel: 2,
+        summary: 'Transtorno do espectro autista.',
+        strengths: 'Boa imitação motora.',
+        priorityNeeds: ['Comunicação funcional'],
+        socialSituation: 'Mora com a mãe e a avó.',
+      },
+      reassessment: null,
+      hasTcle: true,
     });
     expect(repository.findPatient).toHaveBeenCalledWith(
       { kind: 'professional', accountId: 'account-1' },
       'patient-1',
     );
+    expect(repository.findCurrentPts).toHaveBeenCalledWith('patient-1');
+  });
+
+  it('returns no diagnosis and no reassessment for a patient without PTS', async () => {
+    const { repository, service } = createService();
+    repository.patientExists.mockResolvedValue(true);
+    repository.findPatient.mockResolvedValue(detailRow);
+    repository.findSupportContacts.mockResolvedValue([]);
+
+    const result = await service.findOne(adminAccount, 'patient-1');
+
+    expect(result.diagnosis).toBeNull();
+    expect(result.reassessment).toBeNull();
+    expect(result.hasTcle).toBe(false);
   });
 
   it('answers 404 PATIENT_NOT_FOUND for a missing patient', async () => {
@@ -830,5 +932,58 @@ describe('PatientsService support contacts', () => {
       status: 'ERROR',
       message: 'Não foi possível remover o contato de suporte.',
     });
+  });
+});
+
+describe('toReassessment (RN031)', () => {
+  const now = new Date('2026-11-25T15:00:00.000Z');
+  const pts = (status: PtsStateEnum, nextReviewAt: string): CurrentPtsRow => ({
+    id: 'pts-1',
+    status,
+    caseStudyDate: '2026-02-27',
+    diagnosisSummary: 'x',
+    cid: null,
+    supportLevel: null,
+    strengths: null,
+    priorityNeeds: [],
+    socialSituation: 'x',
+    nextReviewAt,
+  });
+
+  it.each([
+    ['2026-12-25', 'open'],
+    ['2026-11-25', 'open'],
+    ['2026-11-24', 'overdue'],
+    ['2026-01-01', 'overdue'],
+  ])('marks a review on %s as %s', (nextReviewAt, status) => {
+    expect(
+      toReassessment(pts(PtsStateEnum.RUNNING, nextReviewAt), now),
+    ).toEqual({
+      status,
+      nextReviewAt,
+    });
+  });
+
+  it('shows nothing when the review is more than 30 days away', () => {
+    expect(
+      toReassessment(pts(PtsStateEnum.RUNNING, '2026-12-26'), now),
+    ).toBeNull();
+  });
+
+  it.each([PtsStateEnum.DRAFT, PtsStateEnum.CONCLUDED, PtsStateEnum.CANCELLED])(
+    'shows nothing for a %s PTS',
+    (status) => {
+      expect(toReassessment(pts(status, '2026-11-30'), now)).toBeNull();
+    },
+  );
+
+  it('uses Brasília time, not UTC, to decide the day', () => {
+    // 01:00 UTC de 26/11 ainda é 25/11 em Brasília.
+    expect(
+      toReassessment(
+        pts(PtsStateEnum.PLANNING, '2026-11-25'),
+        new Date('2026-11-26T01:00:00.000Z'),
+      ),
+    ).toEqual({ status: 'open', nextReviewAt: '2026-11-25' });
   });
 });

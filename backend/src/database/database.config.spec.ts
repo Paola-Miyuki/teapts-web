@@ -25,6 +25,7 @@ import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddP
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
 import { StoredObject } from '../storage/entities/stored-object.entity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
+import { AddPatientProfileFields1791149090000 } from './migrations/1791149090000-AddPatientProfileFields';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { DocumentEntity as Document } from '../documents/entities/document.entity';
@@ -135,6 +136,7 @@ describe('getDatabaseOptions', () => {
         CreateNotification1791149060000,
         CreateActivity1791149070000,
         AddPtsClosingColumns1791149080000,
+        AddPatientProfileFields1791149090000,
       ],
     });
   });

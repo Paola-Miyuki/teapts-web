@@ -10,6 +10,9 @@ export const STORAGE_CONFIG = Symbol('STORAGE_CONFIG');
 
 const DEFAULT_UPLOAD_URL_TTL_MINUTES = 15;
 
+/** Validade da URL de leitura, em minutos; o front pede outra a cada clique. */
+export const READ_URL_TTL_MINUTES = 5;
+
 export type StorageConfig = {
   /** Segredo do HMAC das URLs assinadas. */
   tokenSecret: string;

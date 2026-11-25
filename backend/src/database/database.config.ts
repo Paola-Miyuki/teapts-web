@@ -32,6 +32,7 @@ import { AddProfessionalRegistrationFields1791149020000 } from './migrations/179
 import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
 import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
+import { AddPatientProfileFields1791149090000 } from './migrations/1791149090000-AddPatientProfileFields';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
@@ -79,6 +80,7 @@ const migrations = [
   CreateNotification1791149060000,
   CreateActivity1791149070000,
   AddPtsClosingColumns1791149080000,
+  AddPatientProfileFields1791149090000,
 ];
 
 export function getDatabaseOptions(

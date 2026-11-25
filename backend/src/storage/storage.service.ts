@@ -21,6 +21,11 @@ export type StoredObjectInfo = {
   sizeBytes: number;
 };
 
+/** Objeto lido do storage, com o conteúdo. */
+export type StoredObjectContent = StoredObjectInfo & {
+  content: Buffer;
+};
+
 /** O objeto já existe: o envio não sobrescreve. */
 export class StorageObjectAlreadyExistsError extends Error {
   constructor(readonly fileKey: string) {
@@ -41,6 +46,11 @@ export abstract class StorageService {
   ): SignedUrl;
 
   /**
+   * URL assinada para ler o objeto, limitada a ele e vencendo em breve.
+   */
+  abstract createReadUrl(fileKey: string, now?: Date): SignedUrl;
+
+  /**
    * Grava o objeto, ainda não ativo.
    *
    * @throws StorageObjectAlreadyExistsError quando a chave já existe
@@ -53,6 +63,13 @@ export abstract class StorageService {
    * @returns os dados do objeto, ou `null` quando ele não existe
    */
   abstract headObject(fileKey: string): Promise<StoredObjectInfo | null>;
+
+  /**
+   * Lê o objeto com o conteúdo.
+   *
+   * @returns o objeto, ou `null` quando ele não existe
+   */
+  abstract getObject(fileKey: string): Promise<StoredObjectContent | null>;
 
   /**
    * Marca o objeto como ativo (documento confirmado). Para ficar na mesma

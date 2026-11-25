@@ -129,6 +129,7 @@ describe('getNavigation', () => {
       'Início',
       'PTS',
       'Medicações',
+      'Documentos',
     ]);
 
     expect(labels(account())).toEqual(['Início']);

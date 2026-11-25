@@ -153,6 +153,11 @@ export function getNavigation(account: Account, currentHref: string) {
       icon: 'pill',
       label: 'Medicações',
     });
+    items.push({
+      href: '/my-documents',
+      icon: 'file',
+      label: 'Documentos',
+    });
   }
 
   if (can(account, 'viewPtsProposals') && !ownPts) {

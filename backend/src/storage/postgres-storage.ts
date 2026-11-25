@@ -6,12 +6,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { type EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { StoredObject } from './entities/stored-object.entity';
 import { StorageTokenService } from './services/storage-token.service';
-import { STORAGE_CONFIG, type StorageConfig } from './storage.config';
+import {
+  READ_URL_TTL_MINUTES,
+  STORAGE_CONFIG,
+  type StorageConfig,
+} from './storage.config';
 import {
   type PutObjectInput,
   type SignedUrl,
   StorageObjectAlreadyExistsError,
   StorageService,
+  type StoredObjectContent,
   type StoredObjectInfo,
 } from './storage.service';
 
@@ -38,6 +43,16 @@ export class PostgresStorage extends StorageService {
       now.getTime() + this.config.uploadUrlTtlMinutes * 60_000,
     );
     const token = this.tokens.sign(fileKey, 'write', expiresAt, { mimeType });
+
+    return {
+      url: `${this.config.baseUrl}/storage/objects/${encodeURIComponent(fileKey)}?token=${token}`,
+      expiresAt,
+    };
+  }
+
+  createReadUrl(fileKey: string, now: Date = new Date()): SignedUrl {
+    const expiresAt = new Date(now.getTime() + READ_URL_TTL_MINUTES * 60_000);
+    const token = this.tokens.sign(fileKey, 'read', expiresAt);
 
     return {
       url: `${this.config.baseUrl}/storage/objects/${encodeURIComponent(fileKey)}?token=${token}`,
@@ -79,6 +94,26 @@ export class PostgresStorage extends StorageService {
 
     return object
       ? { mimeType: object.mimeType, sizeBytes: object.sizeBytes }
+      : null;
+  }
+
+  async getObject(fileKey: string): Promise<StoredObjectContent | null> {
+    const object = await this.objects.findOne({
+      where: { fileKey },
+      select: {
+        fileKey: true,
+        mimeType: true,
+        sizeBytes: true,
+        content: true,
+      },
+    });
+
+    return object
+      ? {
+          mimeType: object.mimeType,
+          sizeBytes: object.sizeBytes,
+          content: object.content,
+        }
       : null;
   }
 

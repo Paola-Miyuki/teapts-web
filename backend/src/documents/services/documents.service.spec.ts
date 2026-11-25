@@ -1,5 +1,9 @@
 import { jest } from '@jest/globals';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { type DataSource, type EntityManager, QueryFailedError } from 'typeorm';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
@@ -8,7 +12,10 @@ import type { StorageService } from '../../storage/storage.service';
 import type { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
 import type { DocumentEntity } from '../entities/document.entity';
 import { DocumentCategory } from '../enums/document-category.enum';
-import type { DocumentsRepository } from '../repositories/documents.repository';
+import type {
+  DocumentListRow,
+  DocumentsRepository,
+} from '../repositories/documents.repository';
 import type { DocumentAccessService } from './document-access.service';
 import type { DocumentTimelineService } from './document-timeline.service';
 import { DocumentsService } from './documents.service';
@@ -62,20 +69,27 @@ function createService() {
   };
   const access = {
     assertAccess: jest.fn<DocumentAccessService['assertAccess']>(),
+    assertTeamRead: jest.fn<DocumentAccessService['assertTeamRead']>(),
+    assertDocumentRead: jest.fn<DocumentAccessService['assertDocumentRead']>(),
   };
   const documents = {
     findByFileKey: jest.fn<DocumentsRepository['findByFileKey']>(),
     create: jest.fn<DocumentsRepository['create']>(),
+    findPage: jest.fn<DocumentsRepository['findPage']>(),
+    findActiveById: jest.fn<DocumentsRepository['findActiveById']>(),
   };
   const storage = {
     headObject: jest.fn<StorageService['headObject']>(),
     activateObject: jest.fn<StorageService['activateObject']>(),
+    createReadUrl: jest.fn<StorageService['createReadUrl']>(),
   };
   const timeline = {
     recordUploaded: jest.fn<DocumentTimelineService['recordUploaded']>(),
   };
 
   access.assertAccess.mockResolvedValue();
+  access.assertTeamRead.mockResolvedValue();
+  access.assertDocumentRead.mockResolvedValue();
   documents.findByFileKey.mockResolvedValue(null);
   documents.create.mockResolvedValue(stored);
   storage.headObject.mockResolvedValue({
@@ -83,6 +97,10 @@ function createService() {
     sizeBytes: 1024,
   });
   storage.activateObject.mockResolvedValue();
+  storage.createReadUrl.mockReturnValue({
+    url: 'http://localhost:3000/storage/objects/k?token=t',
+    expiresAt: new Date('2026-12-01T12:05:00.000Z'),
+  });
   timeline.recordUploaded.mockResolvedValue();
 
   return {
@@ -295,5 +313,162 @@ describe('DocumentsService.confirm', () => {
     await expect(
       ctx.service.confirm(account, patientId, request),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('DocumentsService.list', () => {
+  const row: DocumentListRow = {
+    id: 'doc-1',
+    title: 'Laudo neurológico',
+    category: DocumentCategory.MEDICAL_REPORT,
+    mime_type: 'application/pdf',
+    size_bytes: 1024,
+    issue_date: '2026-11-20',
+    created_at: new Date('2026-12-01T12:00:00.000Z'),
+    uploader_id: 'account-9',
+    uploader_name: 'Ana Souza',
+    uploaded_by_patient: false,
+    issuer_account_name: null,
+    issuer_specialism: null,
+    issuer_institution: null,
+    issuer_name: null,
+  };
+  const query = { page: 2, limit: 10 };
+
+  it('checks the team access and returns the page with the pagination', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({ rows: [row], total: 11 });
+
+    const result = await ctx.service.list(account, patientId, query);
+
+    expect(ctx.access.assertTeamRead).toHaveBeenCalledWith(account, patientId);
+    expect(ctx.documents.findPage).toHaveBeenCalledWith(patientId, query);
+    expect(result).toEqual({
+      data: [
+        {
+          id: 'doc-1',
+          title: 'Laudo neurológico',
+          category: 'medical_report',
+          issuer: null,
+          issueDate: '2026-11-20',
+          mimeType: 'application/pdf',
+          sizeBytes: 1024,
+          uploadedBy: { id: 'account-9', name: 'Ana Souza', isPatient: false },
+          createdAt: '2026-12-01T12:00:00.000Z',
+        },
+      ],
+      pagination: { page: 2, limit: 10, total: 11, totalPages: 2 },
+    });
+  });
+
+  it('shows a system professional as issuer, with the specialism and institution', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({
+      rows: [
+        {
+          ...row,
+          issuer_account_name: 'Dra. Marta Reis',
+          issuer_specialism: 'neurologist',
+          issuer_institution: 'IMA',
+        },
+        {
+          ...row,
+          issuer_account_name: 'Dr. João',
+          issuer_specialism: 'doctor',
+        },
+      ],
+      total: 2,
+    });
+
+    const { data } = await ctx.service.list(account, patientId, query);
+
+    expect(data[0].issuer).toEqual({
+      name: 'Dra. Marta Reis',
+      specialism: 'neurologist',
+      institution: 'IMA',
+      outsideSystem: false,
+    });
+    expect(data[1].issuer).toEqual({
+      name: 'Dr. João',
+      specialism: 'doctor',
+      outsideSystem: false,
+    });
+  });
+
+  it('shows the free-text issuer as outside the system and flags the patient upload', async () => {
+    const ctx = createService();
+    ctx.documents.findPage.mockResolvedValue({
+      rows: [
+        { ...row, issuer_name: 'Dra. Marta Reis', uploaded_by_patient: true },
+      ],
+      total: 1,
+    });
+
+    const { data } = await ctx.service.list(account, patientId, query);
+
+    expect(data[0].issuer).toEqual({
+      name: 'Dra. Marta Reis',
+      outsideSystem: true,
+    });
+    expect(data[0].uploadedBy.isPatient).toBe(true);
+  });
+
+  it('does not query when the access is denied', async () => {
+    const ctx = createService();
+    ctx.access.assertTeamRead.mockRejectedValue(new ForbiddenException());
+
+    await expect(
+      ctx.service.list(account, patientId, query),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(ctx.documents.findPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('DocumentsService.getUrl', () => {
+  const document = {
+    ...stored,
+    fileKey: `${patientId}/abc-laudo.pdf`,
+    uploadedByAccountId: 'account-9',
+  } as DocumentEntity;
+
+  it('checks the access to the document and returns the read URL of its object', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(document);
+
+    await expect(ctx.service.getUrl(account, 'doc-1')).resolves.toEqual({
+      url: 'http://localhost:3000/storage/objects/k?token=t',
+      expiresAt: '2026-12-01T12:05:00.000Z',
+    });
+    expect(ctx.access.assertDocumentRead).toHaveBeenCalledWith(
+      account,
+      document,
+    );
+    expect(ctx.storage.createReadUrl).toHaveBeenCalledWith(document.fileKey);
+  });
+
+  it('answers 404 DOCUMENT_NOT_FOUND for a missing or deleted document', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(null);
+
+    const error: unknown = await ctx.service
+      .getUrl(account, 'doc-1')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toMatchObject({
+      status: 'DOCUMENT_NOT_FOUND',
+    });
+    expect(ctx.access.assertDocumentRead).not.toHaveBeenCalled();
+  });
+
+  it('does not sign a URL when the access is denied', async () => {
+    const ctx = createService();
+    ctx.documents.findActiveById.mockResolvedValue(document);
+    ctx.access.assertDocumentRead.mockRejectedValue(new ForbiddenException());
+
+    await expect(ctx.service.getUrl(account, 'doc-1')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(ctx.storage.createReadUrl).not.toHaveBeenCalled();
   });
 });
