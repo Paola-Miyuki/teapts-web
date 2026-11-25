@@ -8,10 +8,13 @@ import {
   ActivityState,
   ActivityType,
 } from '../enums/activity.enums';
+import type { ActivityStatusResponseDto } from '../dto/activity-status.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
+import { ACTIVITY_TRANSITIONS } from '../activity-rules';
 import {
   ActivitiesRepository,
   type ArchiveActivityInput,
+  type ChangeActivityStatusInput,
   type CreateActivityInput,
   type StoredActivity,
   type UpdateActivityInput,
@@ -60,6 +63,7 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
   created: CreateActivityInput[] = [];
   updated: UpdateActivityInput[] = [];
   archived: ArchiveActivityInput[] = [];
+  statusChanges: ChangeActivityStatusInput[] = [];
   activities: StoredActivity[] = [];
   documents: { id: string; patientId: string }[] = [];
 
@@ -129,5 +133,18 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
       status: ActivityState.Archived,
       archivedAt: '2026-12-06T12:00:00.000Z',
     };
+  }
+
+  async changeStatus(
+    input: ChangeActivityStatusInput,
+  ): Promise<ActivityStatusResponseDto> {
+    this.statusChanges.push(input);
+    const activity = this.activities.find(
+      (item) => item.id === input.activityId,
+    )!;
+    const status = ACTIVITY_TRANSITIONS[input.action].to;
+    activity.status = status;
+
+    return { id: activity.id, status, changedAt: '2026-12-07T12:00:00.000Z' };
   }
 }

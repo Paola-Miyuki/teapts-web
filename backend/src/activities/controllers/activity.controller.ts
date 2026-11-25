@@ -40,6 +40,8 @@ import {
   activityNotArchivable,
   activityNotEditable,
   activityNotFound,
+  activityStatusForbidden,
+  invalidActivityTransition,
   invalidFrequency,
 } from '../activities.errors';
 import { ActivityResponseDto } from '../dto/activity-response.dto';
@@ -47,6 +49,10 @@ import {
   ArchiveActivityRequestDto,
   ArchiveActivityResponseDto,
 } from '../dto/archive-activity.dto';
+import {
+  ActivityStatusResponseDto,
+  SuspendActivityRequestDto,
+} from '../dto/activity-status.dto';
 import { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import { ActivitiesService } from '../services/activities.service';
 
@@ -106,5 +112,77 @@ export class ActivityController {
     @CurrentAccount() account: AccountContext,
   ): Promise<ArchiveActivityResponseDto> {
     return this.activitiesService.archiveActivity(id, dto, account);
+  }
+
+  @Post(':id/suspend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Suspende uma atividade em andamento (RFACT009)',
+    description:
+      'Equipe do PTS ou admin, com motivo opcional. Grava activity_suspended na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async suspendActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: SuspendActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'suspend',
+      dto,
+      account,
+    );
+  }
+
+  @Post(':id/resume')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Retoma uma atividade suspensa (RFACT009)',
+    description: 'Equipe do PTS ou admin. Grava activity_resumed na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async resumeActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'resume',
+      {},
+      account,
+    );
+  }
+
+  @Post(':id/conclude')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Conclui uma atividade em andamento ou suspensa (RFACT009)',
+    description:
+      'Equipe do PTS ou admin. A concluída não volta a running. Grava activity_concluded na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async concludeActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'conclude',
+      {},
+      account,
+    );
   }
 }

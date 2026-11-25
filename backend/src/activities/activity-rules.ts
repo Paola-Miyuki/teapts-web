@@ -2,6 +2,7 @@ import {
   activityEditForbidden,
   activityNotArchivable,
   activityNotEditable,
+  invalidActivityTransition,
 } from './activities.errors';
 import { ActivityState } from './enums/activity.enums';
 
@@ -13,6 +14,35 @@ const ARCHIVABLE_STATES = [
   ActivityState.Running,
   ActivityState.Suspended,
 ];
+
+/** Suspender, retomar e concluir (RFACT009); a concluída não volta. */
+export const ACTIVITY_TRANSITIONS = {
+  suspend: {
+    from: [ActivityState.Running],
+    to: ActivityState.Suspended,
+  },
+  resume: {
+    from: [ActivityState.Suspended],
+    to: ActivityState.Running,
+  },
+  conclude: {
+    from: [ActivityState.Running, ActivityState.Suspended],
+    to: ActivityState.Concluded,
+  },
+} as const;
+
+export type ActivityStatusAction = keyof typeof ACTIVITY_TRANSITIONS;
+
+export function assertActivityTransition(
+  action: ActivityStatusAction,
+  status: ActivityState,
+): void {
+  const from: readonly ActivityState[] = ACTIVITY_TRANSITIONS[action].from;
+
+  if (!from.includes(status)) {
+    throw invalidActivityTransition();
+  }
+}
 
 export interface ActivityEditor {
   admin: boolean;

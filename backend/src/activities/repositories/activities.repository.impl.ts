@@ -24,8 +24,12 @@ import {
 import {
   assertActivityArchivable,
   assertActivityEditable,
+  assertActivityTransition,
+  ACTIVITY_TRANSITIONS,
+  type ActivityStatusAction,
 } from '../activity-rules';
 import type { ActivityResponseDto } from '../dto/activity-response.dto';
+import type { ActivityStatusResponseDto } from '../dto/activity-status.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
 import type { ActivityFrequencyDto } from '../dto/create-activity.dto';
 import { ActivityDocumentEntity } from '../entities/activity-document.entity';
@@ -37,6 +41,7 @@ import { ActivityState } from '../enums/activity.enums';
 import {
   ActivitiesRepository,
   type ArchiveActivityInput,
+  type ChangeActivityStatusInput,
   type CreateActivityInput,
   type StoredActivity,
   type UpdateActivityInput,
@@ -64,6 +69,12 @@ function toStoredFrequency(frequency: ActivityFrequencyDto): StoredFrequency {
     duration_minutes: frequency.durationMinutes,
   };
 }
+
+const STATUS_EVENTS: Record<ActivityStatusAction, TimelineRecordType> = {
+  suspend: TimelineRecordType.ActivitySuspended,
+  resume: TimelineRecordType.ActivityResumed,
+  conclude: TimelineRecordType.ActivityConcluded,
+};
 
 @Injectable()
 export class ActivitiesRepositoryImpl extends ActivitiesRepository {
@@ -247,6 +258,43 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
         status: ActivityState.Archived,
         archivedAt: archivedAt.toISOString(),
       };
+    });
+  }
+
+  async changeStatus(
+    input: ChangeActivityStatusInput,
+  ): Promise<ActivityStatusResponseDto> {
+    const { ptsId, activityId, action } = input;
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockPts(manager, ptsId);
+      const activity = await this.lockActivity(manager, ptsId, activityId);
+
+      assertActivityTransition(action, activity.status);
+
+      const status = ACTIVITY_TRANSITIONS[action].to;
+      const changedAt = new Date();
+      await manager.update(
+        ActivityEntity,
+        { id: activityId, ptsId },
+        {
+          status,
+          ...(action === 'suspend' && { suspendedAt: changedAt }),
+          ...(action === 'conclude' && { concludedAt: changedAt }),
+          // Ao retomar ou concluir, o motivo da suspensão deixa de valer.
+          statusReason: input.reason,
+          statusChangedByAccountId: input.executedByAccountId,
+          updatedAt: changedAt,
+        },
+      );
+      await this.record(
+        manager,
+        STATUS_EVENTS[action],
+        input,
+        input.description,
+      );
+
+      return { id: activityId, status, changedAt: changedAt.toISOString() };
     });
   }
 

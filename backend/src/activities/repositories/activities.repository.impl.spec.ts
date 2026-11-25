@@ -461,3 +461,88 @@ describe('ActivitiesRepositoryImpl', () => {
     }
   });
 });
+
+describe('ActivitiesRepositoryImpl.changeStatus (RFACT009)', () => {
+  const change = (action: 'suspend' | 'resume' | 'conclude') => ({
+    ptsId: 'pts-1',
+    activityId: 'act-1',
+    action,
+    reason: action === 'suspend' ? 'Sala' : null,
+    authorProfessionalId: 'prof-2',
+    executedByAccountId: 'acc-2',
+    description: 'João Lima mudou',
+  });
+  const inState = (status: ActivityState) =>
+    setup({ activity: { id: 'act-1', status } });
+
+  it.each([
+    [
+      'suspend',
+      ActivityState.Running,
+      {
+        status: 'suspended',
+        suspendedAt: expect.any(Date),
+        statusReason: 'Sala',
+      },
+      'activity_suspended',
+    ],
+    [
+      'resume',
+      ActivityState.Suspended,
+      { status: 'running', statusReason: null },
+      'activity_resumed',
+    ],
+    [
+      'conclude',
+      ActivityState.Suspended,
+      {
+        status: 'concluded',
+        concludedAt: expect.any(Date),
+        statusReason: null,
+      },
+      'activity_concluded',
+    ],
+  ] as const)(
+    '%s: grava o estado, a data e o evento na mesma transação',
+    async (action, from, values, type) => {
+      const { repository, query, manager, recorder } = inState(from);
+
+      expect(await repository.changeStatus(change(action))).toEqual({
+        id: 'act-1',
+        status: values.status,
+        changedAt: expect.any(String),
+      });
+      expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+      expect(manager.update).toHaveBeenCalledWith(
+        ActivityEntity,
+        { id: 'act-1', ptsId: 'pts-1' },
+        {
+          ...values,
+          statusChangedByAccountId: 'acc-2',
+          updatedAt: expect.any(Date),
+        },
+      );
+      expect(recorder.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type,
+          targetType: 'activity',
+          targetId: 'act-1',
+          description: 'João Lima mudou',
+        }),
+        manager,
+      );
+    },
+  );
+
+  it('refaz a checagem com a atividade travada e não grava na recusa', async () => {
+    const { repository, manager, recorder } = inState(ActivityState.Archived);
+
+    await expectApiError(
+      () => repository.changeStatus(change('conclude')),
+      409,
+      'INVALID_ACTIVITY_TRANSITION',
+    );
+    expect(manager.update).not.toHaveBeenCalled();
+    expect(recorder.record).not.toHaveBeenCalled();
+  });
+});

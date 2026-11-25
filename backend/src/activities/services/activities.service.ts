@@ -18,6 +18,7 @@ import {
   activityEditForbidden,
   activityForbidden,
   activityNotFound,
+  activityStatusForbidden,
   executorsNotAllowed,
   invalidActivityAuthor,
   invalidActivityDocuments,
@@ -29,12 +30,18 @@ import {
 import {
   assertActivityArchivable,
   assertActivityEditable,
+  assertActivityTransition,
   editableStates,
+  type ActivityStatusAction,
 } from '../activity-rules';
 import type {
   ActivityResponseDto,
   GetActivitiesResponseDto,
 } from '../dto/activity-response.dto';
+import type {
+  ActivityStatusResponseDto,
+  SuspendActivityRequestDto,
+} from '../dto/activity-status.dto';
 import type {
   ArchiveActivityRequestDto,
   ArchiveActivityResponseDto,
@@ -69,6 +76,12 @@ function parseFrequency(value: unknown): ActivityFrequencyDto {
 
   return { quantity, period: period as ActivityPeriod, durationMinutes };
 }
+
+const STATUS_VERBS: Record<ActivityStatusAction, string> = {
+  suspend: 'suspendeu',
+  resume: 'retomou',
+  conclude: 'concluiu',
+};
 
 @Injectable()
 export class ActivitiesService {
@@ -289,6 +302,47 @@ export class ActivitiesService {
       authorProfessionalId: profileId,
       executedByAccountId: account.accountId,
       description: `${executorName} arquivou a atividade ${activity.title}${
+        reason ? ` (${reason})` : ''
+      }`,
+    });
+  }
+
+  async changeActivityStatus(
+    activityId: string,
+    action: ActivityStatusAction,
+    dto: SuspendActivityRequestDto,
+    account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+    const admin = isAdmin(account);
+    // Qualquer profissional da equipe do PTS ou o admin (RFACT009).
+    const profileId = admin ? null : (ownTeamProfile(pts, account) ?? null);
+
+    if (!admin && !profileId) {
+      throw activityStatusForbidden();
+    }
+
+    assertActivityTransition(action, activity.status);
+    assertPtsEditable(pts.status);
+
+    const reason = dto.reason?.trim() || null;
+    const executorName = await this.executorName(account, admin);
+
+    return this.activitiesRepository.changeStatus({
+      ptsId: pts.id,
+      activityId,
+      action,
+      reason,
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: profileId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} ${STATUS_VERBS[action]} a atividade ${activity.title}${
         reason ? ` (${reason})` : ''
       }`,
     });
