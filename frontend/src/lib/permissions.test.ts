@@ -298,6 +298,60 @@ describe('can', () => {
     });
   });
 
+  describe('suspender, retomar e concluir atividade (RFACT009)', () => {
+    const pts = { ...draft, status: 'running' };
+    const ALLOWED = {
+      suspendActivity: ['running'],
+      resumeActivity: ['suspended'],
+      concludeActivity: ['running', 'suspended'],
+    } as const;
+    const STATES = [
+      'suggested',
+      'rejected',
+      'running',
+      'suspended',
+      'concluded',
+      'archived',
+    ];
+    const actions = Object.keys(ALLOWED) as (keyof typeof ALLOWED)[];
+
+    it.each(actions)('%s: equipe e admin, só nos estados da ação', (action) => {
+      const allowed: readonly string[] = ALLOWED[action];
+
+      for (const status of STATES) {
+        for (const user of [professional, admin]) {
+          expect(
+            can(user, action, {
+              pts,
+              activity: { status, authorProfessionalId: null },
+            }),
+          ).toBe(allowed.includes(status));
+        }
+      }
+    });
+
+    it.each(actions)('%s: nega fora da equipe e no PTS encerrado', (action) => {
+      const activity = {
+        status: ALLOWED[action][0],
+        authorProfessionalId: null,
+      };
+
+      expect(
+        can(professional, action, {
+          pts: { ...pts, teamProfessionalIds: [] },
+          activity,
+        }),
+      ).toBe(false);
+      expect(can(patient, action, { pts, activity })).toBe(false);
+      expect(can(waiting, action, { pts, activity })).toBe(false);
+      for (const user of [professional, admin]) {
+        expect(
+          can(user, action, { pts: { ...pts, status: 'concluded' }, activity }),
+        ).toBe(false);
+      }
+    });
+  });
+
   describe('archiveActivity (RFACT008)', () => {
     const pts = { ...draft, status: 'running' };
     const activity = (status: string) => ({

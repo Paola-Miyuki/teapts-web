@@ -203,3 +203,27 @@ export function archiveActivity(activityId: string, reason?: string) {
     },
   );
 }
+
+export type ActivityStatusAction = 'suspend' | 'resume' | 'conclude';
+
+export type ActivityStatusResponse = {
+  id: string;
+  status: 'suspended' | 'running' | 'concluded';
+  changedAt: string;
+};
+
+// O motivo só vale na suspensão (RFACT009).
+export function changeActivityStatus(
+  activityId: string,
+  action: ActivityStatusAction,
+  reason?: string,
+) {
+  return request<ActivityStatusResponse>(
+    `/activities/${encodeURIComponent(activityId)}/${action}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
+}

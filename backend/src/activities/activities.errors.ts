@@ -51,6 +51,20 @@ export const activityNotArchivable = () =>
     'Atividade rejeitada, concluída ou já arquivada não pode ser arquivada.',
   );
 
+export const activityStatusForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem mudar o estado da atividade.',
+  );
+
+export const invalidActivityTransition = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'INVALID_ACTIVITY_TRANSITION',
+    'A atividade não está em um estado que permita esta ação.',
+  );
+
 export const activityNotEditable = () =>
   new PtsApiError(
     HttpStatus.CONFLICT,

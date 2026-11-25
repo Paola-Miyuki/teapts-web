@@ -51,7 +51,7 @@ function respond(status: number, body: unknown) {
   } as unknown as Response;
 }
 
-describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
+describe('ActivitiesTab (RFACT001, RFACT005, RFACT008, RFACT009)', () => {
   const replace = jest.fn();
   const reload = jest.fn();
   let fetchMock: jest.Mock;
@@ -69,6 +69,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
         canCreate
         canEdit={() => true}
         canArchive={() => true}
+        canChangeStatus={() => true}
         team={TEAM}
         goals={GOALS}
         isAdmin={false}
@@ -76,6 +77,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
         onStatusFilterChange={jest.fn()}
         executorFilter={undefined}
         onExecutorFilterChange={jest.fn()}
+        onClearFilters={jest.fn()}
         page={1}
         limit={10}
         onPageChange={jest.fn()}
@@ -86,7 +88,9 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
   }
 
   const fill = (label: RegExp | string, value: string) =>
-    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText(label), {
+      target: { value },
+    });
   const submit = () =>
     fireEvent.click(screen.getByRole('button', { name: 'Sugerir atividade' }));
   const sentBody = () => JSON.parse(fetchMock.mock.calls[0][1].body);
@@ -141,6 +145,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
       canCreate: true,
       canEdit: () => true,
       canArchive: () => true,
+      canChangeStatus: () => true,
       team: TEAM,
       goals: GOALS,
       isAdmin: false,
@@ -149,6 +154,7 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
       onStatusFilterChange: jest.fn(),
       executorFilter: undefined,
       onExecutorFilterChange: jest.fn(),
+      onClearFilters: jest.fn(),
       page: 1,
       limit: 10,
       onPageChange: jest.fn(),
@@ -345,32 +351,156 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('filtra por status e executor e permite paginar', () => {
+  it('filtra por status e executor, limpa e permite paginar', () => {
     const onStatusFilterChange = jest.fn();
     const onExecutorFilterChange = jest.fn();
+    const onClearFilters = jest.fn();
     const onPageChange = jest.fn();
 
     renderTab({
       pagination: { page: 1, limit: 10, total: 21, totalPages: 3 },
-      statusFilter: ['suggested', 'running', 'suspended'] as ActivityStatus[],
+      statusFilter: ['suggested', 'running', 'suspended'],
       onStatusFilterChange,
       onExecutorFilterChange,
+      onClearFilters,
       onPageChange,
     });
 
-    expect(screen.getByRole('checkbox', { name: 'Sugerida' })).toBeChecked();
-    fireEvent.click(
-      screen.getByLabelText('Status: Sugerida, Em andamento, Suspensa'),
-    );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Sugerida' }));
-    expect(onStatusFilterChange).toHaveBeenCalledWith(['running', 'suspended']);
-    fireEvent.change(screen.getByLabelText('Executor'), {
+    // A contagem é a do filtro inteiro, não a da página.
+    expect(screen.getByText('21 atividades')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+    expect(
+      screen.getAllByLabelText(/^Status: /, { selector: 'summary' }),
+    ).toHaveLength(1);
+    expect(screen.getByLabelText('Sugerida')).toBeChecked();
+    expect(screen.getByLabelText('Arquivada')).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText('Sugerida'));
+    expect(onStatusFilterChange).toHaveBeenLastCalledWith([
+      'running',
+      'suspended',
+    ]);
+    fireEvent.click(screen.getByLabelText('Arquivada'));
+    expect(onStatusFilterChange).toHaveBeenLastCalledWith([
+      'suggested',
+      'running',
+      'suspended',
+      'archived',
+    ]);
+    fireEvent.change(screen.getByLabelText('Quem executa'), {
       target: { value: 'family' },
     });
     expect(onExecutorFilterChange).toHaveBeenCalledWith('family');
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Página 2' }));
     expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it('mostra tudo o que a API devolveu, seja qual for o status', () => {
+    renderTab({
+      statusFilter: [],
+      activities: [
+        activity({ id: 'act-2', title: 'Hidroterapia', status: 'concluded' }),
+        activity({ id: 'act-3', title: 'Grupo de pais', status: 'rejected' }),
+      ],
+    });
+
+    expect(screen.getByText('Hidroterapia')).toBeInTheDocument();
+    expect(screen.getByText('Grupo de pais')).toBeInTheDocument();
+  });
+
+  it('na página que ficou vazia, mantém a paginação', () => {
+    const onPageChange = jest.fn();
+    renderTab({
+      activities: [],
+      page: 2,
+      pagination: { page: 2, limit: 10, total: 10, totalPages: 1 },
+      onPageChange,
+    });
+
+    expect(
+      screen.getByText('Nenhuma atividade nesta página'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Página 1' }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
+
+  describe('modal "Visualizar"', () => {
+    const openView = (
+      overrides: Partial<Activity> = {},
+      props: Partial<React.ComponentProps<typeof ActivitiesTab>> = {},
+    ) => {
+      const item = activity(overrides);
+      fetchMock.mockResolvedValue(
+        respond(200, {
+          ...item,
+          goal: null,
+          documents: [],
+          appointmentsCount: 0,
+        }),
+      );
+      renderTab({ activities: [item], ...props });
+      fireEvent.click(
+        screen.getByRole('menuitem', { name: 'Visualizar', hidden: true }),
+      );
+
+      return screen.findByText('Quem executa', { selector: 'h3' });
+    };
+
+    it('quem só lê (paciente) abre o detalhe, sem nenhuma ação', async () => {
+      await openView(
+        {},
+        {
+          canEdit: () => false,
+          canArchive: () => false,
+          canChangeStatus: () => false,
+        },
+      );
+
+      const dialog = within(screen.getByRole('dialog'));
+      expect(
+        dialog.queryByRole('button', { name: /Editar|Suspender|Concluir/ }),
+      ).not.toBeInTheDocument();
+      expect(dialog.getByText('Sugerida por')).toBeInTheDocument();
+    });
+
+    it('sem executores vale o autor, só quando a equipe executa', async () => {
+      await openView({ executor: 'team' });
+      expect(
+        screen.getByText('Profissionais executores').nextSibling,
+      ).toHaveTextContent('João Lima');
+    });
+
+    it('com a família executando, não mostra profissional', async () => {
+      await openView({ executor: 'family' });
+      expect(
+        screen.queryByText('Profissionais executores'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('não mostra o id de quem saiu da equipe', async () => {
+      await openView({ authorProfessionalId: 'prof-x' });
+      expect(screen.queryByText(/prof-x/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['Editar', 'Editar atividade'],
+      ['Suspender', 'Suspender Integração sensorial?'],
+      ['Concluir', 'Concluir Integração sensorial?'],
+    ])('abre %s pelo modal (RFACT009)', async (name, title) => {
+      await openView(
+        { status: 'running' },
+        { canChangeStatus: (_activity, action) => action !== 'resume' },
+      );
+      const dialog = within(screen.getByRole('dialog'));
+      expect(
+        dialog.queryByRole('button', { name: 'Retomar' }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(dialog.getByRole('button', { name }));
+
+      expect(screen.getByRole('dialog', { name: title })).toBeInTheDocument();
+    });
   });
 
   it('abre o detalhe em modo somente leitura', async () => {
@@ -432,7 +562,9 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
     expect(screen.getByLabelText(/^Meta/)).toHaveValue('goal-1');
     // Especialidade e quem executa não mudam na edição.
     expect(screen.getByLabelText(/^Especialidade/)).toBeDisabled();
-    expect(screen.getByLabelText(/^Quem executa/)).toBeDisabled();
+    expect(
+      within(screen.getByRole('dialog')).getByLabelText(/^Quem executa/),
+    ).toBeDisabled();
     expect(screen.queryByLabelText(/^Autor/)).not.toBeInTheDocument();
 
     fill(/^Título/, ' Circuito sensorial ');
@@ -474,47 +606,22 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it('por padrão esconde a arquivada, que aparece marcando "Arquivada"', () => {
-    renderTab({
-      activities: [
-        activity(),
-        activity({ id: 'act-2', title: 'Hidroterapia', status: 'archived' }),
-        activity({ id: 'act-3', title: 'Grupo de pais', status: 'rejected' }),
-      ],
-    });
-
-    expect(screen.getByText('Integração sensorial')).toBeInTheDocument();
-    expect(screen.queryByText('Hidroterapia')).not.toBeInTheDocument();
-    expect(screen.queryByText('Grupo de pais')).not.toBeInTheDocument();
-    expect(screen.getByText('1 atividade')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
-    fireEvent.click(screen.getByLabelText('Arquivada'));
-
-    const row = within(screen.getByText('Hidroterapia').closest('tr')!);
-    expect(row.getByText('Arquivada')).toHaveClass('badge', 'archived');
-    expect(screen.getByText('2 atividades')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
-    expect(screen.queryByText('Hidroterapia')).not.toBeInTheDocument();
-  });
-
   it('mostra "Arquivar" só na atividade que a pessoa pode arquivar', () => {
     renderTab({
       activities: [
         activity(),
-        activity({ id: 'act-2', title: 'Suspensa', status: 'suspended' }),
+        activity({ id: 'act-2', title: 'Hidroterapia', status: 'suspended' }),
       ],
-      canEdit: () => false,
       canArchive: (item) => item.status === 'suggested',
     });
+    const archive = (title: string) =>
+      within(screen.getByText(title).closest('tr')!).queryByRole('menuitem', {
+        name: 'Arquivar',
+        hidden: true,
+      });
 
-    expect(
-      screen.getByRole('button', { name: 'Ações para Integração sensorial' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Ações para Suspensa' }),
-    ).not.toBeInTheDocument();
+    expect(archive('Integração sensorial')).toBeInTheDocument();
+    expect(archive('Hidroterapia')).not.toBeInTheDocument();
   });
 
   it('arquiva com o motivo, mostra o carregamento e tira da lista', async () => {
@@ -591,5 +698,110 @@ describe('ActivitiesTab (RFACT001, RFACT005, RFACT008)', () => {
 
     expect(await screen.findByText(message)).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  describe('suspender, retomar e concluir (RFACT009)', () => {
+    const item = (name: string) =>
+      screen.queryByRole('menuitem', { name, hidden: true });
+    const openAction = (name: string, status: Activity['status']) => {
+      renderTab({ activities: [activity({ status })] });
+      fireEvent.click(item(name)!);
+    };
+
+    it('mostra só as ações que a pessoa pode fazer na atividade', () => {
+      renderTab({
+        activities: [activity({ status: 'running' })],
+        canEdit: () => false,
+        canArchive: () => false,
+        canChangeStatus: (_activity, action) => action !== 'resume',
+      });
+
+      expect(item('Suspender')).toBeInTheDocument();
+      expect(item('Concluir')).toBeInTheDocument();
+      expect(item('Retomar')).not.toBeInTheDocument();
+      expect(item('Editar')).not.toBeInTheDocument();
+    });
+
+    it('suspende com o motivo, mostra o carregamento e atualiza a lista', async () => {
+      let finish: (value: Response) => void = () => undefined;
+      fetchMock.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      openAction('Suspender', 'running');
+
+      expect(
+        screen.getByRole('dialog', { name: 'Suspender Integração sensorial?' }),
+      ).toBeInTheDocument();
+      fill(/^Motivo/, '  Reforma da sala. ');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Suspender atividade' }),
+      );
+
+      expect(
+        screen.getByRole('button', { name: 'Suspendendo...' }),
+      ).toBeDisabled();
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:3000/activities/act-1/suspend',
+        expect.objectContaining({ method: 'POST', credentials: 'include' }),
+      );
+      expect(sentBody()).toEqual({ reason: 'Reforma da sala.' });
+
+      finish(respond(200, { id: 'act-1', status: 'suspended' }));
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+      expect(screen.getByText('Atividade suspensa')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['Retomar', 'suspended', 'resume', 'Atividade retomada'],
+      ['Concluir', 'running', 'conclude', 'Atividade concluída'],
+      ['Concluir', 'suspended', 'conclude', 'Atividade concluída'],
+    ] as const)(
+      '%s a %s, sem pedir motivo',
+      async (name, status, path, message) => {
+        openAction(name, status);
+
+        expect(screen.queryByLabelText(/^Motivo/)).not.toBeInTheDocument();
+        const confirm = screen.getByRole('button', {
+          name: `${name} atividade`,
+        });
+        expect(confirm).toHaveClass('btn-primary');
+        fireEvent.click(confirm);
+
+        expect(await screen.findByText(message)).toBeInTheDocument();
+        expect(fetchMock).toHaveBeenCalledWith(
+          `http://localhost:3000/activities/act-1/${path}`,
+          expect.objectContaining({ method: 'POST', credentials: 'include' }),
+        );
+        expect(reload).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('mostra a mensagem de erro da API', async () => {
+      const message =
+        'A atividade não está em um estado que permita esta ação.';
+      fetchMock.mockResolvedValue(
+        respond(409, { status: 'INVALID_ACTIVITY_TRANSITION', message }),
+      );
+      openAction('Concluir', 'running');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Concluir atividade' }),
+      );
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('sem sessão, vai para o login', async () => {
+      fetchMock.mockResolvedValue(respond(401, {}));
+      openAction('Retomar', 'suspended');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Retomar atividade' }),
+      );
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
   });
 });

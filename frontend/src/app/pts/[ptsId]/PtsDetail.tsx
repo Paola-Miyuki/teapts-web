@@ -25,7 +25,11 @@ import {
 import GoalsTab from '@/components/pts/GoalsTab';
 import ActivitiesTab from '@/components/pts/ActivitiesTab';
 import { useActivities } from '@/hooks/useActivities';
-import { type ActivityExecutor, type ActivityStatus } from '@/lib/activities';
+import {
+  ACTIVE_ACTIVITY_STATUSES,
+  type ActivityExecutor,
+  type ActivityStatus,
+} from '@/lib/activities';
 import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
@@ -37,17 +41,7 @@ import ClosePtsDialog from '../_components/ClosePtsDialog';
 import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
-const DEFAULT_ACTIVITY_STATUSES: ActivityStatus[] = [
-  'suggested',
-  'running',
-  'suspended',
-];
-const ALL_ACTIVITY_STATUSES: ActivityStatus[] = [
-  ...DEFAULT_ACTIVITY_STATUSES,
-  'concluded',
-  'rejected',
-  'archived',
-];
+const ALL_STATUSES: ActivityStatus[] = [];
 
 type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
 
@@ -172,9 +166,10 @@ function PtsDetailContent({
   const [retryKey, setRetryKey] = useState(0);
   const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
+  // Sem escolha da pessoa: só o que faz parte do plano ou, no PTS encerrado, tudo.
   const [activityStatuses, setActivityStatuses] = useState<
-    ActivityStatus[] | undefined
-  >();
+    ActivityStatus[] | null
+  >(null);
   const [activityExecutor, setActivityExecutor] = useState<
     ActivityExecutor | undefined
   >();
@@ -191,15 +186,15 @@ function PtsDetailContent({
   const activityStatusFilter =
     activityStatuses ??
     (['concluded', 'cancelled'].includes(pts?.status ?? '')
-      ? undefined
-      : DEFAULT_ACTIVITY_STATUSES);
+      ? ALL_STATUSES
+      : ACTIVE_ACTIVITY_STATUSES);
   const {
     activities,
     pagination: activitiesPagination,
     error: activitiesError,
     reload: reloadActivities,
   } = useActivities(id, {
-    status: activityStatusFilter,
+    status: activityStatusFilter.length > 0 ? activityStatusFilter : undefined,
     executor: activityExecutor,
     page: activityPage,
     limit: activityLimit,
@@ -556,6 +551,14 @@ function PtsDetailContent({
               !isPatient &&
               can(account, 'archiveActivity', { pts: permissionPts, activity })
             }
+            canChangeStatus={(activity, action) =>
+              !readOnly &&
+              !isPatient &&
+              can(account, `${action}Activity`, {
+                pts: permissionPts,
+                activity,
+              })
+            }
             team={members.map((member) => ({
               id: member.id,
               name: member.name,
@@ -565,12 +568,17 @@ function PtsDetailContent({
             isAdmin={isAdmin}
             statusFilter={activityStatusFilter}
             onStatusFilterChange={(status) => {
-              setActivityStatuses(status ?? ALL_ACTIVITY_STATUSES);
+              setActivityStatuses(status);
               setActivityPage(1);
             }}
             executorFilter={activityExecutor}
             onExecutorFilterChange={(executor) => {
               setActivityExecutor(executor);
+              setActivityPage(1);
+            }}
+            onClearFilters={() => {
+              setActivityStatuses(null);
+              setActivityExecutor(undefined);
               setActivityPage(1);
             }}
             page={activityPage}

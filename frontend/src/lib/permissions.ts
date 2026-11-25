@@ -29,6 +29,9 @@ export type PermissionAction =
   | 'createActivity'
   | 'editActivity'
   | 'archiveActivity'
+  | 'suspendActivity'
+  | 'resumeActivity'
+  | 'concludeActivity'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -102,6 +105,20 @@ function isArchivableActivity(activity?: ActivityPermissionData) {
   return ['suggested', 'running', 'suspended'].includes(activity?.status ?? '');
 }
 
+// Estados de onde cada ação sai; a concluída não volta (RFACT009).
+const ACTIVITY_TRANSITIONS = {
+  suspendActivity: ['running'],
+  resumeActivity: ['suspended'],
+  concludeActivity: ['running', 'suspended'],
+};
+
+function allowsTransition(
+  action: keyof typeof ACTIVITY_TRANSITIONS,
+  activity?: ActivityPermissionData,
+) {
+  return ACTIVITY_TRANSITIONS[action].includes(activity?.status ?? '');
+}
+
 function isProposalMember(user: PermissionUser, pts: PtsPermissionData) {
   const memberIds = [
     pts.responsibleProfessionalId,
@@ -155,6 +172,10 @@ export function can(
         );
       case 'archiveActivity':
         return isEditablePts(pts) && isArchivableActivity(activity);
+      case 'suspendActivity':
+      case 'resumeActivity':
+      case 'concludeActivity':
+        return isEditablePts(pts) && allowsTransition(action, activity);
       default:
         return true;
     }
@@ -283,6 +304,18 @@ export function can(
         isEditablePts(pts) &&
         isProposalMember(user, pts) &&
         isArchivableActivity(activity)
+      );
+
+    case 'suspendActivity':
+    case 'resumeActivity':
+    case 'concludeActivity':
+      // RFACT009 – qualquer profissional da equipe do PTS.
+      return (
+        professional &&
+        pts !== undefined &&
+        isEditablePts(pts) &&
+        isProposalMember(user, pts) &&
+        allowsTransition(action, activity)
       );
 
     case 'removePtsTeamMember':
