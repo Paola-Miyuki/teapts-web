@@ -16,7 +16,7 @@ Da raiz: `pnpm --dir backend run <script>`.
 
 ## Variáveis de ambiente
 
-`make env` cria o `.env`; só falta preencher `DATABASE_PASSWORD`. Variáveis: `PORT` (3000), `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_NAME`, `DATABASE_PASSWORD`, `WEBSITE_DOMAIN` (origem do frontend, `http://localhost:3001`), `API_DOMAIN`, `SUPERTOKENS_CONNECTION_URI`, `SUPERTOKENS_API_KEY` e `SUPERTOKENS_VERSION` (fixe uma). No Docker, o Compose troca o host do banco por `postgres` e o do SuperTokens por `supertokens`.
+`make env` cria o `.env`; só falta preencher `DATABASE_PASSWORD`. Variáveis: `PORT` (3000), `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_NAME`, `DATABASE_PASSWORD`, `WEBSITE_DOMAIN` (origem do frontend, `http://localhost:3001`), `API_DOMAIN` (base das URLs de envio de arquivo), `STORAGE_TOKEN_SECRET` (segredo do token dessas URLs), `STORAGE_UPLOAD_URL_TTL_MINUTES` (validade, padrão 15), `SUPERTOKENS_CONNECTION_URI`, `SUPERTOKENS_API_KEY` e `SUPERTOKENS_VERSION` (fixe uma). No Docker, o Compose troca o host do banco por `postgres` e o do SuperTokens por `supertokens`.
 
 ## Estrutura
 
@@ -27,6 +27,7 @@ src/
   common/       pagination, search, swagger, validation
   auth/         guards, SuperTokens, /me, signup e login
   accounts/     patients/     professionals/     pts/     timeline/     health/
+  documents/    storage/ (StorageService, driver PostgresStorage, token HMAC)
   database/     database.config.ts (conexão e arrays entities/migrations), data-source.ts,
                 migrations/, seeds/, enums/
 test/           e2e (*.e2e-spec.ts)
@@ -53,6 +54,8 @@ Todas exigem sessão, exceto `GET /health` e `/auth/signup|signin|session/refres
 | `GET /professionals`                                                                         | conta da sessão (e-mail só para admin e profissional; `accountId` só para admin, para o `DELETE /accounts/:id`)                                 |
 | `POST /professionals`                                                                        | admin: `accountId`, `specialism`, `councilNumber`, `councilState`; opcionais `institution`, `cnes`                                              |
 | `PATCH /professionals/:id`                                                                   | admin: `specialism`; com outro conselho, `councilNumber` e `councilState` (mesmo conselho mantém o registro)                                    |
+| `POST /patients/:id/documents/upload-url`                                                    | admin, profissional com PTS ativo ou o paciente: `fileName`, `mimeType`, `sizeBytes` (5 MB)                                                     |
+| `PUT /storage/objects/:fileKey?token=`                                                       | sem sessão: o token da `uploadUrl` vale só para o objeto e o tipo (`409` se já enviado)                                                         |
 | `POST /pts`                                                                                  | profissional (vira o responsável) ou admin                                                                                                      |
 | `GET /pts/proposals[/:id]`                                                                   | paciente titular, profissional da proposta ou admin                                                                                             |
 | `PATCH, DELETE /pts/proposals/:id`                                                           | responsável ou admin, proposta em `draft`                                                                                                       |
@@ -76,7 +79,7 @@ O schema só muda por migration (`synchronize` é `false`). Entidade ou migratio
 
 Nunca edite migration já aplicada. No Docker, migration nova só vale depois do `make rebuild-backend`. Nomes: colunas em snake_case, enums com sufixo `_e` e restrições com `PK_`, `FK_`, `UQ_`, `IDX_` e `CHK_`.
 
-**Regras do modelo:** uma conta tem no máximo um perfil profissional e um de paciente (RN002), e admin, paciente e profissional usam contas separadas. Excluir é lógico: `account.status = 'inactive'` (RN021) e `deleted_at` na proposta de PTS. O conselho e o nome da especialidade vêm do código (`professionals/professional-registration.ts`); a UF do registro é `uf_e`, em minúsculas.
+**Regras do modelo:** uma conta tem no máximo um perfil profissional e um de paciente (RN002), e admin, paciente e profissional usam contas separadas. Excluir é lógico: `account.status = 'inactive'` (RN021) e `deleted_at` na proposta de PTS. O conselho e o nome da especialidade vêm do código (`professionals/professional-registration.ts`); a UF do registro é `uf_e`, em minúsculas. O storage de arquivos é simulado no Postgres (`stored_object`, `bytea`, até 5 MB; só para a demonstração): o `StorageService` é a única porta e aceita um driver S3 depois.
 
 **O que o seed cria** (`make seed`, ou `pnpm --dir backend run seed:test-user`; precisa do PostgreSQL e do SuperTokens no ar e das migrations aplicadas). Só para desenvolvimento. As contas são criadas ou reaproveitadas a cada execução; a senha de quem já existe no SuperTokens não é redefinida.
 

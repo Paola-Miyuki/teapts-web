@@ -8,6 +8,8 @@ import { Account } from '../src/accounts/entities/account.entity';
 import { Patient } from '../src/patients/entities/patient.entity';
 import { Professional } from '../src/professionals/entities/professional.entity';
 import { PtsEntity } from '../src/pts/entities/pts.entity';
+import { StoredObject } from '../src/storage/entities/stored-object.entity';
+import { STORAGE_CONFIG } from '../src/storage/storage.config';
 import { TimelineRecordEntity } from '../src/timeline/entities/timeline-record.entity';
 import { AppModule } from '../src/app.module';
 import { setupSwagger } from '../src/common/swagger/setup-swagger';
@@ -87,6 +89,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/patients/{patientId}/support-contacts', 'post'],
   ['/patients/{patientId}/support-contacts/{contactId}', 'patch'],
   ['/professionals', 'post'],
+  ['/patients/{id}/documents/upload-url', 'post'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -119,6 +122,14 @@ describe('Swagger (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(TimelineRecordEntity))
       .useValue({})
+      .overrideProvider(getRepositoryToken(StoredObject))
+      .useValue({})
+      .overrideProvider(STORAGE_CONFIG)
+      .useValue({
+        tokenSecret: 'test-secret',
+        uploadUrlTtlMinutes: 15,
+        baseUrl: 'http://localhost:3000',
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -239,6 +250,7 @@ describe('Swagger (e2e)', () => {
         '/patients',
         '/professionals',
         '/patients/{patientId}/support-contacts',
+        '/patients/{id}/documents/upload-url',
       ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
 

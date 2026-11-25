@@ -15,19 +15,19 @@ describe('StorageTokenService', () => {
   it('accepts a token for the same object and operation before it expires', () => {
     const token = service.sign(fileKey, 'write', later);
 
-    expect(service.verify(token, fileKey, 'write', now)).toBe(true);
+    expect(service.verify(token, fileKey, 'write', { now })).toBe(true);
   });
 
   it('rejects an expired token', () => {
     const token = service.sign(fileKey, 'write', later);
 
-    expect(service.verify(token, fileKey, 'write', later)).toBe(false);
+    expect(service.verify(token, fileKey, 'write', { now: later })).toBe(false);
   });
 
   it('rejects a token for another object', () => {
     const token = service.sign(fileKey, 'write', later);
 
-    expect(service.verify(token, 'patient-1/other.pdf', 'write', now)).toBe(
+    expect(service.verify(token, 'patient-1/other.pdf', 'write', { now })).toBe(
       false,
     );
   });
@@ -35,7 +35,7 @@ describe('StorageTokenService', () => {
   it('rejects a token for another operation', () => {
     const token = service.sign(fileKey, 'read', later);
 
-    expect(service.verify(token, fileKey, 'write', now)).toBe(false);
+    expect(service.verify(token, fileKey, 'write', { now })).toBe(false);
   });
 
   it('rejects a token signed with another secret', () => {
@@ -44,7 +44,7 @@ describe('StorageTokenService', () => {
       tokenSecret: 'secret-b',
     }).sign(fileKey, 'write', later);
 
-    expect(service.verify(token, fileKey, 'write', now)).toBe(false);
+    expect(service.verify(token, fileKey, 'write', { now })).toBe(false);
   });
 
   it('rejects a token with a tampered payload', () => {
@@ -54,14 +54,33 @@ describe('StorageTokenService', () => {
     ).toString('base64url');
 
     expect(
-      service.verify(`${forged}.${signature}`, fileKey, 'write', now),
+      service.verify(`${forged}.${signature}`, fileKey, 'write', {
+        now,
+      }),
     ).toBe(false);
+  });
+
+  it('limits the token to the file type it was signed for', () => {
+    const token = service.sign(fileKey, 'write', later, {
+      mimeType: 'application/pdf',
+    });
+
+    expect(
+      service.verify(token, fileKey, 'write', {
+        now,
+        mimeType: 'application/pdf',
+      }),
+    ).toBe(true);
+    expect(
+      service.verify(token, fileKey, 'write', { now, mimeType: 'image/png' }),
+    ).toBe(false);
+    expect(service.verify(token, fileKey, 'write', { now })).toBe(false);
   });
 
   it.each(['', 'abc', 'a.b.c', '.', 'a.'])(
     'rejects the malformed token "%s"',
     (token) => {
-      expect(service.verify(token, fileKey, 'write', now)).toBe(false);
+      expect(service.verify(token, fileKey, 'write', { now })).toBe(false);
     },
   );
 });

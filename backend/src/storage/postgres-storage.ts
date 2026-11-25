@@ -28,11 +28,15 @@ export class PostgresStorage extends StorageService {
     super();
   }
 
-  createUploadUrl(fileKey: string, now: Date = new Date()): SignedUrl {
+  createUploadUrl(
+    fileKey: string,
+    mimeType: string,
+    now: Date = new Date(),
+  ): SignedUrl {
     const expiresAt = new Date(
       now.getTime() + this.config.uploadUrlTtlMinutes * 60_000,
     );
-    const token = this.tokens.sign(fileKey, 'write', expiresAt);
+    const token = this.tokens.sign(fileKey, 'write', expiresAt, { mimeType });
 
     return {
       url: `${this.config.baseUrl}/storage/objects/${encodeURIComponent(fileKey)}?token=${token}`,

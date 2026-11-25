@@ -8,7 +8,15 @@ import { STORAGE_CONFIG, type StorageConfig } from '../storage.config';
 
 export type StorageOperation = 'write' | 'read';
 
-type TokenPayload = { k: string; op: StorageOperation; exp: number };
+type TokenPayload = {
+  k: string;
+  op: StorageOperation;
+  exp: number;
+  /** Tipo do arquivo; quando presente, a requisição precisa ter o mesmo. */
+  m?: string;
+};
+
+export type TokenConstraints = { mimeType?: string };
 
 function base64url(value: Buffer | string) {
   return Buffer.from(value).toString('base64url');
@@ -18,13 +26,22 @@ function base64url(value: Buffer | string) {
 export class StorageTokenService {
   constructor(@Inject(STORAGE_CONFIG) private readonly config: StorageConfig) {}
 
-  /** Assina um token para a operação no objeto, válido até `expiresAt`. */
-  sign(fileKey: string, operation: StorageOperation, expiresAt: Date): string {
+  /**
+   * Assina um token para a operação no objeto, válido até `expiresAt`.
+   * Com `mimeType`, o token só vale para um envio com esse tipo.
+   */
+  sign(
+    fileKey: string,
+    operation: StorageOperation,
+    expiresAt: Date,
+    { mimeType }: TokenConstraints = {},
+  ): string {
     const payload = base64url(
       JSON.stringify({
         k: fileKey,
         op: operation,
         exp: expiresAt.getTime(),
+        ...(mimeType === undefined ? {} : { m: mimeType }),
       } satisfies TokenPayload),
     );
 
@@ -34,14 +51,15 @@ export class StorageTokenService {
   /**
    * Confere assinatura, objeto, operação e vencimento.
    *
-   * @returns `true` só quando o token é deste `fileKey` e desta operação e
-   *   ainda não venceu
+   * @param mimeType tipo da requisição; o token com tipo só vale para ele
+   * @returns `true` só quando o token é deste `fileKey` e desta operação, tem
+   *   o mesmo tipo (se limitado) e ainda não venceu
    */
   verify(
     token: string,
     fileKey: string,
     operation: StorageOperation,
-    now: Date = new Date(),
+    { now = new Date(), mimeType }: { now?: Date } & TokenConstraints = {},
   ): boolean {
     const [payload, signature, ...rest] = token.split('.');
 
@@ -73,7 +91,8 @@ export class StorageTokenService {
       data.k === fileKey &&
       data.op === operation &&
       typeof data.exp === 'number' &&
-      data.exp > now.getTime()
+      data.exp > now.getTime() &&
+      (data.m === undefined || data.m === mimeType)
     );
   }
 

@@ -9,6 +9,8 @@ import { Account } from '../src/accounts/entities/account.entity';
 import { Patient } from '../src/patients/entities/patient.entity';
 import { Professional } from '../src/professionals/entities/professional.entity';
 import { PtsEntity } from '../src/pts/entities/pts.entity';
+import { StoredObject } from '../src/storage/entities/stored-object.entity';
+import { STORAGE_CONFIG } from '../src/storage/storage.config';
 import { AppModule } from '../src/app.module';
 
 // Sobe o AppModule inteiro (Config + TypeOrm + Health) e exercita as rotas por
@@ -43,6 +45,15 @@ describe('AppModule (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
       .useValue({})
+      // O storage lê STORAGE_TOKEN_SECRET e usa o repositório de objetos.
+      .overrideProvider(getRepositoryToken(StoredObject))
+      .useValue({})
+      .overrideProvider(STORAGE_CONFIG)
+      .useValue({
+        tokenSecret: 'test-secret',
+        uploadUrlTtlMinutes: 15,
+        baseUrl: 'http://localhost:3000',
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

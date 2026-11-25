@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { StorageObjectsController } from './controllers/storage-objects.controller';
 import { StoredObject } from './entities/stored-object.entity';
 import { PostgresStorage } from './postgres-storage';
 import { StorageTokenService } from './services/storage-token.service';
@@ -13,6 +14,7 @@ import { StorageService } from './storage.service';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([StoredObject])],
+  controllers: [StorageObjectsController],
   providers: [
     {
       provide: STORAGE_CONFIG,

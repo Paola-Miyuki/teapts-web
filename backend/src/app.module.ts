@@ -4,10 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { getDatabaseOptions } from './database/database.config';
+import { DocumentsModule } from './documents/documents.module';
 import { HealthModule } from './health/health.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { PatientsModule } from './patients/patients.module';
 import { PtsModule } from './pts/pts.module';
+import { StorageModule } from './storage/storage.module';
 import { TimelineModule } from './timeline/timeline.module';
 
 /**
@@ -29,10 +31,12 @@ import { TimelineModule } from './timeline/timeline.module';
 
     AccountsModule,
     AuthModule,
+    DocumentsModule,
     HealthModule,
     ProfessionalsModule,
     PatientsModule,
     PtsModule,
+    StorageModule,
     TimelineModule,
   ],
 })

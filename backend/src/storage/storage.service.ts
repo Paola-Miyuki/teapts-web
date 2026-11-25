@@ -22,8 +22,15 @@ export class StorageObjectAlreadyExistsError extends Error {
 }
 
 export abstract class StorageService {
-  /** URL assinada para enviar o objeto, limitada a ele e vencendo em breve. */
-  abstract createUploadUrl(fileKey: string, now?: Date): SignedUrl;
+  /**
+   * URL assinada para enviar o objeto, limitada a ele e ao tipo do arquivo, e
+   * vencendo em breve.
+   */
+  abstract createUploadUrl(
+    fileKey: string,
+    mimeType: string,
+    now?: Date,
+  ): SignedUrl;
 
   /**
    * Grava o objeto, ainda não ativo.

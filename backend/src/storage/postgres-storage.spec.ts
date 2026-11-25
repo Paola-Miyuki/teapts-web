@@ -31,7 +31,11 @@ describe('PostgresStorage.createUploadUrl', () => {
     const { storage, tokens } = createStorage();
     const now = new Date('2026-12-01T12:00:00.000Z');
 
-    const { url, expiresAt } = storage.createUploadUrl(fileKey, now);
+    const { url, expiresAt } = storage.createUploadUrl(
+      fileKey,
+      'application/pdf',
+      now,
+    );
 
     expect(expiresAt).toEqual(new Date('2026-12-01T12:15:00.000Z'));
 
@@ -40,16 +44,17 @@ describe('PostgresStorage.createUploadUrl', () => {
     expect(`${parsed.origin}${parsed.pathname}`).toBe(
       `http://localhost:3000/storage/objects/${encodeURIComponent(fileKey)}`,
     );
+    const token = parsed.searchParams.get('token')!;
+    const mimeType = 'application/pdf';
+
+    expect(tokens.verify(token, fileKey, 'write', { now, mimeType })).toBe(
+      true,
+    );
     expect(
-      tokens.verify(parsed.searchParams.get('token')!, fileKey, 'write', now),
-    ).toBe(true);
+      tokens.verify(token, fileKey, 'write', { now: expiresAt, mimeType }),
+    ).toBe(false);
     expect(
-      tokens.verify(
-        parsed.searchParams.get('token')!,
-        fileKey,
-        'write',
-        expiresAt,
-      ),
+      tokens.verify(token, fileKey, 'write', { now, mimeType: 'image/png' }),
     ).toBe(false);
   });
 });
