@@ -385,12 +385,15 @@ function PtsDetailContent({
                 Iniciar execução
               </button>
             )}
-            {/* Desabilitado até existir a tela de reavaliação (RFEVA005). */}
+            {/* RFEVA005 – responsável ou admin, com o PTS em andamento. */}
             {canReassess && (
-              <button type="button" className="btn btn-primary" disabled>
+              <Link
+                className="btn btn-primary"
+                href={`/pts/${pts.id}/reassessment`}
+              >
                 <Icon name="checkCircle" className="icon-sm" />
                 Registrar reavaliação
-              </button>
+              </Link>
             )}
             {canClose && (
               <button
