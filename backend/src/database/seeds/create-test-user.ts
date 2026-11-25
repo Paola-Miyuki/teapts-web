@@ -10,6 +10,8 @@ import { Sex } from '../../accounts/enums/sex.enum';
 import { DocumentEntity } from '../../documents/entities/document.entity';
 import { DocumentCategory } from '../../documents/enums/document-category.enum';
 import { Medication } from '../../patients/entities/medication.entity';
+import { SupportContact } from '../../patients/entities/support-contact.entity';
+import { EducationLevel } from '../../patients/enums/education-level.enum';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
@@ -40,10 +42,34 @@ type ProfessionalSeed = {
   cnes: string | null;
 };
 
-type PatientSeed = {
-  cns: string;
-  guardianName: string | null;
-};
+// Cadastro do paciente (RFPAC001) e histórico clínico (RFPAC007), com os
+// valores que as telas do prontuário mostram (propriedades-front.md, 3.2).
+// CEP e telefone só com dígitos.
+type PatientSeed = Pick<
+  Patient,
+  | 'cns'
+  | 'guardianName'
+  | 'guardianPhone'
+  | 'addressZipCode'
+  | 'addressStreet'
+  | 'addressNumber'
+  | 'addressComplement'
+  | 'addressDistrict'
+  | 'addressCity'
+  | 'addressState'
+  | 'filiation1'
+  | 'filiation2'
+  | 'educationLevel'
+  | 'schoolName'
+  | 'referenceUnit'
+  | 'allergies'
+  | 'noKnownAllergies'
+  | 'clinicalHistory'
+  | 'surgicalHistory'
+  | 'familyHistory'
+  | 'habits'
+  | 'developmentalMilestones'
+>;
 
 type TestUser = {
   key: string;
@@ -231,7 +257,35 @@ const TEST_USERS: TestUser[] = [
       cpf: '98765432100',
       phone: '41998123344',
     },
-    patient: { cns: '700001234567894', guardianName: null },
+    patient: {
+      cns: '700001234567894',
+      guardianName: 'Marlene Teste',
+      guardianPhone: '41997015522',
+      addressZipCode: '80045140',
+      addressStreet: 'Rua Itupava',
+      addressNumber: '1240',
+      addressComplement: 'ap. 32',
+      addressDistrict: 'Alto da XV',
+      addressCity: 'Curitiba',
+      addressState: 'pr',
+      filiation1: 'Marlene Teste',
+      filiation2: 'Não declarado',
+      educationLevel: EducationLevel.TechnicalOngoing,
+      schoolName: 'Colégio Estadual do Paraná',
+      referenceUnit: 'UBS Bairro Alto',
+      allergies:
+        'Alergia a amoxicilina (urticária generalizada). Sem lactose; aceita bebida vegetal.',
+      noKnownAllergies: false,
+      clinicalHistory:
+        'Gestação a termo (39 semanas), parto cesáreo. Icterícia neonatal com fototerapia por 2 dias. Otites de repetição até os 3 anos; insônia inicial desde os 5.',
+      surgicalHistory: 'Adenoidectomia em 2022, sem intercorrências.',
+      familyHistory:
+        'Primo materno com TEA. Pai com diagnóstico de TDAH na vida adulta. Avó materna com hipertensão.',
+      habits:
+        'Dorme por volta das 22h, com despertares à noite. Seletividade alimentar leve. Cerca de 2 horas de tela por dia.',
+      developmentalMilestones:
+        'Sentou aos 7 meses e andou aos 16. Primeiras palavras aos 2 anos e 6 meses; frases curtas aos 4.',
+    },
   },
   {
     key: 'luna',
@@ -247,7 +301,34 @@ const TEST_USERS: TestUser[] = [
       cpf: '11144477735',
       phone: '41996554433',
     },
-    patient: { cns: '700002223334444', guardianName: null },
+    patient: {
+      cns: '700002223334444',
+      guardianName: 'Marta Ferreira',
+      guardianPhone: '41996012233',
+      addressZipCode: '80020310',
+      addressStreet: 'Rua XV de Novembro',
+      addressNumber: '800',
+      addressComplement: 'bloco B',
+      addressDistrict: 'Centro',
+      addressCity: 'Curitiba',
+      addressState: 'pr',
+      filiation1: 'Marta Ferreira',
+      filiation2: 'Não declarado',
+      educationLevel: EducationLevel.HighSchoolOngoing,
+      schoolName: 'Colégio Estadual Pedro II',
+      referenceUnit: 'CER Curitiba',
+      allergies: 'Alergia a dipirona (edema de lábios). Sem glúten.',
+      noKnownAllergies: false,
+      clinicalHistory:
+        'Gestação a termo, parto normal sem intercorrências. Crises de ansiedade desde os 12 anos; acompanhamento psicológico desde 2023.',
+      surgicalHistory: 'Apendicectomia em 2020, sem intercorrências.',
+      familyHistory:
+        'Mãe com transtorno de ansiedade. Tio materno com TEA. Avô paterno com diabetes tipo 2.',
+      habits:
+        'Dorme por volta da meia-noite. Prefere atividades solitárias e música. Cerca de 4 horas de tela por dia.',
+      developmentalMilestones:
+        'Sentou aos 6 meses e andou aos 12. Primeiras palavras aos 14 meses; frases aos 3 anos.',
+    },
   },
   {
     key: 'diego',
@@ -264,7 +345,34 @@ const TEST_USERS: TestUser[] = [
       phone: null,
     },
     // Menor de 18 anos: tem responsável tutelar.
-    patient: { cns: '700005556667777', guardianName: 'Paula Alves' },
+    patient: {
+      cns: '700005556667777',
+      guardianName: 'Paula Alves',
+      guardianPhone: '41996012233',
+      addressZipCode: '80730000',
+      addressStreet: 'Rua Padre Anchieta',
+      addressNumber: '2100',
+      addressComplement: 'ap. 14',
+      addressDistrict: 'Bigorrilho',
+      addressCity: 'Curitiba',
+      addressState: 'pr',
+      filiation1: 'Paula Alves',
+      filiation2: 'Não declarado',
+      educationLevel: EducationLevel.ElementaryOngoing,
+      schoolName: 'Escola Municipal Papa João XXIII',
+      referenceUnit: 'UBS Bigorrilho',
+      allergies: null,
+      noKnownAllergies: true,
+      clinicalHistory:
+        'Gestação a termo (38 semanas), parto cesáreo. Refluxo nos primeiros meses. Otites de repetição até os 4 anos.',
+      surgicalHistory: 'Nenhuma cirurgia até o momento.',
+      familyHistory:
+        'Primo materno com TEA. Pai com diagnóstico de TDAH na vida adulta.',
+      habits:
+        'Dorme por volta das 21h30, com sono agitado. Seletividade alimentar importante. Cerca de 1 hora de tela por dia.',
+      developmentalMilestones:
+        'Sentou aos 8 meses e andou aos 18. Primeiras palavras aos 3 anos; frases curtas aos 5.',
+    },
   },
 ];
 
@@ -280,6 +388,62 @@ type PtsSeed = {
   beganAt?: string;
   concludedAt?: string;
   cancelledAt?: string;
+  // Próxima revisão (RN031) a partir de hoje, para mostrar o selo de
+  // reavaliação aberta (até 30 dias) ou vencida (negativo); sem ela, 12 meses
+  // depois da criação.
+  nextReviewInDays?: number;
+};
+
+type DiagnosisSeed = {
+  cid: string;
+  supportLevel: number;
+  summary: string;
+  strengths: string;
+  priorityNeeds: string[];
+};
+
+// Diagnóstico em comum (RN030) da ficha dos PTS de cada paciente.
+const DIAGNOSES: Record<string, DiagnosisSeed> = {
+  patient: {
+    cid: 'F84.0',
+    supportLevel: 2,
+    summary:
+      'Transtorno do espectro autista, com fala funcional limitada, ecolalia imediata e hipersensibilidade auditiva. No trabalho, crises de sobrecarga em ambientes barulhentos. A família participa do cuidado e já usa pranchas de CAA em casa.',
+    strengths:
+      'Boa imitação motora, interesse por música e vínculo forte com a mãe.',
+    priorityNeeds: [
+      'Comunicação funcional: fazer pedidos e pedir ajuda',
+      'Participação em atividades em grupo',
+      'Regulação sensorial em ambientes barulhentos',
+      'Autonomia na rotina de trabalho e estudo',
+    ],
+  },
+  luna: {
+    cid: 'F84.5',
+    supportLevel: 1,
+    summary:
+      'Síndrome de Asperger, com dificuldade em interações sociais, interesses restritos e ansiedade em situações novas. Mantém fala fluente e bom desempenho escolar em exatas.',
+    strengths:
+      'Memória excelente, interesse por música e tecnologia, vínculo forte com a mãe.',
+    priorityNeeds: [
+      'Habilidades sociais em contextos novos',
+      'Manejo da ansiedade',
+      'Planejamento da transição para o curso técnico',
+    ],
+  },
+  diego: {
+    cid: 'F84.1',
+    supportLevel: 3,
+    summary:
+      'Autismo atípico, com atraso de linguagem, comportamentos repetitivos e seletividade alimentar importante. Precisa de apoio na rotina escolar e nas atividades de vida diária.',
+    strengths:
+      'Boa memória visual, gosta de quebra-cabeças e responde bem a rotinas previsíveis.',
+    priorityNeeds: [
+      'Comunicação funcional com apoio visual',
+      'Flexibilidade diante de mudanças na rotina',
+      'Ampliação do repertório alimentar',
+    ],
+  },
 };
 
 // Um PTS de cada status, para as telas e as regras de acesso (RN016): o
@@ -326,6 +490,7 @@ const TEST_PTS: PtsSeed[] = [
     createdAt: '2026-07-01T13:00:00.000Z',
     acceptedAt: '2026-07-05T13:00:00.000Z',
     beganAt: '2026-08-01T13:00:00.000Z',
+    nextReviewInDays: 20,
   },
   {
     patient: 'diego',
@@ -345,6 +510,7 @@ const TEST_PTS: PtsSeed[] = [
     socialSituation: 'Mora com a mãe e a avó; a avó busca na escola às terças.',
     createdAt: '2026-10-10T13:00:00.000Z',
     acceptedAt: '2026-10-20T13:00:00.000Z',
+    nextReviewInDays: -10,
   },
 ];
 
@@ -495,8 +661,43 @@ async function ensurePatientProfile(
   console.log(`Perfil de paciente criado: ${account.email}`);
 }
 
-// Cria os PTS de teste do paciente que ainda não tem nenhum PTS; com algum
-// PTS, o paciente fica como está, e o seed pode rodar de novo.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function dateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+// Ficha do PTS (RFPTS005): estudo de caso na data da criação e a próxima
+// revisão 12 meses depois, ou daqui a `nextReviewInDays` dias.
+function sheetOf(pts: PtsSeed) {
+  const diagnosis = DIAGNOSES[pts.patient];
+  const created = new Date(pts.createdAt);
+  const review =
+    pts.nextReviewInDays === undefined
+      ? new Date(
+          Date.UTC(
+            created.getUTCFullYear() + 1,
+            created.getUTCMonth(),
+            created.getUTCDate(),
+          ),
+        )
+      : new Date(Date.now() + pts.nextReviewInDays * DAY_MS);
+
+  return {
+    caseStudyDate: dateOnly(created),
+    diagnosisSummary: diagnosis.summary,
+    cid: diagnosis.cid,
+    supportLevel: diagnosis.supportLevel,
+    strengths: diagnosis.strengths,
+    priorityNeeds: diagnosis.priorityNeeds,
+    socialSituation: pts.socialSituation,
+    nextReviewAt: dateOnly(review),
+  };
+}
+
+// Cria os PTS de teste do paciente que ainda não tem nenhum PTS e devolve a
+// ficha (diagnóstico e próxima revisão) dos que já existem, achados pela data
+// de criação; o seed pode rodar de novo.
 async function ensureTestPts(
   patientIds: Map<string, string>,
   professionals: Map<string, Professional>,
@@ -506,20 +707,29 @@ async function ensureTestPts(
 
   for (const patientKey of new Set(TEST_PTS.map((pts) => pts.patient))) {
     const patientId = patientIds.get(patientKey)!;
-
-    if (await ptsRepository.existsBy({ patientId })) {
-      console.log(`PTS de teste ja existem: ${patientKey}`);
-      continue;
-    }
+    const hadPts = await ptsRepository.existsBy({ patientId });
 
     for (const pts of TEST_PTS.filter((item) => item.patient === patientKey)) {
+      const existing = await ptsRepository.findOne({
+        where: { patientId, createdAt: new Date(pts.createdAt) },
+      });
+
+      if (existing) {
+        await ptsRepository.update(existing.id, sheetOf(pts));
+        continue;
+      }
+
+      if (hadPts) {
+        continue;
+      }
+
       await ptsRepository.save(
         ptsRepository.create({
           patientId,
           responsibleProfessionalId: professionals.get(pts.responsible)!.id,
           team: pts.team.map((key) => professionals.get(key)!),
           status: pts.status,
-          socialSituation: pts.socialSituation,
+          ...sheetOf(pts),
           createdAt: new Date(pts.createdAt),
           acceptedAt: date(pts.acceptedAt),
           rejectedAt: date(pts.rejectedAt),
@@ -530,9 +740,81 @@ async function ensureTestPts(
       );
     }
 
-    console.log(`PTS de teste criados: ${patientKey}`);
+    console.log(`PTS de teste prontos: ${patientKey}`);
   }
 }
+
+type SupportContactSeed = Pick<
+  SupportContact,
+  'name' | 'description' | 'email' | 'phone' | 'isEmergency'
+>;
+
+// Contatos de suporte (RFPAC003): um de emergência, com telefone, e os demais
+// por e-mail ou telefone. Não concedem acesso (RN017).
+const TEST_SUPPORT_CONTACTS: Record<string, SupportContactSeed[]> = {
+  patient: [
+    {
+      name: 'Marlene Teste',
+      description: 'Mãe',
+      email: 'marlene.teste@gmail.com',
+      phone: '41997015522',
+      isEmergency: true,
+    },
+    {
+      name: 'Rosa Teste',
+      description: 'Avó, busca na escola às terças',
+      email: null,
+      phone: '41996772211',
+      isEmergency: false,
+    },
+    {
+      name: 'Lia Martins',
+      description: 'Babá',
+      email: 'lia.martins@gmail.com',
+      phone: null,
+      isEmergency: false,
+    },
+  ],
+  luna: [
+    {
+      name: 'Marta Ferreira',
+      description: 'Mãe',
+      email: 'marta.ferreira@gmail.com',
+      phone: '41996012233',
+      isEmergency: true,
+    },
+    {
+      name: 'Ricardo Ferreira',
+      description: 'Tio, leva às consultas',
+      email: null,
+      phone: '41995443322',
+      isEmergency: false,
+    },
+  ],
+  diego: [
+    {
+      name: 'Paula Alves',
+      description: 'Mãe',
+      email: 'paula.alves@gmail.com',
+      phone: '41996012233',
+      isEmergency: true,
+    },
+    {
+      name: 'Dona Célia',
+      description: 'Avó, busca na escola às terças',
+      email: null,
+      phone: '41994556677',
+      isEmergency: false,
+    },
+    {
+      name: 'Prof. Marcos Lima',
+      description: 'Professor de apoio',
+      email: 'marcos.lima@escola.pr.gov.br',
+      phone: null,
+      isEmergency: false,
+    },
+  ],
+};
 
 type MedicationSeed = {
   patient: string;
@@ -695,6 +977,107 @@ const TEST_DOCUMENTS: DocumentSeed[] = [
     uploadedBy: 'professional',
     createdAt: '2026-03-03T13:00:00.000Z',
   },
+  {
+    patient: 'patient',
+    slug: 'receita-risperidona',
+    title: 'Receita de risperidona',
+    category: DocumentCategory.PRESCRIPTION,
+    issueDate: '2026-04-05',
+    issuer: { account: 'professional' },
+    description: null,
+    uploadedBy: 'professional',
+    createdAt: '2026-04-05T13:00:00.000Z',
+  },
+  {
+    patient: 'patient',
+    slug: 'exame-audiometria',
+    title: 'Audiometria tonal',
+    category: DocumentCategory.EXAM,
+    issueDate: '2026-02-18',
+    issuer: { name: 'Clínica Audire' },
+    description: null,
+    uploadedBy: 'patient',
+    createdAt: '2026-02-19T13:00:00.000Z',
+  },
+  {
+    patient: 'patient',
+    slug: 'relatorio-escolar',
+    title: 'Relatório do 3º bimestre',
+    category: DocumentCategory.SCHOOL_REPORT,
+    issueDate: '2026-09-30',
+    issuer: {
+      name: 'Profa. Carla Dias (Escola Municipal Papa João XXIII)',
+    },
+    description: null,
+    uploadedBy: 'physiotherapist',
+    createdAt: '2026-10-02T13:00:00.000Z',
+  },
+  {
+    patient: 'patient',
+    slug: 'plano-sensorial',
+    title: 'Plano de adaptação sensorial',
+    category: DocumentCategory.THERAPY_REPORT,
+    issueDate: '2026-10-30',
+    issuer: { account: 'physiotherapist' },
+    description: null,
+    uploadedBy: 'physiotherapist',
+    createdAt: '2026-10-31T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    slug: 'tcle',
+    title: 'Termo de consentimento do PTS',
+    category: DocumentCategory.TCLE,
+    issueDate: '2025-09-15',
+    description: null,
+    uploadedBy: 'luna',
+    createdAt: '2025-09-15T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    slug: 'autorizacao-imagem',
+    title: 'Autorização de uso de imagem',
+    category: DocumentCategory.IMAGE_AUTHORIZATION,
+    issueDate: '2025-09-15',
+    description: null,
+    uploadedBy: 'luna',
+    createdAt: '2025-09-15T14:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    slug: 'laudo-psiquiatrico',
+    title: 'Laudo psiquiátrico',
+    category: DocumentCategory.MEDICAL_REPORT,
+    issueDate: '2026-01-20',
+    issuer: { account: 'professional' },
+    description: null,
+    uploadedBy: 'professional',
+    createdAt: '2026-01-22T13:00:00.000Z',
+  },
+  {
+    patient: 'diego',
+    slug: 'laudo-neuropediatrico',
+    title: 'Laudo neuropediátrico',
+    category: DocumentCategory.MEDICAL_REPORT,
+    issueDate: '2026-02-10',
+    issuer: {
+      name: 'Dr. Paulo Mendes, CRM-PR 4521, Hospital Pequeno Príncipe',
+    },
+    description: null,
+    uploadedBy: 'diego',
+    createdAt: '2026-02-14T13:00:00.000Z',
+  },
+  {
+    patient: 'diego',
+    slug: 'relatorio-fonoaudiologico',
+    title: 'Avaliação fonoaudiológica',
+    category: DocumentCategory.THERAPY_REPORT,
+    issueDate: '2026-06-20',
+    issuer: { account: 'physiotherapist' },
+    description: null,
+    uploadedBy: 'physiotherapist',
+    createdAt: '2026-06-21T13:00:00.000Z',
+  },
 ];
 
 // PDF mínimo e válido, com uma linha de texto, para os documentos de teste.
@@ -725,6 +1108,26 @@ function minimalPdf(text: string): Buffer {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
 
   return Buffer.from(pdf, 'latin1');
+}
+
+// Cria os contatos de suporte do paciente que ainda não tem nenhum; com algum
+// contato, o paciente fica como está.
+async function ensureSupportContacts(
+  patientIds: Map<string, string>,
+): Promise<void> {
+  const contacts = dataSource.getRepository(SupportContact);
+
+  for (const [patientKey, items] of Object.entries(TEST_SUPPORT_CONTACTS)) {
+    const patientId = patientIds.get(patientKey)!;
+
+    if (await contacts.existsBy({ patientId })) {
+      console.log(`Contatos de suporte ja existem: ${patientKey}`);
+      continue;
+    }
+
+    await contacts.insert(items.map((item) => ({ patientId, ...item })));
+    console.log(`Contatos de suporte criados: ${patientKey}`);
+  }
 }
 
 async function ensureTestMedications(
@@ -848,6 +1251,7 @@ async function createTestUsers(): Promise<void> {
     }
 
     await ensureTestPts(patientIds, professionals);
+    await ensureSupportContacts(patientIds);
     await ensureTestMedications(patientIds, accountIds);
     await ensureTestDocuments(patientIds, accountIds);
   } finally {

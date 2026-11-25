@@ -7,6 +7,7 @@ import type { Account } from '@/lib/account';
 import { personalData } from '@/test-utils/account';
 
 import PatientDetail from './PatientDetail';
+import { patientProfileExtras } from '@/test-utils/patient';
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -54,6 +55,7 @@ const ROSA = {
 
 function patient(readOnly: boolean) {
   return {
+    ...patientProfileExtras,
     id: PATIENT_ID,
     name: 'Ana Clara Ribeiro',
     socialName: null,

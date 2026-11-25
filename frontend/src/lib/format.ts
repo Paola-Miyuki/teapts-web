@@ -76,7 +76,10 @@ function plural(count: number, singular: string, pluralForm: string) {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-/** Idade em anos, meses e dias, como nos mockups ("41 anos, 10 meses e 2 dias"). */
+/**
+ * Idade em anos, meses e dias, como nos mockups ("41 anos, 10 meses e 2
+ * dias"); as partes zeradas saem (propriedades-front.md).
+ */
 export function formatAge(birthDate: string, today = new Date()) {
   const [year, month, day] = birthDate.split('-').map(Number);
   let years = today.getFullYear() - year;
@@ -93,7 +96,19 @@ export function formatAge(birthDate: string, today = new Date()) {
     months += 12;
   }
 
-  return `${plural(years, 'ano', 'anos')}, ${plural(months, 'mês', 'meses')} e ${plural(days, 'dia', 'dias')}`;
+  const parts = [
+    years > 0 ? plural(years, 'ano', 'anos') : null,
+    months > 0 ? plural(months, 'mês', 'meses') : null,
+    days > 0 ? plural(days, 'dia', 'dias') : null,
+  ].filter((part): part is string => part !== null);
+
+  if (parts.length === 0) {
+    return plural(0, 'dia', 'dias');
+  }
+
+  return parts.length === 1
+    ? parts[0]
+    : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
 }
 
 /** Iniciais do primeiro e do último nome. */
@@ -101,4 +116,9 @@ export function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
 
   return `${parts[0]?.charAt(0) ?? ''}${parts.length > 1 ? parts[parts.length - 1].charAt(0) : ''}`.toUpperCase();
+}
+
+/** CEP com 8 dígitos em `00000-000`; outro formato fica como veio. */
+export function formatCep(cep: string) {
+  return cep.replace(/^(\d{5})(\d{3})$/, '$1-$2');
 }

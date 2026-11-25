@@ -1,3 +1,4 @@
+import type { Gender, Sex } from '@/lib/account';
 import { request } from '@/lib/api';
 import type { PaginationData } from '@/lib/professionals';
 import type { PtsStatus } from '@/lib/pts-status';
@@ -220,11 +221,102 @@ export type ClinicalDataPatch = {
   developmentalMilestones?: string;
 };
 
+export type EducationLevel =
+  | 'early_childhood_daycare'
+  | 'early_childhood_preschool'
+  | 'elementary_incomplete'
+  | 'elementary_ongoing'
+  | 'elementary_complete'
+  | 'high_school_incomplete'
+  | 'high_school_ongoing'
+  | 'high_school_complete'
+  | 'technical_incomplete'
+  | 'technical_ongoing'
+  | 'technical_complete'
+  | 'undergraduate_incomplete'
+  | 'undergraduate_ongoing'
+  | 'undergraduate_complete'
+  | 'postgraduate_specialization'
+  | 'postgraduate_mba'
+  | 'postgraduate_masters'
+  | 'postgraduate_doctorate';
+
+// Escolaridade, com os grupos de propriedades-front.md (3.2).
+export const EDUCATION_LABELS: Record<EducationLevel, string> = {
+  early_childhood_daycare: 'Educação Infantil, creche',
+  early_childhood_preschool: 'Educação Infantil, pré-escola',
+  elementary_incomplete: 'Ensino Fundamental incompleto',
+  elementary_ongoing: 'Ensino Fundamental cursando',
+  elementary_complete: 'Ensino Fundamental completo',
+  high_school_incomplete: 'Ensino Médio incompleto',
+  high_school_ongoing: 'Ensino Médio cursando',
+  high_school_complete: 'Ensino Médio completo',
+  technical_incomplete: 'Técnico / Profissionalizante incompleto',
+  technical_ongoing: 'Técnico / Profissionalizante cursando',
+  technical_complete: 'Técnico / Profissionalizante concluído',
+  undergraduate_incomplete: 'Ensino Superior incompleta',
+  undergraduate_ongoing: 'Ensino Superior cursando',
+  undergraduate_complete: 'Ensino Superior concluída',
+  postgraduate_specialization: 'Pós-graduação, especialização',
+  postgraduate_mba: 'Pós-graduação, MBA',
+  postgraduate_masters: 'Pós-graduação, mestrado',
+  postgraduate_doctorate: 'Pós-graduação, doutorado',
+};
+
+export type PatientAddress = {
+  // CEP, 8 dígitos.
+  zipCode: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  district: string | null;
+  city: string | null;
+  // Sigla em minúsculas (`uf_e`).
+  state: string | null;
+};
+
+// Diagnóstico em comum do PTS atual (RN030).
+export type PatientDiagnosis = {
+  ptsId: string;
+  ptsStatus: PtsStatus;
+  // `AAAA-MM-DD`.
+  caseStudyDate: string;
+  cid: string | null;
+  supportLevel: number | null;
+  summary: string;
+  strengths: string | null;
+  priorityNeeds: string[];
+  socialSituation: string;
+};
+
+// Selo do cartão do paciente: aberta de 30 dias antes da próxima revisão até
+// a data, vencida depois (RN031).
+export type PatientReassessment = {
+  status: 'open' | 'overdue';
+  // `AAAA-MM-DD`.
+  nextReviewAt: string;
+};
+
 export type PatientDetail = PatientListItem &
   ClinicalData & {
     phone: string | null;
     cpf: string | null;
+    // `AAAA-MM-DD`.
+    birthDate: string | null;
+    sex: Sex | null;
+    gender: Gender | null;
+    filiation1: string | null;
+    filiation2: string | null;
+    address: PatientAddress;
+    guardianPhone: string | null;
+    educationLevel: EducationLevel | null;
+    schoolName: string | null;
+    referenceUnit: string | null;
     supportContacts: SupportContact[];
+    diagnosis: PatientDiagnosis | null;
+    reassessment: PatientReassessment | null;
+    // `false` mostra o selo "Sem TCLE".
+    hasTcle: boolean;
   };
 
 // GET /patients/:id: admin ou profissional com acesso pela RN016.
