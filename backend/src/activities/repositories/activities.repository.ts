@@ -1,6 +1,23 @@
-import type { ActivityResponseDto } from '../dto/activity-response.dto';
+import type {
+  ActivityDetailsResponseDto,
+  ActivityResponseDto,
+} from '../dto/activity-response.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
 import type { ActivityState } from '../enums/activity.enums';
+import type { ActivityExecutor } from '../enums/activity.enums';
+
+export interface FindActivitiesInput {
+  ptsId: string;
+  status?: ActivityState[];
+  executor?: ActivityExecutor;
+  page: number;
+  limit: number;
+}
+
+export interface FindActivitiesResult {
+  rows: ActivityResponseDto[];
+  total: number;
+}
 
 export interface CreateActivityInput {
   ptsId: string;
@@ -24,6 +41,7 @@ export interface CreateActivityInput {
 
 /** Atividade com o PTS dela: a edição chega só com o id da atividade. */
 export type StoredActivity = ActivityResponseDto & { ptsId: string };
+export type StoredActivityDetails = ActivityDetailsResponseDto;
 
 export interface UpdateActivityInput {
   ptsId: string;
@@ -63,8 +81,11 @@ export interface ArchiveActivityInput {
 }
 
 export abstract class ActivitiesRepository {
-  abstract findByPts(ptsId: string): Promise<ActivityResponseDto[]>;
+  abstract findByPts(input: FindActivitiesInput): Promise<FindActivitiesResult>;
   abstract findById(activityId: string): Promise<StoredActivity | null>;
+  abstract findDetailsById(
+    activityId: string,
+  ): Promise<StoredActivityDetails | null>;
   /** Dos ids informados, os documentos não excluídos do paciente. */
   abstract findPatientDocumentIds(
     patientId: string,

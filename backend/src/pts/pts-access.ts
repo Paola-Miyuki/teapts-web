@@ -19,6 +19,7 @@ export function ownTeamProfile(
 export function assertCanViewPts(
   pts: GoalPtsTarget,
   account: AccountContext,
+  forbidden: () => Error = ptsForbidden,
 ): void {
   const isPatientOwner =
     account.patientProfileId !== null &&
@@ -28,6 +29,6 @@ export function assertCanViewPts(
     ownTeamProfile(pts, account) !== undefined;
 
   if (!isAdmin(account) && !isPatientOwner && !isTeam) {
-    throw ptsForbidden();
+    throw forbidden();
   }
 }

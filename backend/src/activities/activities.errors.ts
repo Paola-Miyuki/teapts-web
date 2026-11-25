@@ -16,6 +16,13 @@ export const activityForbidden = () =>
     'Somente a equipe do PTS e o administrador podem criar atividades.',
   );
 
+export const activitiesViewForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso às atividades deste PTS.',
+  );
+
 export const activityEditForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,

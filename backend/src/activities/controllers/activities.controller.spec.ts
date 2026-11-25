@@ -21,8 +21,11 @@ describe('ActivitiesController (RFACT001)', () => {
 
     expect(created.status).toBe('suggested');
     expect(repo.created[0].executedByAccountId).toBe(member.accountId);
-    expect((await controller.findActivities('pts-1', member)).data).toEqual([
-      created,
-    ]);
+    expect(
+      await controller.findActivities('pts-1', { page: 1, limit: 20 }, member),
+    ).toMatchObject({
+      data: [created],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
   });
 });

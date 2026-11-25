@@ -5,13 +5,18 @@ import { useState } from 'react';
 import Icon from '@/components/Icon';
 import KebabMenu from '@/components/table/KebabMenu';
 import MultiSelect from '@/components/table/MultiSelect';
+import Pagination from '@/components/table/Pagination';
 import ui from '@/components/ui.module.css';
 import {
   ACTIVE_ACTIVITY_STATUSES,
+  ACTIVITY_EXECUTOR_LABELS,
   ACTIVITY_STATUS_LABELS,
   ACTIVITY_TYPE_LABELS,
   archiveActivity,
   formatFrequency,
+  type ActivityExecutor,
+  type ActivityPagination,
+  type ActivityStatus,
   type Activity,
 } from '@/lib/activities';
 import { ApiError } from '@/lib/api';
@@ -22,21 +27,31 @@ import ActivityFormDialog, {
   type ActivityGoalOption,
   type ActivityTeamMember,
 } from './ActivityFormDialog';
+import ActivityViewDialog from './ActivityViewDialog';
 import ConfirmActivityDialog from './ConfirmActivityDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 
-type OpenDialog =
-  { kind: 'add' } | { kind: 'edit' | 'archive'; activity: Activity } | null;
-
 const STATUS_OPTIONS = Object.entries(ACTIVITY_STATUS_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
+const EXECUTOR_OPTIONS = Object.entries(ACTIVITY_EXECUTOR_LABELS);
+const ACTIVE_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
+  ACTIVE_ACTIVITY_STATUSES.includes(value as ActivityStatus),
+);
+
+type OpenDialog =
+  | { kind: 'add' }
+  | { kind: 'edit'; activity: Activity }
+  | { kind: 'view'; activity: Activity }
+  | { kind: 'archive'; activity: Activity }
+  | null;
 
 type ActivitiesTabProps = {
   ptsId: string;
   // null enquanto carrega.
   activities: Activity[] | null;
+  pagination: ActivityPagination | null;
   error: unknown;
   reload: () => void;
   canCreate: boolean;
@@ -48,19 +63,25 @@ type ActivitiesTabProps = {
   team: ActivityTeamMember[];
   goals: ActivityGoalOption[];
   isAdmin: boolean;
+  statusFilter: ActivityStatus[] | undefined;
+  onStatusFilterChange: (status: ActivityStatus[] | undefined) => void;
+  executorFilter: ActivityExecutor | undefined;
+  onExecutorFilterChange: (executor: ActivityExecutor | undefined) => void;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
 };
 
 function specialismLabel(value: string) {
   return SPECIALISMS.find((item) => item.value === value)?.label ?? value;
 }
 
-// Aba "Atividades" de `pts-detalhe.html`. Por padrão mostra só o que faz parte
-// do plano; a arquivada aparece marcando "Arquivada" no filtro de status. Busca,
-// ordenação, paginação, os outros filtros e as outras ações de cada linha
-// entram com as tasks delas.
+// Aba "Atividades" do detalhe do PTS (RFACT002).
 export default function ActivitiesTab({
   ptsId,
   activities,
+  pagination,
   error,
   reload,
   canCreate,
@@ -69,6 +90,14 @@ export default function ActivitiesTab({
   team,
   goals,
   isAdmin,
+  statusFilter,
+  onStatusFilterChange,
+  executorFilter,
+  onExecutorFilterChange,
+  page,
+  limit,
+  onPageChange,
+  onLimitChange,
 }: ActivitiesTabProps) {
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [feedback, setFeedback] = useState('');
@@ -103,7 +132,7 @@ export default function ActivitiesTab({
     );
   }
 
-  if (!activities) {
+  if (!activities || !pagination) {
     return (
       <div className={ui.empty} role="status" aria-live="polite">
         <p>Carregando atividades...</p>
@@ -111,17 +140,20 @@ export default function ActivitiesTab({
     );
   }
 
-  // Nenhum status marcado vale como "Todos", igual aos outros filtros.
-  const shown =
-    statuses.length === 0
-      ? activities
-      : activities.filter((activity) => statuses.includes(activity.status));
-
   function finish(message: string) {
     setDialog(null);
     setFeedback(message);
     reload();
   }
+
+  const shown =
+    statuses.length === 0
+      ? activities
+      : activities.filter(
+          (activity) =>
+            statuses.includes(activity.status) ||
+            (activity.status === 'archived' && !canEdit(activity)),
+        );
 
   return (
     <>
@@ -157,34 +189,76 @@ export default function ActivitiesTab({
         </div>
 
         <div className="ux-toolbar">
-          <div className="ux-tools">
-            <button
-              type="button"
-              className="btn filter-toggle"
-              aria-expanded={filtersOpen}
-              aria-controls="acts-more"
-              onClick={() => setFiltersOpen((current) => !current)}
+          <button
+            type="button"
+            className="btn filter-toggle"
+            aria-expanded={filtersOpen}
+            aria-controls="acts-more"
+            onClick={() => setFiltersOpen((current) => !current)}
+          >
+            <Icon name="filter" className="icon-sm" />
+            Filtros
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setStatuses(ACTIVE_ACTIVITY_STATUSES);
+              onStatusFilterChange(ACTIVE_ACTIVITY_STATUSES);
+            }}
+          >
+            <Icon name="close" className="icon-sm" />
+            Limpar
+          </button>
+          <MultiSelect
+            label="Status"
+            options={ACTIVE_STATUS_OPTIONS}
+            value={statusFilter ?? [...ACTIVE_ACTIVITY_STATUSES]}
+            onChange={(values) =>
+              onStatusFilterChange(
+                values.length === 0 ||
+                  values.length === ACTIVE_ACTIVITY_STATUSES.length
+                  ? undefined
+                  : (values as ActivityStatus[]),
+              )
+            }
+          />
+          <label className="field">
+            <span>Executor</span>
+            <select
+              className="select"
+              aria-label="Executor"
+              value={executorFilter ?? ''}
+              onChange={(event) =>
+                onExecutorFilterChange(
+                  (event.target.value || undefined) as
+                    ActivityExecutor | undefined,
+                )
+              }
             >
-              <Icon name="filter" className="icon-sm" />
-              Filtros
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setStatuses(ACTIVE_ACTIVITY_STATUSES)}
-            >
-              <Icon name="close" className="icon-sm" />
-              Limpar
-            </button>
-          </div>
+              <option value="">Todos</option>
+              {EXECUTOR_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="filter-more" id="acts-more" hidden={!filtersOpen}>
           <MultiSelect
-            label="Status"
+            label="Status adicionais"
             options={STATUS_OPTIONS}
             value={statuses}
-            onChange={setStatuses}
+            onChange={(values) => {
+              setStatuses(values);
+              onStatusFilterChange(
+                values.length === 0 || values.length === STATUS_OPTIONS.length
+                  ? undefined
+                  : (values as ActivityStatus[]),
+              );
+            }}
           />
         </div>
 
@@ -193,93 +267,116 @@ export default function ActivitiesTab({
             <div className="empty-icon">
               <Icon name="activity" className="icon" />
             </div>
-            <h2>Nenhuma atividade</h2>
-            <p>Este PTS ainda não tem atividades.</p>
-          </div>
-        ) : shown.length === 0 ? (
-          <div className="empty">
-            <div className="empty-icon">
-              <Icon name="search" className="icon" />
-            </div>
-            <h2>Nenhuma atividade encontrada</h2>
-            <p>Revise os filtros.</p>
+            <h2>
+              {pagination.total === 0
+                ? 'Nenhuma atividade'
+                : 'Nenhuma atividade nesta página'}
+            </h2>
+            <p>
+              {pagination.total === 0
+                ? 'Este PTS ainda não tem atividades para os filtros selecionados.'
+                : 'Altere a página ou os filtros para ver outras atividades.'}
+            </p>
           </div>
         ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Atividade</th>
-                  <th scope="col">Tipo</th>
-                  <th scope="col">Especialidade</th>
-                  <th scope="col">Frequência</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Criada em</th>
-                  <th scope="col" className="actions-col">
-                    <span className="sr-only">Ações</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((activity) => (
-                  <tr key={activity.id}>
-                    <td className="ux-wide">
-                      <strong>{activity.title}</strong>
-                    </td>
-                    <td className="ux-col-lg">
-                      {ACTIVITY_TYPE_LABELS[activity.type]}
-                    </td>
-                    <td>{specialismLabel(activity.specialism)}</td>
-                    <td className="nowrap">
-                      {formatFrequency(activity.frequency)}
-                    </td>
-                    <td className="nowrap">
-                      <span className={`badge ${activity.status}`}>
-                        {ACTIVITY_STATUS_LABELS[activity.status]}
-                      </span>
-                    </td>
-                    <td className="num">{formatDate(activity.createdAt)}</td>
-                    <td className="actions-col">
-                      {(canEdit(activity) || canArchive(activity)) && (
-                        <KebabMenu label={`Ações para ${activity.title}`}>
-                          {canEdit(activity) && (
-                            <li>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() =>
-                                  openDialog({ kind: 'edit', activity })
-                                }
-                              >
-                                <Icon name="edit" className="icon-sm" />
-                                Editar
-                              </button>
-                            </li>
-                          )}
-                          {canArchive(activity) && (
-                            <li>
-                              <div className="sep" />
-                              <button
-                                type="button"
-                                role="menuitem"
-                                className="danger"
-                                onClick={() =>
-                                  openDialog({ kind: 'archive', activity })
-                                }
-                              >
-                                <Icon name="lock" className="icon-sm" />
-                                Arquivar
-                              </button>
-                            </li>
-                          )}
-                        </KebabMenu>
-                      )}
-                    </td>
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th scope="col">Atividade</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Especialidade</th>
+                    <th scope="col">Frequência</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Criada em</th>
+                    <th scope="col" className="actions-col">
+                      <span className="sr-only">Ações</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {shown.map((activity) => (
+                    <tr key={activity.id}>
+                      <td className="ux-wide">
+                        <strong>{activity.title}</strong>
+                      </td>
+                      <td className="ux-col-lg">
+                        {ACTIVITY_TYPE_LABELS[activity.type]}
+                      </td>
+                      <td>{specialismLabel(activity.specialism)}</td>
+                      <td className="nowrap">
+                        {formatFrequency(activity.frequency)}
+                      </td>
+                      <td className="nowrap">
+                        <span className={`badge ${activity.status}`}>
+                          {ACTIVITY_STATUS_LABELS[activity.status]}
+                        </span>
+                      </td>
+                      <td className="num">{formatDate(activity.createdAt)}</td>
+                      <td className="actions-col">
+                        {(canEdit(activity) || canArchive(activity)) && (
+                          <KebabMenu label={`Ações para ${activity.title}`}>
+                            <li>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() =>
+                                  openDialog({ kind: 'view', activity })
+                                }
+                              >
+                                <Icon name="eye" className="icon-sm" />
+                                Visualizar
+                              </button>
+                            </li>
+                            {canEdit(activity) && (
+                              <li>
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() =>
+                                    openDialog({ kind: 'edit', activity })
+                                  }
+                                >
+                                  <Icon name="edit" className="icon-sm" />
+                                  Editar
+                                </button>
+                              </li>
+                            )}
+                            {canArchive(activity) && (
+                              <li>
+                                <div className="sep" />
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="danger"
+                                  onClick={() =>
+                                    openDialog({ kind: 'archive', activity })
+                                  }
+                                >
+                                  <Icon name="lock" className="icon-sm" />
+                                  Arquivar
+                                </button>
+                              </li>
+                            )}
+                          </KebabMenu>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={page}
+              limit={limit}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              label="Paginação das atividades"
+              onPageChange={onPageChange}
+              onLimitChange={onLimitChange}
+            />
+          </>
         )}
       </div>
 
@@ -308,6 +405,14 @@ export default function ActivitiesTab({
           errorMessage="Não foi possível arquivar a atividade"
           onConfirm={(reason) => archiveActivity(dialog.activity.id, reason)}
           onDone={() => finish('Atividade arquivada')}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'view' && (
+        <ActivityViewDialog
+          key={dialog.activity.id}
+          activityId={dialog.activity.id}
+          team={team.map(({ id, name }) => ({ id, name }))}
           onClose={() => setDialog(null)}
         />
       )}
