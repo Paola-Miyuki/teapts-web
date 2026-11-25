@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -32,12 +35,18 @@ import {
 } from '../../pts/pts.errors';
 import { errors } from '../../pts/swagger-errors';
 import {
+  activityArchiveForbidden,
   activityEditForbidden,
+  activityNotArchivable,
   activityNotEditable,
   activityNotFound,
   invalidFrequency,
 } from '../activities.errors';
 import { ActivityResponseDto } from '../dto/activity-response.dto';
+import {
+  ArchiveActivityRequestDto,
+  ArchiveActivityResponseDto,
+} from '../dto/archive-activity.dto';
 import { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import { ActivitiesService } from '../services/activities.service';
 
@@ -77,5 +86,25 @@ export class ActivityController {
     @CurrentAccount() account: AccountContext,
   ): Promise<ActivityResponseDto> {
     return this.activitiesService.updateActivity(id, dto, account);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Arquiva uma atividade (RFACT008)',
+    description:
+      'Equipe do PTS ou admin arquiva a atividade sugerida, em andamento ou suspensa. Exclusão lógica (RN021): os atendimentos continuam. Grava o motivo opcional e activity_archived na timeline.',
+  })
+  @ApiOkResponse({ type: ArchiveActivityResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityArchiveForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotArchivable(), ptsNotEditable()))
+  async archiveActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: ArchiveActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ArchiveActivityResponseDto> {
+    return this.activitiesService.archiveActivity(id, dto, account);
   }
 }

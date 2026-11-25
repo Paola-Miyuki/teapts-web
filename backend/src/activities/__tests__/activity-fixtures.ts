@@ -8,8 +8,10 @@ import {
   ActivityState,
   ActivityType,
 } from '../enums/activity.enums';
+import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
 import {
   ActivitiesRepository,
+  type ArchiveActivityInput,
   type CreateActivityInput,
   type StoredActivity,
   type UpdateActivityInput,
@@ -57,6 +59,7 @@ function toResponse(activity: StoredActivity): ActivityResponseDto {
 export class InMemoryActivitiesRepository extends ActivitiesRepository {
   created: CreateActivityInput[] = [];
   updated: UpdateActivityInput[] = [];
+  archived: ArchiveActivityInput[] = [];
   activities: StoredActivity[] = [];
   documents: { id: string; patientId: string }[] = [];
 
@@ -110,5 +113,21 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
     });
 
     return toResponse(activity);
+  }
+
+  async archive(
+    input: ArchiveActivityInput,
+  ): Promise<ArchiveActivityResponseDto> {
+    this.archived.push(input);
+    const activity = this.activities.find(
+      (item) => item.id === input.activityId,
+    )!;
+    activity.status = ActivityState.Archived;
+
+    return {
+      id: activity.id,
+      status: ActivityState.Archived,
+      archivedAt: '2026-12-06T12:00:00.000Z',
+    };
   }
 }

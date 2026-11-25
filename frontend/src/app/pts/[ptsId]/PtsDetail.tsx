@@ -514,6 +514,11 @@ function PtsDetailContent({
               !isPatient &&
               can(account, 'editActivity', { pts: permissionPts, activity })
             }
+            canArchive={(activity) =>
+              !readOnly &&
+              !isPatient &&
+              can(account, 'archiveActivity', { pts: permissionPts, activity })
+            }
             team={members.map((member) => ({
               id: member.id,
               name: member.name,

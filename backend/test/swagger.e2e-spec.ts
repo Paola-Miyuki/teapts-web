@@ -84,6 +84,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
   ['/activities/{id}', 'patch'],
+  ['/activities/{id}/archive', 'post'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -344,6 +345,10 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}', 'patch', '404'],
     ['/activities/{id}', 'patch', '409'],
     ['/activities/{id}', 'patch', '422'],
+    ['/activities/{id}/archive', 'post', '400'],
+    ['/activities/{id}/archive', 'post', '403'],
+    ['/activities/{id}/archive', 'post', '404'],
+    ['/activities/{id}/archive', 'post', '409'],
     ['/notifications', 'get', '400'],
     ['/notifications/{id}/read', 'post', '400'],
     ['/notifications/{id}/read', 'post', '404'],
@@ -753,6 +758,31 @@ describe('Swagger (e2e)', () => {
         Object.keys(
           patch.responses[status]?.content?.['application/json']?.examples ??
             {},
+        ),
+      ).toEqual(codes);
+    }
+  });
+
+  it('documents POST /activities/{id}/archive', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/activities/{id}/archive'];
+
+    expect(responseSchema(post, '200')?.$ref).toBe(
+      '#/components/schemas/ArchiveActivityResponseDto',
+    );
+    expect(components.schemas.ArchiveActivityResponseDto.required).toEqual([
+      'id',
+      'status',
+      'archivedAt',
+    ]);
+    for (const [status, codes] of [
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_ARCHIVABLE', 'PTS_NOT_EDITABLE']],
+    ] as const) {
+      expect(
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
         ),
       ).toEqual(codes);
     }
