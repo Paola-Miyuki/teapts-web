@@ -12,6 +12,7 @@ import { PtsGoalsRepositoryImpl } from './repositories/pts-goals.repository.impl
 import { PtsRepository } from './repositories/pts.repository';
 import { PtsRepositoryImpl } from './repositories/pts.repository.impl';
 import { PtsGoalsService } from './services/pts-goals.service';
+import { PtsNextVersionService } from './services/pts-next-version.service';
 import { PtsService } from './services/pts.service';
 import { Professional } from '../professionals/entities/professional.entity';
 import { Patient } from '../patients/entities/patient.entity';
@@ -27,6 +28,7 @@ import { TimelineModule } from '../timeline/timeline.module';
   providers: [
     PtsService,
     PtsGoalsService,
+    PtsNextVersionService,
     { provide: PtsRepository, useClass: PtsRepositoryImpl },
     { provide: PtsGoalsRepository, useClass: PtsGoalsRepositoryImpl },
   ],

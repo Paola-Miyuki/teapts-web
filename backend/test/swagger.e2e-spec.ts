@@ -629,6 +629,27 @@ describe('Swagger (e2e)', () => {
     ]);
   });
 
+  it('documents the GOALS_INCOMPLETE of POST /pts/proposals/{id}/approve', async () => {
+    const { paths, components } = await getDocument();
+    const conflict = paths['/pts/proposals/{id}/approve'].post.responses['409'];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'PTS_NOT_DRAFT',
+      'ACTIVE_PTS_ALREADY_EXISTS',
+      'GOALS_INCOMPLETE',
+    ]);
+    expect(components.schemas.GoalsIncompleteErrorDto.required).toEqual([
+      'status',
+      'message',
+      'pendingGoals',
+    ]);
+    expect(
+      components.schemas.UpdatePtsProposalRequestDto.required,
+    ).toBeUndefined();
+  });
+
   it('documents POST /pts/{id}/close', async () => {
     const { paths, components } = await getDocument();
     const operation = paths['/pts/{id}/close'].post;

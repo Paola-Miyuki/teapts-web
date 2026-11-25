@@ -1,21 +1,14 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsNotEmpty,
-  IsString,
-  IsUUID,
-  ValidateIf,
-} from 'class-validator';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { IsArray, IsUUID, ValidateIf } from 'class-validator';
 
-export class UpdatePtsProposalRequestDto {
-  @ApiPropertyOptional({
-    example: 'Mora com a mãe e frequenta a escola municipal.',
-  })
-  @ValidateIf((_, value) => value !== undefined)
-  @IsString()
-  @IsNotEmpty()
-  socialSituation?: string;
+import { UpdatePtsSheetRequestDto } from './update-pts-sheet.dto';
 
+/** Ficha, data máxima e equipe da proposta: só o que for enviado muda (RFPTS007). */
+export class UpdatePtsProposalRequestDto extends PartialType(
+  UpdatePtsSheetRequestDto,
+  // Só o campo ausente é opcional: null continua inválido nos obrigatórios.
+  { skipNullProperties: false },
+) {
   @ApiPropertyOptional({
     type: String,
     isArray: true,
