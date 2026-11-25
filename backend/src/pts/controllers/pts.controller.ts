@@ -35,6 +35,8 @@ import {
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
+import { GetPtsListQueryDto } from '../dto/get-pts-list-query.dto';
+import { GetPtsListResponseDto } from '../dto/pts-list-response.dto';
 import { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
 import { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
 import { TransferPtsResponsibilityRequestDto } from '../dto/transfer-pts-responsibility.dto';
@@ -97,6 +99,27 @@ export class PtsController {
     @CurrentAccount() account: AccountContext,
   ) {
     return this.ptsService.createPts(dto, account);
+  }
+
+  /** Lista de PTS de todos os estados, para o admin e a equipe. */
+  @Get()
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: GetPtsListResponseDto })
+  @ApiOperation({
+    summary: 'Lista os PTS (lista de PTS)',
+    description:
+      'O admin vê todos os PTS (RN022); o profissional, só os de que é responsável ou membro da equipe. Filtros: busca pelo paciente (nome, nome social ou CNS), status, responsável, membro da equipe e data de criação. O paciente recebe 403.',
+  })
+  @ApiBadRequestResponse({ type: ErrorResponseDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  async findList(
+    @Query() query: GetPtsListQueryDto,
+    @CurrentAccount() account: AccountContext,
+  ) {
+    return this.ptsService.findPtsList(query, account);
   }
 
   @Get('proposals')

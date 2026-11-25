@@ -22,6 +22,7 @@ type TermsTabProps = {
   patientId: string;
   canUpload: boolean;
   canEditDocuments?: boolean;
+  canDeleteDocuments?: boolean;
 };
 
 const TERMS: {
@@ -52,6 +53,7 @@ export default function TermsTab({
   patientId,
   canUpload,
   canEditDocuments = false,
+  canDeleteDocuments = false,
 }: TermsTabProps) {
   const router = useRouter();
   const viewer = useDocumentViewer();
@@ -188,6 +190,8 @@ export default function TermsTab({
         categories={TERM_CATEGORY_OPTIONS}
         showUploader
         canEditDocuments={canEditDocuments}
+        canDeleteDocuments={canDeleteDocuments}
+        onDeleted={() => setRetryKey((current) => current + 1)}
         load={(query: DocumentsQuery, signal) =>
           getDocuments(patientId, query, signal)
         }

@@ -9,8 +9,10 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
+import { AdminGuard } from '../../auth/guards/admin.guard';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
+import type { DeleteDocumentResponseDto } from '../dto/delete-document-response.dto';
 import type { DocumentUrlResponseDto } from '../dto/document-url-response.dto';
 import { DocumentsService } from '../services/documents.service';
 import { DocumentsController } from './documents.controller';
@@ -21,6 +23,10 @@ const account: AccountContext = {
   role: AccountRole.Admin,
   patientProfileId: null,
   professionalProfileIds: [],
+};
+const deleted: DeleteDocumentResponseDto = {
+  id: documentId,
+  deletedAt: '2026-12-09T12:00:00.000Z',
 };
 const url: DocumentUrlResponseDto = {
   url: 'http://localhost:3000/storage/objects/k?token=t',
@@ -33,16 +39,30 @@ describe('DocumentsController', () => {
     getUrl: jest.Mock<
       (account: AccountContext, id: string) => Promise<DocumentUrlResponseDto>
     >;
+    remove: jest.Mock<
+      (
+        account: AccountContext,
+        id: string,
+      ) => Promise<DeleteDocumentResponseDto>
+    >;
   };
   let allowed: boolean;
+  let current: AccountContext;
 
   beforeEach(async () => {
     allowed = true;
-    documents = { getUrl: jest.fn(async () => url) };
+    current = account;
+    documents = {
+      getUrl: jest.fn(async () => url),
+      remove: jest.fn(async () => deleted),
+    };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [DocumentsController],
-      providers: [{ provide: DocumentsService, useValue: documents }],
+      providers: [
+        AdminGuard,
+        { provide: DocumentsService, useValue: documents },
+      ],
     })
       .overrideGuard(AuthGuard)
       .useValue({
@@ -50,7 +70,7 @@ describe('DocumentsController', () => {
           context
             .switchToHttp()
             .getRequest<{ accountContext?: AccountContext }>().accountContext =
-            account;
+            current;
           return allowed;
         },
       })
@@ -116,5 +136,65 @@ describe('DocumentsController', () => {
 
     expect(response.status).toBe(403);
     expect(documents.getUrl).not.toHaveBeenCalled();
+  });
+
+  describe('DELETE /documents/:id', () => {
+    it('answers 200 with the id and deletedAt', async () => {
+      const response = await request(app.getHttpServer()).delete(
+        `/documents/${documentId}`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(deleted);
+      expect(documents.remove).toHaveBeenCalledWith(account, documentId);
+    });
+
+    it('answers 403 FORBIDDEN for a non-admin without calling the service', async () => {
+      current = {
+        ...account,
+        role: AccountRole.User,
+        professionalProfileIds: ['professional-1'],
+      };
+
+      const response = await request(app.getHttpServer()).delete(
+        `/documents/${documentId}`,
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.body.status).toBe('FORBIDDEN');
+      expect(documents.remove).not.toHaveBeenCalled();
+    });
+
+    it('answers 403 without calling the service when the session guard blocks', async () => {
+      allowed = false;
+
+      const response = await request(app.getHttpServer()).delete(
+        `/documents/${documentId}`,
+      );
+
+      expect(response.status).toBe(403);
+      expect(documents.remove).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR for an id that is not a UUID', async () => {
+      const response = await request(app.getHttpServer()).delete(
+        '/documents/123',
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.body.status).toBe('VALIDATION_ERROR');
+    });
+
+    it('forwards 404 DOCUMENT_NOT_FOUND from the service', async () => {
+      documents.remove.mockRejectedValueOnce(
+        new NotFoundException({ status: 'DOCUMENT_NOT_FOUND' }),
+      );
+
+      const response = await request(app.getHttpServer()).delete(
+        `/documents/${documentId}`,
+      );
+
+      expect(response.status).toBe(404);
+    });
   });
 });

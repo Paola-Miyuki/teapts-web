@@ -1,10 +1,11 @@
 // Este arquivo expõe as rotas de um documento: a URL temporária de leitura
-// (RFDOC003). O acesso é conferido pelo service, pelo paciente dono do
-// documento.
+// (RFDOC003) e a exclusão lógica (RFDOC006, só do admin). O acesso à leitura é
+// conferido pelo service, pelo paciente dono do documento.
 
 import {
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -22,11 +23,13 @@ import {
 } from '@nestjs/swagger';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
+import { AdminGuard } from '../../auth/guards/admin.guard';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import {
   ErrorResponseDto,
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
+import { DeleteDocumentResponseDto } from '../dto/delete-document-response.dto';
 import { DocumentUrlResponseDto } from '../dto/document-url-response.dto';
 import { DocumentsService } from '../services/documents.service';
 
@@ -104,5 +107,43 @@ export class DocumentsController {
     @CurrentAccount() account: AccountContext,
   ): Promise<DocumentUrlResponseDto> {
     return this.documents.getUrl(account, documentId);
+  }
+
+  /**
+   * Exclui o documento de forma lógica (RFDOC006, RN021): ele sai das
+   * consultas e a URL de leitura é negada, mas o registro e o arquivo ficam.
+   *
+   * @param documentId documento ativo
+   * @returns o `id` e o `deletedAt`
+   */
+  @Delete(':id')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: DeleteDocumentResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: { status: 'VALIDATION_ERROR', message: 'Parâmetro inválido: id' },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Acesso restrito ao administrador.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'DOCUMENT_NOT_FOUND',
+      message: 'Documento não encontrado.',
+    },
+  })
+  async remove(
+    @Param('id', parseDocumentId) documentId: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<DeleteDocumentResponseDto> {
+    return this.documents.remove(account, documentId);
   }
 }

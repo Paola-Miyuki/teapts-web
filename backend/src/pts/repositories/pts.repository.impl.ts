@@ -22,6 +22,8 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type FindPtsListInput,
+  type FindPtsListResult,
   type CreateDraftInput,
   type ProfessionalRecord,
   type UpdatePtsProposalInput,
@@ -39,6 +41,7 @@ import {
   type FindPtsHistoryResult,
 } from './pts.repository';
 import type { PtsHistoryItemDto } from '../dto/pts-history.dto';
+import type { PtsListItemResponseDto } from '../dto/pts-list-response.dto';
 import type { ClosePtsResponseDto } from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
@@ -280,6 +283,142 @@ export class PtsRepositoryImpl extends PtsRepository {
 
     return {
       rows: proposals.map((proposal) => this.toProposalResponse(proposal)),
+      total,
+    };
+  }
+
+  async findPtsList(input: FindPtsListInput): Promise<FindPtsListResult> {
+    const query = this.ptsRepository
+      .createQueryBuilder('pts')
+      .innerJoin('pts.patient', 'patient')
+      .innerJoin('patient.account', 'patientAccount');
+
+    if (input.professionalProfileIds) {
+      this.restrictToProfessionals(query, 'pts', input.professionalProfileIds);
+    }
+
+    if (input.q) {
+      const term = `%${escapeLike(input.q)}%`;
+
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where('patientAccount.name ILIKE :term', { term })
+            .orWhere('patientAccount.socialName ILIKE :term')
+            .orWhere('patient.cns ILIKE :term');
+        }),
+      );
+    }
+
+    if (input.status) {
+      query.andWhere('pts.status IN (:...statuses)', {
+        statuses: input.status,
+      });
+    }
+
+    if (input.responsibleId) {
+      query.andWhere('pts.responsibleProfessionalId = :responsibleId', {
+        responsibleId: input.responsibleId,
+      });
+    }
+
+    if (input.memberId) {
+      query.andWhere(
+        new Brackets((qb) => {
+          qb.where('pts.responsibleProfessionalId = :memberId', {
+            memberId: input.memberId,
+          }).orWhere(
+            `EXISTS (
+              SELECT 1
+              FROM professional_participating_on_therapeutic_journey participation
+              WHERE participation.therapeutic_journey_id = pts.id
+                AND participation.professional_id = :memberId
+            )`,
+          );
+        }),
+      );
+    }
+
+    if (input.createdFrom) {
+      query.andWhere('pts.createdAt >= CAST(:createdFrom AS date)', {
+        createdFrom: input.createdFrom,
+      });
+    }
+
+    if (input.createdTo) {
+      query.andWhere('pts.createdAt < CAST(:createdTo AS date) + 1', {
+        createdTo: input.createdTo,
+      });
+    }
+
+    const total = await query.clone().getCount();
+    const direction = input.order === 'asc' ? 'ASC' : 'DESC';
+
+    // Ordem do ciclo: proposta, planejamento, andamento, encerrados.
+    const statusRank = `CASE pts.status
+      WHEN '${PtsStateEnum.DRAFT}' THEN 1
+      WHEN '${PtsStateEnum.PLANNING}' THEN 2
+      WHEN '${PtsStateEnum.RUNNING}' THEN 3
+      WHEN '${PtsStateEnum.CONCLUDED}' THEN 4
+      WHEN '${PtsStateEnum.CANCELLED}' THEN 5
+      ELSE 6
+    END`;
+
+    const idsQuery = query
+      .clone()
+      .select('pts.id', 'id')
+      .addSelect(statusRank, 'status_rank')
+      .addSelect('pts.createdAt', 'created_at');
+
+    if (input.sort === 'status') {
+      idsQuery
+        .orderBy('status_rank', direction)
+        .addOrderBy('created_at', 'DESC');
+    } else {
+      idsQuery.orderBy('created_at', direction);
+    }
+
+    const idRows = await idsQuery
+      .addOrderBy('pts.id', direction)
+      .offset((input.page - 1) * input.limit)
+      .limit(input.limit)
+      .getRawMany<{ id: string }>();
+    const ids = idRows.map((row) => row.id);
+
+    if (ids.length === 0) {
+      return { rows: [], total };
+    }
+
+    const loaded = await this.ptsRepository.find({
+      where: { id: In(ids) },
+      relations: {
+        patient: { account: true },
+        responsible: { account: true },
+        team: { account: true },
+      },
+    });
+    const byId = new Map(loaded.map((pts) => [pts.id, pts]));
+    const patientIds = [...new Set(loaded.map((pts) => pts.patientId))];
+
+    // A versão conta todos os PTS do paciente, não só os da página.
+    const versionRows = await this.ptsRepository
+      .createQueryBuilder('versioned')
+      .select('versioned.id', 'id')
+      .addSelect(
+        'ROW_NUMBER() OVER (PARTITION BY versioned.patientId ORDER BY versioned.createdAt ASC, versioned.id ASC)',
+        'version',
+      )
+      .where('versioned.patientId IN (:...patientIds)', { patientIds })
+      .getRawMany<{ id: string; version: string }>();
+    const versions = new Map(
+      versionRows.map((row) => [row.id, Number(row.version)]),
+    );
+
+    return {
+      rows: ids.flatMap((id) => {
+        const pts = byId.get(id);
+
+        return pts ? [this.toListItem(pts, versions)] : [];
+      }),
       total,
     };
   }
@@ -1339,6 +1478,33 @@ export class PtsRepositoryImpl extends PtsRepository {
       },
       responsible: this.mapProfessional(proposal.responsible),
       team: (proposal.team ?? []).map((professional) =>
+        this.mapProfessional(professional),
+      ),
+    };
+  }
+
+  private toListItem(
+    pts: PtsEntity,
+    versions: Map<string, number>,
+  ): PtsListItemResponseDto {
+    const account = pts.patient.account;
+
+    return {
+      id: pts.id,
+      status: pts.status,
+      version: versions.get(pts.id) ?? 1,
+      createdAt: pts.createdAt.toISOString(),
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      closedAt:
+        pts.concludedAt?.toISOString() ??
+        pts.cancelledAt?.toISOString() ??
+        null,
+      patient: {
+        id: pts.patient.accountId,
+        name: account?.socialName?.trim() || account?.name || '',
+      },
+      responsible: this.mapProfessional(pts.responsible),
+      team: (pts.team ?? []).map((professional) =>
         this.mapProfessional(professional),
       ),
     };

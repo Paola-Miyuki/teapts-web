@@ -319,6 +319,44 @@ export type PatientDetail = PatientListItem &
     hasTcle: boolean;
   };
 
+// Corpo do PATCH /patients/:id; o que não vai fica como está, e `null` limpa o
+// campo opcional. Os dados da conta (nome, e-mail e CPF) só o admin altera.
+export type UpdatePatientInput = {
+  name?: string;
+  socialName?: string | null;
+  birthDate?: string;
+  sex?: Sex;
+  cpf?: string;
+  phone?: string | null;
+  email?: string;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+  address?: Partial<{
+    zipCode: string;
+    street: string;
+    number: string;
+    complement: string | null;
+    district: string;
+    city: string;
+    state: string;
+  }>;
+  filiation1?: string;
+  filiation2?: string | null;
+  referenceUnit?: string | null;
+  educationLevel?: EducationLevel | null;
+  schoolName?: string | null;
+};
+
+// PATCH /patients/:id ("Editar paciente"): admin (também a conta) ou
+// profissional de PTS ativo (RN024, só os dados do paciente). Devolve o
+// paciente atualizado.
+export function updatePatient(patientId: string, input: UpdatePatientInput) {
+  return request<PatientDetail>(
+    `/patients/${encodeURIComponent(patientId)}`,
+    jsonBody('PATCH', input),
+  );
+}
+
 // GET /patients/:id: admin ou profissional com acesso pela RN016.
 export function getPatient(id: string, signal?: AbortSignal) {
   return request<PatientDetail>(`/patients/${encodeURIComponent(id)}`, {

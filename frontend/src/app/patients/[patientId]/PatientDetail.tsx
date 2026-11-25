@@ -22,6 +22,7 @@ import ClinicalDataCard from '../_components/ClinicalDataCard';
 import DeletePatientDialog from '../_components/DeletePatientDialog';
 import DiagnosisCard from '../_components/DiagnosisCard';
 import DocumentsTab from '../_components/DocumentsTab';
+import EditPatientDialog from '../_components/EditPatientDialog';
 import PersonalDataCard from '../_components/PersonalDataCard';
 import SupportContactsCard from '../_components/SupportContactsCard';
 import TermsTab from '../_components/TermsTab';
@@ -65,6 +66,8 @@ function PatientDetailContent({
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,9 +141,13 @@ function PatientDetailContent({
   }
 
   const canViewDocuments = can(account, 'viewPatientDocuments');
+  const canEditPatient = can(account, 'editPatient', {
+    patientReadOnly: patient.readOnly,
+  });
   const canEditDocuments = can(account, 'editDocument', {
     patientReadOnly: patient.readOnly,
   });
+  const canDeleteDocuments = can(account, 'deleteDocument');
   const canUpload = can(account, 'uploadDocument', {
     patientReadOnly: patient.readOnly,
   });
@@ -207,6 +214,15 @@ function PatientDetailContent({
           </>
         )}
       </nav>
+
+      {success && (
+        <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
+          <div className={ui.alertIcon}>
+            <Icon name="checkCircle" />
+          </div>
+          <span>{success}</span>
+        </div>
+      )}
 
       {activeTab === 'dados' && (
         <section data-panel="dados" id="dados">
@@ -278,6 +294,20 @@ function PatientDetailContent({
                   </dl>
                 </div>
 
+                {canEditPatient && (
+                  <button
+                    type="button"
+                    className="btn btn-primary ux-idedit"
+                    onClick={() => {
+                      setSuccess('');
+                      setEditing(true);
+                    }}
+                  >
+                    <Icon name="edit" className="icon-sm" />
+                    Editar paciente
+                  </button>
+                )}
+
                 {account.role === 'admin' && (
                   <button
                     type="button"
@@ -300,33 +330,9 @@ function PatientDetailContent({
             <div className="ux-profile-main">
               <PersonalDataCard patient={patient} />
 
-              <SupportContactsCard
-                patientId={patient.id}
-                patientName={patient.name}
-                contacts={supportContacts}
-                canEdit={can(account, 'manageSupportContacts', {
-                  patientReadOnly: patient.readOnly,
-                })}
-                onChange={setSupportContacts}
-              />
+              <SupportContactsCard contacts={supportContacts} />
 
-              <ClinicalDataCard
-                patientId={patient.id}
-                data={patient}
-                canEdit={can(account, 'manageClinicalData', {
-                  patientReadOnly: patient.readOnly,
-                })}
-                onSaved={(clinicalData) =>
-                  setPatient((current) =>
-                    current
-                      ? {
-                          ...current,
-                          ...clinicalData,
-                        }
-                      : current,
-                  )
-                }
-              />
+              <ClinicalDataCard data={patient} />
 
               {patient.diagnosis && (
                 <DiagnosisCard diagnosis={patient.diagnosis} />
@@ -355,6 +361,7 @@ function PatientDetailContent({
             patientId={patient.id}
             canUpload={canUpload}
             canEditDocuments={canEditDocuments}
+            canDeleteDocuments={canDeleteDocuments}
           />
         </section>
       )}
@@ -365,6 +372,7 @@ function PatientDetailContent({
             patientId={patient.id}
             canUpload={canUpload}
             canEditDocuments={canEditDocuments}
+            canDeleteDocuments={canDeleteDocuments}
           />
         </section>
       )}
@@ -373,6 +381,22 @@ function PatientDetailContent({
         <section data-panel="historico-pts" id="historico-pts">
           <PtsHistoryTab patientId={patient.id} />
         </section>
+      )}
+
+      {editing && (
+        <EditPatientDialog
+          patient={patient}
+          contacts={supportContacts}
+          canEditAccount={account.role === 'admin'}
+          onContactsChange={setSupportContacts}
+          onSaved={(saved) => {
+            setPatient(saved);
+            setSupportContacts(saved.supportContacts);
+            setEditing(false);
+            setSuccess(`Dados de ${saved.name} salvos`);
+          }}
+          onClose={() => setEditing(false)}
+        />
       )}
 
       <DeletePatientDialog

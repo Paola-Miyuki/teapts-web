@@ -15,9 +15,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
-import type { AccountContext } from '../../accounts/services/accounts.service';
+import {
+  AccountsService,
+  type AccountChanges,
+  type AccountContext,
+} from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { isAdmin } from '../../auth/account-context';
+import { isValidBirthDate, isValidCpf } from '../../auth/sign-up-fields';
 import { toPagination } from '../../common/pagination/pagination';
 import { REVIEW_TIME_ZONE } from '../../notifications/services/review-window.service';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
@@ -41,6 +46,10 @@ import type {
   MedicationResponseDto,
 } from '../dto/medication-response.dto';
 import type { UpdateClinicalDataRequestDto } from '../dto/update-clinical-data-request.dto';
+import {
+  ACCOUNT_FIELDS,
+  type UpdatePatientRequestDto,
+} from '../dto/update-patient-request.dto';
 import type { Medication } from '../entities/medication.entity';
 import type { SupportContact } from '../entities/support-contact.entity';
 import {
@@ -61,6 +70,7 @@ import {
   type PatientDetailRow,
   type PatientRow,
   type MedicationValues,
+  type PatientDataValues,
   type PatientScope,
   type PatientsPage,
   PatientsRepository,
@@ -158,6 +168,20 @@ function toSupportContact(contact: SupportContactDto): SupportContactDto {
 /**
  * Consulta pacientes autorizados e cadastra perfis de paciente.
  */
+function invalidPatientData(message: string): BadRequestException {
+  return new BadRequestException({ status: 'VALIDATION_ERROR', message });
+}
+
+/** Menor de 18 anos hoje (datas `AAAA-MM-DD`). */
+function isUnderage(birthDate: string, today = new Date()): boolean {
+  const [year, month, day] = birthDate.split('-').map(Number);
+  const adult = new Date(year + 18, month - 1, day);
+
+  return (
+    adult > new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  );
+}
+
 function forbiddenPatient(): ForbiddenException {
   return new ForbiddenException({
     status: 'FORBIDDEN',
@@ -304,6 +328,7 @@ export class PatientsService {
     private readonly patientsRepository: PatientsRepository,
     @InjectRepository(Account)
     private readonly accountRepository: Repository<Account>,
+    private readonly accountsService: AccountsService,
   ) {}
 
   /**
@@ -422,6 +447,109 @@ export class PatientsService {
       reassessment: currentPts && toReassessment(currentPts),
       hasTcle,
     };
+  }
+
+  /**
+   * Atualiza o cadastro do paciente (Editar paciente): o administrador também
+   * altera os dados da conta; o profissional de PTS ativo (RN024), só os do
+   * paciente. Devolve o paciente atualizado.
+   *
+   * @throws ForbiddenException `FORBIDDEN` sem acesso de escrita, ou quando o
+   *   profissional envia dados da conta
+   * @throws BadRequestException `VALIDATION_ERROR` para dado inválido, inclusive
+   *   responsável tutelar ausente em menor de 18 anos
+   * @throws ConflictException `EMAIL_ALREADY_EXISTS` ou `CPF_ALREADY_EXISTS`
+   */
+  async update(
+    account: AccountContext,
+    patientId: string,
+    request: UpdatePatientRequestDto,
+  ): Promise<PatientDetailResponseDto> {
+    await this.assertSupportContactAccess(account, patientId, 'write');
+
+    const accountChanges: AccountChanges = {};
+    const requested = ACCOUNT_FIELDS.filter(
+      (field) => request[field] !== undefined,
+    );
+
+    if (requested.length > 0 && !isAdmin(account)) {
+      throw new ForbiddenException({
+        status: 'FORBIDDEN',
+        message: 'Só o administrador altera os dados da conta do paciente.',
+      });
+    }
+
+    if (
+      request.birthDate !== undefined &&
+      !isValidBirthDate(request.birthDate)
+    ) {
+      throw invalidPatientData('Informe uma data de nascimento válida.');
+    }
+
+    if (request.cpf !== undefined && !isValidCpf(request.cpf)) {
+      throw invalidPatientData('Informe um CPF válido.');
+    }
+
+    const current = await this.patientsRepository.findPatient(
+      { kind: 'all' },
+      patientId,
+    );
+
+    if (!current) {
+      throw patientNotFound();
+    }
+
+    const birthDate = request.birthDate ?? current.birth_date;
+    const guardianName =
+      request.guardianName === undefined
+        ? current.guardian_name
+        : request.guardianName;
+
+    if (birthDate && isUnderage(birthDate) && !guardianName) {
+      throw invalidPatientData(
+        'Informe o responsável tutelar: o paciente é menor de 18 anos.',
+      );
+    }
+
+    for (const field of requested) {
+      Object.assign(accountChanges, { [field]: request[field] });
+    }
+
+    // A conta primeiro: é a que pode recusar (e-mail ou CPF já cadastrados).
+    if (requested.length > 0) {
+      await this.accountsService.updateAccountData(patientId, accountChanges);
+    }
+
+    const { address } = request;
+    const values: PatientDataValues = {
+      guardianName: request.guardianName,
+      guardianPhone: request.guardianPhone,
+      addressZipCode: address?.zipCode,
+      addressStreet: address?.street,
+      addressNumber: address?.number,
+      addressComplement: address?.complement,
+      addressDistrict: address?.district,
+      addressCity: address?.city,
+      addressState: address?.state,
+      filiation1: request.filiation1,
+      filiation2: request.filiation2,
+      referenceUnit: request.referenceUnit,
+      educationLevel: request.educationLevel,
+      schoolName: request.schoolName,
+    };
+    const changed = Object.fromEntries(
+      Object.entries(values).filter(([, value]) => value !== undefined),
+    ) as PatientDataValues;
+
+    if (Object.keys(changed).length > 0) {
+      await this.patientsRepository.updatePatientData(
+        patientId,
+        changed,
+        account.accountId,
+      );
+    }
+
+    return this.findOne(account, patientId);
   }
 
   /**

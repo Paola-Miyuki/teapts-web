@@ -12,7 +12,11 @@ import {
 } from '@nestjs/common';
 import { QueryFailedError, type Repository } from 'typeorm';
 import type { Account } from '../../accounts/entities/account.entity';
-import type { AccountContext } from '../../accounts/services/accounts.service';
+import type {
+  AccountChanges,
+  AccountContext,
+  AccountsService,
+} from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import type { Professional } from '../../professionals/entities/professional.entity';
@@ -20,7 +24,12 @@ import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import type { Patient } from '../entities/patient.entity';
-import type { NewPatient } from '../repositories/patients.repository';
+import type {
+  NewPatient,
+  PatientDataValues,
+} from '../repositories/patients.repository';
+import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
+import type { UpdatePatientRequestDto } from '../dto/update-patient-request.dto';
 import type { SupportContact } from '../entities/support-contact.entity';
 import type {
   CurrentPtsRow,
@@ -44,6 +53,14 @@ function createService() {
           scope: PatientScope,
           filters: GetAuthorizedPatientsRequestDto,
         ) => Promise<PatientsPage>
+      >(),
+    updatePatientData:
+      jest.fn<
+        (
+          patientId: string,
+          values: PatientDataValues,
+          updatedByAccountId: string,
+        ) => Promise<void>
       >(),
     findPatient:
       jest.fn<
@@ -87,12 +104,19 @@ function createService() {
   repository.findCurrentPts.mockResolvedValue(null);
   repository.hasTcle.mockResolvedValue(false);
 
+  const accountsService = {
+    updateAccountData:
+      jest.fn<
+        (accountId: string, changes: AccountChanges) => Promise<Account>
+      >(),
+  };
   const service = new PatientsService(
     repository as unknown as PatientsRepository,
     accountRepository as unknown as Repository<Account>,
+    accountsService as unknown as AccountsService,
   );
 
-  return { repository, accountRepository, service };
+  return { repository, accountRepository, accountsService, service };
 }
 
 const professionalAccount: AccountContext = {
@@ -932,6 +956,190 @@ describe('PatientsService support contacts', () => {
       status: 'ERROR',
       message: 'Não foi possível remover o contato de suporte.',
     });
+  });
+});
+
+describe('PatientsService.update', () => {
+  const current = {
+    account_id: 'patient-1',
+    birth_date: '2019-04-18',
+    guardian_name: 'Juliana Ribeiro',
+  } as unknown as PatientDetailRow;
+
+  function setup() {
+    const ctx = createService();
+    ctx.repository.patientExists.mockResolvedValue(true);
+    ctx.repository.findPatient.mockResolvedValue(current);
+    ctx.repository.updatePatientData.mockResolvedValue();
+    ctx.accountsService.updateAccountData.mockResolvedValue({} as Account);
+    const detail = { id: 'patient-1' } as PatientDetailResponseDto;
+    jest.spyOn(ctx.service, 'findOne').mockResolvedValue(detail);
+
+    return { ...ctx, detail };
+  }
+
+  it('lets the admin change the account and the patient data and returns the patient', async () => {
+    const { repository, accountsService, service, detail } = setup();
+    const request = {
+      name: 'Ana Clara Ribeiro',
+      cpf: '11144477735',
+      email: 'ribeiro.familia@gmail.com',
+      guardianPhone: '41997015522',
+      address: { zipCode: '80045140', street: 'Rua Itupava', state: 'pr' },
+      filiation1: 'Juliana Ribeiro',
+      educationLevel: null,
+    } as unknown as UpdatePatientRequestDto;
+
+    await expect(
+      service.update(adminAccount, 'patient-1', request),
+    ).resolves.toBe(detail);
+
+    expect(accountsService.updateAccountData).toHaveBeenCalledWith(
+      'patient-1',
+      {
+        name: 'Ana Clara Ribeiro',
+        cpf: '11144477735',
+        email: 'ribeiro.familia@gmail.com',
+      },
+    );
+    expect(repository.updatePatientData).toHaveBeenCalledWith(
+      'patient-1',
+      {
+        guardianPhone: '41997015522',
+        addressZipCode: '80045140',
+        addressStreet: 'Rua Itupava',
+        addressState: 'pr',
+        filiation1: 'Juliana Ribeiro',
+        educationLevel: null,
+      },
+      'admin-1',
+    );
+  });
+
+  it('lets the team professional change only the patient data', async () => {
+    const { repository, accountsService, service } = setup();
+    repository.findPatient.mockResolvedValue({
+      ...current,
+      read_only: false,
+    } as PatientDetailRow);
+
+    await service.update(professionalAccount, 'patient-1', {
+      referenceUnit: 'UBS Bairro Alto',
+    } as UpdatePatientRequestDto);
+
+    expect(accountsService.updateAccountData).not.toHaveBeenCalled();
+    expect(repository.updatePatientData).toHaveBeenCalledWith(
+      'patient-1',
+      { referenceUnit: 'UBS Bairro Alto' },
+      'account-1',
+    );
+  });
+
+  it('forbids the professional to change the account data', async () => {
+    const { repository, accountsService, service } = setup();
+    repository.findPatient.mockResolvedValue({
+      ...current,
+      read_only: false,
+    } as PatientDetailRow);
+
+    await expect(
+      service.update(professionalAccount, 'patient-1', {
+        name: 'Outro nome',
+      } as UpdatePatientRequestDto),
+    ).rejects.toMatchObject({ response: { status: 'FORBIDDEN' } });
+    expect(accountsService.updateAccountData).not.toHaveBeenCalled();
+    expect(repository.updatePatientData).not.toHaveBeenCalled();
+  });
+
+  it('forbids a professional without active PTS with the patient', async () => {
+    const { repository, service } = setup();
+    repository.findPatient.mockResolvedValue({
+      ...current,
+      read_only: true,
+    } as PatientDetailRow);
+
+    await expect(
+      service.update(professionalAccount, 'patient-1', {
+        referenceUnit: 'UBS',
+      } as UpdatePatientRequestDto),
+    ).rejects.toMatchObject({ response: { status: 'FORBIDDEN' } });
+  });
+
+  it('answers PATIENT_NOT_FOUND for an unknown patient', async () => {
+    const { repository, service } = setup();
+    repository.patientExists.mockResolvedValue(false);
+
+    await expect(
+      service.update(adminAccount, 'patient-1', {} as UpdatePatientRequestDto),
+    ).rejects.toMatchObject({ response: { status: 'PATIENT_NOT_FOUND' } });
+  });
+
+  it.each([
+    ['birthDate', { birthDate: '2999-01-01' }, 'data de nascimento'],
+    ['cpf', { cpf: '11111111111' }, 'CPF'],
+  ])('rejects an invalid %s', async (_field, body, text) => {
+    const { repository, service } = setup();
+
+    await expect(
+      service.update(
+        adminAccount,
+        'patient-1',
+        body as UpdatePatientRequestDto,
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        status: 'VALIDATION_ERROR',
+        message: expect.stringContaining(text),
+      },
+    });
+    expect(repository.updatePatientData).not.toHaveBeenCalled();
+  });
+
+  it('requires the guardian for a patient under 18, also when the request clears it', async () => {
+    const { repository, accountsService, service } = setup();
+
+    await expect(
+      service.update(adminAccount, 'patient-1', {
+        guardianName: null,
+      } as UpdatePatientRequestDto),
+    ).rejects.toMatchObject({
+      response: {
+        status: 'VALIDATION_ERROR',
+        message: expect.stringContaining('responsável tutelar'),
+      },
+    });
+    expect(accountsService.updateAccountData).not.toHaveBeenCalled();
+    expect(repository.updatePatientData).not.toHaveBeenCalled();
+  });
+
+  it('allows an adult without guardian', async () => {
+    const { repository, service } = setup();
+    repository.findPatient.mockResolvedValue({
+      ...current,
+      birth_date: '1990-05-20',
+      guardian_name: null,
+    } as PatientDetailRow);
+
+    await expect(
+      service.update(adminAccount, 'patient-1', {
+        filiation1: 'Maria',
+      } as UpdatePatientRequestDto),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not write the patient data when the account change is refused', async () => {
+    const { repository, accountsService, service } = setup();
+    accountsService.updateAccountData.mockRejectedValue(
+      new ConflictException({ status: 'EMAIL_ALREADY_EXISTS' }),
+    );
+
+    await expect(
+      service.update(adminAccount, 'patient-1', {
+        email: 'outro@example.com',
+        filiation1: 'Maria',
+      } as UpdatePatientRequestDto),
+    ).rejects.toMatchObject({ response: { status: 'EMAIL_ALREADY_EXISTS' } });
+    expect(repository.updatePatientData).not.toHaveBeenCalled();
   });
 });
 

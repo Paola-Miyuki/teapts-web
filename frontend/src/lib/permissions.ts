@@ -9,6 +9,7 @@ export type PermissionAction =
   | 'viewOwnCare'
   | 'createPatientProfile'
   | 'manageSupportContacts'
+  | 'editPatient'
   | 'manageClinicalData'
   | 'manageMedications'
   | 'viewAuthorizedPatients'
@@ -16,10 +17,12 @@ export type PermissionAction =
   | 'viewProfessionalDirectory'
   | 'uploadDocument'
   | 'editDocument'
+  | 'deleteDocument'
   | 'viewPatientDocuments'
   | 'createProfessional'
   | 'manageAccounts'
   | 'viewNotifications'
+  | 'viewPtsList'
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
@@ -207,6 +210,11 @@ export function can(
       // suporte não concede acesso (RN017).
       return professional && context.patientReadOnly === false;
 
+    case 'editPatient':
+      // RFPAC003, RFPAC007, RN024 – administrador (RN022) ou profissional
+      // membro da equipe de um PTS ativo do paciente.
+      return professional && context.patientReadOnly === false;
+
     case 'manageClinicalData':
       // RFPAC007, RN024 – administrador (RN022) ou profissional membro da
       // equipe de um PTS ativo do paciente.
@@ -238,6 +246,9 @@ export function can(
     case 'editDocument':
       // RFDOC005 – admin ou profissional com acesso de escrita ao paciente.
       return professional && context.patientReadOnly === false;
+    case 'deleteDocument':
+      // RFDOC006, DP009 – só o administrador exclui documentos.
+      return admin;
     case 'viewPatientDocuments':
       // RFDOC003, RN028 – admin (RN022) e profissional vinculado (a API
       // confere o vínculo); o paciente não vê os documentos da equipe.
@@ -245,6 +256,10 @@ export function can(
     case 'viewProfessionalDirectory':
       // RFPRO001 – profissional; administrador só para seleção.
       return admin || professional;
+    case 'viewPtsList':
+      // RFPTS002, RFPTS004, RFPTS009 – a lista de PTS é do admin (RN022, todos)
+      // e do profissional (só os da equipe; a API confere).
+      return professional;
     case 'viewPtsProposals':
       // RFPTS002 – paciente titular ou profissional da proposta.
       return patient || (professional && (!pts || isProposalMember(user, pts)));

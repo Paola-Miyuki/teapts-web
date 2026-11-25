@@ -98,6 +98,25 @@ export class DocumentsRepository {
     return documents.findOne({ where: { id, deletedAt: IsNull() } });
   }
 
+  /**
+   * Marca o documento ativo como excluído (RN021). Só atualiza a linha; o
+   * arquivo continua no storage.
+   *
+   * @returns `true` se o documento estava ativo e foi excluído
+   */
+  async softDelete(
+    id: string,
+    deletedByAccountId: string,
+    deletedAt: Date,
+    manager: EntityManager,
+  ): Promise<boolean> {
+    const result = await manager
+      .getRepository(DocumentEntity)
+      .update({ id, deletedAt: IsNull() }, { deletedAt, deletedByAccountId });
+
+    return (result.affected ?? 0) > 0;
+  }
+
   /** Persiste alterações na transação informada. */
   save(
     document: DocumentEntity,

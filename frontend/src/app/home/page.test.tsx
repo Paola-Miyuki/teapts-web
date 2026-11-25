@@ -216,7 +216,7 @@ describe('HomePage', () => {
     ).toHaveAttribute('href', '/pts/novo');
     expect(screen.getByRole('link', { name: 'PTS' })).toHaveAttribute(
       'href',
-      '/pts/proposals',
+      '/pts',
     );
     expect(screen.getByRole('link', { name: 'Profissionais' })).toHaveAttribute(
       'href',

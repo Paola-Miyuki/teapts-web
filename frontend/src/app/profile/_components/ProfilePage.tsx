@@ -180,10 +180,7 @@ function ProfileContent({
           </section>
 
           {kind === 'patient' && account.patientProfileId && (
-            <OwnSupportContacts
-              patientId={account.patientProfileId}
-              patientName={account.name}
-            />
+            <OwnSupportContacts patientId={account.patientProfileId} />
           )}
 
           {kind === 'professional' && (

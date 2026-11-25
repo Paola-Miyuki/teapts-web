@@ -52,6 +52,20 @@ export interface CreateForSupertokensUserDto {
   phone: string | null;
 }
 
+/** Dados pessoais da conta que podem mudar; ausente mantém o valor atual. */
+export interface AccountChanges {
+  name?: string;
+  email?: string;
+  socialName?: string | null;
+  birthDate?: string;
+  sex?: Sex;
+  gender?: Gender | null;
+  /** Só dígitos, com DDD. */
+  phone?: string | null;
+  /** Só dígitos. */
+  cpf?: string;
+}
+
 export interface AccountContext {
   accountId: string;
   role: AccountRole;
@@ -83,6 +97,10 @@ export function toMeResponse(
 }
 
 const SUPERTOKENS_TENANT_ID = 'public';
+const CPF_ALREADY_EXISTS_RESPONSE = {
+  status: 'CPF_ALREADY_EXISTS',
+  message: 'Este CPF já está cadastrado.',
+};
 const EMAIL_ALREADY_EXISTS_RESPONSE = {
   status: 'EMAIL_ALREADY_EXISTS',
   message: 'Este e-mail já está cadastrado.',
@@ -160,21 +178,27 @@ export class AccountsService {
     return account;
   }
 
-  async updateMe(
-    accountContext: AccountContext,
-    request: UpdateMeRequestDto,
-  ): Promise<MeResponseDto> {
-    if (request.role !== undefined) {
-      throw new ForbiddenException({
-        status: 'FORBIDDEN',
-        message: 'Não é permitido alterar o papel da conta.',
-      });
-    }
-
-    const account = await this.findById(accountContext.accountId);
-    const nextName = request.name?.trim() ?? account.name;
-    const nextEmail = request.email?.trim().toLowerCase() ?? account.email;
+  /**
+   * Grava os dados pessoais da conta. Trocar o e-mail muda também o
+   * SuperTokens e desfaz a troca se a gravação falhar.
+   *
+   * @throws ConflictException `EMAIL_ALREADY_EXISTS` ou `CPF_ALREADY_EXISTS`
+   */
+  private async applyAccountChanges(
+    account: Account,
+    changes: AccountChanges,
+  ): Promise<Account> {
+    const nextName = changes.name?.trim() ?? account.name;
+    const nextEmail = changes.email?.trim().toLowerCase() ?? account.email;
     const emailChanged = nextEmail !== account.email;
+
+    if (
+      changes.cpf !== undefined &&
+      changes.cpf !== account.cpf &&
+      (await this.isCpfTaken(changes.cpf))
+    ) {
+      throw new ConflictException(CPF_ALREADY_EXISTS_RESPONSE);
+    }
 
     if (emailChanged) {
       const emailOwner = await this.accountRepository.findOne({
@@ -206,13 +230,14 @@ export class AccountsService {
       name: nextName,
       email: nextEmail,
       socialName:
-        request.socialName === undefined
+        changes.socialName === undefined
           ? account.socialName
-          : request.socialName?.trim() || null,
-      birthDate: request.birthDate ?? account.birthDate,
-      sex: request.sex ?? account.sex,
-      gender: request.gender === undefined ? account.gender : request.gender,
-      phone: request.phone === undefined ? account.phone : request.phone,
+          : changes.socialName?.trim() || null,
+      birthDate: changes.birthDate ?? account.birthDate,
+      sex: changes.sex ?? account.sex,
+      gender: changes.gender === undefined ? account.gender : changes.gender,
+      phone: changes.phone === undefined ? account.phone : changes.phone,
+      cpf: changes.cpf ?? account.cpf,
       lastUpdatedAt: new Date(),
     };
 
@@ -235,6 +260,44 @@ export class AccountsService {
 
       throw error;
     }
+
+    return updated;
+  }
+
+  /**
+   * Atualiza os dados pessoais de outra conta, a pedido do administrador
+   * (ex.: editar paciente).
+   */
+  async updateAccountData(
+    accountId: string,
+    changes: AccountChanges,
+  ): Promise<Account> {
+    const account = await this.findById(accountId);
+
+    return this.applyAccountChanges(account, changes);
+  }
+
+  async updateMe(
+    accountContext: AccountContext,
+    request: UpdateMeRequestDto,
+  ): Promise<MeResponseDto> {
+    if (request.role !== undefined) {
+      throw new ForbiddenException({
+        status: 'FORBIDDEN',
+        message: 'Não é permitido alterar o papel da conta.',
+      });
+    }
+
+    const account = await this.findById(accountContext.accountId);
+    const updated = await this.applyAccountChanges(account, {
+      name: request.name,
+      email: request.email,
+      socialName: request.socialName,
+      birthDate: request.birthDate,
+      sex: request.sex,
+      gender: request.gender,
+      phone: request.phone,
+    });
 
     return toMeResponse(updated, accountContext);
   }

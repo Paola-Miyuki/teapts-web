@@ -101,23 +101,41 @@ function mockApi(
   }) as jest.Mock;
 }
 
+// Os contatos são editados no modal "Editar paciente".
+async function openEditor(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(
+    await screen.findByRole('button', { name: 'Editar paciente' }),
+  );
+  await screen.findByRole('dialog', { name: /^Editar Ana Clara Ribeiro/ });
+}
+
 function bodyOf(call: [string, RequestInit]) {
   return JSON.parse(call[1].body as string);
 }
 
-describe('contatos de suporte em /patients/[patientId]', () => {
+describe('contatos de suporte no modal Editar paciente', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (useRouter as jest.Mock).mockReturnValue({ replace: jest.fn() });
   });
 
-  it('o admin vê Adicionar, Editar e Remover e o selo de emergência', async () => {
+  it('o cartão só lê; o admin edita no modal, com Adicionar, Editar e Remover', async () => {
+    const user = userEvent.setup();
     mockApi(ADMIN, patient(true));
 
     render(<PatientDetail id={PATIENT_ID} />);
 
     await screen.findByText('Juliana Ribeiro', { selector: 'strong' });
     expect(screen.getByText('Emergência')).toHaveClass('badge', 'rejected');
+    expect(
+      screen.queryByRole('button', { name: 'Adicionar contato' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^Editar (?!paciente)/ }),
+    ).not.toBeInTheDocument();
+
+    await openEditor(user);
+
     expect(
       screen.getByRole('button', { name: 'Adicionar contato' }),
     ).toBeInTheDocument();
@@ -130,11 +148,13 @@ describe('contatos de suporte em /patients/[patientId]', () => {
   });
 
   it('o profissional de PTS ativo edita; o de PTS encerrado só lê', async () => {
+    const user = userEvent.setup();
     mockApi(PROFESSIONAL, patient(false));
     const { unmount } = render(<PatientDetail id={PATIENT_ID} />);
 
+    await openEditor(user);
     expect(
-      await screen.findByRole('button', { name: 'Adicionar contato' }),
+      screen.getByRole('button', { name: 'Adicionar contato' }),
     ).toBeInTheDocument();
     unmount();
 
@@ -143,10 +163,10 @@ describe('contatos de suporte em /patients/[patientId]', () => {
 
     await screen.findByText('Rosa Ribeiro', { selector: 'strong' });
     expect(
-      screen.queryByRole('button', { name: 'Adicionar contato' }),
+      screen.queryByRole('button', { name: 'Editar paciente' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /^Editar / }),
+      screen.queryByRole('button', { name: 'Adicionar contato' }),
     ).not.toBeInTheDocument();
   });
 
@@ -165,19 +185,21 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     });
 
     render(<PatientDetail id={PATIENT_ID} />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Adicionar contato' }),
-    );
+    await openEditor(user);
+    await user.click(screen.getByRole('button', { name: 'Adicionar contato' }));
 
-    const dialog = within(await screen.findByRole('dialog'));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: 'Adicionar contato' }),
+    );
 
     await user.type(dialog.getByLabelText(/Nome do contato/), 'Lia Martins');
     await user.type(dialog.getByLabelText('E-mail'), 'lia@example.com');
     await user.click(dialog.getByRole('button', { name: 'Adicionar contato' }));
 
     expect(
-      await screen.findByText('Lia Martins', { selector: 'strong' }),
-    ).toBeInTheDocument();
+      (await screen.findAllByText('Lia Martins', { selector: 'strong' }))
+        .length,
+    ).toBeGreaterThan(0);
 
     const post = (global.fetch as jest.Mock).mock.calls.find(
       ([, init]) => init?.method === 'POST',
@@ -197,11 +219,12 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     mockApi(ADMIN, patient(false));
 
     render(<PatientDetail id={PATIENT_ID} />);
-    await user.click(
-      await screen.findByRole('button', { name: 'Adicionar contato' }),
-    );
+    await openEditor(user);
+    await user.click(screen.getByRole('button', { name: 'Adicionar contato' }));
 
-    const dialog = within(await screen.findByRole('dialog'));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: 'Adicionar contato' }),
+    );
     const save = dialog.getByRole('button', { name: 'Adicionar contato' });
 
     await user.click(save);
@@ -235,11 +258,14 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     });
 
     render(<PatientDetail id={PATIENT_ID} />);
+    await openEditor(user);
     await user.click(
-      await screen.findByRole('button', { name: 'Editar Juliana Ribeiro' }),
+      screen.getByRole('button', { name: 'Editar Juliana Ribeiro' }),
     );
 
-    const dialog = within(await screen.findByRole('dialog'));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: 'Editar contato' }),
+    );
 
     expect(dialog.getByLabelText(/Nome do contato/)).toHaveValue(
       'Juliana Ribeiro',
@@ -249,7 +275,9 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     await user.type(dialog.getByLabelText('Descrição'), 'Mãe da Ana');
     await user.click(dialog.getByRole('button', { name: 'Salvar contato' }));
 
-    expect(await screen.findByText(/Mãe da Ana/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Mãe da Ana/)).length).toBeGreaterThan(
+      0,
+    );
 
     const patch = (global.fetch as jest.Mock).mock.calls.find(
       ([, init]) => init?.method === 'PATCH',
@@ -276,11 +304,14 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     });
 
     render(<PatientDetail id={PATIENT_ID} />);
+    await openEditor(user);
     await user.click(
-      await screen.findByRole('button', { name: 'Editar Rosa Ribeiro' }),
+      screen.getByRole('button', { name: 'Editar Rosa Ribeiro' }),
     );
 
-    const dialog = within(await screen.findByRole('dialog'));
+    const dialog = within(
+      await screen.findByRole('dialog', { name: 'Editar contato' }),
+    );
 
     await user.click(dialog.getByRole('button', { name: 'Salvar contato' }));
 
@@ -296,11 +327,16 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     });
 
     render(<PatientDetail id={PATIENT_ID} />);
+    await openEditor(user);
     await user.click(
-      await screen.findByRole('button', { name: 'Remover Rosa Ribeiro' }),
+      screen.getByRole('button', { name: 'Remover Rosa Ribeiro' }),
     );
 
-    const dialog = within(await screen.findByRole('dialog'));
+    const dialog = within(
+      await screen.findByRole('dialog', {
+        name: 'Remover Rosa Ribeiro dos contatos de suporte?',
+      }),
+    );
 
     expect(
       dialog.getByRole('heading', {
@@ -319,8 +355,8 @@ describe('contatos de suporte em /patients/[patientId]', () => {
       ).not.toBeInTheDocument(),
     );
     expect(
-      screen.getByText('Juliana Ribeiro', { selector: 'strong' }),
-    ).toBeInTheDocument();
+      screen.getAllByText('Juliana Ribeiro', { selector: 'strong' }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('cancelar a remoção não chama a API', async () => {
@@ -328,13 +364,16 @@ describe('contatos de suporte em /patients/[patientId]', () => {
     mockApi(ADMIN, patient(false));
 
     render(<PatientDetail id={PATIENT_ID} />);
+    await openEditor(user);
     await user.click(
-      await screen.findByRole('button', { name: 'Remover Rosa Ribeiro' }),
+      screen.getByRole('button', { name: 'Remover Rosa Ribeiro' }),
     );
     await user.click(
-      within(await screen.findByRole('dialog')).getByRole('button', {
-        name: 'Cancelar',
-      }),
+      within(
+        await screen.findByRole('dialog', {
+          name: 'Remover Rosa Ribeiro dos contatos de suporte?',
+        }),
+      ).getByRole('button', { name: 'Cancelar' }),
     );
 
     expect(
@@ -343,7 +382,7 @@ describe('contatos de suporte em /patients/[patientId]', () => {
       ),
     ).toBe(false);
     expect(
-      screen.getByText('Rosa Ribeiro', { selector: 'strong' }),
-    ).toBeInTheDocument();
+      screen.getAllByText('Rosa Ribeiro', { selector: 'strong' }).length,
+    ).toBeGreaterThan(0);
   });
 });

@@ -3,6 +3,8 @@ import { StorageTokenService } from './storage-token.service';
 const config = {
   tokenSecret: 'secret-a',
   uploadUrlTtlMinutes: 15,
+  cleanupIntervalMinutes: 60,
+  unconfirmedTtlMinutes: 1440,
   baseUrl: 'http://localhost:3000',
 };
 const fileKey = 'patient-1/abc-laudo.pdf';

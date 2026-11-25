@@ -14,6 +14,7 @@ type DocumentsTabProps = {
   patientId: string;
   canUpload: boolean;
   canEditDocuments?: boolean;
+  canDeleteDocuments?: boolean;
 };
 
 // Aba "Documentos" de `paciente.html` (RFDOC003): os documentos do paciente,
@@ -22,6 +23,7 @@ export default function DocumentsTab({
   patientId,
   canUpload,
   canEditDocuments = false,
+  canDeleteDocuments = false,
 }: DocumentsTabProps) {
   return (
     <DocumentsTable
@@ -32,6 +34,7 @@ export default function DocumentsTab({
       categories={NON_TERM_CATEGORY_OPTIONS}
       showUploader
       canEditDocuments={canEditDocuments}
+      canDeleteDocuments={canDeleteDocuments}
       load={(query: DocumentsQuery, signal) =>
         getDocuments(patientId, query, signal)
       }
