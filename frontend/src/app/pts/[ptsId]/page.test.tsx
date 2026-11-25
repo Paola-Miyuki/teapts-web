@@ -282,6 +282,59 @@ describe('PtsDetail', () => {
     expect(screen.getByText('30/05/2026')).toBeInTheDocument();
   });
 
+  it('não mostra ações de edição ou status quando aberto pelo histórico', async () => {
+    mockApi(respond(200, { ...PTS, status: 'planning' }));
+
+    render(<PtsDetailPage id="pts-1" readOnly version={1} />);
+
+    expect(
+      await screen.findByRole('heading', { name: '1º PTS' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Visualização somente leitura.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Editar PTS' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Iniciar execução' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+    expect(
+      screen.queryByRole('button', { name: /Adicionar profissional/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mantém o paciente em Meu PTS e mostra o caminho do histórico no detalhe', async () => {
+    mockApi(respond(200, PTS), PATIENT);
+
+    render(<PtsDetailPage id="pts-1" readOnly version={1} />);
+
+    expect(
+      await screen.findByRole('heading', { name: '1º PTS' }),
+    ).toBeInTheDocument();
+    const sidebar = within(
+      screen.getByRole('navigation', { name: 'Menu principal' }),
+    );
+    expect(sidebar.getByRole('link', { name: 'Meu PTS' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      sidebar.getByRole('link', { name: 'Propostas de PTS' }),
+    ).not.toHaveAttribute('aria-current');
+
+    const breadcrumb = within(
+      screen.getByRole('navigation', { name: 'Caminho da página' }),
+    );
+    expect(breadcrumb.getByRole('link', { name: 'Meu PTS' })).toHaveAttribute(
+      'href',
+      '/pts',
+    );
+    expect(breadcrumb.getByText('1º PTS')).toBeInTheDocument();
+  });
+
   it('mostra o acesso negado da API', async () => {
     mockApi(
       respond(403, {

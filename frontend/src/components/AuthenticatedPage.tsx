@@ -12,7 +12,7 @@ import styles from './AppShell.module.css';
 import ui from './ui.module.css';
 
 type AuthenticatedPageProps = {
-  currentHref: string;
+  currentHref: string | ((kind: ProfileKind) => string);
   requiredAction?: PermissionAction;
   // Título da tela de acesso negado (padrão: "Acesso restrito").
   deniedTitle?: string;
@@ -65,6 +65,8 @@ export default function AuthenticatedPage({
   }
 
   const kind = getProfileKind(account);
+  const resolvedCurrentHref =
+    typeof currentHref === 'function' ? currentHref(kind) : currentHref;
 
   if (requiredAction && !can(account, requiredAction)) {
     return (
@@ -82,8 +84,8 @@ export default function AuthenticatedPage({
     <AppShell
       userName={account.name}
       roleLabel={ROLE_LABELS[kind]}
-      navItems={getNavigation(account, currentHref)}
-      currentHref={currentHref}
+      navItems={getNavigation(account, resolvedCurrentHref)}
+      currentHref={resolvedCurrentHref}
       breadcrumb={
         typeof breadcrumb === 'function' ? breadcrumb(kind) : breadcrumb
       }
