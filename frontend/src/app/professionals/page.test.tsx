@@ -49,7 +49,9 @@ function mockApi(professionals: jest.Mock, account: object = ACCOUNT) {
     (url: string, init?: RequestInit) =>
       url.endsWith('/me')
         ? Promise.resolve(mockResponse({ data: account }))
-        : professionals(url, init),
+        : url.endsWith('/unread-count')
+          ? Promise.resolve(mockResponse({ data: { unreadCount: 0 } }))
+          : professionals(url, init),
   );
 }
 

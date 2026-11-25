@@ -158,6 +158,20 @@ export const ptsNotPlanning = () =>
     'Só um PTS em planejamento pode ter a execução iniciada.',
   );
 
+export const ptsCloseForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente o responsável pode encerrar o PTS.',
+  );
+
+export const ptsCloseNotActive = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_ACTIVE',
+    'Só um PTS em planejamento ou em andamento pode ser encerrado.',
+  );
+
 export const ptsProposalDeleteForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,
@@ -233,7 +247,7 @@ export const ptsNotEditable = () =>
   new PtsApiError(
     HttpStatus.CONFLICT,
     'PTS_NOT_EDITABLE',
-    'As metas só mudam com o PTS em proposta, em planejamento ou em andamento.',
+    'O PTS só pode ser alterado em proposta, em planejamento ou em andamento.',
   );
 
 export const lastGoal = () =>

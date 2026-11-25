@@ -7,7 +7,7 @@ import KebabMenu from '@/components/table/KebabMenu';
 import Pagination from '@/components/table/Pagination';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
-import { formatDateOnly, TIME_ZONE } from '@/lib/format';
+import { formatDateOnly, todayDateOnly } from '@/lib/format';
 import {
   GOAL_AREA_LABELS,
   GOAL_STATUS_BADGES,
@@ -53,11 +53,6 @@ function countLabel(count: number) {
   return `${count} ${count === 1 ? 'meta' : 'metas'}`;
 }
 
-// Hoje em AAAA-MM-DD, no horário de Brasília.
-function today() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: TIME_ZONE });
-}
-
 function TargetDate({ goal }: { goal: Goal }) {
   if (!goal.targetDate) {
     return <>Defina a data-alvo</>;
@@ -65,7 +60,7 @@ function TargetDate({ goal }: { goal: Goal }) {
 
   const date = formatDateOnly(goal.targetDate);
 
-  return goal.status === 'in_progress' && goal.targetDate < today() ? (
+  return goal.status === 'in_progress' && goal.targetDate < todayDateOnly() ? (
     <span className="ux-overdue" title="Data-alvo vencida e meta em andamento">
       {date}
     </span>

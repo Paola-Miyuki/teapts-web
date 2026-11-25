@@ -5,8 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // ensino e unidade de referência. As colunas ficam anuláveis porque os
 // pacientes que já existem não as têm (como o `cns`); a obrigatoriedade vale
 // no cadastro.
-export class AddPatientProfileFields1791149070000 implements MigrationInterface {
-  name = 'AddPatientProfileFields1791149070000';
+export class AddPatientProfileFields1791149090000 implements MigrationInterface {
+  name = 'AddPatientProfileFields1791149090000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

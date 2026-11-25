@@ -18,12 +18,14 @@ export type PermissionAction =
   | 'viewPatientDocuments'
   | 'createProfessional'
   | 'manageAccounts'
+  | 'viewNotifications'
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
   | 'viewPtsSheet'
   | 'editPts'
   | 'manageGoals'
+  | 'createActivity'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -31,6 +33,7 @@ export type PermissionAction =
   | 'editPtsProposal'
   | 'deletePtsProposal'
   | 'startPts'
+  | 'closePts'
   | 'registerPtsReassessment';
 
 // Mesmos valores do PtsStateEnum da API.
@@ -76,7 +79,7 @@ function isActivePts(pts?: PtsPermissionData) {
   return ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '');
 }
 
-function hasEditableGoals(pts?: PtsPermissionData) {
+function isEditablePts(pts?: PtsPermissionData) {
   return pts?.status?.toLowerCase() === 'draft' || isActivePts(pts);
 }
 
@@ -108,6 +111,7 @@ export function can(
     switch (action) {
       case 'viewOwnCare':
       case 'viewWaitingHome':
+      case 'viewNotifications':
         return false;
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
@@ -119,9 +123,11 @@ export function can(
       case 'registerPtsReassessment':
         return pts?.status === 'running';
       case 'editPts':
+      case 'closePts':
         return isActivePts(pts);
       case 'manageGoals':
-        return hasEditableGoals(pts);
+      case 'createActivity':
+        return isEditablePts(pts);
       default:
         return true;
     }
@@ -161,6 +167,9 @@ export function can(
     case 'manageAccounts':
       // RN032 – só o administrador lista, consulta e desativa contas.
       return admin;
+    case 'viewNotifications':
+      // RFNOT002 – profissional e paciente; o admin não recebe.
+      return professional || patient;
     case 'createProfessional':
       // RFPRO002 – só o administrador cria o perfil profissional.
       return admin;
@@ -199,12 +208,13 @@ export function can(
       );
 
     case 'manageGoals':
-      // RFPTS012 – equipe do PTS, em proposta, planejamento ou andamento; o
-      // paciente só vê as metas.
+    case 'createActivity':
+      // RFPTS012, RFACT001 – equipe do PTS, em proposta, planejamento ou
+      // andamento; o paciente só vê.
       return (
         professional &&
         pts !== undefined &&
-        hasEditableGoals(pts) &&
+        isEditablePts(pts) &&
         isProposalMember(user, pts)
       );
 
@@ -242,6 +252,15 @@ export function can(
         pts?.status === 'planning' &&
         user.professionalProfileIds.includes(
           pts.responsibleProfessionalId ?? '',
+        )
+      );
+    case 'closePts':
+      // RFPTS010 – profissional responsável, em planejamento ou andamento.
+      return (
+        professional &&
+        isActivePts(pts) &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
         )
       );
     case 'registerPtsReassessment':

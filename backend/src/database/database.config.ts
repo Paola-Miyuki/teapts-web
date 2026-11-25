@@ -1,5 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
+import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
+import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Medication } from '../patients/entities/medication.entity';
 import { Patient } from '../patients/entities/patient.entity';
@@ -27,8 +29,10 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
+import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
-import { AddPatientProfileFields1791149070000 } from './migrations/1791149070000-AddPatientProfileFields';
+import { AddPatientProfileFields1791149090000 } from './migrations/1791149090000-AddPatientProfileFields';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
@@ -39,6 +43,8 @@ import { CreateDocument1791149050000 } from './migrations/1791149050000-CreateDo
 // precisa ser registrada aqui.
 const entities = [
   Account,
+  Activity,
+  ActivityDocument,
   Medication,
   Notification,
   Patient,
@@ -72,7 +78,9 @@ const migrations = [
   CreatePtsGoal1791149040000,
   CreateDocument1791149050000,
   CreateNotification1791149060000,
-  AddPatientProfileFields1791149070000,
+  CreateActivity1791149070000,
+  AddPtsClosingColumns1791149080000,
+  AddPatientProfileFields1791149090000,
 ];
 
 export function getDatabaseOptions(

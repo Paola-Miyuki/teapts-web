@@ -11,17 +11,20 @@ import PtsStatusBadge from '@/components/table/PtsStatusBadge';
 import RegistrationCell from '@/components/table/RegistrationCell';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatDateOnly } from '@/lib/format';
 import type { Account } from '@/lib/account';
 import { can } from '@/lib/permissions';
 import { formatRegistration } from '@/lib/professionals';
 import {
   getPts,
+  type ClosePtsResponse,
   type PtsDetail,
   type PtsProfessional,
   type PtsStartResponse,
 } from '@/lib/pts';
 import GoalsTab from '@/components/pts/GoalsTab';
+import ActivitiesTab from '@/components/pts/ActivitiesTab';
+import { useActivities } from '@/hooks/useActivities';
 import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
@@ -29,11 +32,12 @@ import {
   AddTeamMembersModal,
   type PtsData,
 } from '../_components/AddTeamMembersModal';
+import ClosePtsDialog from '../_components/ClosePtsDialog';
 import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
-type Tab = 'visao' | 'metas' | 'equipe' | 'timeline';
+type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
 
 // Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
 function currentHash() {
@@ -86,7 +90,7 @@ function professionalLabel(professional: PtsProfessional) {
 }
 
 // Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
-// Atividades, atendimentos e as ações do PTS entram com as tasks deles.
+// Atendimentos e as ações do PTS entram com as tasks deles.
 export default function PtsDetailPage({
   id,
   readOnly = false,
@@ -154,15 +158,21 @@ function PtsDetailContent({
   const [pts, setPts] = useState<PtsDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const [isCloseOpen, setIsCloseOpen] = useState(false);
   const [isStartOpen, setIsStartOpen] = useState(false);
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient
-      ? ['metas', 'equipe', 'timeline']
-      : ['visao', 'metas', 'equipe', 'timeline'],
+      ? ['metas', 'equipe', 'atividades', 'timeline']
+      : ['visao', 'metas', 'equipe', 'atividades', 'timeline'],
   );
 
   const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
+  const {
+    activities,
+    error: activitiesError,
+    reload: reloadActivities,
+  } = useActivities(id);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -263,20 +273,48 @@ function PtsDetailContent({
   };
   const canStart =
     !readOnly && can(account, 'startPts', { pts: permissionPts });
+  const canClose =
+    !readOnly && can(account, 'closePts', { pts: permissionPts });
   const canReassess =
     !readOnly &&
     can(account, 'registerPtsReassessment', {
       pts: permissionPts,
     });
 
+  // PTS encerrado antes da RFPTS010 só tem a data do registro.
+  const closedAt = pts.concludedAt ?? pts.cancelledAt;
+  const closedOn = pts.closingDate
+    ? formatDateOnly(pts.closingDate)
+    : closedAt && formatDate(closedAt);
   const canManageGoals =
     !readOnly &&
     !isPatient &&
     can(account, 'manageGoals', { pts: permissionPts });
 
+  const canCreateActivity =
+    !readOnly &&
+    !isPatient &&
+    can(account, 'createActivity', { pts: permissionPts });
+
   const handleStarted = ({ status, beganAt }: PtsStartResponse) => {
     setPts((prev) => (prev ? { ...prev, status, beganAt } : prev));
     setIsStartOpen(false);
+  };
+
+  const handleClosed = (closed: ClosePtsResponse) => {
+    setPts((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: closed.status,
+            closingDate: closed.closingDate,
+            closingReason: closed.closingReason,
+          }
+        : prev,
+    );
+    setIsCloseOpen(false);
+    // As atividades em andamento ou suspensas são encerradas junto.
+    reloadActivities();
   };
 
   const handleTeamUpdated = (updatedPts: PtsData) => {
@@ -314,11 +352,9 @@ function PtsDetailContent({
             <Item label="Aceito em">{formatDate(pts.acceptedAt)}</Item>
           )}
           <Item label="Início">{pts.beganAt && formatDate(pts.beganAt)}</Item>
-          {pts.concludedAt && (
-            <Item label="Concluído em">{formatDate(pts.concludedAt)}</Item>
-          )}
-          {pts.cancelledAt && (
-            <Item label="Cancelado em">{formatDate(pts.cancelledAt)}</Item>
+          {closedOn && <Item label="Encerrado em">{closedOn}</Item>}
+          {pts.closingReason && (
+            <Item label="Motivo do encerramento">{pts.closingReason}</Item>
           )}
           {pts.rejectedAt && (
             <Item label="Rejeitado em">{formatDate(pts.rejectedAt)}</Item>
@@ -356,9 +392,28 @@ function PtsDetailContent({
                 Registrar reavaliação
               </button>
             )}
+            {canClose && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setIsCloseOpen(true)}
+              >
+                <Icon name="lock" className="icon-sm" />
+                Encerrar
+              </button>
+            )}
           </div>
         )}
       </section>
+
+      {canClose && isCloseOpen && (
+        <ClosePtsDialog
+          ptsId={pts.id}
+          patientName={pts.patient.name}
+          onClosed={handleClosed}
+          onClose={() => setIsCloseOpen(false)}
+        />
+      )}
 
       {canStart && (
         <StartPtsDialog
@@ -406,6 +461,17 @@ function PtsDetailContent({
           <span className="tab-count">{members.length}</span>
         </a>
         <a
+          href="#atividades"
+          aria-current={tab === 'atividades' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setTab('atividades');
+          }}
+        >
+          Atividades
+          {activities && <span className="tab-count">{activities.length}</span>}
+        </a>
+        <a
           href="#timeline"
           aria-current={tab === 'timeline' ? 'page' : undefined}
           onClick={(event) => {
@@ -429,6 +495,27 @@ function PtsDetailContent({
               name,
             }))}
             isPatient={isPatient}
+          />
+        </section>
+      ) : tab === 'atividades' ? (
+        <section data-panel="atividades" id="atividades">
+          <ActivitiesTab
+            ptsId={pts.id}
+            activities={activities}
+            error={activitiesError}
+            reload={() => {
+              reloadActivities();
+              // A quantidade de atividades de cada meta muda.
+              reloadGoals();
+            }}
+            canCreate={canCreateActivity}
+            team={members.map((member) => ({
+              id: member.id,
+              name: member.name,
+              specialism: member.specialism.name,
+            }))}
+            goals={goals ?? []}
+            isAdmin={isAdmin}
           />
         </section>
       ) : tab === 'metas' ? (
