@@ -148,6 +148,12 @@ export function getNavigation(account: Account, currentHref: string) {
   }
 
   if (can(account, 'viewOwnCare')) {
+    // RFACT006 – o paciente vê os próprios atendimentos (só o plano, RN028).
+    items.push({
+      href: '/my-appointments',
+      icon: 'session',
+      label: 'Atendimentos',
+    });
     items.push({
       href: '/medications',
       icon: 'pill',
@@ -167,6 +173,14 @@ export function getNavigation(account: Account, currentHref: string) {
 
   if (can(account, 'viewAuthorizedPatients')) {
     items.push({ href: '/patients', icon: 'patient', label: 'Pacientes' });
+  }
+
+  if (can(account, 'viewAppointments')) {
+    items.push({
+      href: '/appointments',
+      icon: 'session',
+      label: 'Atendimentos',
+    });
   }
 
   return items.map((item) => ({
