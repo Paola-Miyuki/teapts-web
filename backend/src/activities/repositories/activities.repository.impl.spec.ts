@@ -1,5 +1,10 @@
 import { jest } from '@jest/globals';
-import type { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  In,
+  type DataSource,
+  type EntityManager,
+  type Repository,
+} from 'typeorm';
 
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { expectApiError } from '../../pts/__tests__/test-utils';
@@ -8,10 +13,13 @@ import type { PtsEntity } from '../../pts/entities/pts.entity';
 import type { TimelineRecorderService } from '../../timeline/services/timeline-recorder.service';
 import { ActivityDocumentEntity } from '../entities/activity-document.entity';
 import { ActivityEntity } from '../entities/activity.entity';
-import { ActivityExecutor } from '../enums/activity.enums';
+import { ActivityExecutor, ActivityState } from '../enums/activity.enums';
 import { activityBody } from '../__tests__/activity-fixtures';
 import { ActivitiesRepositoryImpl } from './activities.repository.impl';
-import type { CreateActivityInput } from './activities.repository';
+import type {
+  CreateActivityInput,
+  UpdateActivityInput,
+} from './activities.repository';
 
 const STORED_FREQUENCY = {
   quantity: 1,
@@ -37,6 +45,30 @@ const input = (
   ...overrides,
 });
 
+const updateInput = (
+  overrides: Partial<UpdateActivityInput> = {},
+): UpdateActivityInput => ({
+  ptsId: 'pts-1',
+  activityId: 'act-1',
+  values: {
+    title: 'Circuito sensorial',
+    description: activityBody().description,
+    type: activityBody().type,
+    frequency: activityBody().frequency,
+    modality: activityBody().modality,
+    visitPlace: null,
+    goalId: null,
+  },
+  documentIds: ['doc-1', 'doc-3'],
+  allowedStates: [ActivityState.Suggested],
+  authorProfessionalId: 'prof-2',
+  executedByAccountId: 'acc-2',
+  description: 'João Lima atualizou a atividade Circuito sensorial',
+  goalUnlinkedDescription:
+    'João Lima desligou a atividade Circuito sensorial da meta',
+  ...overrides,
+});
+
 function setup({
   pts = {
     id: 'pts-1',
@@ -45,15 +77,24 @@ function setup({
   } as Partial<PtsEntity> | null,
   goals = 1,
   documents = [{ id: 'doc-1' }] as { id: string }[],
+  activity = {
+    id: 'act-1',
+    status: ActivityState.Suggested,
+    goalId: 'goal-1',
+  } as Partial<ActivityEntity> | null,
+  linked = [{ documentId: 'doc-1' }, { documentId: 'doc-2' }],
 } = {}) {
   const row = {
     id: 'act-1',
+    ptsId: 'pts-1',
     ...input().values,
     frequency: STORED_FREQUENCY,
     status: 'suggested',
     executors: [{ id: 'prof-1' }],
     documents: [{ documentId: 'doc-1' }],
+    authorProfessionalId: 'prof-2',
     createdAt: new Date('2026-12-01T13:00:00.000Z'),
+    updatedAt: null,
   };
   const query = {
     setLock: jest.fn(),
@@ -69,12 +110,20 @@ function setup({
   const manager = {
     createQueryBuilder: jest.fn(() => query),
     existsBy: jest.fn(async () => goals > 0),
-    find: jest.fn(async () => documents),
+    find: jest.fn(async (entity: unknown) =>
+      entity === ActivityDocumentEntity ? linked : documents,
+    ),
     insert: jest.fn(async () => ({ identifiers: [{ id: 'act-1' }] })),
     findOneOrFail: jest.fn(async () => row),
+    findOne: jest.fn(async () => activity),
+    update: jest.fn(async () => undefined),
+    delete: jest.fn(async () => undefined),
   };
   const recorder = { record: jest.fn(async () => undefined) };
-  const activities = { find: jest.fn(async () => [row]) };
+  const activities = {
+    find: jest.fn(async () => [row]),
+    findOne: jest.fn(async () => row),
+  };
   const repository = new ActivitiesRepositoryImpl(
     {
       transaction: (run: (m: EntityManager) => Promise<unknown>) =>
@@ -124,7 +173,9 @@ describe('ActivitiesRepositoryImpl', () => {
       executorProfessionalIds: ['prof-1'],
       documentIds: ['doc-1'],
       status: 'suggested',
+      authorProfessionalId: 'prof-2',
       createdAt: '2026-12-01T13:00:00.000Z',
+      updatedAt: null,
     });
   });
 
@@ -184,5 +235,145 @@ describe('ActivitiesRepositoryImpl', () => {
       }),
     );
     expect(activity.frequency).toEqual(activityBody().frequency);
+  });
+
+  it('acha a atividade pelo id, com o PTS dela', async () => {
+    const { repository, activities } = setup();
+
+    expect(await repository.findById('act-1')).toMatchObject({
+      id: 'act-1',
+      ptsId: 'pts-1',
+      authorProfessionalId: 'prof-2',
+    });
+
+    activities.findOne.mockResolvedValueOnce(null as never);
+    expect(await repository.findById('act-x')).toBeNull();
+  });
+
+  it('edita, troca os documentos e grava activity_updated e activity_goal_unlinked na mesma transação', async () => {
+    const { repository, query, manager, recorder } = setup({
+      documents: [{ id: 'doc-1' }, { id: 'doc-3' }],
+    });
+
+    await repository.update(updateInput());
+
+    expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(manager.findOne).toHaveBeenCalledWith(ActivityEntity, {
+      where: { id: 'act-1', ptsId: 'pts-1' },
+      lock: { mode: 'pessimistic_write' },
+    });
+    expect(manager.update).toHaveBeenCalledWith(
+      ActivityEntity,
+      { id: 'act-1', ptsId: 'pts-1' },
+      {
+        ...updateInput().values,
+        frequency: STORED_FREQUENCY,
+        updatedAt: expect.any(Date),
+      },
+    );
+    expect(manager.delete).toHaveBeenCalledWith(ActivityDocumentEntity, {
+      activityId: 'act-1',
+      documentId: In(['doc-2']),
+    });
+    expect(manager.insert).toHaveBeenCalledWith(ActivityDocumentEntity, [
+      { activityId: 'act-1', documentId: 'doc-3' },
+    ]);
+    expect(recorder.record).toHaveBeenCalledTimes(2);
+    expect(recorder.record).toHaveBeenNthCalledWith(
+      1,
+      {
+        type: 'activity_updated',
+        targetType: 'activity',
+        targetId: 'act-1',
+        ptsId: 'pts-1',
+        description: updateInput().description,
+        authorProfessionalId: 'prof-2',
+        executedByAccountId: 'acc-2',
+      },
+      manager,
+    );
+    expect(recorder.record).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        type: 'activity_goal_unlinked',
+        description: updateInput().goalUnlinkedDescription,
+      }),
+      manager,
+    );
+  });
+
+  it('sem documentIds mantém os documentos; com a meta mantida, só activity_updated', async () => {
+    const { repository, manager, recorder } = setup();
+
+    await repository.update(
+      updateInput({
+        documentIds: undefined,
+        values: { ...updateInput().values, goalId: 'goal-1' },
+      }),
+    );
+
+    expect(manager.existsBy).not.toHaveBeenCalled();
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(manager.insert).not.toHaveBeenCalled();
+    expect(recorder.record).toHaveBeenCalledTimes(1);
+    expect(recorder.record).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'activity_updated' }),
+      manager,
+    );
+  });
+
+  it('refaz as checagens com o PTS e a atividade travados e não grava nada na recusa', async () => {
+    const cases = [
+      [setup({ activity: null }), updateInput(), 404, 'ACTIVITY_NOT_FOUND'],
+      [
+        setup({
+          activity: { id: 'act-1', status: ActivityState.Archived },
+        }),
+        updateInput(),
+        409,
+        'ACTIVITY_NOT_EDITABLE',
+      ],
+      [
+        setup({
+          activity: { id: 'act-1', status: ActivityState.Running },
+        }),
+        updateInput(),
+        403,
+        'FORBIDDEN',
+      ],
+      [
+        setup({
+          pts: { id: 'pts-1', status: PtsStateEnum.CONCLUDED },
+        }),
+        updateInput(),
+        409,
+        'PTS_NOT_EDITABLE',
+      ],
+      [
+        setup({ goals: 0 }),
+        updateInput({
+          values: { ...updateInput().values, goalId: 'goal-2' },
+        }),
+        400,
+        'VALIDATION_ERROR',
+      ],
+      [
+        setup({ documents: [{ id: 'doc-1' }] }),
+        updateInput(),
+        400,
+        'VALIDATION_ERROR',
+      ],
+    ] as const;
+
+    for (const [
+      { repository, manager, recorder },
+      data,
+      status,
+      code,
+    ] of cases) {
+      await expectApiError(() => repository.update(data), status, code);
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(recorder.record).not.toHaveBeenCalled();
+    }
   });
 });
