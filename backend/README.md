@@ -27,6 +27,7 @@ src/
   common/       pagination, search, swagger, validation
   auth/         guards, SuperTokens, /me, signup e login
   accounts/     patients/     professionals/     pts/     timeline/     health/
+  notifications/ rotina diária do aviso da janela de reavaliação (RFNOT001, 06:00 de Brasília)
   documents/    storage/ (StorageService, driver PostgresStorage, token HMAC)
   database/     database.config.ts (conexão e arrays entities/migrations), data-source.ts,
                 migrations/, seeds/, enums/
