@@ -1327,6 +1327,8 @@ describe('PtsService.findPtsById', () => {
     beganAt: '2026-01-12T12:00:00.000Z',
     concludedAt: '2026-07-10T12:00:00.000Z',
     cancelledAt: null,
+    closingDate: null,
+    closingReason: null,
     patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
     responsible: {
       id: 'prof-10',
@@ -1435,6 +1437,8 @@ describe('PtsService.findPtsHistory', () => {
       beganAt: '2025-01-03T12:00:00.000Z',
       concludedAt: '2025-06-01T12:00:00.000Z',
       cancelledAt: null,
+      closingDate: null,
+      closingReason: null,
       patient: { id: 'patient-25', name: 'Paciente' },
       responsible: {
         id: 'prof-10',
@@ -2396,4 +2400,153 @@ describe('PtsService.startPts (RFPTS006)', () => {
       expect(repo.startedRecords).toHaveLength(0);
     },
   );
+});
+
+describe('PtsService.closePts (RFPTS010)', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  const seedPts = (status: PtsStateEnum) => {
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  };
+
+  const body = (
+    outcome: 'concluded' | 'cancelled' = 'concluded',
+    reason?: string,
+  ) => ({ outcome, closingDate: '2026-12-10', reason });
+
+  beforeEach(() => {
+    repo = seededRepo();
+    service = new PtsService(repo);
+    seedPts(PtsStateEnum.RUNNING);
+    repo.accountNames.set('acc-1', 'Kaio Felipe');
+  });
+
+  it.each([PtsStateEnum.PLANNING, PtsStateEnum.RUNNING])(
+    'o responsável conclui o PTS em %s',
+    async (status) => {
+      seedPts(status);
+
+      expect(
+        await service.closePts(
+          'pts-100',
+          body('concluded', '  Metas atingidas  '),
+          responsibleAccount,
+        ),
+      ).toEqual({
+        id: 'pts-100',
+        status: 'concluded',
+        closingDate: '2026-12-10',
+        closingReason: 'Metas atingidas',
+      });
+
+      const [record] = repo.closedRecords;
+      expect(record).toMatchObject({
+        ptsId: 'pts-100',
+        outcome: 'concluded',
+        closingDate: '2026-12-10',
+        closingReason: 'Metas atingidas',
+        authorProfessionalId: 'prof-10',
+        executedByAccountId: 'acc-1',
+        description: 'Kaio Felipe concluiu o PTS (Metas atingidas)',
+      });
+      expect(record.activityDescription('Integração')).toBe(
+        'Kaio Felipe concluiu a atividade Integração',
+      );
+    },
+  );
+
+  it.each([undefined, '   '])(
+    'cancela sem motivo (%j), e a atividade é arquivada',
+    async (reason) => {
+      const result = await service.closePts(
+        'pts-100',
+        body('cancelled', reason),
+        responsibleAccount,
+      );
+
+      expect(result).toMatchObject({
+        status: 'cancelled',
+        closingReason: null,
+      });
+      expect(repo.closedRecords[0].description).toBe(
+        'Kaio Felipe cancelou o PTS',
+      );
+      expect(repo.closedRecords[0].activityDescription('Integração')).toBe(
+        'Kaio Felipe arquivou a atividade Integração',
+      );
+    },
+  );
+
+  it('o admin encerra sem profissional atribuído (RN029)', async () => {
+    await service.closePts('pts-100', body(), adminAccount);
+
+    expect(repo.closedRecords[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+    });
+  });
+
+  it('nega a membro da equipe e ao paciente', async () => {
+    for (const account of [
+      { ...responsibleAccount, professionalProfileIds: ['prof-11'] },
+      {
+        ...responsibleAccount,
+        patientProfileId: 'acc-1',
+        professionalProfileIds: [],
+      },
+    ]) {
+      await expectApiError(
+        () => service.closePts('pts-100', body(), account),
+        403,
+        'FORBIDDEN',
+      );
+    }
+    expect(repo.closedRecords).toHaveLength(0);
+  });
+
+  it.each([
+    PtsStateEnum.DRAFT,
+    PtsStateEnum.CONCLUDED,
+    PtsStateEnum.CANCELLED,
+    PtsStateEnum.REJECTED,
+  ])('recusa o PTS em %s, até para o admin', async (status) => {
+    seedPts(status);
+
+    for (const account of [responsibleAccount, adminAccount]) {
+      const error = await expectApiError(
+        () => service.closePts('pts-100', body(), account),
+        409,
+        'PTS_NOT_ACTIVE',
+      );
+      expect(error.message).toBe(
+        'Só um PTS em planejamento ou em andamento pode ser encerrado.',
+      );
+    }
+  });
+
+  it('responde 404 para PTS inexistente', async () => {
+    await expectApiError(
+      () => service.closePts('pts-999', body(), responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
 });

@@ -139,6 +139,142 @@ export function confirmDocument(
   );
 }
 
+// TCLE e autorização de uso de imagem: vão para a aba "Termos e consentimentos".
+export const TERM_CATEGORIES = [
+  'tcle',
+  'image_authorization',
+] as const satisfies readonly DocumentCategory[];
+
+export const TERM_CATEGORY_OPTIONS = DOCUMENT_CATEGORIES.filter(({ value }) =>
+  (TERM_CATEGORIES as readonly string[]).includes(value),
+);
+
+// Demais categorias, na aba "Documentos".
+export const NON_TERM_CATEGORY_OPTIONS = DOCUMENT_CATEGORIES.filter(
+  ({ value }) => !(TERM_CATEGORIES as readonly string[]).includes(value),
+);
+
+export function categoryLabel(category: string) {
+  return (
+    DOCUMENT_CATEGORIES.find(({ value }) => value === category)?.label ??
+    category
+  );
+}
+
+// Emissor do documento: profissional do sistema ou texto livre, de fora.
+export type DocumentIssuer = {
+  name: string;
+  specialism?: string;
+  institution?: string;
+  outsideSystem: boolean;
+};
+
+export type DocumentListItem = {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  issuer: DocumentIssuer | null;
+  // `AAAA-MM-DD`.
+  issueDate: string | null;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedBy: { id: string; name: string; isPatient: boolean };
+  createdAt: string;
+};
+
+export type DocumentList = {
+  data: DocumentListItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export type DocumentsQuery = {
+  page: number;
+  limit: number;
+  q?: string;
+  category?: readonly DocumentCategory[];
+};
+
+function toParams({ page, limit, q, category = [] }: DocumentsQuery) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  const term = q?.trim();
+
+  if (term) {
+    params.set('q', term);
+  }
+
+  if (category.length > 0) {
+    params.set('category', category.join(','));
+  }
+
+  return params;
+}
+
+// GET /patients/:id/documents (RFDOC003): admin e profissional vinculado;
+// filtros vazios não entram na query string.
+export function getDocuments(
+  patientId: string,
+  query: DocumentsQuery,
+  signal?: AbortSignal,
+) {
+  return request<DocumentList>(
+    `/patients/${encodeURIComponent(patientId)}/documents?${toParams(query)}`,
+    { signal },
+  );
+}
+
+// GET /me/documents (RFDOC007): só o que o paciente titular enviou.
+export function getMyDocuments(query: DocumentsQuery, signal?: AbortSignal) {
+  return request<DocumentList>(`/me/documents?${toParams(query)}`, { signal });
+}
+
+export type DocumentUrl = { url: string; expiresAt: string };
+
+// GET /documents/:id/url: URL temporária de leitura; pedida a cada clique,
+// porque vence em poucos minutos.
+export function getDocumentUrl(documentId: string) {
+  return request<DocumentUrl>(
+    `/documents/${encodeURIComponent(documentId)}/url`,
+  );
+}
+
+/** A mesma URL de leitura, mas forçando o download (`attachment`). */
+export function downloadUrlOf(url: string) {
+  return `${url}${url.includes('?') ? '&' : '?'}download=1`;
+}
+
+/** Segue para a URL na própria aba (o download não sai da página). */
+export function goToUrl(url: string) {
+  window.location.assign(url);
+}
+
+const FILE_KIND_LABELS: Record<string, string> = {
+  'application/pdf': 'PDF',
+  'image/png': 'Imagem PNG',
+  'image/jpeg': 'Imagem JPG',
+  'application/msword': 'DOC',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    'DOCX',
+};
+
+/** `PDF · 1,2 MB`: tipo e tamanho do arquivo, como na tabela. */
+export function formatFileInfo(mimeType: string, sizeBytes: number) {
+  const kind = FILE_KIND_LABELS[mimeType] ?? 'Arquivo';
+  const size =
+    sizeBytes < 1_048_576
+      ? `${Math.max(1, Math.round(sizeBytes / 1024))} KB`
+      : `${(sizeBytes / 1_048_576).toFixed(1).replace('.', ',')} MB`;
+
+  return `${kind} · ${size}`;
+}
+
 type UploadOptions = {
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;

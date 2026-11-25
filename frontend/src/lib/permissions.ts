@@ -15,8 +15,10 @@ export type PermissionAction =
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
   | 'uploadDocument'
+  | 'viewPatientDocuments'
   | 'createProfessional'
   | 'manageAccounts'
+  | 'viewNotifications'
   | 'viewPtsProposals'
   | 'viewPts'
   | 'viewActivePts'
@@ -32,6 +34,7 @@ export type PermissionAction =
   | 'editPtsProposal'
   | 'deletePtsProposal'
   | 'startPts'
+  | 'closePts'
   | 'registerPtsReassessment';
 
 // Mesmos valores do PtsStateEnum da API.
@@ -120,6 +123,7 @@ export function can(
     switch (action) {
       case 'viewOwnCare':
       case 'viewWaitingHome':
+      case 'viewNotifications':
         return false;
       case 'approvePtsProposal':
       case 'rejectPtsProposal':
@@ -131,6 +135,7 @@ export function can(
       case 'registerPtsReassessment':
         return pts?.status === 'running';
       case 'editPts':
+      case 'closePts':
         return isActivePts(pts);
       case 'manageGoals':
       case 'createActivity':
@@ -180,6 +185,9 @@ export function can(
     case 'manageAccounts':
       // RN032 – só o administrador lista, consulta e desativa contas.
       return admin;
+    case 'viewNotifications':
+      // RFNOT002 – profissional e paciente; o admin não recebe.
+      return professional || patient;
     case 'createProfessional':
       // RFPRO002 – só o administrador cria o perfil profissional.
       return admin;
@@ -187,6 +195,10 @@ export function can(
       // RFDOC001, RN028 – o paciente envia os próprios documentos (a API
       // confere o id); o profissional, só com PTS ativo do paciente.
       return patient || (professional && context.patientReadOnly === false);
+    case 'viewPatientDocuments':
+      // RFDOC003, RN028 – admin (RN022) e profissional vinculado (a API
+      // confere o vínculo); o paciente não vê os documentos da equipe.
+      return professional;
     case 'viewProfessionalDirectory':
       // RFPRO001 – profissional; administrador só para seleção.
       return admin || professional;
@@ -285,6 +297,15 @@ export function can(
         pts?.status === 'planning' &&
         user.professionalProfileIds.includes(
           pts.responsibleProfessionalId ?? '',
+        )
+      );
+    case 'closePts':
+      // RFPTS010 – profissional responsável, em planejamento ou andamento.
+      return (
+        professional &&
+        isActivePts(pts) &&
+        user.professionalProfileIds.includes(
+          pts?.responsibleProfessionalId ?? '',
         )
       );
     case 'registerPtsReassessment':

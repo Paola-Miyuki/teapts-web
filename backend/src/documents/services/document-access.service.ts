@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
+import { documentForbidden, onlyOwnDocuments } from '../documents.errors';
+import type { DocumentEntity } from '../entities/document.entity';
 import { PatientsRepository } from '../../patients/repositories/patients.repository';
 
 @Injectable()
@@ -57,5 +59,49 @@ export class DocumentAccessService {
     if (!row || (mode === 'write' && row.read_only)) {
       throw forbidden();
     }
+  }
+
+  /**
+   * Confere o acesso da equipe (admin ou profissional vinculado) à consulta
+   * dos documentos: o paciente, inclusive o titular, não consulta (RN028).
+   *
+   * @throws ForbiddenException `FORBIDDEN` para o paciente e para quem não
+   *   tem vínculo
+   * @throws NotFoundException `PATIENT_NOT_FOUND` quando o paciente não existe
+   */
+  async assertTeamRead(
+    account: AccountContext,
+    patientId: string,
+  ): Promise<void> {
+    if (!isAdmin(account) && account.patientProfileId !== null) {
+      throw documentForbidden();
+    }
+
+    await this.assertAccess(account, patientId, 'read');
+  }
+
+  /**
+   * Confere a leitura de um documento ativo: a equipe, pelo paciente dele; o
+   * paciente titular, só do que ele mesmo enviou (RFDOC007, RN028).
+   *
+   * @throws ForbiddenException `FORBIDDEN` quando o paciente pede o de outro
+   *   ou a equipe não tem vínculo
+   */
+  async assertDocumentRead(
+    account: AccountContext,
+    document: Pick<DocumentEntity, 'patientId' | 'uploadedByAccountId'>,
+  ): Promise<void> {
+    if (!isAdmin(account) && account.patientProfileId !== null) {
+      if (
+        account.patientProfileId !== document.patientId ||
+        document.uploadedByAccountId !== account.accountId
+      ) {
+        throw onlyOwnDocuments();
+      }
+
+      return;
+    }
+
+    await this.assertTeamRead(account, document.patientId);
   }
 }

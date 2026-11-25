@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 
 import Logo from '@/components/Logo';
+import NotificationBell from '@/components/NotificationBell';
 import LogoutButton from '@/components/LogoutButton';
 import type { NavItem } from '@/lib/account';
 import styles from './AppShell.module.css';
@@ -18,6 +19,7 @@ type AppShellProps = {
   roleLabel: string;
   navItems: NavItem[];
   currentHref: string;
+  showNotifications?: boolean;
   breadcrumb?: string | Crumb[];
   children: ReactNode;
 };
@@ -39,6 +41,7 @@ export default function AppShell({
   roleLabel,
   navItems,
   currentHref,
+  showNotifications = false,
   breadcrumb,
   children,
 }: AppShellProps) {
@@ -180,24 +183,29 @@ export default function AppShell({
             </button>
           )}
 
-          <Link
-            href="/profile"
-            className={`${styles.headerProfile} ux-header-end`}
-            aria-current={
-              currentHref.startsWith('/profile') ? 'page' : undefined
-            }
-            aria-label={`Meu perfil: ${userName}, ${roleLabel}`}
-            title="Meu perfil"
-          >
-            <span className={styles.avatar} aria-hidden="true">
-              {getInitials(userName)}
-            </span>
+          <div className="ux-header-end">
+            {showNotifications && (
+              <NotificationBell current={currentHref === '/notifications'} />
+            )}
+            <Link
+              href="/profile"
+              className={styles.headerProfile}
+              aria-current={
+                currentHref.startsWith('/profile') ? 'page' : undefined
+              }
+              aria-label={`Meu perfil: ${userName}, ${roleLabel}`}
+              title="Meu perfil"
+            >
+              <span className={styles.avatar} aria-hidden="true">
+                {getInitials(userName)}
+              </span>
 
-            <span className={styles.profileInfo}>
-              <strong>{userName}</strong>
-              <small>{roleLabel}</small>
-            </span>
-          </Link>
+              <span className={styles.profileInfo}>
+                <strong>{userName}</strong>
+                <small>{roleLabel}</small>
+              </span>
+            </Link>
+          </div>
         </header>
 
         <main className={`${styles.content} shell-content`}>

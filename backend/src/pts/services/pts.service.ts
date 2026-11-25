@@ -20,6 +20,10 @@ import type {
   UpdatePtsSheetRequestDto,
   UpdatePtsSheetResponseDto,
 } from '../dto/update-pts-sheet.dto';
+import type {
+  ClosePtsRequestDto,
+  ClosePtsResponseDto,
+} from '../dto/close-pts.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
@@ -41,6 +45,8 @@ import {
   ptsProposalNotPending,
   activePtsForbidden,
   activePtsNotFound,
+  ptsCloseForbidden,
+  ptsCloseNotActive,
   ptsNotActive,
   ptsForbidden,
   ptsHistoryForbidden,
@@ -779,6 +785,55 @@ export class PtsService {
       authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
       executedByAccountId: account.accountId,
       description: `${executorName} iniciou a execução do PTS`,
+    });
+  }
+
+  async closePts(
+    id: string,
+    dto: ClosePtsRequestDto,
+    account: AccountContext,
+  ): Promise<ClosePtsResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RFPTS010: só o responsável (ou o admin, RN022) encerra.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw ptsCloseForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsCloseNotActive();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+    const concluded = dto.outcome === 'concluded';
+    const closingReason = dto.reason?.trim() || null;
+
+    return this.ptsRepository.closePts({
+      ptsId: id,
+      outcome: dto.outcome,
+      closingDate: dto.closingDate,
+      closingReason,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} ${concluded ? 'concluiu' : 'cancelou'} o PTS${
+        closingReason ? ` (${closingReason})` : ''
+      }`,
+      activityDescription: (title) =>
+        `${executorName} ${concluded ? 'concluiu' : 'arquivou'} a atividade ${title}`,
     });
   }
 

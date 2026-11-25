@@ -3,8 +3,14 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository, type SelectQueryBuilder } from 'typeorm';
+import { Brackets, IsNull, Repository, type SelectQueryBuilder } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import type { Gender } from '../../accounts/enums/gender.enum';
+import type { Sex } from '../../accounts/enums/sex.enum';
+import { DocumentEntity } from '../../documents/entities/document.entity';
+import { DocumentCategory } from '../../documents/enums/document-category.enum';
+import type { Uf } from '../../professionals/enums/uf.enum';
+import type { EducationLevel } from '../enums/education-level.enum';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { escapeLike } from '../../common/search/escape-like';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -87,6 +93,22 @@ export type PatientRow = {
 };
 
 export type PatientDetailRow = PatientRow & {
+  birth_date: string | null;
+  sex: Sex | null;
+  gender: Gender | null;
+  guardian_phone: string | null;
+  address_zip_code: string | null;
+  address_street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  address_district: string | null;
+  address_city: string | null;
+  address_state: Uf | null;
+  filiation_1: string | null;
+  filiation_2: string | null;
+  education_level: EducationLevel | null;
+  school_name: string | null;
+  reference_unit: string | null;
   clinical_history: string | null;
   surgical_history: string | null;
   family_history: string | null;
@@ -95,6 +117,21 @@ export type PatientDetailRow = PatientRow & {
   allergies: string | null;
   no_known_allergies: boolean;
 };
+
+/** Ficha do PTS atual do paciente. */
+export type CurrentPtsRow = Pick<
+  PtsEntity,
+  | 'id'
+  | 'status'
+  | 'caseStudyDate'
+  | 'diagnosisSummary'
+  | 'cid'
+  | 'supportLevel'
+  | 'strengths'
+  | 'priorityNeeds'
+  | 'socialSituation'
+  | 'nextReviewAt'
+>;
 
 /** Página de linhas e total da lista de pacientes. */
 export type PatientsPage = {
@@ -316,6 +353,22 @@ export class PatientsRepository {
   ): Promise<PatientDetailRow | null> {
     const row = await this.scopedPatients(scope)
       .addSelect([
+        `to_char(account.birth_date, 'YYYY-MM-DD') AS birth_date`,
+        'account.sex AS sex',
+        'account.gender AS gender',
+        'patient.guardian_phone AS guardian_phone',
+        'patient.address_zip_code AS address_zip_code',
+        'patient.address_street AS address_street',
+        'patient.address_number AS address_number',
+        'patient.address_complement AS address_complement',
+        'patient.address_district AS address_district',
+        'patient.address_city AS address_city',
+        'patient.address_state AS address_state',
+        'patient.filiation_1 AS filiation_1',
+        'patient.filiation_2 AS filiation_2',
+        'patient.education_level AS education_level',
+        'patient.school_name AS school_name',
+        'patient.reference_unit AS reference_unit',
         'patient.clinical_history AS clinical_history',
         'patient.surgical_history AS surgical_history',
         'patient.family_history AS family_history',
@@ -328,6 +381,57 @@ export class PatientsRepository {
       .getRawOne<PatientDetailRow>();
 
     return row ?? null;
+  }
+
+  /**
+   * PTS que a tela do paciente mostra como atual (diagnóstico em comum,
+   * RN030): o ativo; sem ele, o mais recente sem contar os rejeitados.
+   *
+   * @param patientId identificador do paciente (a conta)
+   * @returns a ficha do PTS, ou `null` quando o paciente não tem PTS
+   * @throws erro do banco, sem tratamento
+   */
+  async findCurrentPts(patientId: string): Promise<CurrentPtsRow | null> {
+    const rows = await this.patientRepository.manager
+      .getRepository(PtsEntity)
+      .createQueryBuilder('pts')
+      .select([
+        'pts.id',
+        'pts.status',
+        'pts.caseStudyDate',
+        'pts.diagnosisSummary',
+        'pts.cid',
+        'pts.supportLevel',
+        'pts.strengths',
+        'pts.priorityNeeds',
+        'pts.socialSituation',
+        'pts.nextReviewAt',
+      ])
+      .where('pts.patient_id = :patientId', { patientId })
+      .andWhere('pts.status <> :rejected', { rejected: PtsStateEnum.REJECTED })
+      .orderBy('pts.createdAt', 'DESC')
+      .getMany();
+
+    return (
+      rows.find((pts) => ACTIVE_PTS_STATES.includes(pts.status)) ??
+      rows[0] ??
+      null
+    );
+  }
+
+  /**
+   * Diz se o paciente tem documento ativo da categoria TCLE (selo "Sem TCLE").
+   *
+   * @throws erro do banco, sem tratamento
+   */
+  async hasTcle(patientId: string): Promise<boolean> {
+    return this.patientRepository.manager.getRepository(DocumentEntity).exists({
+      where: {
+        patientId,
+        category: DocumentCategory.TCLE,
+        deletedAt: IsNull(),
+      },
+    });
   }
 
   /**

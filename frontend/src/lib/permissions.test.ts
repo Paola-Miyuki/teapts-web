@@ -282,6 +282,13 @@ describe('can', () => {
     });
   });
 
+  it('mostra as notificações ao profissional e ao paciente, não ao admin', () => {
+    expect(can(professional, 'viewNotifications')).toBe(true);
+    expect(can(patient, 'viewNotifications')).toBe(true);
+    expect(can(admin, 'viewNotifications')).toBe(false);
+    expect(can(waiting, 'viewNotifications')).toBe(false);
+  });
+
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
       expect(can(patient, action, { pts: draft })).toBe(true);
@@ -524,4 +531,38 @@ describe.each([
       can(professional, 'uploadDocument', { patientReadOnly: false }),
     ).toBe(true);
   });
+});
+
+describe('closePts', () => {
+  const pts = (
+    status: string,
+    responsibleProfessionalId = 'professional-id',
+  ) => ({
+    pts: {
+      status,
+      responsibleProfessionalId,
+      teamProfessionalIds: ['professional-id'],
+    },
+  });
+
+  it.each(['planning', 'running'])(
+    'libera ao responsável e ao admin em %s',
+    (status) => {
+      expect(can(professional, 'closePts', pts(status))).toBe(true);
+      expect(can(admin, 'closePts', pts(status, 'other-id'))).toBe(true);
+      expect(can(professional, 'closePts', pts(status, 'other-id'))).toBe(
+        false,
+      );
+      expect(can(patient, 'closePts', pts(status))).toBe(false);
+      expect(can(waiting, 'closePts', pts(status))).toBe(false);
+    },
+  );
+
+  it.each(['draft', 'concluded', 'cancelled', 'rejected'])(
+    'nega em %s, inclusive ao admin',
+    (status) => {
+      expect(can(professional, 'closePts', pts(status))).toBe(false);
+      expect(can(admin, 'closePts', pts(status))).toBe(false);
+    },
+  );
 });

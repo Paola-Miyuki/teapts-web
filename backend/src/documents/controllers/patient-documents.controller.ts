@@ -1,14 +1,17 @@
 // Este arquivo expõe as rotas de documentos de um paciente: o pedido da URL
-// de envio (RFDOC001) e a confirmação do documento (RFDOC002). O
-// ValidationPipe global valida o corpo e o controller delega aos services.
+// de envio (RFDOC001), a confirmação do documento (RFDOC002) e a listagem
+// (RFDOC003). O ValidationPipe global valida o corpo e a query, e o controller
+// delega aos services.
 
 import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -18,6 +21,7 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -28,6 +32,8 @@ import {
   ErrorResponseDto,
   UnauthorizedResponseDto,
 } from '../../common/swagger/error-response.dto';
+import { DocumentListResponseDto } from '../dto/document-list-response.dto';
+import { GetDocumentsQueryDto } from '../dto/get-documents-query.dto';
 import { ConfirmDocumentRequestDto } from '../dto/confirm-document-request.dto';
 import { DocumentResponseDto } from '../dto/document-response.dto';
 import { CreateUploadUrlRequestDto } from '../dto/create-upload-url-request.dto';
@@ -50,6 +56,46 @@ export class PatientDocumentsController {
     private readonly uploads: DocumentUploadService,
     private readonly documents: DocumentsService,
   ) {}
+
+  /**
+   * Lista os documentos do paciente (RFDOC003), paginados, com busca pelo
+   * título e filtro por categoria; os excluídos ficam de fora.
+   *
+   * @param patientId paciente dono dos documentos
+   * @param query `q`, `category`, `page` e `limit`
+   * @returns a página de documentos
+   */
+  @Get('patients/:id/documents')
+  @UseGuards(AuthGuard)
+  @ApiCookieAuth()
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: DocumentListResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: { status: 'ERROR', message: 'Parâmetro inválido: page' },
+  })
+  @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Você não tem acesso aos documentos deste paciente.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    },
+  })
+  async listDocuments(
+    @Param('id', parsePatientId) patientId: string,
+    @Query() query: GetDocumentsQueryDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<DocumentListResponseDto> {
+    return this.documents.list(account, patientId, query);
+  }
 
   /**
    * Pede a URL temporária para enviar um documento do paciente (RFDOC001).

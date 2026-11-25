@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { DocumentEntity } from '../../documents/entities/document.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { PtsEntity } from '../../pts/entities/pts.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -54,6 +55,7 @@ describe('PatientsRepository list and detail', () => {
         SupportContact,
         Professional,
         PtsEntity,
+        DocumentEntity,
       ],
     });
     await (
@@ -257,6 +259,101 @@ describe('PatientsRepository list and detail', () => {
     expect(captured[0].parameters).toMatchObject({
       patientId: 'patient-1',
       accountId: 'account-1',
+    });
+  });
+
+  it('selects the registration data of the detail: account birth and sex, address, filiation and school', async () => {
+    answer(undefined);
+
+    await repository.findPatient({ kind: 'all' }, 'patient-1');
+
+    // O TypeORM aspa os nomes; sem as aspas fica a forma escrita no código.
+    const sql = captured[0].sql.replaceAll('"', '');
+
+    expect(sql).toContain(
+      `to_char(account.birth_date, 'YYYY-MM-DD') AS birth_date`,
+    );
+
+    for (const column of [
+      'account.sex AS sex',
+      'account.gender AS gender',
+      'patient.guardian_phone AS guardian_phone',
+      'patient.address_zip_code AS address_zip_code',
+      'patient.address_state AS address_state',
+      'patient.filiation_1 AS filiation_1',
+      'patient.filiation_2 AS filiation_2',
+      'patient.education_level AS education_level',
+      'patient.school_name AS school_name',
+      'patient.reference_unit AS reference_unit',
+    ]) {
+      expect(sql).toContain(column);
+    }
+  });
+
+  describe('findCurrentPts', () => {
+    function pts(status: PtsStateEnum, id: string) {
+      return { id, status } as PtsEntity;
+    }
+
+    function answerMany(rows: PtsEntity[]) {
+      jest
+        .spyOn(SelectQueryBuilder.prototype, 'getMany')
+        .mockImplementation(function (this: SelectQueryBuilder<PtsEntity>) {
+          captured.push({
+            sql: this.getQuery(),
+            parameters: this.getParameters(),
+          });
+          return Promise.resolve(rows);
+        });
+    }
+
+    it('leaves the rejected PTS out, newest first, and picks the active one', async () => {
+      answerMany([
+        pts(PtsStateEnum.CONCLUDED, 'newest'),
+        pts(PtsStateEnum.RUNNING, 'active'),
+      ]);
+
+      await expect(
+        repository.findCurrentPts('patient-1'),
+      ).resolves.toMatchObject({ id: 'active' });
+      expect(captured[0].sql).toContain('"pts"."status" <> :rejected');
+      expect(captured[0].sql).toContain('ORDER BY "pts"."created_at" DESC');
+      expect(captured[0].parameters).toMatchObject({
+        patientId: 'patient-1',
+        rejected: PtsStateEnum.REJECTED,
+      });
+    });
+
+    it('falls back to the most recent PTS without an active one, or null without PTS', async () => {
+      answerMany([
+        pts(PtsStateEnum.CONCLUDED, 'newest'),
+        pts(PtsStateEnum.CANCELLED, 'older'),
+      ]);
+
+      await expect(
+        repository.findCurrentPts('patient-1'),
+      ).resolves.toMatchObject({ id: 'newest' });
+
+      jest.restoreAllMocks();
+      answerMany([]);
+
+      await expect(repository.findCurrentPts('patient-1')).resolves.toBeNull();
+    });
+  });
+
+  it('checks for an active TCLE document of the patient', async () => {
+    const exists = jest
+      .spyOn(Repository.prototype, 'exists')
+      .mockResolvedValue(true);
+
+    await expect(repository.hasTcle('patient-1')).resolves.toBe(true);
+
+    expect(exists).toHaveBeenCalledWith({
+      where: {
+        patientId: 'patient-1',
+        category: 'tcle',
+        deletedAt: expect.objectContaining({}),
+      },
     });
   });
 });

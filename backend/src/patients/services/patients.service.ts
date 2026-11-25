@@ -19,6 +19,7 @@ import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { isAdmin } from '../../auth/account-context';
 import { toPagination } from '../../common/pagination/pagination';
+import { REVIEW_TIME_ZONE } from '../../notifications/services/review-window.service';
 import type { CreatePatientRequestDto } from '../dto/create-patient-request.dto';
 import type { GetAuthorizedPatientsRequestDto } from '../dto/get-authorized-patients-request.dto';
 import type {
@@ -27,7 +28,11 @@ import type {
 } from '../dto/get-authorized-patients-response.dto';
 import type { GetEligiblePatientsRequestDto } from '../dto/get-eligible-patients-request.dto';
 import type { GetEligiblePatientsResponseDto } from '../dto/get-eligible-patients-response.dto';
-import type { PatientDetailResponseDto } from '../dto/patient-detail-response.dto';
+import type {
+  PatientDetailResponseDto,
+  PatientDiagnosisResponseDto,
+  PatientReassessmentResponseDto,
+} from '../dto/patient-detail-response.dto';
 import type { PatientResponseDto } from '../dto/patient-response.dto';
 import type { ClinicalDataResponseDto } from '../dto/clinical-data-response.dto';
 import type { MedicationRequestDto } from '../dto/medication-request.dto';
@@ -49,7 +54,9 @@ import type {
 } from '../dto/support-contact-response.dto';
 import type { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import {
+  ACTIVE_PTS_STATES,
   type ClinicalDataValues,
+  type CurrentPtsRow,
   type EligiblePatientsPage,
   type PatientDetailRow,
   type PatientRow,
@@ -64,6 +71,52 @@ import {
 const UNIQUE_VIOLATION = '23505';
 
 const OPTIONAL_CONTACT_FIELDS = ['description', 'email', 'phone'] as const;
+
+// A janela de reavaliação abre 30 dias antes da próxima revisão (RN031).
+const REVIEW_WINDOW_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Diagnóstico em comum do PTS atual (RN030). */
+function toDiagnosis(pts: CurrentPtsRow): PatientDiagnosisResponseDto {
+  return {
+    ptsId: pts.id,
+    ptsStatus: pts.status,
+    caseStudyDate: pts.caseStudyDate,
+    cid: pts.cid,
+    supportLevel: pts.supportLevel,
+    summary: pts.diagnosisSummary,
+    strengths: pts.strengths,
+    priorityNeeds: pts.priorityNeeds,
+    socialSituation: pts.socialSituation,
+  };
+}
+
+/**
+ * Selo de reavaliação do PTS ativo: `open` de 30 dias antes da próxima revisão
+ * até a data, `overdue` depois dela; fora disso, ou sem PTS ativo, `null`.
+ */
+export function toReassessment(
+  pts: CurrentPtsRow,
+  now = new Date(),
+): PatientReassessmentResponseDto | null {
+  if (!ACTIVE_PTS_STATES.includes(pts.status)) {
+    return null;
+  }
+
+  // en-CA formata em yyyy-mm-dd.
+  const today = now.toLocaleDateString('en-CA', { timeZone: REVIEW_TIME_ZONE });
+  const days = Math.round(
+    (Date.parse(pts.nextReviewAt) - Date.parse(today)) / DAY_MS,
+  );
+
+  if (days < 0) {
+    return { status: 'overdue', nextReviewAt: pts.nextReviewAt };
+  }
+
+  return days <= REVIEW_WINDOW_DAYS
+    ? { status: 'open', nextReviewAt: pts.nextReviewAt }
+    : null;
+}
 
 /** Erro `409` de conta que já tem perfil de paciente (RN002). */
 function patientProfileAlreadyExists(): ConflictException {
@@ -320,9 +373,13 @@ export class PatientsService {
     }
 
     let contacts: SupportContact[];
+    let currentPts: CurrentPtsRow | null;
+    let hasTcle: boolean;
 
     try {
       contacts = await this.patientsRepository.findSupportContacts(patientId);
+      currentPts = await this.patientsRepository.findCurrentPts(patientId);
+      hasTcle = await this.patientsRepository.hasTcle(patientId);
     } catch (error) {
       this.logger.error('Patient support contacts query failed', error);
       throw new InternalServerErrorException({
@@ -335,6 +392,24 @@ export class PatientsService {
       ...toAuthorizedPatient(row),
       phone: row.phone,
       cpf: row.cpf,
+      birthDate: row.birth_date,
+      sex: row.sex,
+      gender: row.gender,
+      filiation1: row.filiation_1,
+      filiation2: row.filiation_2,
+      address: {
+        zipCode: row.address_zip_code,
+        street: row.address_street,
+        number: row.address_number,
+        complement: row.address_complement,
+        district: row.address_district,
+        city: row.address_city,
+        state: row.address_state,
+      },
+      guardianPhone: row.guardian_phone,
+      educationLevel: row.education_level,
+      schoolName: row.school_name,
+      referenceUnit: row.reference_unit,
       clinicalHistory: row.clinical_history,
       surgicalHistory: row.surgical_history,
       familyHistory: row.family_history,
@@ -343,6 +418,9 @@ export class PatientsService {
       allergies: row.allergies,
       noKnownAllergies: row.no_known_allergies,
       supportContacts: contacts.map(toSupportContactResponse),
+      diagnosis: currentPts && toDiagnosis(currentPts),
+      reassessment: currentPts && toReassessment(currentPts),
+      hasTcle,
     };
   }
 

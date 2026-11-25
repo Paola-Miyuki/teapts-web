@@ -152,65 +152,53 @@ export default function ClinicalDataCard({
       {error && <p role="alert">{error}</p>}
 
       {!editing ? (
-        <ul className="mini-list">
-          <li>
-            <span className="grow">
-              <span className="badge rejected">Alergias e restrições</span>
-              <small className="ux-sub">
-                {data.noKnownAllergies ? (
-                  'Nenhuma alergia conhecida'
-                ) : (
-                  <ClinicalValue value={data.allergies} />
-                )}
-              </small>
-            </span>
-          </li>
+        <div className="ux-anam-grid">
+          <div className="ux-anam-tile">
+            <h3>Antecedentes clínicos</h3>
+            <p>
+              <ClinicalValue value={data.clinicalHistory} />
+            </p>
+          </div>
 
-          <li>
-            <span className="grow">
-              <strong>Antecedentes clínicos</strong>
-              <small className="ux-sub">
-                <ClinicalValue value={data.clinicalHistory} />
-              </small>
-            </span>
-          </li>
+          <div className="ux-anam-tile">
+            <h3>Antecedentes cirúrgicos</h3>
+            <p>
+              <ClinicalValue value={data.surgicalHistory} />
+            </p>
+          </div>
 
-          <li>
-            <span className="grow">
-              <strong>Antecedentes cirúrgicos</strong>
-              <small className="ux-sub">
-                <ClinicalValue value={data.surgicalHistory} />
-              </small>
-            </span>
-          </li>
+          <div className="ux-anam-tile">
+            <h3>Antecedentes familiares</h3>
+            <p>
+              <ClinicalValue value={data.familyHistory} />
+            </p>
+          </div>
 
-          <li>
-            <span className="grow">
-              <strong>Antecedentes familiares</strong>
-              <small className="ux-sub">
-                <ClinicalValue value={data.familyHistory} />
-              </small>
-            </span>
-          </li>
+          <div className="ux-anam-tile">
+            <h3>Hábitos</h3>
+            <p>
+              <ClinicalValue value={data.habits} />
+            </p>
+          </div>
 
-          <li>
-            <span className="grow">
-              <strong>Hábitos</strong>
-              <small className="ux-sub">
-                <ClinicalValue value={data.habits} />
-              </small>
-            </span>
-          </li>
+          <div className="ux-anam-tile">
+            <h3>Marcos do desenvolvimento</h3>
+            <p>
+              <ClinicalValue value={data.developmentalMilestones} />
+            </p>
+          </div>
 
-          <li>
-            <span className="grow">
-              <strong>Marcos do desenvolvimento</strong>
-              <small className="ux-sub">
-                <ClinicalValue value={data.developmentalMilestones} />
-              </small>
-            </span>
-          </li>
-        </ul>
+          <div className="ux-anam-tile is-alert">
+            <h3>Alergias e restrições</h3>
+            <p>
+              {data.noKnownAllergies ? (
+                'Nenhuma alergia conhecida'
+              ) : (
+                <ClinicalValue value={data.allergies} />
+              )}
+            </p>
+          </div>
+        </div>
       ) : (
         <form onSubmit={submit}>
           <div className={styles.field}>
