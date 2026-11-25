@@ -53,6 +53,14 @@ export type VisitPlace = keyof typeof VISIT_PLACE_LABELS;
 export type ActivityExecutor = keyof typeof ACTIVITY_EXECUTOR_LABELS;
 export type ActivityStatus = keyof typeof ACTIVITY_STATUS_LABELS;
 
+// Filtro padrão da lista: o que ainda faz parte do plano (`pts-detalhe.html`).
+// São também os estados que podem ser arquivados (RFACT008).
+export const ACTIVE_ACTIVITY_STATUSES: ActivityStatus[] = [
+  'suggested',
+  'running',
+  'suspended',
+];
+
 export type ActivityFrequency = {
   quantity: number;
   period: ActivityPeriod;
@@ -76,6 +84,26 @@ export type Activity = {
   authorProfessionalId: string | null;
   createdAt: string;
   updatedAt: string | null;
+};
+
+export type ActivityPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ActivityListQuery = {
+  status?: ActivityStatus[];
+  executor?: ActivityExecutor;
+  page: number;
+  limit: number;
+};
+
+export type ActivityDetails = Activity & {
+  goal: { id: string; title: string } | null;
+  documents: { id: string; title: string }[];
+  appointmentsCount: number;
 };
 
 export type ActivityInput = Pick<
@@ -112,8 +140,32 @@ function activitiesPath(ptsId: string) {
   return `/pts/${encodeURIComponent(ptsId)}/activities`;
 }
 
-export function getActivities(ptsId: string, signal?: AbortSignal) {
-  return request<{ data: Activity[] }>(activitiesPath(ptsId), { signal });
+export function getActivities(
+  ptsId: string,
+  query: ActivityListQuery,
+  signal?: AbortSignal,
+) {
+  const search = new URLSearchParams({
+    page: String(query.page),
+    limit: String(query.limit),
+  });
+  query.status?.forEach((status) => search.append('status', status));
+
+  if (query.executor) {
+    search.set('executor', query.executor);
+  }
+
+  return request<{ data: Activity[]; pagination: ActivityPagination }>(
+    `${activitiesPath(ptsId)}?${search.toString()}`,
+    { signal },
+  );
+}
+
+export function getActivity(activityId: string, signal?: AbortSignal) {
+  return request<ActivityDetails>(
+    `/activities/${encodeURIComponent(activityId)}`,
+    { signal },
+  );
 }
 
 export function createActivity(ptsId: string, activity: ActivityInput) {
@@ -133,4 +185,21 @@ export function updateActivity(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(changes),
   });
+}
+
+export type ArchiveActivityResponse = {
+  id: string;
+  status: 'archived';
+  archivedAt: string;
+};
+
+export function archiveActivity(activityId: string, reason?: string) {
+  return request<ArchiveActivityResponse>(
+    `/activities/${encodeURIComponent(activityId)}/archive`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reason ? { reason } : {}),
+    },
+  );
 }

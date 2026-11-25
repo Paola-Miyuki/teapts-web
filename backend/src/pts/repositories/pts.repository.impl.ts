@@ -10,7 +10,10 @@ import {
   Brackets,
   DataSource,
   In,
+  IsNull,
+  Not,
   Repository,
+  type EntityManager,
   type SelectQueryBuilder,
 } from 'typeorm';
 
@@ -49,6 +52,8 @@ import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { ActivityEntity } from '../../activities/entities/activity.entity';
 import { ActivityState } from '../../activities/enums/activity.enums';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
+import { PtsGoalEntity } from '../entities/pts-goal.entity';
+import { nextPtsVersion } from '../pts-version';
 import { PtsEntity } from '../entities/pts.entity';
 import { Account } from '../../accounts/entities/account.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -60,6 +65,7 @@ import { TimelineRecorderService } from '../../timeline/services/timeline-record
 import {
   activePtsAlreadyExists,
   cannotRemoveResponsible,
+  goalsIncomplete,
   ptsCloseForbidden,
   ptsCloseNotActive,
   ptsNotActive,
@@ -76,6 +82,16 @@ import {
   newResponsibleInvalid,
   teamDuplicateAccount,
 } from '../pts.errors';
+
+function countPendingGoals(
+  manager: EntityManager,
+  ptsId: string,
+): Promise<number> {
+  return manager.countBy(PtsGoalEntity, [
+    { ptsId, term: IsNull() },
+    { ptsId, targetDate: IsNull() },
+  ]);
+}
 
 @Injectable()
 export class PtsRepositoryImpl extends PtsRepository {
@@ -155,6 +171,7 @@ export class PtsRepositoryImpl extends PtsRepository {
         status: PtsStateEnum.DRAFT,
         patientId: input.patientId,
         responsibleProfessionalId: input.responsibleProfessionalId,
+        version: await nextPtsVersion(queryRunner.manager, input.patientId),
       });
 
       const savedPts = await queryRunner.manager.save(PtsEntity, pts);
@@ -505,6 +522,7 @@ export class PtsRepositoryImpl extends PtsRepository {
   async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
     const pts = await this.ptsRepository
       .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.previousPts', 'previousPts')
       .leftJoinAndSelect('pts.patient', 'patient')
       .leftJoinAndSelect('patient.account', 'patientAccount')
       .leftJoinAndSelect('pts.responsible', 'responsible')
@@ -549,25 +567,8 @@ export class PtsRepositoryImpl extends PtsRepository {
       .take(input.limit)
       .getManyAndCount();
 
-    const versionRows = await this.ptsRepository
-      .createQueryBuilder('versioned')
-      .select('versioned.id', 'id')
-      .addSelect(
-        'ROW_NUMBER() OVER (ORDER BY versioned.createdAt ASC, versioned.id ASC)',
-        'version',
-      )
-      .where('versioned.patientId = :patientId', {
-        patientId: input.patientId,
-      })
-      .orderBy('versioned.createdAt', 'ASC')
-      .addOrderBy('versioned.id', 'ASC')
-      .getRawMany<{ id: string; version: string }>();
-    const versions = new Map(
-      versionRows.map((row) => [row.id, Number(row.version)]),
-    );
-
     return {
-      rows: ptsRows.map((pts) => this.toHistoryItem(pts, versions)),
+      rows: ptsRows.map((pts) => this.toHistoryItem(pts)),
       total,
     };
   }
@@ -592,14 +593,8 @@ export class PtsRepositoryImpl extends PtsRepository {
         throw ptsProposalNotDraft();
       }
 
-      const update: Partial<PtsEntity> = {};
-
-      if (input.socialSituation !== undefined) {
-        update.socialSituation = input.socialSituation;
-      }
-
-      if (Object.keys(update).length > 0) {
-        await queryRunner.manager.update(PtsEntity, input.id, update);
+      if (Object.keys(input.sheet).length > 0) {
+        await queryRunner.manager.update(PtsEntity, input.id, input.sheet);
       }
 
       if (input.teamProfessionalIds !== undefined) {
@@ -775,6 +770,12 @@ export class PtsRepositoryImpl extends PtsRepository {
         )
       ) {
         throw activePtsAlreadyExists();
+      }
+
+      const pendingGoals = await countPendingGoals(queryRunner.manager, id);
+
+      if (pendingGoals > 0) {
+        throw goalsIncomplete(pendingGoals);
       }
 
       const now = new Date();
@@ -1266,6 +1267,21 @@ export class PtsRepositoryImpl extends PtsRepository {
     }
   }
 
+  async countPendingGoals(ptsId: string): Promise<number> {
+    return countPendingGoals(this.dataSource.manager, ptsId);
+  }
+
+  async findLatestGoalTarget(ptsId: string): Promise<string | null> {
+    const [goal] = await this.dataSource.manager.find(PtsGoalEntity, {
+      where: { ptsId, targetDate: Not(IsNull()) },
+      select: { id: true, targetDate: true },
+      order: { targetDate: 'DESC' },
+      take: 1,
+    });
+
+    return goal?.targetDate ?? null;
+  }
+
   async closePts(input: ClosePtsInput): Promise<ClosePtsResponseDto> {
     const { ptsId, outcome, closingDate, closingReason } = input;
     const concluded = outcome === 'concluded';
@@ -1533,18 +1549,19 @@ export class PtsRepositoryImpl extends PtsRepository {
       cancelledAt: pts.cancelledAt?.toISOString() ?? null,
       closingDate: pts.closingDate ?? null,
       closingReason: pts.closingReason ?? null,
+      version: pts.version,
+      previousPts: pts.previousPts
+        ? { id: pts.previousPts.id, version: pts.previousPts.version }
+        : null,
     };
   }
 
-  private toHistoryItem(
-    pts: PtsEntity,
-    versions: Map<string, number>,
-  ): PtsHistoryItemDto {
+  private toHistoryItem(pts: PtsEntity): PtsHistoryItemDto {
     const responsible = this.mapProfessional(pts.responsible);
 
     return {
       id: pts.id,
-      version: versions.get(pts.id) ?? 1,
+      version: pts.version,
       status: pts.status,
       responsible: {
         id: responsible.id,

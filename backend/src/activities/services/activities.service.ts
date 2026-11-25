@@ -14,6 +14,8 @@ import {
   type GoalPtsTarget,
 } from '../../pts/repositories/pts-goals.repository';
 import {
+  activitiesViewForbidden,
+  activityArchiveForbidden,
   activityEditForbidden,
   activityForbidden,
   activityNotFound,
@@ -25,11 +27,21 @@ import {
   invalidFrequency,
   missingVisitPlace,
 } from '../activities.errors';
-import { assertActivityEditable, editableStates } from '../activity-rules';
+import {
+  assertActivityArchivable,
+  assertActivityEditable,
+  editableStates,
+} from '../activity-rules';
 import type {
+  ActivityDetailsResponseDto,
   ActivityResponseDto,
   GetActivitiesResponseDto,
 } from '../dto/activity-response.dto';
+import type { GetActivitiesQueryDto } from '../dto/get-activities-query.dto';
+import type {
+  ArchiveActivityRequestDto,
+  ArchiveActivityResponseDto,
+} from '../dto/archive-activity.dto';
 import type {
   ActivityFrequencyDto,
   CreateActivityRequestDto,
@@ -41,6 +53,7 @@ import {
   ActivityPeriod,
 } from '../enums/activity.enums';
 import { ActivitiesRepository } from '../repositories/activities.repository';
+import { toPagination } from '../../common/pagination/pagination';
 
 function isPositiveInteger(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) > 0;
@@ -70,21 +83,56 @@ export class ActivitiesService {
 
   async findActivities(
     ptsId: string,
+    query: GetActivitiesQueryDto,
     account: AccountContext,
   ): Promise<GetActivitiesResponseDto> {
     const pts = await this.findPts(ptsId);
 
-    assertCanViewPts(pts, account);
+    assertCanViewPts(pts, account, activitiesViewForbidden);
 
-    const activities = await this.activitiesRepository.findByPts(ptsId);
+    const { rows, total } = await this.activitiesRepository.findByPts({
+      ptsId,
+      ...query,
+    });
     const seesDocuments =
       isAdmin(account) || ownTeamProfile(pts, account) !== undefined;
 
     return {
       data: seesDocuments
-        ? activities
-        : activities.map((activity) => ({ ...activity, documentIds: [] })),
+        ? rows
+        : rows.map((activity) => ({ ...activity, documentIds: [] })),
+      pagination: toPagination(query, total),
     };
+  }
+
+  async findActivityById(
+    activityId: string,
+    account: AccountContext,
+  ): Promise<ActivityDetailsResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+
+    assertCanViewPts(pts, account, activitiesViewForbidden);
+
+    const details = await this.activitiesRepository.findDetailsById(activityId);
+
+    if (!details) {
+      throw activityNotFound();
+    }
+
+    const seesDocuments =
+      isAdmin(account) || ownTeamProfile(pts, account) !== undefined;
+
+    if (seesDocuments) {
+      return details;
+    }
+
+    return { ...details, documentIds: [], documents: [] };
   }
 
   async createActivity(
@@ -243,6 +291,45 @@ export class ActivitiesService {
       executedByAccountId: account.accountId,
       description: `${executorName} atualizou a atividade ${title}`,
       goalUnlinkedDescription: `${executorName} desligou a atividade ${title} da meta`,
+    });
+  }
+
+  async archiveActivity(
+    activityId: string,
+    dto: ArchiveActivityRequestDto,
+    account: AccountContext,
+  ): Promise<ArchiveActivityResponseDto> {
+    const activity = await this.activitiesRepository.findById(activityId);
+
+    if (!activity) {
+      throw activityNotFound();
+    }
+
+    const pts = await this.findPts(activity.ptsId);
+    const admin = isAdmin(account);
+    // Qualquer profissional da equipe do PTS ou o admin (RFACT008).
+    const profileId = admin ? null : (ownTeamProfile(pts, account) ?? null);
+
+    if (!admin && !profileId) {
+      throw activityArchiveForbidden();
+    }
+
+    assertActivityArchivable(activity.status);
+    assertPtsEditable(pts.status);
+
+    const reason = dto.reason?.trim() || null;
+    const executorName = await this.executorName(account, admin);
+
+    return this.activitiesRepository.archive({
+      ptsId: pts.id,
+      activityId,
+      reason,
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: profileId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} arquivou a atividade ${activity.title}${
+        reason ? ` (${reason})` : ''
+      }`,
     });
   }
 

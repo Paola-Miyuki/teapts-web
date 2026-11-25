@@ -158,6 +158,28 @@ export const ptsNotPlanning = () =>
     'Só um PTS em planejamento pode ter a execução iniciada.',
   );
 
+export const goalsIncomplete = (pendingGoals: number) =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'GOALS_INCOMPLETE',
+    'Defina o prazo e a data-alvo de todas as metas antes de aprovar.',
+    { pendingGoals },
+  );
+
+export const ptsNotRunning = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_RUNNING',
+    'Só um PTS em andamento pode gerar a próxima versão.',
+  );
+
+export const draftAlreadyExists = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'DRAFT_ALREADY_EXISTS',
+    'O paciente já possui uma proposta aguardando decisão.',
+  );
+
 export const ptsCloseForbidden = () =>
   new PtsApiError(
     HttpStatus.FORBIDDEN,

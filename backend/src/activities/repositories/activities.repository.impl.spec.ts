@@ -17,6 +17,7 @@ import { ActivityExecutor, ActivityState } from '../enums/activity.enums';
 import { activityBody } from '../__tests__/activity-fixtures';
 import { ActivitiesRepositoryImpl } from './activities.repository.impl';
 import type {
+  ArchiveActivityInput,
   CreateActivityInput,
   UpdateActivityInput,
 } from './activities.repository';
@@ -67,6 +68,16 @@ const updateInput = (
   goalUnlinkedDescription:
     'João Lima desligou a atividade Circuito sensorial da meta',
   ...overrides,
+});
+
+const archiveInput = (): ArchiveActivityInput => ({
+  ptsId: 'pts-1',
+  activityId: 'act-1',
+  reason: 'Família assumiu a atividade em casa.',
+  authorProfessionalId: 'prof-2',
+  executedByAccountId: 'acc-2',
+  description:
+    'João Lima arquivou a atividade Integração sensorial (Família assumiu a atividade em casa.)',
 });
 
 function setup({
@@ -122,6 +133,7 @@ function setup({
   const recorder = { record: jest.fn(async () => undefined) };
   const activities = {
     find: jest.fn(async () => [row]),
+    findAndCount: jest.fn(async () => [[row], 1] as const),
     findOne: jest.fn(async () => row),
   };
   const repository = new ActivitiesRepositoryImpl(
@@ -226,15 +238,48 @@ describe('ActivitiesRepositoryImpl', () => {
   it('lista da mais recente para a mais antiga', async () => {
     const { repository, activities } = setup();
 
-    const [activity] = await repository.findByPts('pts-1');
+    const result = await repository.findByPts({
+      ptsId: 'pts-1',
+      page: 1,
+      limit: 20,
+    });
 
-    expect(activities.find).toHaveBeenCalledWith(
+    expect(activities.findAndCount).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { ptsId: 'pts-1' },
         order: { createdAt: 'DESC', id: 'DESC' },
+        skip: 0,
+        take: 20,
       }),
     );
-    expect(activity.frequency).toEqual(activityBody().frequency);
+    expect(result).toMatchObject({
+      total: 1,
+      rows: [{ frequency: activityBody().frequency }],
+    });
+  });
+
+  it('filtra por status e executor em cada página', async () => {
+    const { repository, activities } = setup();
+
+    await repository.findByPts({
+      ptsId: 'pts-1',
+      status: [ActivityState.Running],
+      executor: ActivityExecutor.Team,
+      page: 3,
+      limit: 10,
+    });
+
+    expect(activities.findAndCount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ptsId: 'pts-1',
+          status: In([ActivityState.Running]),
+          executor: ActivityExecutor.Team,
+        },
+        skip: 20,
+        take: 10,
+      }),
+    );
   });
 
   it('acha a atividade pelo id, com o PTS dela', async () => {
@@ -372,6 +417,79 @@ describe('ActivitiesRepositoryImpl', () => {
       code,
     ] of cases) {
       await expectApiError(() => repository.update(data), status, code);
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(recorder.record).not.toHaveBeenCalled();
+    }
+  });
+
+  it('arquiva com data, motivo e activity_archived na mesma transação (RN021)', async () => {
+    const { repository, query, manager, recorder } = setup();
+
+    const archived = await repository.archive(archiveInput());
+
+    expect(query.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(manager.findOne).toHaveBeenCalledWith(ActivityEntity, {
+      where: { id: 'act-1', ptsId: 'pts-1' },
+      lock: { mode: 'pessimistic_write' },
+    });
+    expect(manager.update).toHaveBeenCalledWith(
+      ActivityEntity,
+      { id: 'act-1', ptsId: 'pts-1' },
+      {
+        status: 'archived',
+        archivedAt: expect.any(Date),
+        statusReason: 'Família assumiu a atividade em casa.',
+        statusChangedByAccountId: 'acc-2',
+        updatedAt: expect.any(Date),
+      },
+    );
+    // Exclusão lógica: nada é apagado.
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(recorder.record).toHaveBeenCalledWith(
+      {
+        type: 'activity_archived',
+        targetType: 'activity',
+        targetId: 'act-1',
+        ptsId: 'pts-1',
+        description: archiveInput().description,
+        authorProfessionalId: 'prof-2',
+        executedByAccountId: 'acc-2',
+      },
+      manager,
+    );
+    expect(archived).toEqual({
+      id: 'act-1',
+      status: 'archived',
+      archivedAt: expect.any(String),
+    });
+  });
+
+  it('refaz as checagens do arquivamento e não grava nada na recusa', async () => {
+    const cases = [
+      [setup({ activity: null }), 404, 'ACTIVITY_NOT_FOUND'],
+      [
+        setup({ activity: { id: 'act-1', status: ActivityState.Archived } }),
+        409,
+        'ACTIVITY_NOT_ARCHIVABLE',
+      ],
+      [
+        setup({ activity: { id: 'act-1', status: ActivityState.Concluded } }),
+        409,
+        'ACTIVITY_NOT_ARCHIVABLE',
+      ],
+      [
+        setup({ pts: { id: 'pts-1', status: PtsStateEnum.CANCELLED } }),
+        409,
+        'PTS_NOT_EDITABLE',
+      ],
+    ] as const;
+
+    for (const [{ repository, manager, recorder }, status, code] of cases) {
+      await expectApiError(
+        () => repository.archive(archiveInput()),
+        status,
+        code,
+      );
       expect(manager.update).not.toHaveBeenCalled();
       expect(recorder.record).not.toHaveBeenCalled();
     }

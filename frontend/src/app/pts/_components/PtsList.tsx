@@ -644,16 +644,19 @@ function PtsListContent({ account }: { account: Account }) {
                                 </button>
                               </li>
                             )}
-                            {/* Desabilitado até existir a tela de reavaliação (RFEVA005). */}
+                            {/* RFEVA005 – responsável ou admin, com o PTS em andamento. */}
                             {canReassess && (
                               <li>
-                                <button type="button" role="menuitem" disabled>
+                                <Link
+                                  role="menuitem"
+                                  href={`/pts/${pts.id}/reassessment`}
+                                >
                                   <Icon
                                     name="checkCircle"
                                     className="icon-sm"
                                   />
                                   Registrar reavaliação
-                                </button>
+                                </Link>
                               </li>
                             )}
                             {canClose && (

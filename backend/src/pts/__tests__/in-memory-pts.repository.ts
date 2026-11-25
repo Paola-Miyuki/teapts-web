@@ -44,6 +44,11 @@ export class InMemoryPtsRepository extends PtsRepository {
   transferredRecords: TransferResponsibilityInput[] = [];
   startedRecords: StartPtsInput[] = [];
   closedRecords: ClosePtsInput[] = [];
+  proposalUpdates: UpdatePtsProposalInput[] = [];
+  /** Metas sem prazo ou data-alvo, por proposta (RFPTS013). */
+  pendingGoals = new Map<string, number>();
+  /** Maior data-alvo das metas, por proposta. */
+  latestGoalTargets = new Map<string, string>();
   /** Eventos member_added: um por profissional adicionado. */
   addedRecords: Array<
     Omit<AddTeamMembersInput, 'members'> & {
@@ -242,8 +247,10 @@ export class InMemoryPtsRepository extends PtsRepository {
       throw new Error('Proposta não encontrada.');
     }
 
-    if (input.socialSituation !== undefined) {
-      proposal.socialSituation = input.socialSituation;
+    this.proposalUpdates.push(input);
+
+    if (input.sheet.socialSituation !== undefined) {
+      proposal.socialSituation = input.sheet.socialSituation;
     }
 
     if (input.teamProfessionalIds !== undefined) {
@@ -256,6 +263,14 @@ export class InMemoryPtsRepository extends PtsRepository {
     }
 
     return proposal;
+  }
+
+  async countPendingGoals(ptsId: string): Promise<number> {
+    return this.pendingGoals.get(ptsId) ?? 0;
+  }
+
+  async findLatestGoalTarget(ptsId: string): Promise<string | null> {
+    return this.latestGoalTargets.get(ptsId) ?? null;
   }
 
   async findSheetTarget(id: string): Promise<PtsSheetTarget | null> {

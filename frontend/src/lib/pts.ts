@@ -136,6 +136,8 @@ export type PtsDetail = {
   beganAt: string | null;
   concludedAt: string | null;
   cancelledAt: string | null;
+  version?: number;
+  previousPts?: { id: string; version: number } | null;
   // Data e motivo informados ao encerrar (RFPTS010).
   closingDate?: string | null;
   closingReason?: string | null;
@@ -217,6 +219,34 @@ export function closePts(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+// Reavaliação do fim do ciclo (RFEVA005).
+export type GoalResult = 'achieved' | 'partially_achieved' | 'not_achieved';
+
+export type ReassessmentInput = {
+  meetingDate: string;
+  goals: { goalId: string; status: GoalResult; note?: string }[];
+  createNextVersion: boolean;
+  reason?: string;
+};
+
+export type ReassessmentResponse = {
+  id: string;
+  status: 'concluded';
+  reassessedAt: string;
+  nextPtsId: string | null;
+};
+
+export function registerReassessment(id: string, body: ReassessmentInput) {
+  return request<ReassessmentResponse>(
+    `/pts/${encodeURIComponent(id)}/reassessment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export type PtsStartResponse = {

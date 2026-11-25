@@ -2,9 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -32,12 +36,22 @@ import {
 } from '../../pts/pts.errors';
 import { errors } from '../../pts/swagger-errors';
 import {
+  activitiesViewForbidden,
+  activityArchiveForbidden,
   activityEditForbidden,
+  activityNotArchivable,
   activityNotEditable,
   activityNotFound,
   invalidFrequency,
 } from '../activities.errors';
-import { ActivityResponseDto } from '../dto/activity-response.dto';
+import {
+  ActivityDetailsResponseDto,
+  ActivityResponseDto,
+} from '../dto/activity-response.dto';
+import {
+  ArchiveActivityRequestDto,
+  ArchiveActivityResponseDto,
+} from '../dto/archive-activity.dto';
 import { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import { ActivitiesService } from '../services/activities.service';
 
@@ -59,6 +73,23 @@ const parseActivityId = new ParseUUIDPipe({
 export class ActivityController {
   constructor(private readonly activitiesService: ActivitiesService) {}
 
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Consulta uma atividade (RFACT002)',
+    description:
+      'Retorna os dados da atividade, a meta e os documentos associados. O paciente titular não vê os documentos (RN028).',
+  })
+  @ApiOkResponse({ type: ActivityDetailsResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activitiesViewForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  async findActivityById(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDetailsResponseDto> {
+    return this.activitiesService.findActivityById(id, account);
+  }
+
   @Patch(':id')
   @ApiOperation({
     summary: 'Edita uma atividade (RFACT005)',
@@ -77,5 +108,25 @@ export class ActivityController {
     @CurrentAccount() account: AccountContext,
   ): Promise<ActivityResponseDto> {
     return this.activitiesService.updateActivity(id, dto, account);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Arquiva uma atividade (RFACT008)',
+    description:
+      'Equipe do PTS ou admin arquiva a atividade sugerida, em andamento ou suspensa. Exclusão lógica (RN021): os atendimentos continuam. Grava o motivo opcional e activity_archived na timeline.',
+  })
+  @ApiOkResponse({ type: ArchiveActivityResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityArchiveForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotArchivable(), ptsNotEditable()))
+  async archiveActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: ArchiveActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ArchiveActivityResponseDto> {
+    return this.activitiesService.archiveActivity(id, dto, account);
   }
 }

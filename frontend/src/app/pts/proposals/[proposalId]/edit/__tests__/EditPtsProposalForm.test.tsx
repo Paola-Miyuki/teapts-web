@@ -1,17 +1,25 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { Account } from '@/lib/account';
+import { ApiError } from '@/lib/api';
+import { getActivities } from '@/lib/activities';
+import { getGoals, type Goal } from '@/lib/goals';
+import { getPts } from '@/lib/pts';
+import { personalData } from '@/test-utils/account';
 
 import EditPtsProposalForm from '../EditPtsProposalForm';
-
 import {
   getProfessionalsForTeam,
-  getPtsProposal,
   PtsProposalApiError,
   updatePtsProposal,
 } from '../api';
-import { personalData } from '@/test-utils/account';
 
 jest.mock('@/lib/supertokens', () => ({
   initSuperTokens: jest.fn(),
@@ -19,35 +27,33 @@ jest.mock('@/lib/supertokens', () => ({
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
-
-const mockRouter = {
-  push: mockPush,
-  replace: mockReplace,
-};
+const mockRouter = { push: mockPush, replace: mockReplace };
 
 jest.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
 }));
 
-jest.mock('../api', () => {
-  const actual = jest.requireActual('../api');
-
-  return {
-    ...actual,
-    getPtsProposal: jest.fn(),
-    getProfessionalsForTeam: jest.fn(),
-    updatePtsProposal: jest.fn(),
-  };
-});
+jest.mock('../api', () => ({
+  ...jest.requireActual('../api'),
+  getProfessionalsForTeam: jest.fn(),
+  updatePtsProposal: jest.fn(),
+}));
+jest.mock('@/lib/pts', () => ({
+  ...jest.requireActual('@/lib/pts'),
+  getPts: jest.fn(),
+}));
+jest.mock('@/lib/goals', () => ({
+  ...jest.requireActual('@/lib/goals'),
+  getGoals: jest.fn(),
+}));
+jest.mock('@/lib/activities', () => ({
+  ...jest.requireActual('@/lib/activities'),
+  getActivities: jest.fn(),
+}));
 
 const RESPONSIBLE_ID = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
-
-const PATIENT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
-
 const TEAM_ID = '5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a';
-
 const OTHER_ID = '4d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1b';
-
 const PROPOSAL_ID = '3f2e1d0c-9b8a-4765-a432-10fedcba9876';
 
 const account: Account = {
@@ -60,133 +66,245 @@ const account: Account = {
   professionalProfileIds: [RESPONSIBLE_ID],
 };
 
+const professional = (id: string, name: string, specialism: string) => ({
+  id,
+  name,
+  email: `${id}@example.com`,
+  specialism: { id: specialism, name: specialism },
+  registration: null,
+});
+
 const proposal = {
   id: PROPOSAL_ID,
-
-  status: 'DRAFT',
-
+  status: 'draft',
+  version: 2,
+  previousPts: { id: 'pts-1', version: 1 },
+  caseStudyDate: '2026-12-15',
+  diagnosisSummary: 'Síntese anterior',
+  cid: 'F84.0',
+  supportLevel: 2,
+  strengths: 'Música',
+  priorityNeeds: ['Comunicação'],
   socialSituation: 'Mora com a mãe.',
-
-  createdAt: '2026-10-15T12:00:00.000Z',
-
-  patient: {
-    id: PATIENT_ID,
-    name: 'Paciente Teste',
-  },
-
-  responsible: {
-    id: RESPONSIBLE_ID,
-    name: 'Responsável Teste',
-
-    specialism: {
-      id: 'psychologist',
-      name: 'Psicologia',
-    },
-  },
-
-  team: [
-    {
-      id: TEAM_ID,
-      name: 'Médico Teste',
-
-      specialism: {
-        id: 'doctor',
-        name: 'Medicina',
-      },
-    },
-  ],
+  vulnerabilities: null,
+  comorbidities: 'TDAH',
+  sensoryProfile: null,
+  communicationMethod: null,
+  nextReviewAt: '2027-12-15',
+  createdAt: '2026-12-15T12:00:00.000Z',
+  patient: { id: 'patient-1', name: 'Paciente Teste' },
+  responsible: professional(RESPONSIBLE_ID, 'Responsável Teste', 'Psicologia'),
+  team: [professional(TEAM_ID, 'Médico Teste', 'Medicina')],
 };
 
 const professionals = [
-  {
-    id: RESPONSIBLE_ID,
-    name: 'Responsável Teste',
-    email: 'responsavel@example.com',
-
-    specialism: {
-      id: 'psychologist',
-      name: 'Psicologia',
-    },
-  },
-
-  {
-    id: TEAM_ID,
-    name: 'Médico Teste',
-    email: 'medico@example.com',
-
-    specialism: {
-      id: 'doctor',
-      name: 'Medicina',
-    },
-  },
-
-  {
-    id: OTHER_ID,
-    name: 'Fisioterapeuta Teste',
-    email: 'fisio@example.com',
-
-    specialism: {
-      id: 'physiotherapist',
-      name: 'Fisioterapia',
-    },
-  },
+  professional(RESPONSIBLE_ID, 'Responsável Teste', 'Psicologia'),
+  professional(TEAM_ID, 'Médico Teste', 'Medicina'),
+  professional(OTHER_ID, 'Fisioterapeuta Teste', 'Fisioterapia'),
 ];
+
+const goal = (overrides: Partial<Goal> = {}): Goal => ({
+  id: 'goal-1',
+  title: 'Esperar a vez',
+  description: 'Esperar a vez em grupos.',
+  term: 'short',
+  area: 'social',
+  measureCriterion: '8 de 10 rodadas',
+  targetDate: '2027-02-01',
+  status: 'in_progress',
+  resultNote: null,
+  origin: 'new',
+  activitiesCount: 0,
+  registeredBy: { id: 'p', name: 'Ana' },
+  createdAt: '2026-12-15T12:00:00.000Z',
+  ...overrides,
+});
+
+const ACTIVITY = {
+  id: 'act-1',
+  title: 'Integração sensorial',
+  type: 'individual_session',
+  frequency: { quantity: 1, period: 'weekly', durationMinutes: 45 },
+  executor: 'team',
+};
+
+function setGoals(...goals: Goal[]) {
+  (getGoals as jest.Mock).mockResolvedValue({ data: goals });
+}
 
 describe('EditPtsProposalForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    (getPtsProposal as jest.Mock).mockResolvedValue(proposal);
-
+    (getPts as jest.Mock).mockResolvedValue(proposal);
     (getProfessionalsForTeam as jest.Mock).mockResolvedValue(professionals);
+    (getActivities as jest.Mock).mockResolvedValue({ data: [ACTIVITY] });
+    setGoals(goal());
   });
 
-  it('mostra o paciente, a situação social e a equipe atual nos passos', async () => {
-    const user = userEvent.setup();
-    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
+  async function open(current: Account = account) {
+    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={current} />);
+    await screen.findByText('Paciente Teste');
+  }
 
-    expect(await screen.findByText('Paciente Teste')).toBeInTheDocument();
+  const next = () =>
+    fireEvent.click(screen.getByRole('button', { name: /Próximo/ }));
+
+  async function goTo(step: number) {
+    for (let current = 1; current < step; current += 1) {
+      next();
+    }
     expect(
-      screen.getByRole('list', { name: 'Passo 1 de 3' }),
+      await screen.findByRole('list', { name: `Passo ${step} de 4` }),
+    ).toBeInTheDocument();
+  }
+
+  it('abre os 4 passos preenchidos', async () => {
+    await open();
+
+    expect(
+      screen.getByRole('heading', { name: 'PTS v2 de Paciente Teste' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Data do novo estudo de caso/)).toHaveValue(
+      '2026-12-15',
+    );
+
+    next();
+    expect(screen.getByLabelText(/^Síntese do diagnóstico/)).toHaveValue(
+      'Síntese anterior',
+    );
+    expect(screen.getByLabelText('CID')).toHaveValue('F84.0');
+    expect(screen.getByText('Comunicação')).toBeInTheDocument();
+    expect(screen.getByLabelText('Comorbidades')).toHaveValue('TDAH');
+    expect(screen.getByLabelText(/^Situação social/)).toHaveValue(
+      'Mora com a mãe.',
+    );
+
+    next();
+    expect(
+      screen.getByRole('listitem', { name: 'Esperar a vez' }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Próximo/ }));
-    expect(
-      screen.getByRole('textbox', { name: /^Situação social/ }),
-    ).toHaveValue('Mora com a mãe.');
-
-    await user.click(screen.getByRole('button', { name: /Próximo/ }));
+    next();
     expect(
       screen.getByDisplayValue('Responsável Teste · Psicologia'),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Remover Médico Teste da equipe' }),
     ).toBeInTheDocument();
-
-    // O responsável não é oferecido como membro.
-    await user.click(
-      screen.getByRole('combobox', { name: 'Adicionar membro' }),
-    );
+    expect(screen.getByLabelText(/^Data máxima/)).toHaveValue('2027-12-15');
+    expect(await screen.findByText('Integração sensorial')).toBeInTheDocument();
     expect(
-      screen.queryByRole('option', { name: 'Responsável Teste · Psicologia' }),
+      screen.getByRole('heading', { name: 'Atividades copiadas' }),
+    ).toBeInTheDocument();
+  });
+
+  it('a primeira proposta continua "Editar proposta de PTS", sem cópias', async () => {
+    (getPts as jest.Mock).mockResolvedValue({
+      ...proposal,
+      version: 1,
+      previousPts: null,
+    });
+    await open();
+
+    expect(
+      screen.getByRole('heading', { name: 'Editar proposta de PTS' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/^Data do estudo de caso/),
+    ).toBeInTheDocument();
+    await goTo(4);
+    expect(
+      screen.queryByRole('heading', { name: 'Atividades copiadas' }),
     ).not.toBeInTheDocument();
   });
 
-  it('atualiza situação social e equipe e volta para as propostas', async () => {
+  it('mostra a origem e os avisos das metas copiadas e não deixa avançar', async () => {
+    setGoals(
+      goal({
+        id: 'g-1',
+        title: 'Parcial',
+        origin: 'kept_partial',
+        term: null,
+        targetDate: null,
+      }),
+      goal({
+        id: 'g-2',
+        title: 'Não atingida',
+        origin: 'kept_not_achieved',
+        targetDate: null,
+      }),
+    );
+    await open();
+    await goTo(3);
+
+    const partial = within(screen.getByRole('listitem', { name: 'Parcial' }));
+    expect(partial.getByText('v1 · parcial')).toBeInTheDocument();
+    expect(partial.getByText('Defina o prazo')).toBeInTheDocument();
+    expect(partial.getByText('Defina a data-alvo')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('listitem', { name: 'Não atingida' })).getByText(
+        'v1 · não atingida',
+      ),
+    ).toBeInTheDocument();
+
+    next();
+    expect(
+      screen.getByText(
+        'Defina o prazo e a data-alvo de todas as metas (faltam 2)',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', { name: 'Passo 3 de 4' }),
+    ).toBeInTheDocument();
+  });
+
+  it('inclui, edita e remove metas pelo passo 3', async () => {
+    await open();
+    await goTo(3);
+
+    fireEvent.click(screen.getByRole('button', { name: /Incluir meta/ }));
+    expect(
+      screen.getByRole('dialog', { name: 'Adicionar meta' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Editar meta' }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Cancelar',
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
+    expect(
+      screen.getByRole('dialog', { name: 'Excluir a meta?' }),
+    ).toBeInTheDocument();
+  });
+
+  it('salva a ficha, a data máxima (por atalho) e a equipe', async () => {
     const user = userEvent.setup();
-    (updatePtsProposal as jest.Mock).mockResolvedValue(proposal);
+    (updatePtsProposal as jest.Mock).mockResolvedValue(undefined);
+    await open();
 
-    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
-
-    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
-    const textarea = screen.getByRole('textbox', { name: /^Situação social/ });
-    await user.clear(textarea);
-    await user.type(textarea, 'Nova situação social.');
-    await user.click(screen.getByRole('button', { name: /Próximo/ }));
+    next();
+    fireEvent.change(screen.getByLabelText(/^Síntese do diagnóstico/), {
+      target: { value: '  Nova síntese  ' },
+    });
+    next();
+    next();
+    await user.click(screen.getByRole('button', { name: '6 meses' }));
+    expect(screen.getByLabelText(/^Data máxima/)).toHaveValue('2027-06-15');
 
     await user.click(
       screen.getByRole('combobox', { name: 'Adicionar membro' }),
     );
+    // O responsável não é oferecido como membro.
+    expect(
+      screen.queryByRole('option', { name: 'Responsável Teste · Psicologia' }),
+    ).not.toBeInTheDocument();
     await user.click(
       screen.getByRole('option', {
         name: 'Fisioterapeuta Teste · Fisioterapia',
@@ -197,29 +315,42 @@ describe('EditPtsProposalForm', () => {
 
     await waitFor(() => {
       expect(updatePtsProposal).toHaveBeenCalledWith(PROPOSAL_ID, {
-        socialSituation: 'Nova situação social.',
+        caseStudyDate: '2026-12-15',
+        diagnosisSummary: 'Nova síntese',
+        cid: 'F84.0',
+        supportLevel: 2,
+        strengths: 'Música',
+        priorityNeeds: ['Comunicação'],
+        socialSituation: 'Mora com a mãe.',
+        vulnerabilities: null,
+        comorbidities: 'TDAH',
+        sensoryProfile: null,
+        communicationMethod: null,
+        nextReviewAt: '2027-06-15',
         teamProfessionalIds: [TEAM_ID, OTHER_ID],
       });
     });
     expect(mockPush).toHaveBeenCalledWith('/pts/proposals?updated=1');
   });
 
-  it('valida situação social vazia', async () => {
-    const user = userEvent.setup();
-    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
+  it.each([
+    [1, /^Data do novo estudo de caso/, 'Informe a data do estudo de caso'],
+    [2, /^Síntese do diagnóstico/, 'Descreva a síntese do diagnóstico'],
+    [2, /^Situação social/, 'Descreva a situação social do paciente'],
+    [4, /^Data máxima/, 'Informe a próxima revisão'],
+  ])('no passo %s, exige %s', async (step, label, message) => {
+    await open();
+    await goTo(step);
+    fireEvent.change(screen.getByLabelText(label), { target: { value: '' } });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Próximo|Salvar proposta/ }),
+    );
 
-    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
-    await user.clear(screen.getByRole('textbox', { name: /^Situação social/ }));
-    await user.click(screen.getByRole('button', { name: /Próximo/ }));
-
-    expect(
-      await screen.findByText('Descreva a situação social do paciente'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
     expect(updatePtsProposal).not.toHaveBeenCalled();
   });
 
   it('exibe a mensagem da API quando a proposta já foi decidida', async () => {
-    const user = userEvent.setup();
     (updatePtsProposal as jest.Mock).mockRejectedValue(
       new PtsProposalApiError(
         409,
@@ -227,12 +358,9 @@ describe('EditPtsProposalForm', () => {
         'PTS_NOT_DRAFT',
       ),
     );
-
-    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
-
-    await user.click(await screen.findByRole('button', { name: /Próximo/ }));
-    await user.click(screen.getByRole('button', { name: /Próximo/ }));
-    await user.click(screen.getByRole('button', { name: 'Salvar proposta' }));
+    await open();
+    await goTo(4);
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar proposta' }));
 
     expect(
       await screen.findByText(
@@ -242,32 +370,31 @@ describe('EditPtsProposalForm', () => {
   });
 
   it('redireciona para login ao receber 401 no carregamento', async () => {
-    (getPtsProposal as jest.Mock).mockRejectedValue(
-      new PtsProposalApiError(401, 'Não autorizado.'),
-    );
+    (getPts as jest.Mock).mockRejectedValue(new ApiError(401));
 
     render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={account} />);
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/login');
-    });
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/login'));
   });
 
-  it('impede edição quando a conta não é responsável pela proposta', async () => {
-    const otherAccount: Account = {
-      ...account,
+  it.each([
+    [
+      'quem não é o responsável',
+      { ...account, professionalProfileIds: [OTHER_ID] },
+      proposal,
+      'Somente o profissional responsável pode editar esta proposta',
+    ],
+    [
+      'PTS que não é proposta',
+      account,
+      { ...proposal, status: 'running' },
+      'Somente propostas aguardando decisão podem ser editadas',
+    ],
+  ])('não abre para %s', async (_name, current, loaded, message) => {
+    (getPts as jest.Mock).mockResolvedValue(loaded);
 
-      professionalProfileIds: [OTHER_ID],
-    };
+    render(<EditPtsProposalForm proposalId={PROPOSAL_ID} account={current} />);
 
-    render(
-      <EditPtsProposalForm proposalId={PROPOSAL_ID} account={otherAccount} />,
-    );
-
-    expect(
-      await screen.findByText(
-        'Somente o profissional responsável pode editar esta proposta',
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(message)).toBeInTheDocument();
   });
 });

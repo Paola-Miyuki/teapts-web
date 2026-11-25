@@ -32,7 +32,10 @@ import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
 import type { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
-import { PtsRepository } from '../repositories/pts.repository';
+import {
+  PtsRepository,
+  type UpdatePtsProposalInput,
+} from '../repositories/pts.repository';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -48,6 +51,7 @@ import {
   ptsProposalNotPending,
   activePtsForbidden,
   activePtsNotFound,
+  goalsIncomplete,
   ptsCloseForbidden,
   ptsCloseNotActive,
   ptsNotActive,
@@ -92,6 +96,26 @@ function withoutSheet<T extends PtsSheetViewDto>(pts: T): T {
   }
 
   return patientView;
+}
+
+type ProposalSheet = Omit<UpdatePtsProposalRequestDto, 'teamProfessionalIds'>;
+
+/** Só os campos enviados, com os textos aparados; opcional vazio vira null. */
+function cleanSheet(fields: ProposalSheet): UpdatePtsProposalInput['sheet'] {
+  const entries = Object.entries(fields)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]: [string, unknown]) => {
+      if (Array.isArray(value)) {
+        return [
+          key,
+          (value as string[]).map((need) => need.trim()).filter(Boolean),
+        ];
+      }
+
+      return [key, typeof value === 'string' ? value.trim() || null : value];
+    });
+
+  return Object.fromEntries(entries) as UpdatePtsProposalInput['sheet'];
 }
 
 @Injectable()
@@ -383,15 +407,14 @@ export class PtsService {
     dto: UpdatePtsProposalRequestDto,
     account: AccountContext,
   ): Promise<PtsProposalResponseDto> {
-    if (
-      dto.socialSituation === undefined &&
-      dto.teamProfessionalIds === undefined
-    ) {
+    const { teamProfessionalIds: requestedTeam, ...fields } = dto;
+    const sheet = cleanSheet(fields);
+
+    if (Object.keys(sheet).length === 0 && requestedTeam === undefined) {
       throw validationError([
         {
           field: 'body',
-          message:
-            'Informe socialSituation e/ou teamProfessionalIds para editar a proposta.',
+          message: 'Informe ao menos um campo da proposta.',
         },
       ]);
     }
@@ -411,6 +434,21 @@ export class PtsService {
 
     if (proposal.status !== PtsStateEnum.DRAFT) {
       throw ptsProposalNotDraft();
+    }
+
+    if (sheet.nextReviewAt) {
+      const latestTarget = await this.ptsRepository.findLatestGoalTarget(id);
+
+      // RN031: nenhuma meta passa da data máxima.
+      if (latestTarget && latestTarget > sheet.nextReviewAt) {
+        throw validationError([
+          {
+            field: 'nextReviewAt',
+            message:
+              'A próxima revisão não pode ficar antes da data-alvo das metas.',
+          },
+        ]);
+      }
     }
 
     let teamProfessionalIds: string[] | undefined;
@@ -436,7 +474,7 @@ export class PtsService {
 
     return this.ptsRepository.updateDraftProposal({
       id,
-      socialSituation: dto.socialSituation,
+      sheet,
       teamProfessionalIds,
     });
   }
@@ -534,6 +572,12 @@ export class PtsService {
 
     if (await this.ptsRepository.hasApprovedActivePts(proposal.patientId)) {
       throw activePtsAlreadyExists();
+    }
+
+    const pendingGoals = await this.ptsRepository.countPendingGoals(id);
+
+    if (pendingGoals > 0) {
+      throw goalsIncomplete(pendingGoals);
     }
 
     return this.ptsRepository.approveProposal(id, proposal.patientId);

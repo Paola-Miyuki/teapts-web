@@ -60,11 +60,26 @@ export const GOAL_STATUS_BADGES: Record<GoalStatus, string> = {
   not_achieved: 'not-met',
 };
 
-export const GOAL_ORIGIN_LABELS: Record<GoalOrigin, string> = {
-  new: 'Nova',
-  kept_partial: 'Versão anterior · parcial',
-  kept_not_achieved: 'Versão anterior · não atingida',
+const KEPT_ORIGIN_LABELS: Record<Exclude<GoalOrigin, 'new'>, string> = {
+  kept_partial: 'parcial',
+  kept_not_achieved: 'não atingida',
 };
+
+/** Ex.: "v1 · parcial"; a meta escrita neste PTS é "Nova". */
+export function goalOriginLabel(origin: GoalOrigin, previousVersion?: number) {
+  if (origin === 'new') {
+    return 'Nova';
+  }
+
+  const version = previousVersion ? `v${previousVersion}` : 'Versão anterior';
+
+  return `${version} · ${KEPT_ORIGIN_LABELS[origin]}`;
+}
+
+/** Meta copiada que ainda precisa de prazo e data-alvo (RFPTS013). */
+export function isGoalIncomplete(goal: Goal) {
+  return !goal.term || !goal.targetDate;
+}
 
 function goalsPath(ptsId: string, goalId?: string) {
   const path = `/pts/${encodeURIComponent(ptsId)}/goals`;

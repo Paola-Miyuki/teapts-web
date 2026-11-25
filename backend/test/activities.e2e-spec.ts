@@ -136,7 +136,10 @@ describe('criar atividade (e2e - RFACT001)', () => {
     });
 
     const listed = await request(app.getHttpServer()).get(route).expect(200);
-    expect(listed.body).toEqual({ data: [created.body] });
+    expect(listed.body).toEqual({
+      data: [created.body],
+      pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
   });
 
   it('responde 401 sem sessão', async () => {

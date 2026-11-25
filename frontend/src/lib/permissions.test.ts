@@ -314,6 +314,63 @@ describe('can', () => {
     });
   });
 
+  describe('archiveActivity (RFACT008)', () => {
+    const pts = { ...draft, status: 'running' };
+    const activity = (status: string) => ({
+      status,
+      authorProfessionalId: 'outro-id',
+    });
+
+    it('deixa a equipe e o admin arquivarem a sugerida, em andamento ou suspensa', () => {
+      for (const status of ['suggested', 'running', 'suspended']) {
+        expect(
+          can(professional, 'archiveActivity', {
+            pts,
+            activity: activity(status),
+          }),
+        ).toBe(true);
+        expect(
+          can(admin, 'archiveActivity', { pts, activity: activity(status) }),
+        ).toBe(true);
+      }
+    });
+
+    it('não arquiva a rejeitada, a concluída nem a já arquivada', () => {
+      for (const status of ['rejected', 'concluded', 'archived']) {
+        for (const user of [professional, admin]) {
+          expect(
+            can(user, 'archiveActivity', { pts, activity: activity(status) }),
+          ).toBe(false);
+        }
+      }
+    });
+
+    it('nega fora da equipe, ao paciente e com o PTS encerrado', () => {
+      const suggested = activity('suggested');
+
+      expect(
+        can(professional, 'archiveActivity', {
+          pts: { ...pts, teamProfessionalIds: [] },
+          activity: suggested,
+        }),
+      ).toBe(false);
+      expect(
+        can(patient, 'archiveActivity', { pts, activity: suggested }),
+      ).toBe(false);
+      expect(
+        can(waiting, 'archiveActivity', { pts, activity: suggested }),
+      ).toBe(false);
+      for (const user of [professional, admin]) {
+        expect(
+          can(user, 'archiveActivity', {
+            pts: { ...pts, status: 'cancelled' },
+            activity: suggested,
+          }),
+        ).toBe(false);
+      }
+    });
+  });
+
   it('mostra as notificações ao profissional e ao paciente, não ao admin', () => {
     expect(can(professional, 'viewNotifications')).toBe(true);
     expect(can(patient, 'viewNotifications')).toBe(true);

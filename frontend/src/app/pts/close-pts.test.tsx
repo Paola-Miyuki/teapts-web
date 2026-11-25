@@ -210,7 +210,7 @@ describe('Encerrar PTS (RFPTS010)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(closeButton()).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Registrar reavaliação' }),
+      screen.queryByRole('link', { name: 'Registrar reavaliação' }),
     ).not.toBeInTheDocument();
     await waitFor(() =>
       expect(callsTo('/activities')).toHaveLength(activitiesBefore + 1),

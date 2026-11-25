@@ -10,6 +10,7 @@ import {
 } from '../../pts/__tests__/goal-fixtures';
 import { expectApiError } from '../../pts/__tests__/test-utils';
 import type { CreateActivityRequestDto } from '../dto/create-activity.dto';
+import type { GetActivitiesQueryDto } from '../dto/get-activities-query.dto';
 import type { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import {
   ActivityExecutor,
@@ -41,6 +42,9 @@ describe('ActivitiesService (RFACT001)', () => {
     ptsId = 'pts-1',
   ) =>
     service.createActivity(ptsId, { ...activityBody(), ...changes }, account);
+  const query = (
+    changes: Partial<GetActivitiesQueryDto> = {},
+  ): GetActivitiesQueryDto => ({ page: 1, limit: 20, ...changes });
 
   beforeEach(() => setup());
 
@@ -67,7 +71,6 @@ describe('ActivitiesService (RFACT001)', () => {
         });
       },
     );
-
     it.each([
       undefined,
       null,
@@ -225,7 +228,7 @@ describe('ActivitiesService (RFACT001)', () => {
 
       for (const account of [responsible, member, patient, admin]) {
         expect(
-          (await service.findActivities('pts-1', account)).data,
+          (await service.findActivities('pts-1', query(), account)).data,
         ).toHaveLength(1);
       }
     });
@@ -234,23 +237,29 @@ describe('ActivitiesService (RFACT001)', () => {
       repo.documents = [{ id: 'doc-1', patientId: 'patient-1' }];
       await create({ documentIds: ['doc-1'] });
 
-      const [seenByPatient] = (await service.findActivities('pts-1', patient))
-        .data;
-      const [seenByTeam] = (await service.findActivities('pts-1', member)).data;
+      const [seenByPatient] = (
+        await service.findActivities('pts-1', query(), patient)
+      ).data;
+      const [seenByTeam] = (
+        await service.findActivities('pts-1', query(), member)
+      ).data;
 
       expect(seenByPatient.documentIds).toEqual([]);
       expect(seenByTeam.documentIds).toEqual(['doc-1']);
     });
 
     it('nega a quem não tem vínculo e à equipe do PTS rejeitado (RN016)', async () => {
-      await expectApiError(
-        () => service.findActivities('pts-1', outsider),
+      const forbidden = await expectApiError(
+        () => service.findActivities('pts-1', query(), outsider),
         403,
         'FORBIDDEN',
       );
+      expect(forbidden.message).toBe(
+        'Você não tem acesso às atividades deste PTS.',
+      );
       setup(PtsStateEnum.REJECTED);
       await expectApiError(
-        () => service.findActivities('pts-1', member),
+        () => service.findActivities('pts-1', query(), member),
         403,
         'FORBIDDEN',
       );
@@ -258,9 +267,52 @@ describe('ActivitiesService (RFACT001)', () => {
 
     it('responde 404 quando o PTS não existe', async () => {
       await expectApiError(
-        () => service.findActivities('pts-x', admin),
+        () => service.findActivities('pts-x', query(), admin),
         404,
         'PTS_NOT_FOUND',
+      );
+    });
+
+    it('aplica filtros e paginação e devolve o total', async () => {
+      await create();
+      await create({ title: 'Atividade suspensa' });
+
+      const result = await service.findActivities(
+        'pts-1',
+        query({ status: [ActivityState.Suggested], page: 2, limit: 1 }),
+        member,
+      );
+
+      expect(result).toMatchObject({
+        data: [{ title: 'Atividade suspensa' }],
+        pagination: { page: 2, limit: 1, total: 2, totalPages: 2 },
+      });
+    });
+
+    it('retorna o detalhe autorizado e não revela documentos ao paciente', async () => {
+      repo.documents = [{ id: 'doc-1', patientId: 'patient-1' }];
+      const created = await create({
+        documentIds: ['doc-1'],
+        goalId: 'goal-1',
+      });
+
+      await expect(
+        service.findActivityById(created.id, member),
+      ).resolves.toMatchObject({
+        goal: { id: 'goal-1', title: 'Meta terapêutica' },
+        documents: [{ id: 'doc-1', title: 'Documento doc-1' }],
+        appointmentsCount: 0,
+      });
+      await expect(
+        service.findActivityById(created.id, patient),
+      ).resolves.toMatchObject({ documents: [], documentIds: [] });
+    });
+
+    it('responde ACTIVITY_NOT_FOUND para atividade inexistente', async () => {
+      await expectApiError(
+        () => service.findActivityById('act-x', admin),
+        404,
+        'ACTIVITY_NOT_FOUND',
       );
     });
   });
@@ -483,5 +535,109 @@ describe('ActivitiesService.updateActivity (RFACT005)', () => {
       ['doc-1'],
       [],
     ]);
+  });
+});
+
+describe('ActivitiesService.archiveActivity (RFACT008)', () => {
+  let repo: InMemoryActivitiesRepository;
+  let service: ActivitiesService;
+
+  function setup(
+    activity: Partial<StoredActivity> = {},
+    status = PtsStateEnum.RUNNING,
+  ) {
+    repo = new InMemoryActivitiesRepository();
+    repo.activities.push(storedActivity(activity));
+    service = new ActivitiesService(repo, seededGoalsRepo(status));
+  }
+
+  const archive = (reason?: string, account = member, activityId = 'act-1') =>
+    service.archiveActivity(activityId, { reason }, account);
+
+  beforeEach(() => setup());
+
+  it.each([
+    ActivityState.Suggested,
+    ActivityState.Running,
+    ActivityState.Suspended,
+  ])('a equipe arquiva a atividade %s com o motivo', async (status) => {
+    setup({ status });
+
+    expect(await archive('  Família assumiu a atividade em casa.  ')).toEqual({
+      id: 'act-1',
+      status: 'archived',
+      archivedAt: '2026-12-06T12:00:00.000Z',
+    });
+    expect(repo.archived[0]).toEqual({
+      ptsId: 'pts-1',
+      activityId: 'act-1',
+      reason: 'Família assumiu a atividade em casa.',
+      authorProfessionalId: 'prof-2',
+      executedByAccountId: 'acc-2',
+      description:
+        'João Lima arquivou a atividade Integração sensorial (Família assumiu a atividade em casa.)',
+    });
+  });
+
+  it('arquiva sem motivo, e qualquer membro da equipe pode', async () => {
+    setup({ authorProfessionalId: 'prof-1' });
+
+    await archive('   ');
+
+    expect(repo.archived[0]).toMatchObject({
+      reason: null,
+      description: 'João Lima arquivou a atividade Integração sensorial',
+    });
+  });
+
+  it('o admin arquiva sem autor no evento (RN022)', async () => {
+    await archive(undefined, admin);
+
+    expect(repo.archived[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+      description: 'Kaio arquivou a atividade Integração sensorial',
+    });
+  });
+
+  it.each([
+    ActivityState.Rejected,
+    ActivityState.Concluded,
+    ActivityState.Archived,
+  ])('recusa a atividade %s com 409, até para o admin', async (status) => {
+    setup({ status });
+
+    for (const account of [member, admin]) {
+      const error = await expectApiError(
+        () => archive(undefined, account),
+        409,
+        'ACTIVITY_NOT_ARCHIVABLE',
+      );
+      expect(error.message).toBe(
+        'Atividade rejeitada, concluída ou já arquivada não pode ser arquivada.',
+      );
+    }
+    expect(repo.archived).toHaveLength(0);
+  });
+
+  it('nega a quem não é da equipe', async () => {
+    for (const account of [outsider, patient, accountOf()]) {
+      await expectApiError(() => archive(undefined, account), 403, 'FORBIDDEN');
+    }
+    expect(repo.archived).toHaveLength(0);
+  });
+
+  it('responde 404 quando a atividade não existe', async () => {
+    await expectApiError(
+      () => archive(undefined, admin, 'act-x'),
+      404,
+      'ACTIVITY_NOT_FOUND',
+    );
+  });
+
+  it('recusa com o PTS encerrado', async () => {
+    setup({}, PtsStateEnum.CONCLUDED);
+
+    await expectApiError(() => archive(), 409, 'PTS_NOT_EDITABLE');
   });
 });

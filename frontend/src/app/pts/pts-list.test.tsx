@@ -219,7 +219,7 @@ describe('PtsList', () => {
     ).toHaveAttribute('href', '/pts/pts-1/edit');
     expect(
       screen.getByRole('menuitem', { name: 'Registrar reavaliação' }),
-    ).toBeDisabled();
+    ).toHaveAttribute('href', '/pts/pts-1/reassessment');
     expect(
       screen.getByRole('menuitem', { name: 'Encerrar' }),
     ).toBeInTheDocument();

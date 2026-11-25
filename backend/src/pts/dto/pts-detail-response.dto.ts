@@ -6,6 +6,14 @@ import {
 } from './pts-proposal-response.dto';
 import { PtsSheetViewDto } from './update-pts-sheet.dto';
 
+export class PreviousPtsDto {
+  @ApiProperty({ example: 'uuid-do-pts-anterior' })
+  id!: string;
+
+  @ApiProperty({ example: 1 })
+  version!: number;
+}
+
 /** PTS em qualquer estado, com as datas de cada mudança (RFPTS001, RFPTS009). */
 export class PtsDetailResponseDto extends PtsSheetViewDto {
   @ApiProperty({ example: 'uuid-do-pts' })
@@ -31,6 +39,12 @@ export class PtsDetailResponseDto extends PtsSheetViewDto {
 
   @ApiProperty({ nullable: true, example: null })
   cancelledAt!: string | null;
+
+  @ApiProperty({ example: 2 })
+  version!: number;
+
+  @ApiProperty({ type: PreviousPtsDto, nullable: true })
+  previousPts!: PreviousPtsDto | null;
 
   @ApiProperty({ type: String, nullable: true, example: '2027-04-15' })
   closingDate!: string | null;

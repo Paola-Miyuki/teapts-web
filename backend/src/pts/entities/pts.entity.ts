@@ -8,12 +8,15 @@ import {
   JoinColumn,
   CreateDateColumn,
   DeleteDateColumn,
+  Unique,
+  type Relation,
 } from 'typeorm';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 @Entity('projeto_terapeutico_singular')
+@Unique('UQ_pts_patient_version', ['patientId', 'version'])
 export class PtsEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -119,6 +122,27 @@ export class PtsEntity {
 
   @Column({ name: 'closed_by_account_id', type: 'uuid', nullable: true })
   closedByAccountId: string | null;
+
+  // Data do encontro de reavaliação (RFEVA005); volta como 'yyyy-mm-dd'.
+  @Column({ name: 'reassessed_at', type: 'date', nullable: true })
+  reassessedAt: string | null;
+
+  @Column({ name: 'reassessed_by_account_id', type: 'uuid', nullable: true })
+  reassessedByAccountId: string | null;
+
+  // Versão do paciente (1, 2, 3…); toda criação usa nextPtsVersion.
+  @Column({ type: 'integer', default: 1 })
+  version: number;
+
+  @Column({ name: 'previous_pts_id', type: 'uuid', nullable: true })
+  previousPtsId: string | null;
+
+  @ManyToOne(() => PtsEntity, { nullable: true })
+  @JoinColumn({
+    name: 'previous_pts_id',
+    foreignKeyConstraintName: 'FK_pts_previous',
+  })
+  previousPts?: Relation<PtsEntity> | null;
 
   @Column({ name: 'patient_id' })
   patientId: string;

@@ -7,28 +7,47 @@ import type { FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import HelpTooltip from '@/components/HelpTooltip';
+import FormField from '@/components/FormField';
 import Icon from '@/components/Icon';
+import GoalsStep from '@/components/pts/GoalsStep';
 import TeamMembers from '@/components/pts/TeamMembers';
 import WizardSteps, {
-  PTS_STEPS,
-  type PtsStep,
+  PROPOSAL_STEPS,
+  type ProposalStep,
 } from '@/components/pts/WizardSteps';
 import ui from '@/components/ui.module.css';
+import { useActivities } from '@/hooks/useActivities';
+import { useGoals } from '@/hooks/useGoals';
 
 import type { Account } from '@/lib/account';
+import {
+  ACTIVITY_EXECUTOR_LABELS,
+  ACTIVITY_TYPE_LABELS,
+  formatFrequency,
+} from '@/lib/activities';
+import { ApiError } from '@/lib/api';
+import { addMonths } from '@/lib/format';
+import { isGoalIncomplete } from '@/lib/goals';
 import { can } from '@/lib/permissions';
+import { getPts, type PtsDetail } from '@/lib/pts';
 
 import { initSuperTokens } from '@/lib/supertokens';
 
 import {
+  SheetDiagnosisFields,
+  SheetProfileFields,
+  toSheetForm,
+  toSheetInput,
+  type SheetErrors,
+  type SheetForm,
+} from '../../../_components/SheetFields';
+import {
   getProfessionalsForTeam,
-  getPtsProposal,
   PtsProposalApiError,
   updatePtsProposal,
 } from './api';
 
-import type { Professional, PtsProposal } from './types';
+import type { Professional } from './types';
 
 type EditPtsProposalFormProps = {
   proposalId: string;
@@ -37,6 +56,47 @@ type EditPtsProposalFormProps = {
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
+const LOAD_ERROR = 'Não foi possível carregar os dados da proposta';
+const REVIEW_SHORTCUTS = [3, 6, 12];
+
+const FIELD_IDS: Record<keyof SheetErrors, string> = {
+  caseStudyDate: 'edit-study',
+  diagnosisSummary: 'sheet-summary',
+  socialSituation: 'sheet-social',
+  nextReviewAt: 'edit-review',
+};
+
+function isUnauthorized(error: unknown) {
+  return (
+    (error instanceof PtsProposalApiError && error.statusCode === 401) ||
+    (error instanceof ApiError && error.status === 401)
+  );
+}
+
+function validate(step: ProposalStep, form: SheetForm): SheetErrors {
+  const found: SheetErrors = {};
+
+  if (step === 0 && !form.caseStudyDate) {
+    found.caseStudyDate = 'Informe a data do estudo de caso';
+  }
+
+  if (step === 1 && !form.diagnosisSummary.trim()) {
+    found.diagnosisSummary = 'Descreva a síntese do diagnóstico';
+  }
+
+  if (step === 1 && !form.socialSituation.trim()) {
+    found.socialSituation = 'Descreva a situação social do paciente';
+  }
+
+  if (step === 3 && !form.nextReviewAt) {
+    found.nextReviewAt = 'Informe a próxima revisão';
+  }
+
+  return found;
+}
+
+// Editar proposta nos 4 passos (RFPTS007): também o rascunho da próxima versão,
+// que chega preenchido (RFPTS013).
 export default function EditPtsProposalForm({
   proposalId,
   account,
@@ -47,15 +107,17 @@ export default function EditPtsProposalForm({
 
   const [reloadKey, setReloadKey] = useState(0);
 
-  const [proposal, setProposal] = useState<PtsProposal | null>(null);
+  const [proposal, setProposal] = useState<PtsDetail | null>(null);
+
+  const [form, setForm] = useState<SheetForm | null>(null);
 
   const [professionals, setProfessionals] = useState<Professional[]>([]);
 
-  const [socialSituation, setSocialSituation] = useState('');
-
   const [teamIds, setTeamIds] = useState<string[]>([]);
 
-  const [socialError, setSocialError] = useState('');
+  const [errors, setErrors] = useState<SheetErrors>({});
+
+  const [goalsError, setGoalsError] = useState('');
 
   const [loadError, setLoadError] = useState('');
 
@@ -63,9 +125,16 @@ export default function EditPtsProposalForm({
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const [step, setStep] = useState<PtsStep>(0);
+  const [step, setStep] = useState<ProposalStep>(0);
 
   const errorRef = useRef<HTMLDivElement>(null);
+
+  const {
+    goals,
+    error: goalsLoadError,
+    reload: reloadGoals,
+  } = useGoals(proposalId);
+  const { activities } = useActivities(proposalId, { page: 1, limit: 50 });
 
   useEffect(() => {
     initSuperTokens();
@@ -75,7 +144,7 @@ export default function EditPtsProposalForm({
     const controller = new AbortController();
 
     Promise.all([
-      getPtsProposal(proposalId, controller.signal),
+      getPts(proposalId, controller.signal),
 
       getProfessionalsForTeam(controller.signal),
     ])
@@ -84,7 +153,7 @@ export default function EditPtsProposalForm({
           return;
         }
 
-        if (loadedProposal.status.toUpperCase() !== 'DRAFT') {
+        if (loadedProposal.status !== 'draft') {
           setLoadError(
             'Somente propostas aguardando decisão podem ser editadas',
           );
@@ -111,24 +180,21 @@ export default function EditPtsProposalForm({
           return;
         }
 
-        const teamOptions = loadedProfessionals.filter(
-          (professional) => professional.id !== loadedProposal.responsible.id,
-        );
-
-        const initialTeamIds = loadedProposal.team
-          .map((member) => member.id)
-          .filter(
-            (professionalId) =>
-              professionalId !== loadedProposal.responsible.id,
-          );
-
         setProposal(loadedProposal);
 
-        setProfessionals(teamOptions);
+        setForm(toSheetForm(loadedProposal));
 
-        setSocialSituation(loadedProposal.socialSituation ?? '');
+        setProfessionals(
+          loadedProfessionals.filter(
+            (professional) => professional.id !== loadedProposal.responsible.id,
+          ),
+        );
 
-        setTeamIds(initialTeamIds);
+        setTeamIds(
+          loadedProposal.team
+            .map((member) => member.id)
+            .filter((id) => id !== loadedProposal.responsible.id),
+        );
 
         setLoadError('');
         setLoadStatus('ready');
@@ -138,7 +204,7 @@ export default function EditPtsProposalForm({
           return;
         }
 
-        if (error instanceof PtsProposalApiError && error.statusCode === 401) {
+        if (isUnauthorized(error)) {
           router.replace('/login');
 
           return;
@@ -147,7 +213,11 @@ export default function EditPtsProposalForm({
         if (error instanceof PtsProposalApiError) {
           setLoadError(error.message);
         } else {
-          setLoadError('Não foi possível carregar os dados da proposta');
+          setLoadError(
+            error instanceof ApiError && error.apiMessage
+              ? error.apiMessage
+              : LOAD_ERROR,
+          );
         }
 
         setLoadStatus('error');
@@ -166,10 +236,7 @@ export default function EditPtsProposalForm({
 
   function handleRetry() {
     setProposal(null);
-    setProfessionals([]);
-    setSocialSituation('');
-    setTeamIds([]);
-    setSocialError('');
+    setForm(null);
     setLoadError('');
     setSubmitError('');
     setLoadStatus('loading');
@@ -177,61 +244,70 @@ export default function EditPtsProposalForm({
     setReloadKey((current) => current + 1);
   }
 
+  function update<K extends keyof SheetForm>(key: K, value: SheetForm[K]) {
+    setForm((current) => (current ? { ...current, [key]: value } : current));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+  }
+
+  const pendingGoals = (goals ?? []).filter(isGoalIncomplete).length;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (isSaving || !proposal) {
+    if (isSaving || !proposal || !form) {
       return;
     }
 
-    const trimmedSocialSituation = socialSituation.trim();
+    const found = validate(step, form);
+    const [firstError] = Object.keys(found) as (keyof SheetErrors)[];
 
-    setSocialError('');
+    setErrors(found);
     setSubmitError('');
+    setGoalsError('');
 
-    if (step >= 1 && !trimmedSocialSituation) {
-      setSocialError('Descreva a situação social do paciente');
-      setStep(1);
-
-      document.getElementById('edit-social-situation')?.focus();
+    if (firstError) {
+      document.getElementById(FIELD_IDS[firstError])?.focus();
 
       return;
     }
 
-    if (step < 2) {
-      setStep((step + 1) as PtsStep);
+    if (step === 2 && pendingGoals > 0) {
+      setGoalsError(
+        `Defina o prazo e a data-alvo de todas as metas (${
+          pendingGoals === 1 ? 'falta 1' : `faltam ${pendingGoals}`
+        })`,
+      );
 
       return;
     }
 
-    const validTeamIds = teamIds.filter(
-      (professionalId) => professionalId !== proposal.responsible.id,
-    );
+    if (step < 3) {
+      setStep((step + 1) as ProposalStep);
+
+      return;
+    }
 
     setIsSaving(true);
 
     try {
       await updatePtsProposal(proposal.id, {
-        socialSituation: trimmedSocialSituation,
-
-        teamProfessionalIds: validTeamIds,
+        ...toSheetInput(form),
+        teamProfessionalIds: teamIds,
       });
 
       router.push('/pts/proposals?updated=1');
     } catch (error: unknown) {
-      if (error instanceof PtsProposalApiError && error.statusCode === 401) {
+      if (isUnauthorized(error)) {
         router.replace('/login');
 
         return;
       }
 
-      if (error instanceof PtsProposalApiError) {
-        setSubmitError(error.message);
-
-        return;
-      }
-
-      setSubmitError('Não foi possível atualizar a proposta de PTS');
+      setSubmitError(
+        error instanceof PtsProposalApiError
+          ? error.message
+          : 'Não foi possível atualizar a proposta de PTS',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -240,7 +316,11 @@ export default function EditPtsProposalForm({
   const heading = (
     <div className="heading">
       <div>
-        <h1>Editar proposta de PTS</h1>
+        <h1>
+          {proposal?.previousPts
+            ? `PTS v${proposal.version} de ${proposal.patient.name}`
+            : 'Editar proposta de PTS'}
+        </h1>
       </div>
       <div className="heading-actions">
         <Link className="btn" href="/pts/proposals">
@@ -262,7 +342,7 @@ export default function EditPtsProposalForm({
     );
   }
 
-  if (loadStatus === 'error' || !proposal) {
+  if (loadStatus === 'error' || !proposal || !form) {
     return (
       <>
         {heading}
@@ -291,60 +371,86 @@ export default function EditPtsProposalForm({
 
   if (step === 0) {
     body = (
-      <dl className="ux-summary">
-        <div>
-          <dt>Paciente</dt>
-          <dd>{proposal.patient.name}</dd>
+      <>
+        <dl className="ux-summary">
+          <div>
+            <dt>Paciente</dt>
+            <dd>{proposal.patient.name}</dd>
+          </div>
+        </dl>
+        <div className="form-grid">
+          <FormField
+            id="edit-study"
+            label={
+              proposal.previousPts
+                ? 'Data do novo estudo de caso'
+                : 'Data do estudo de caso'
+            }
+            help="Dia da reunião em que a equipe decidiu o diagnóstico."
+            error={errors.caseStudyDate}
+            full
+          >
+            <input
+              className="input"
+              id="edit-study"
+              type="date"
+              aria-required="true"
+              aria-invalid={Boolean(errors.caseStudyDate)}
+              value={form.caseStudyDate}
+              onChange={(event) => update('caseStudyDate', event.target.value)}
+            />
+          </FormField>
         </div>
-      </dl>
+      </>
     );
   } else if (step === 1) {
     body = (
-      <div className="form-grid">
-        <div className="field full">
-          <span className="ux-labeltip">
-            <label className="field-label" htmlFor="edit-social-situation">
-              Situação social
-              <span className="ux-req" aria-hidden="true">
-                {' '}
-                *
-              </span>
-            </label>
-            <HelpTooltip id="edit-social-tip" label="Situação social">
-              Moradia, rotina da família, rede de apoio e acesso a serviços.
-              Nunca aparece ao paciente.
-            </HelpTooltip>
-          </span>
-          <textarea
-            className="input"
-            id="edit-social-situation"
-            name="socialSituation"
-            rows={4}
-            aria-required="true"
-            value={socialSituation}
+      <>
+        <div className="form-grid">
+          <SheetDiagnosisFields
+            form={form}
+            errors={errors}
             disabled={isSaving}
-            placeholder="Ex.: mora com a mãe e a avó; a mãe trabalha à tarde"
-            aria-invalid={Boolean(socialError)}
-            aria-describedby={
-              socialError
-                ? 'edit-social-tip edit-social-error'
-                : 'edit-social-tip'
-            }
-            onChange={(event) => {
-              setSocialSituation(event.target.value);
-
-              if (socialError) {
-                setSocialError('');
-              }
-            }}
+            update={update}
           />
-          {socialError ? (
-            <p id="edit-social-error" className={ui.fieldError}>
-              {socialError}
-            </p>
-          ) : null}
         </div>
-      </div>
+        <SheetProfileFields
+          form={form}
+          errors={errors}
+          disabled={isSaving}
+          update={update}
+        />
+      </>
+    );
+  } else if (step === 2) {
+    body = (
+      <>
+        {goalsError && (
+          <div className={`${ui.alert} ${ui.alertError}`} role="alert">
+            <p>{goalsError}</p>
+          </div>
+        )}
+        <GoalsStep
+          ptsId={proposal.id}
+          goals={goals}
+          error={goalsLoadError}
+          reload={() => {
+            setGoalsError('');
+            reloadGoals();
+          }}
+          nextReviewAt={proposal.nextReviewAt}
+          previousVersion={proposal.previousPts?.version}
+          priorityNeeds={form.priorityNeeds}
+          authors={
+            account.role === 'admin'
+              ? [proposal.responsible, ...proposal.team].map((member) => ({
+                  id: member.id,
+                  name: `${member.name}, ${member.specialism.name}`,
+                }))
+              : undefined
+          }
+        />
+      </>
     );
   } else {
     body = (
@@ -375,6 +481,86 @@ export default function EditPtsProposalForm({
           onChange={setTeamIds}
           disabled={isSaving}
         />
+
+        <section className="ux-fsection">
+          <header>
+            <h3>Data máxima do PTS</h3>
+          </header>
+          <div>
+            <div className="form-grid">
+              <FormField
+                id="edit-review"
+                label="Data máxima (próxima revisão)"
+                error={errors.nextReviewAt}
+              >
+                <input
+                  className="input"
+                  id="edit-review"
+                  type="date"
+                  aria-required="true"
+                  aria-invalid={Boolean(errors.nextReviewAt)}
+                  disabled={isSaving}
+                  value={form.nextReviewAt}
+                  onChange={(event) =>
+                    update('nextReviewAt', event.target.value)
+                  }
+                />
+              </FormField>
+
+              <div className="field">
+                <span className="field-label">
+                  Atalhos a partir do estudo de caso
+                </span>
+                <div className="ux-inline">
+                  {REVIEW_SHORTCUTS.map((months) => (
+                    <button
+                      key={months}
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={isSaving}
+                      onClick={() =>
+                        update(
+                          'nextReviewAt',
+                          addMonths(form.caseStudyDate, months),
+                        )
+                      }
+                    >
+                      {`${months} meses`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {proposal.previousPts && activities && activities.length > 0 && (
+          <section className="ux-fsection">
+            <header>
+              <h3>Atividades copiadas</h3>
+            </header>
+            <div>
+              <ul className="mini-list">
+                {activities.map((activity) => (
+                  <li key={activity.id}>
+                    <span className="grow">
+                      <strong>{activity.title}</strong>
+                      <small className="ux-sub">
+                        {`Tipo: ${ACTIVITY_TYPE_LABELS[activity.type]}`}
+                      </small>
+                      <small className="ux-sub">
+                        {`Frequência: ${formatFrequency(activity.frequency)}`}
+                      </small>
+                    </span>
+                    <span className="badge plain">
+                      {ACTIVITY_EXECUTOR_LABELS[activity.executor]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
       </>
     );
   }
@@ -397,51 +583,62 @@ export default function EditPtsProposalForm({
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit} noValidate>
-        <section className="ux-formcard ux-wz-step" aria-labelledby="wz-title">
-          <div className="ux-wz-head">
-            <WizardSteps current={step} />
-            <div>
-              <h2 id="wz-title">{PTS_STEPS[step]}</h2>
-            </div>
+      {/* Os diálogos das metas têm o próprio formulário: ficam fora deste. */}
+      <form id="proposal-form" onSubmit={handleSubmit} noValidate />
+
+      <section className="ux-formcard ux-wz-step" aria-labelledby="wz-title">
+        <div className="ux-wz-head">
+          <WizardSteps current={step} steps={PROPOSAL_STEPS} />
+          <div>
+            <h2 id="wz-title">{PROPOSAL_STEPS[step]}</h2>
           </div>
+        </div>
 
-          <div className="ux-wz-body">{body}</div>
+        <div className="ux-wz-body">{body}</div>
 
-          <div className="ux-formcard-foot ux-wz-foot">
-            {step > 0 ? (
-              <button
-                type="button"
-                className="btn"
-                disabled={isSaving}
-                onClick={() => setStep((step - 1) as PtsStep)}
-              >
-                <Icon name="chevronLeft" className="icon-sm" />
-                Voltar
-              </button>
-            ) : (
-              <span />
-            )}
+        <div className="ux-formcard-foot ux-wz-foot">
+          {step > 0 ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={isSaving}
+              onClick={() => {
+                setErrors({});
+                setGoalsError('');
+                setStep((step - 1) as ProposalStep);
+              }}
+            >
+              <Icon name="chevronLeft" className="icon-sm" />
+              Voltar
+            </button>
+          ) : (
+            <span />
+          )}
 
-            {step < 2 ? (
-              <button type="submit" className="btn btn-primary">
-                Próximo
-                <Icon name="chevronRight" className="icon-sm" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={isSaving}
-                aria-busy={isSaving}
-                className="btn btn-primary"
-              >
-                <Icon name="check" className="icon-sm" />
-                {isSaving ? 'Salvando...' : 'Salvar proposta'}
-              </button>
-            )}
-          </div>
-        </section>
-      </form>
+          {step < 3 ? (
+            <button
+              type="submit"
+              form="proposal-form"
+              className="btn btn-primary"
+              disabled={step === 2 && !goals}
+            >
+              Próximo
+              <Icon name="chevronRight" className="icon-sm" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              form="proposal-form"
+              disabled={isSaving}
+              aria-busy={isSaving}
+              className="btn btn-primary"
+            >
+              <Icon name="check" className="icon-sm" />
+              {isSaving ? 'Salvando...' : 'Salvar proposta'}
+            </button>
+          )}
+        </div>
+      </section>
     </>
   );
 }

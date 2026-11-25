@@ -36,6 +36,8 @@ import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateAc
 import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
 import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
 import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
+import { AddPtsVersion1791149100000 } from './migrations/1791149100000-AddPtsVersion';
+import { AddPtsReassessmentColumns1791149110000 } from './migrations/1791149110000-AddPtsReassessmentColumns';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -137,6 +139,8 @@ describe('getDatabaseOptions', () => {
         CreateActivity1791149070000,
         AddPtsClosingColumns1791149080000,
         AddPatientProfileFields1791149090000,
+        AddPtsVersion1791149100000,
+        AddPtsReassessmentColumns1791149110000,
       ],
     });
   });

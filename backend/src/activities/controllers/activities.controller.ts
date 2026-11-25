@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -26,20 +27,27 @@ import {
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
 import { AuthGuard } from '../../auth/guards/auth.guard';
-import { UnauthorizedResponseDto } from '../../common/swagger/error-response.dto';
 import {
-  ptsForbidden,
+  ErrorResponseDto,
+  UnauthorizedResponseDto,
+} from '../../common/swagger/error-response.dto';
+import {
   ptsNotEditable,
   ptsNotFound,
   validationError,
 } from '../../pts/pts.errors';
 import { errors } from '../../pts/swagger-errors';
-import { activityForbidden, invalidFrequency } from '../activities.errors';
+import {
+  activitiesViewForbidden,
+  activityForbidden,
+  invalidFrequency,
+} from '../activities.errors';
 import {
   ActivityResponseDto,
   GetActivitiesResponseDto,
 } from '../dto/activity-response.dto';
 import { CreateActivityRequestDto } from '../dto/create-activity.dto';
+import { GetActivitiesQueryDto } from '../dto/get-activities-query.dto';
 import { ActivitiesService } from '../services/activities.service';
 
 const parsePtsId = new ParseUUIDPipe({
@@ -63,17 +71,33 @@ export class ActivitiesController {
   @ApiOperation({
     summary: 'Lista as atividades do PTS',
     description:
-      'Da mais recente à mais antiga, sem paginação nem filtros (RFACT002). Veem o admin, a equipe (menos PTS rejeitado, RN016) e o paciente titular.',
+      'Da mais recente à mais antiga, paginadas e filtráveis por status e executor (RFACT002). Veem o admin, a equipe (menos PTS rejeitado, RN016) e o paciente titular.',
   })
   @ApiOkResponse({ type: GetActivitiesResponseDto })
-  @ApiBadRequestResponse(errors(validationError([])))
-  @ApiForbiddenResponse(errors(ptsForbidden()))
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    examples: {
+      ERROR: {
+        summary: 'Filtro ou paginação inválida',
+        value: { status: 'ERROR', message: 'Parâmetro inválido: status' },
+      },
+      VALIDATION_ERROR: {
+        summary: 'id do PTS que não é UUID',
+        value: {
+          status: 'VALIDATION_ERROR',
+          message: 'Parâmetro inválido: id',
+        },
+      },
+    },
+  })
+  @ApiForbiddenResponse(errors(activitiesViewForbidden()))
   @ApiNotFoundResponse(errors(ptsNotFound()))
   async findActivities(
     @Param('id', parsePtsId) id: string,
+    @Query() query: GetActivitiesQueryDto,
     @CurrentAccount() account: AccountContext,
   ): Promise<GetActivitiesResponseDto> {
-    return this.activitiesService.findActivities(id, account);
+    return this.activitiesService.findActivities(id, query, account);
   }
 
   @Post()

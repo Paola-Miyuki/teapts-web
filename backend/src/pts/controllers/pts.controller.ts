@@ -18,6 +18,7 @@ import {
   ApiBearerAuth,
   ApiCookieAuth,
   ApiConflictResponse,
+  ApiExtraModels,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -49,6 +50,7 @@ import {
   UpdatePtsSheetRequestDto,
   UpdatePtsSheetResponseDto,
 } from '../dto/update-pts-sheet.dto';
+import { GoalsIncompleteErrorDto } from '../dto/goals-incomplete-error.dto';
 import { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import { ClosePtsRequestDto, ClosePtsResponseDto } from '../dto/close-pts.dto';
 import { PtsStartResponseDto } from '../dto/pts-start-response.dto';
@@ -57,6 +59,9 @@ import { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-respons
 import { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
 import {
+  activePtsAlreadyExists,
+  goalsIncomplete,
+  ptsProposalNotPending,
   ptsCloseForbidden,
   ptsCloseNotActive,
   ptsNotFound,
@@ -231,7 +236,19 @@ export class PtsController {
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiForbiddenResponse({ type: ErrorResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })
-  @ApiConflictResponse({ type: ErrorResponseDto })
+  @ApiExtraModels(GoalsIncompleteErrorDto)
+  @ApiConflictResponse({
+    description:
+      'GOALS_INCOMPLETE traz também pendingGoals (GoalsIncompleteErrorDto): metas sem prazo ou data-alvo (RFPTS013).',
+    ...errors(ptsProposalNotPending(), activePtsAlreadyExists()),
+    examples: {
+      ...errors(ptsProposalNotPending(), activePtsAlreadyExists()).examples,
+      GOALS_INCOMPLETE: {
+        summary: 'Meta sem prazo ou sem data-alvo',
+        value: goalsIncomplete(2).getResponse(),
+      },
+    },
+  })
   @ApiUnauthorizedResponse({ type: UnauthorizedResponseDto })
   async approveProposal(
     @Param('id', parseProposalId) id: string,

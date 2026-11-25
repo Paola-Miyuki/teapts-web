@@ -79,11 +79,13 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/proposals/{id}', 'patch'],
   ['/pts/{id}/start', 'post'],
   ['/pts/{id}/close', 'post'],
+  ['/pts/{id}/reassessment', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
   ['/activities/{id}', 'patch'],
+  ['/activities/{id}/archive', 'post'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -320,6 +322,10 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/close', 'post', '403'],
     ['/pts/{id}/close', 'post', '404'],
     ['/pts/{id}/close', 'post', '409'],
+    ['/pts/{id}/reassessment', 'post', '400'],
+    ['/pts/{id}/reassessment', 'post', '403'],
+    ['/pts/{id}/reassessment', 'post', '404'],
+    ['/pts/{id}/reassessment', 'post', '409'],
     ['/pts/{id}/start', 'post', '400'],
     ['/pts/{id}/start', 'post', '403'],
     ['/pts/{id}/start', 'post', '404'],
@@ -344,6 +350,10 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}', 'patch', '404'],
     ['/activities/{id}', 'patch', '409'],
     ['/activities/{id}', 'patch', '422'],
+    ['/activities/{id}/archive', 'post', '400'],
+    ['/activities/{id}/archive', 'post', '403'],
+    ['/activities/{id}/archive', 'post', '404'],
+    ['/activities/{id}/archive', 'post', '409'],
     ['/notifications', 'get', '400'],
     ['/notifications/{id}/read', 'post', '400'],
     ['/notifications/{id}/read', 'post', '404'],
@@ -631,6 +641,27 @@ describe('Swagger (e2e)', () => {
     ]);
   });
 
+  it('documents the GOALS_INCOMPLETE of POST /pts/proposals/{id}/approve', async () => {
+    const { paths, components } = await getDocument();
+    const conflict = paths['/pts/proposals/{id}/approve'].post.responses['409'];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'PTS_NOT_DRAFT',
+      'ACTIVE_PTS_ALREADY_EXISTS',
+      'GOALS_INCOMPLETE',
+    ]);
+    expect(components.schemas.GoalsIncompleteErrorDto.required).toEqual([
+      'status',
+      'message',
+      'pendingGoals',
+    ]);
+    expect(
+      components.schemas.UpdatePtsProposalRequestDto.required,
+    ).toBeUndefined();
+  });
+
   it('documents POST /pts/{id}/close', async () => {
     const { paths, components } = await getDocument();
     const operation = paths['/pts/{id}/close'].post;
@@ -655,6 +686,38 @@ describe('Swagger (e2e)', () => {
         ),
       ).toEqual([code]);
     }
+  });
+
+  it('documents POST /pts/{id}/reassessment', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/reassessment'].post;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/RegisterReassessmentResponseDto',
+    );
+    expect(components.schemas.RegisterReassessmentRequestDto.required).toEqual([
+      'meetingDate',
+      'goals',
+      'createNextVersion',
+    ]);
+    expect(components.schemas.RegisterReassessmentResponseDto.required).toEqual(
+      ['id', 'status', 'reassessedAt', 'nextPtsId'],
+    );
+    expect(examples('400')).toEqual([
+      'VALIDATION_ERROR',
+      'GOALS_WITHOUT_RESULT',
+    ]);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual([
+      'PTS_NOT_RUNNING',
+      'DRAFT_ALREADY_EXISTS',
+    ]);
   });
 
   it('documents POST /pts/{id}/start', async () => {
@@ -732,6 +795,31 @@ describe('Swagger (e2e)', () => {
         Object.keys(
           patch.responses[status]?.content?.['application/json']?.examples ??
             {},
+        ),
+      ).toEqual(codes);
+    }
+  });
+
+  it('documents POST /activities/{id}/archive', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/activities/{id}/archive'];
+
+    expect(responseSchema(post, '200')?.$ref).toBe(
+      '#/components/schemas/ArchiveActivityResponseDto',
+    );
+    expect(components.schemas.ArchiveActivityResponseDto.required).toEqual([
+      'id',
+      'status',
+      'archivedAt',
+    ]);
+    for (const [status, codes] of [
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_ARCHIVABLE', 'PTS_NOT_EDITABLE']],
+    ] as const) {
+      expect(
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
         ),
       ).toEqual(codes);
     }

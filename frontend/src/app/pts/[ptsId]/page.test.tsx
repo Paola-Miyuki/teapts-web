@@ -128,6 +128,7 @@ const ACTIVITIES = {
       createdAt: '2026-12-01T13:00:00.000Z',
     },
   ],
+  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
 };
 
 function mockApi(
@@ -143,7 +144,7 @@ function mockApi(
           ? respond(200, timeline)
           : url.endsWith('/goals')
             ? respond(200, GOALS)
-            : url.endsWith('/activities')
+            : url.split('?')[0].endsWith('/activities')
               ? respond(200, ACTIVITIES)
               : detail,
     ),
@@ -269,6 +270,33 @@ describe('PtsDetail', () => {
     const newButton = () =>
       screen.queryByRole('button', { name: 'Nova atividade' });
 
+    it('filtra por Sugerida, Em andamento e Suspensa por padrão', async () => {
+      await openActivities({ status: 'running' }, PROFESSIONAL);
+
+      await waitFor(() => {
+        const request = (global.fetch as jest.Mock).mock.calls
+          .map(([url]) => String(url))
+          .filter((url) => url.includes('/activities?'))
+          .at(-1);
+        const statuses = new URL(request!).searchParams.getAll('status');
+
+        expect(statuses).toEqual(['suggested', 'running', 'suspended']);
+      });
+    });
+
+    it('mostra todos os status por padrão em um PTS encerrado', async () => {
+      await openActivities({ status: 'concluded' }, PROFESSIONAL);
+
+      await waitFor(() => {
+        const request = (global.fetch as jest.Mock).mock.calls
+          .map(([url]) => String(url))
+          .filter((url) => url.includes('/activities?'))
+          .at(-1);
+
+        expect(new URL(request!).searchParams.getAll('status')).toEqual([]);
+      });
+    });
+
     it.each(['draft', 'planning', 'running'])(
       'a equipe cria com o PTS em %s, com as metas e a equipe no modal',
       async (status) => {
@@ -301,7 +329,8 @@ describe('PtsDetail', () => {
       const loads = (path: string) =>
         (global.fetch as jest.Mock).mock.calls.filter(
           ([url, init]) =>
-            url.endsWith(path) && (init?.method ?? 'GET') === 'GET',
+            url.split('?')[0].endsWith(path) &&
+            (init?.method ?? 'GET') === 'GET',
         ).length;
       const goalsBefore = loads('/goals');
 
@@ -316,7 +345,7 @@ describe('PtsDetail', () => {
       );
 
       await waitFor(() => expect(loads('/activities')).toBe(2));
-      expect(loads('/goals')).toBe(goalsBefore + 1);
+      await waitFor(() => expect(loads('/goals')).toBe(goalsBefore + 1));
     });
   });
 
