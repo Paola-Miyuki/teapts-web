@@ -112,8 +112,9 @@ async function renderPts() {
 
 const startButton = () =>
   screen.queryByRole('button', { name: 'Iniciar execução' });
+// Link para a tela de reavaliação (RFEVA005).
 const reassessButton = () =>
-  screen.queryByRole('button', { name: 'Registrar reavaliação' });
+  screen.queryByRole('link', { name: 'Registrar reavaliação' });
 
 function openDialog() {
   fireEvent.click(startButton()!);
