@@ -38,10 +38,12 @@ import { errors } from '../../pts/swagger-errors';
 import {
   activitiesViewForbidden,
   activityArchiveForbidden,
+  activityDecisionForbidden,
   activityEditForbidden,
   activityNotArchivable,
   activityNotEditable,
   activityNotFound,
+  activityNotSuggested,
   activityStatusForbidden,
   invalidActivityTransition,
   invalidFrequency,
@@ -58,6 +60,10 @@ import {
   ActivityStatusResponseDto,
   SuspendActivityRequestDto,
 } from '../dto/activity-status.dto';
+import {
+  ActivityDecisionResponseDto,
+  RejectActivityRequestDto,
+} from '../dto/activity-decision.dto';
 import { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import { ActivitiesService } from '../services/activities.service';
 
@@ -206,5 +212,44 @@ export class ActivityController {
       {},
       account,
     );
+  }
+
+  @Post(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Aprova uma atividade sugerida (RFACT003)',
+    description:
+      'Equipe do PTS (autor e responsável inclusive) ou admin. A aprovada entra em execução (running). Grava activity_approved na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityDecisionResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityDecisionForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotSuggested(), ptsNotEditable()))
+  async approveActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDecisionResponseDto> {
+    return this.activitiesService.decideActivity(id, 'approve', {}, account);
+  }
+
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Rejeita uma atividade sugerida (RFACT003)',
+    description:
+      'Equipe do PTS (autor e responsável inclusive) ou admin, com motivo opcional. Grava activity_rejected na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityDecisionResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityDecisionForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotSuggested(), ptsNotEditable()))
+  async rejectActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: RejectActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDecisionResponseDto> {
+    return this.activitiesService.decideActivity(id, 'reject', dto, account);
   }
 }
