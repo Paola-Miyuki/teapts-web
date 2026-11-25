@@ -85,6 +85,9 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/activities', 'post'],
   ['/activities/{id}', 'patch'],
   ['/activities/{id}/archive', 'post'],
+  ['/activities/{id}/suspend', 'post'],
+  ['/activities/{id}/resume', 'post'],
+  ['/activities/{id}/conclude', 'post'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -345,6 +348,18 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}', 'patch', '404'],
     ['/activities/{id}', 'patch', '409'],
     ['/activities/{id}', 'patch', '422'],
+    ['/activities/{id}/suspend', 'post', '400'],
+    ['/activities/{id}/suspend', 'post', '403'],
+    ['/activities/{id}/suspend', 'post', '404'],
+    ['/activities/{id}/suspend', 'post', '409'],
+    ['/activities/{id}/resume', 'post', '400'],
+    ['/activities/{id}/resume', 'post', '403'],
+    ['/activities/{id}/resume', 'post', '404'],
+    ['/activities/{id}/resume', 'post', '409'],
+    ['/activities/{id}/conclude', 'post', '400'],
+    ['/activities/{id}/conclude', 'post', '403'],
+    ['/activities/{id}/conclude', 'post', '404'],
+    ['/activities/{id}/conclude', 'post', '409'],
     ['/activities/{id}/archive', 'post', '400'],
     ['/activities/{id}/archive', 'post', '403'],
     ['/activities/{id}/archive', 'post', '404'],
@@ -762,6 +777,33 @@ describe('Swagger (e2e)', () => {
       ).toEqual(codes);
     }
   });
+
+  it.each(['suspend', 'resume', 'conclude'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityStatusResponseDto',
+      );
+      expect(components.schemas.ActivityStatusResponseDto.required).toEqual([
+        'id',
+        'status',
+        'changedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'INVALID_ACTIVITY_TRANSITION',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
 
   it('documents POST /activities/{id}/archive', async () => {
     const { paths, components } = await getDocument();
