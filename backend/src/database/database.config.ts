@@ -1,9 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSourceOptions } from 'typeorm';
+import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
+import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
 import { Account } from '../accounts/entities/account.entity';
 import { Medication } from '../patients/entities/medication.entity';
 import { Patient } from '../patients/entities/patient.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
+import { DocumentEntity as Document } from '../documents/entities/document.entity';
 import { StoredObject } from '../storage/entities/stored-object.entity';
 import { Professional } from '../professionals/entities/professional.entity';
 import { PtsEntity as Pts } from '../pts/entities/pts.entity';
@@ -26,16 +29,20 @@ import { AddPatientClinicalDataAndMedication1791148990000 } from './migrations/1
 import { AddAccountStatus1791149000000 } from './migrations/1791149000000-AddAccountStatus';
 import { AddPtsSheetColumns1791149010000 } from './migrations/1791149010000-AddPtsSheetColumns';
 import { AddProfessionalRegistrationFields1791149020000 } from './migrations/1791149020000-AddProfessionalRegistrationFields';
+import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
 import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
+import { CreateDocument1791149050000 } from './migrations/1791149050000-CreateDocument';
 
 // Entidades e migrations sao listadas explicitamente: glob com __dirname nao
 // funciona sob ESM (testes) nem depois do build. Toda entidade/migration nova
 // precisa ser registrada aqui.
 const entities = [
   Account,
+  Activity,
+  ActivityDocument,
   Medication,
   Notification,
   Patient,
@@ -45,6 +52,7 @@ const entities = [
   PtsGoal,
   TimelineRecord,
   StoredObject,
+  Document,
 ];
 const migrations = [
   CreateAccount1791072000000,
@@ -66,7 +74,9 @@ const migrations = [
   AddProfessionalRegistrationFields1791149020000,
   CreateStoredObject1791149030000,
   CreatePtsGoal1791149040000,
+  CreateDocument1791149050000,
   CreateNotification1791149060000,
+  CreateActivity1791149070000,
 ];
 
 export function getDatabaseOptions(

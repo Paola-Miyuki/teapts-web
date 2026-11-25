@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import HelpTooltip from '@/components/HelpTooltip';
+import FormField from '@/components/FormField';
 import Modal from '@/components/Modal';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
@@ -43,57 +43,6 @@ const REQUIRED_MESSAGES: Record<keyof Values, string> = {
   measureCriterion: 'Informe o critério de medida',
   targetDate: 'Informe a data-alvo',
 };
-
-function Field({
-  id,
-  label,
-  help,
-  error,
-  full = false,
-  required = true,
-  children,
-}: {
-  id: string;
-  label: string;
-  help?: string;
-  error?: string;
-  full?: boolean;
-  required?: boolean;
-  children: ReactNode;
-}) {
-  const labelElement = (
-    <label className="field-label" htmlFor={id}>
-      {label}
-      {required && (
-        <span className="ux-req" aria-hidden="true">
-          {' '}
-          *
-        </span>
-      )}
-    </label>
-  );
-
-  return (
-    <div className={full ? 'field full' : 'field'}>
-      {help ? (
-        <span className="ux-labeltip">
-          {labelElement}
-          <HelpTooltip id={`${id}-tip`} label={label}>
-            {help}
-          </HelpTooltip>
-        </span>
-      ) : (
-        labelElement
-      )}
-      {children}
-      {error && (
-        <p id={`${id}-error`} className={ui.fieldError} role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
 
 // Modais "Adicionar meta" e "Editar meta" de `pts-detalhe.html`.
 export default function GoalFormDialog({
@@ -253,7 +202,7 @@ export default function GoalFormDialog({
         )}
 
         <div className="form-grid">
-          <Field
+          <FormField
             id={`${fieldId}-title`}
             label="Meta (título)"
             error={errors.title}
@@ -266,9 +215,9 @@ export default function GoalFormDialog({
               value={values.title}
               onChange={(event) => set('title', event.target.value)}
             />
-          </Field>
+          </FormField>
 
-          <Field id={`${fieldId}-term`} label="Prazo" error={errors.term}>
+          <FormField id={`${fieldId}-term`} label="Prazo" error={errors.term}>
             <select
               {...controlProps('term')}
               className="select"
@@ -282,9 +231,9 @@ export default function GoalFormDialog({
                 </option>
               ))}
             </select>
-          </Field>
+          </FormField>
 
-          <Field id={`${fieldId}-area`} label="Área" error={errors.area}>
+          <FormField id={`${fieldId}-area`} label="Área" error={errors.area}>
             <select
               {...controlProps('area')}
               className="select"
@@ -297,9 +246,9 @@ export default function GoalFormDialog({
                 </option>
               ))}
             </select>
-          </Field>
+          </FormField>
 
-          <Field
+          <FormField
             id={`${fieldId}-description`}
             label="Meta (descrição)"
             help="Objetivo SMART: específico, mensurável, alcançável, relevante e com prazo."
@@ -314,9 +263,9 @@ export default function GoalFormDialog({
               value={values.description}
               onChange={(event) => set('description', event.target.value)}
             />
-          </Field>
+          </FormField>
 
-          <Field
+          <FormField
             id={`${fieldId}-measureCriterion`}
             label="Critério de medida"
             help="Como a equipe sabe que a meta foi atingida."
@@ -331,9 +280,9 @@ export default function GoalFormDialog({
               value={values.measureCriterion}
               onChange={(event) => set('measureCriterion', event.target.value)}
             />
-          </Field>
+          </FormField>
 
-          <Field
+          <FormField
             id={`${fieldId}-targetDate`}
             label="Data-alvo"
             help="Até a data máxima do PTS (próxima revisão)."
@@ -347,10 +296,10 @@ export default function GoalFormDialog({
               value={values.targetDate}
               onChange={(event) => set('targetDate', event.target.value)}
             />
-          </Field>
+          </FormField>
 
           {!goal && authors && (
-            <Field
+            <FormField
               id={`${fieldId}-author`}
               label="Autor"
               help="Profissional da equipe do PTS."
@@ -371,7 +320,7 @@ export default function GoalFormDialog({
                   </option>
                 ))}
               </select>
-            </Field>
+            </FormField>
           )}
         </div>
       </form>

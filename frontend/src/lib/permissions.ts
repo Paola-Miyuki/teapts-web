@@ -24,6 +24,7 @@ export type PermissionAction =
   | 'viewPtsSheet'
   | 'editPts'
   | 'manageGoals'
+  | 'createActivity'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -76,7 +77,7 @@ function isActivePts(pts?: PtsPermissionData) {
   return ['planning', 'running'].includes(pts?.status?.toLowerCase() ?? '');
 }
 
-function hasEditableGoals(pts?: PtsPermissionData) {
+function isEditablePts(pts?: PtsPermissionData) {
   return pts?.status?.toLowerCase() === 'draft' || isActivePts(pts);
 }
 
@@ -122,7 +123,8 @@ export function can(
       case 'editPts':
         return isActivePts(pts);
       case 'manageGoals':
-        return hasEditableGoals(pts);
+      case 'createActivity':
+        return isEditablePts(pts);
       default:
         return true;
     }
@@ -199,12 +201,13 @@ export function can(
       );
 
     case 'manageGoals':
-      // RFPTS012 – equipe do PTS, em proposta, planejamento ou andamento; o
-      // paciente só vê as metas.
+    case 'createActivity':
+      // RFPTS012, RFACT001 – equipe do PTS, em proposta, planejamento ou
+      // andamento; o paciente só vê.
       return (
         professional &&
         pts !== undefined &&
-        hasEditableGoals(pts) &&
+        isEditablePts(pts) &&
         isProposalMember(user, pts)
       );
 

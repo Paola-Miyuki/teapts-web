@@ -12,7 +12,7 @@ const EDITABLE_STATES = [
   PtsStateEnum.RUNNING,
 ];
 
-export function assertGoalsEditable(status: PtsStateEnum): void {
+export function assertPtsEditable(status: PtsStateEnum): void {
   if (!EDITABLE_STATES.includes(status)) {
     throw ptsNotEditable();
   }

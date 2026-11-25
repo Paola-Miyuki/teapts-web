@@ -8,8 +8,8 @@ import type { PtsProposal } from '@/lib/proposals';
 import { decideProposal, type ProposalDecision } from '../api';
 
 const FEEDBACK: Record<ProposalDecision, string> = {
-  approve: 'Proposta aprovada. O PTS está em planejamento.',
-  reject: 'Proposta rejeitada.',
+  approve: 'Proposta aprovada, o PTS está em planejamento',
+  reject: 'Proposta rejeitada',
 };
 
 // Aprovar ou rejeitar uma proposta (RFPTS003): o paciente decide a própria; o

@@ -138,10 +138,13 @@ export function getNavigation(account: Account, currentHref: string) {
     });
   }
 
-  // RFPTS004 – o paciente vê o próprio PTS ativo; o profissional chega a
-  // ele pela rota do paciente (/patients/[id]/pts).
-  if (can(account, 'viewOwnCare') && can(account, 'viewActivePts')) {
-    items.push({ href: '/pts', icon: 'check', label: 'Meu PTS' });
+  // RFPTS004 – o paciente vê o próprio PTS ativo, as propostas e o histórico
+  // em abas de /pts; o profissional chega ao PTS ativo pela rota do paciente
+  // (/patients/[id]/pts).
+  const ownPts = can(account, 'viewOwnCare') && can(account, 'viewActivePts');
+
+  if (ownPts) {
+    items.push({ href: '/pts', icon: 'clipboard', label: 'PTS' });
   }
 
   if (can(account, 'viewOwnCare')) {
@@ -152,12 +155,8 @@ export function getNavigation(account: Account, currentHref: string) {
     });
   }
 
-  if (can(account, 'viewPtsProposals')) {
-    items.push({
-      href: '/pts/proposals',
-      icon: 'clipboard',
-      label: account.patientProfileId !== null ? 'Propostas de PTS' : 'PTS',
-    });
+  if (can(account, 'viewPtsProposals') && !ownPts) {
+    items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
   }
 
   if (can(account, 'viewAuthorizedPatients')) {

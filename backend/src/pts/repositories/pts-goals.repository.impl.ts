@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, type EntityManager } from 'typeorm';
+import {
+  DataSource,
+  IsNull,
+  Not,
+  Repository,
+  type EntityManager,
+} from 'typeorm';
 
+import { ActivityEntity } from '../../activities/entities/activity.entity';
 import { Account } from '../../accounts/entities/account.entity';
 import { TimelineRecordTarget } from '../../timeline/enums/timeline-record-target.enum';
 import { TimelineRecordType } from '../../timeline/enums/timeline-record-type.enum';
@@ -11,7 +18,7 @@ import { PtsGoalEntity } from '../entities/pts-goal.entity';
 import { PtsEntity } from '../entities/pts.entity';
 import {
   assertGoalRemovable,
-  assertGoalsEditable,
+  assertPtsEditable,
   assertTargetDate,
 } from '../goal-rules';
 import { goalNotFound, ptsNotFound } from '../pts.errors';
@@ -81,7 +88,9 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
       order: { createdAt: 'ASC', id: 'ASC' },
     });
 
-    return goals.map((goal) => this.toResponse(goal));
+    const counts = await this.countActivities(this.goals.manager, ptsId);
+
+    return goals.map((goal) => this.toResponse(goal, counts));
   }
 
   async create(input: CreateGoalInput): Promise<GoalResponseDto> {
@@ -102,7 +111,7 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
         goalId,
       });
 
-      return this.toResponse(await this.loadGoal(manager, input.ptsId, goalId));
+      return this.loadResponse(manager, input.ptsId, goalId);
     });
   }
 
@@ -121,7 +130,7 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
       );
       await this.record(manager, TimelineRecordType.GoalUpdated, input);
 
-      return this.toResponse(await this.loadGoal(manager, ptsId, goalId));
+      return this.loadResponse(manager, ptsId, goalId);
     });
   }
 
@@ -133,7 +142,7 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
       await this.loadGoal(manager, ptsId, goalId);
       assertGoalRemovable(
         await manager.count(PtsGoalEntity, { where: { ptsId } }),
-        this.countActivities(),
+        (await this.countActivities(manager, ptsId)).get(goalId) ?? 0,
       );
 
       await manager.softDelete(PtsGoalEntity, { id: goalId, ptsId });
@@ -156,7 +165,7 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
       throw ptsNotFound();
     }
 
-    assertGoalsEditable(pts.status);
+    assertPtsEditable(pts.status);
 
     return pts;
   }
@@ -197,12 +206,39 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
     );
   }
 
-  // A tabela activity entra com a RFACT001; até lá nenhuma meta tem atividade.
-  private countActivities(): number {
-    return 0;
+  /** Quantidade de atividades ligadas, por meta do PTS. */
+  private async countActivities(
+    manager: EntityManager,
+    ptsId: string,
+  ): Promise<Map<string, number>> {
+    const linked = await manager.find(ActivityEntity, {
+      where: { ptsId, goalId: Not(IsNull()) },
+      select: { id: true, goalId: true },
+    });
+    const counts = new Map<string, number>();
+
+    for (const { goalId } of linked) {
+      counts.set(goalId!, (counts.get(goalId!) ?? 0) + 1);
+    }
+
+    return counts;
   }
 
-  private toResponse(goal: PtsGoalEntity): GoalResponseDto {
+  private async loadResponse(
+    manager: EntityManager,
+    ptsId: string,
+    goalId: string,
+  ): Promise<GoalResponseDto> {
+    return this.toResponse(
+      await this.loadGoal(manager, ptsId, goalId),
+      await this.countActivities(manager, ptsId),
+    );
+  }
+
+  private toResponse(
+    goal: PtsGoalEntity,
+    counts: Map<string, number>,
+  ): GoalResponseDto {
     const author = goal.authorProfessional;
 
     return {
@@ -216,7 +252,7 @@ export class PtsGoalsRepositoryImpl extends PtsGoalsRepository {
       status: goal.status,
       resultNote: goal.resultNote,
       origin: goal.origin,
-      activitiesCount: this.countActivities(),
+      activitiesCount: counts.get(goal.id) ?? 0,
       registeredBy: author
         ? { id: author.id, name: displayName(author.account) }
         : {

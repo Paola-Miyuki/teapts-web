@@ -27,8 +27,13 @@ import { StoredObject } from '../storage/entities/stored-object.entity';
 import { CreateNotification1791149060000 } from './migrations/1791149060000-CreateNotification';
 import { NotificationEntity as Notification } from '../notifications/entities/notification.entity';
 import { CreateStoredObject1791149030000 } from './migrations/1791149030000-CreateStoredObject';
+import { DocumentEntity as Document } from '../documents/entities/document.entity';
 import { CreatePtsGoal1791149040000 } from './migrations/1791149040000-CreatePtsGoal';
+import { CreateDocument1791149050000 } from './migrations/1791149050000-CreateDocument';
 import { PtsGoalEntity as PtsGoal } from '../pts/entities/pts-goal.entity';
+import { CreateActivity1791149070000 } from './migrations/1791149070000-CreateActivity';
+import { ActivityEntity as Activity } from '../activities/entities/activity.entity';
+import { ActivityDocumentEntity as ActivityDocument } from '../activities/entities/activity-document.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -92,6 +97,8 @@ describe('getDatabaseOptions', () => {
     expect(optionsFrom(validEnv)).toMatchObject({
       entities: [
         Account,
+        Activity,
+        ActivityDocument,
         Medication,
         Notification,
         Patient,
@@ -101,6 +108,7 @@ describe('getDatabaseOptions', () => {
         PtsGoal,
         TimelineRecord,
         StoredObject,
+        Document,
       ],
       migrations: [
         CreateAccount1791072000000,
@@ -122,7 +130,9 @@ describe('getDatabaseOptions', () => {
         AddProfessionalRegistrationFields1791149020000,
         CreateStoredObject1791149030000,
         CreatePtsGoal1791149040000,
+        CreateDocument1791149050000,
         CreateNotification1791149060000,
+        CreateActivity1791149070000,
       ],
     });
   });

@@ -202,7 +202,7 @@ export default function PtsOverview({ account, patientId }: PtsOverviewProps) {
       >
         {isOwnPts && (
           <Link
-            href="/pts/proposals"
+            href="/pts#propostas"
             className={`${ui.btn} ${ui.btnPrimary} ${styles.stateAction}`}
           >
             Ver propostas de PTS

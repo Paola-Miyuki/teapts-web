@@ -7,11 +7,15 @@ import { AccountRole } from '../../accounts/enums/account-role.enum';
 import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Gender } from '../../accounts/enums/gender.enum';
 import { Sex } from '../../accounts/enums/sex.enum';
+import { DocumentEntity } from '../../documents/entities/document.entity';
+import { DocumentCategory } from '../../documents/enums/document-category.enum';
+import { Medication } from '../../patients/entities/medication.entity';
 import { Patient } from '../../patients/entities/patient.entity';
 import { Professional } from '../../professionals/entities/professional.entity';
 import { Specialism } from '../../professionals/enums/specialism.enum';
 import type { Uf } from '../../professionals/enums/uf.enum';
 import { PtsEntity } from '../../pts/entities/pts.entity';
+import { StoredObject } from '../../storage/entities/stored-object.entity';
 import { PtsStateEnum } from '../enums/pts-state.enum';
 
 const TENANT_ID = 'public';
@@ -530,6 +534,290 @@ async function ensureTestPts(
   }
 }
 
+type MedicationSeed = {
+  patient: string;
+  drugName: string;
+  dose: string;
+  frequency: string;
+  prescriber: string | null;
+  reason: string | null;
+  startDate: string;
+  // Medicação suspensa: a data de término e quem suspendeu (RFPAC007).
+  endDate?: string;
+  registeredBy: string;
+};
+
+// Medicações de uso contínuo (RFPAC007): o paciente de teste e Luna têm
+// ativas e uma suspensa; Diego tem uma só. Quem registra é o profissional.
+const TEST_MEDICATIONS: MedicationSeed[] = [
+  {
+    patient: 'patient',
+    drugName: 'Risperidona',
+    dose: '0,5 mg',
+    frequency: '1 vez ao dia, à noite',
+    prescriber: 'Dr. Kaio Felipe',
+    reason: 'Irritabilidade e agressividade',
+    startDate: '2026-03-10',
+    registeredBy: 'professional',
+  },
+  {
+    patient: 'patient',
+    drugName: 'Melatonina',
+    dose: '3 mg',
+    frequency: '1 vez ao dia, antes de dormir',
+    prescriber: 'Dr. Kaio Felipe',
+    reason: 'Dificuldade para dormir',
+    startDate: '2026-05-02',
+    registeredBy: 'professional',
+  },
+  {
+    patient: 'patient',
+    drugName: 'Metilfenidato',
+    dose: '10 mg',
+    frequency: '1 vez ao dia, pela manhã',
+    prescriber: 'Dra. Renata Okada',
+    reason: 'Desatenção',
+    startDate: '2025-08-15',
+    endDate: '2026-02-20',
+    registeredBy: 'professional',
+  },
+  {
+    patient: 'luna',
+    drugName: 'Sertralina',
+    dose: '50 mg',
+    frequency: '1 vez ao dia, pela manhã',
+    prescriber: 'Dra. Camila Rocha',
+    reason: 'Ansiedade',
+    startDate: '2026-01-20',
+    registeredBy: 'professional',
+  },
+  {
+    patient: 'luna',
+    drugName: 'Ácido valproico',
+    dose: '250 mg',
+    frequency: '2 vezes ao dia',
+    prescriber: null,
+    reason: null,
+    startDate: '2024-11-05',
+    endDate: '2025-12-01',
+    registeredBy: 'physiotherapist',
+  },
+  {
+    patient: 'diego',
+    drugName: 'Aripiprazol',
+    dose: '2 mg',
+    frequency: '1 vez ao dia, pela manhã',
+    prescriber: 'Dr. Kaio Felipe',
+    reason: 'Comportamentos repetitivos',
+    startDate: '2026-02-12',
+    registeredBy: 'professional',
+  },
+];
+
+type DocumentSeed = {
+  patient: string;
+  slug: string;
+  title: string;
+  category: DocumentCategory;
+  issueDate: string | null;
+  // Conta do profissional emissor, ou o texto de um emissor de fora.
+  issuer?: { account: string } | { name: string };
+  description: string | null;
+  uploadedBy: string;
+  createdAt: string;
+};
+
+// Documentos de teste (RFDOC002), todos em PDF e já ativos no storage. O
+// paciente de teste enviou um dos próprios; os demais vêm do profissional.
+const TEST_DOCUMENTS: DocumentSeed[] = [
+  {
+    patient: 'patient',
+    slug: 'laudo-neurologico',
+    title: 'Laudo neurológico',
+    category: DocumentCategory.MEDICAL_REPORT,
+    issueDate: '2026-09-20',
+    issuer: {
+      name: 'Dra. Marta Reis, CRM-PR 12345, Hospital Pequeno Príncipe',
+    },
+    description: 'Avaliação neurológica de 2026.',
+    uploadedBy: 'professional',
+    createdAt: '2026-09-25T13:00:00.000Z',
+  },
+  {
+    patient: 'patient',
+    slug: 'relatorio-terapeutico',
+    title: 'Relatório terapêutico do semestre',
+    category: DocumentCategory.THERAPY_REPORT,
+    issueDate: '2026-10-05',
+    issuer: { account: 'professional' },
+    description: null,
+    uploadedBy: 'professional',
+    createdAt: '2026-10-06T13:00:00.000Z',
+  },
+  {
+    patient: 'patient',
+    slug: 'tcle',
+    title: 'TCLE assinado',
+    category: DocumentCategory.TCLE,
+    issueDate: null,
+    description: 'Termo enviado pelo próprio paciente.',
+    uploadedBy: 'patient',
+    createdAt: '2026-10-08T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    slug: 'exame-audiometria',
+    title: 'Audiometria',
+    category: DocumentCategory.EXAM,
+    issueDate: '2026-04-14',
+    issuer: { name: 'Clínica Ouvir Bem' },
+    description: null,
+    uploadedBy: 'professional',
+    createdAt: '2026-04-20T13:00:00.000Z',
+  },
+  {
+    patient: 'luna',
+    slug: 'relatorio-escolar',
+    title: 'Relatório escolar',
+    category: DocumentCategory.SCHOOL_REPORT,
+    issueDate: '2026-07-01',
+    description: 'Entregue pela coordenação da escola.',
+    uploadedBy: 'physiotherapist',
+    createdAt: '2026-07-10T13:00:00.000Z',
+  },
+  {
+    patient: 'diego',
+    slug: 'autorizacao-imagem',
+    title: 'Autorização de uso de imagem',
+    category: DocumentCategory.IMAGE_AUTHORIZATION,
+    issueDate: '2026-03-02',
+    description: 'Assinada pela responsável, Paula Alves.',
+    uploadedBy: 'professional',
+    createdAt: '2026-03-03T13:00:00.000Z',
+  },
+];
+
+// PDF mínimo e válido, com uma linha de texto, para os documentos de teste.
+function minimalPdf(text: string): Buffer {
+  const escaped = text.replace(/[\\()]/g, '\\$&');
+  const stream = `BT /F1 14 Tf 40 760 Td (${escaped}) Tj ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [];
+
+  objects.forEach((body, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
+  });
+
+  const xref = pdf.length;
+
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  pdf += offsets
+    .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`)
+    .join('');
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+
+  return Buffer.from(pdf, 'latin1');
+}
+
+async function ensureTestMedications(
+  patientIds: Map<string, string>,
+  accountIds: Map<string, string>,
+): Promise<void> {
+  const medications = dataSource.getRepository(Medication);
+
+  for (const patientKey of new Set(TEST_MEDICATIONS.map((m) => m.patient))) {
+    const patientId = patientIds.get(patientKey)!;
+
+    if (await medications.existsBy({ patientId })) {
+      console.log(`Medicacoes de teste ja existem: ${patientKey}`);
+      continue;
+    }
+
+    for (const item of TEST_MEDICATIONS.filter(
+      (m) => m.patient === patientKey,
+    )) {
+      const registeredBy = accountIds.get(item.registeredBy)!;
+
+      await medications.insert({
+        patientId,
+        drugName: item.drugName,
+        dose: item.dose,
+        frequency: item.frequency,
+        prescriber: item.prescriber,
+        reason: item.reason,
+        startDate: item.startDate,
+        endDate: item.endDate ?? null,
+        registeredByAccountId: registeredBy,
+        stoppedByAccountId: item.endDate ? registeredBy : null,
+      });
+    }
+
+    console.log(`Medicacoes de teste criadas: ${patientKey}`);
+  }
+}
+
+// Cria os documentos de teste que ainda não existem (pela `file_key`, que é
+// fixa): o arquivo entra ativo em `stored_object` e o registro em `document`.
+async function ensureTestDocuments(
+  patientIds: Map<string, string>,
+  accountIds: Map<string, string>,
+): Promise<void> {
+  const documents = dataSource.getRepository(DocumentEntity);
+
+  for (const item of TEST_DOCUMENTS) {
+    const patientId = patientIds.get(item.patient)!;
+    const fileKey = `${patientId}/seed-${item.slug}.pdf`;
+
+    if (await documents.existsBy({ fileKey })) {
+      console.log(`Documento de teste ja existe: ${fileKey}`);
+      continue;
+    }
+
+    const content = minimalPdf(item.title);
+
+    await dataSource.transaction(async (manager) => {
+      await manager.getRepository(StoredObject).upsert(
+        {
+          fileKey,
+          mimeType: 'application/pdf',
+          sizeBytes: content.length,
+          content,
+          active: true,
+        },
+        ['fileKey'],
+      );
+      await manager.getRepository(DocumentEntity).insert({
+        patientId,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        issueDate: item.issueDate,
+        issuerAccountId:
+          item.issuer && 'account' in item.issuer
+            ? accountIds.get(item.issuer.account)!
+            : null,
+        issuerName:
+          item.issuer && 'name' in item.issuer ? item.issuer.name : null,
+        fileKey,
+        mimeType: 'application/pdf',
+        sizeBytes: content.length,
+        uploadedByAccountId: accountIds.get(item.uploadedBy)!,
+        createdAt: new Date(item.createdAt),
+      });
+    });
+
+    console.log(`Documento de teste criado: ${fileKey}`);
+  }
+}
+
 async function createTestUsers(): Promise<void> {
   initSupertokens();
   await dataSource.initialize();
@@ -537,9 +825,12 @@ async function createTestUsers(): Promise<void> {
   try {
     const patientIds = new Map<string, string>();
     const professionals = new Map<string, Professional>();
+    const accountIds = new Map<string, string>();
 
     for (const user of [...TEST_USERS, ...ACCOUNTS_WITHOUT_PROFILE]) {
       const account = await createOrReuseAccount(user);
+
+      accountIds.set(user.key, account.id);
 
       if (user.professional) {
         professionals.set(
@@ -557,6 +848,8 @@ async function createTestUsers(): Promise<void> {
     }
 
     await ensureTestPts(patientIds, professionals);
+    await ensureTestMedications(patientIds, accountIds);
+    await ensureTestDocuments(patientIds, accountIds);
   } finally {
     await dataSource.destroy();
   }

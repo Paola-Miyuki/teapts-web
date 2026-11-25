@@ -45,6 +45,7 @@ let PatientDocumentsController: (typeof import('../src/documents/controllers/pat
 let StorageObjectsController: (typeof import('../src/storage/controllers/storage-objects.controller.js'))['StorageObjectsController'];
 let DocumentAccessService: (typeof import('../src/documents/services/document-access.service.js'))['DocumentAccessService'];
 let DocumentUploadService: (typeof import('../src/documents/services/document-upload.service.js'))['DocumentUploadService'];
+let DocumentsService: (typeof import('../src/documents/services/documents.service.js'))['DocumentsService'];
 let PostgresStorage: (typeof import('../src/storage/postgres-storage.js'))['PostgresStorage'];
 let StorageService: (typeof import('../src/storage/storage.service.js'))['StorageService'];
 let StorageTokenService: (typeof import('../src/storage/services/storage-token.service.js'))['StorageTokenService'];
@@ -63,6 +64,8 @@ beforeAll(async () => {
     await import('../src/documents/services/document-access.service.js'));
   ({ DocumentUploadService } =
     await import('../src/documents/services/document-upload.service.js'));
+  ({ DocumentsService } =
+    await import('../src/documents/services/documents.service.js'));
   ({ PostgresStorage } = await import('../src/storage/postgres-storage.js'));
   ({ StorageService } = await import('../src/storage/storage.service.js'));
   ({ StorageTokenService } =
@@ -150,6 +153,8 @@ describe('document upload (e2e)', () => {
         { provide: AccountsService, useValue: { isActive: async () => true } },
         DocumentAccessService,
         DocumentUploadService,
+        // A confirmação (RFDOC002) tem o próprio e2e; aqui só satisfaz o controller.
+        { provide: DocumentsService, useValue: {} },
         StorageTokenService,
         {
           provide: STORAGE_CONFIG,

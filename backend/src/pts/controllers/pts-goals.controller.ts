@@ -27,10 +27,7 @@ import {
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { CurrentAccount } from '../../auth/decorators/current-account.decorator';
 import { AuthGuard } from '../../auth/guards/auth.guard';
-import {
-  ErrorResponseDto,
-  UnauthorizedResponseDto,
-} from '../../common/swagger/error-response.dto';
+import { UnauthorizedResponseDto } from '../../common/swagger/error-response.dto';
 import { CreateGoalRequestDto } from '../dto/create-goal.dto';
 import {
   DeleteGoalResponseDto,
@@ -47,8 +44,8 @@ import {
   ptsNotEditable,
   ptsNotFound,
   validationError,
-  type PtsApiError,
 } from '../pts.errors';
+import { errors } from '../swagger-errors';
 import { PtsGoalsService } from '../services/pts-goals.service';
 
 const parseUuidParam = (name: string) =>
@@ -62,23 +59,6 @@ const parseUuidParam = (name: string) =>
 
 const parsePtsId = parseUuidParam('id');
 const parseGoalId = parseUuidParam('goalId');
-
-// Os exemplos do Swagger saem dos próprios erros da API.
-function errors(...items: PtsApiError[]) {
-  return {
-    type: ErrorResponseDto,
-    examples: Object.fromEntries(
-      items.map((error) => {
-        const { status, message } = error.getResponse() as {
-          status: string;
-          message: string;
-        };
-
-        return [status, { summary: message, value: { status, message } }];
-      }),
-    ),
-  };
-}
 
 @ApiTags('pts')
 @ApiCookieAuth()

@@ -69,7 +69,7 @@ describe('validateFile', () => {
 
   it('refuses an empty file', () => {
     expect(validateFile(fileOf('a.pdf', 'application/pdf', 0))).toBe(
-      'O arquivo está vazio.',
+      'O arquivo está vazio',
     );
   });
 });

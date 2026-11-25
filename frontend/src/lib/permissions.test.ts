@@ -168,6 +168,33 @@ describe('can', () => {
     },
   );
 
+  it.each(['draft', 'planning', 'running'])(
+    'deixa a equipe e o admin criarem atividade no PTS em %s',
+    (status) => {
+      const pts = { ...draft, status };
+
+      expect(can(professional, 'createActivity', { pts })).toBe(true);
+      expect(
+        can(professional, 'createActivity', {
+          pts: { ...pts, teamProfessionalIds: [] },
+        }),
+      ).toBe(false);
+      expect(can(admin, 'createActivity', { pts })).toBe(true);
+      expect(can(patient, 'createActivity', { pts })).toBe(false);
+      expect(can(waiting, 'createActivity', { pts })).toBe(false);
+    },
+  );
+
+  it.each(['rejected', 'concluded', 'cancelled'])(
+    'não deixa ninguém criar atividade no PTS em %s',
+    (status) => {
+      const pts = { ...draft, status };
+
+      expect(can(professional, 'createActivity', { pts })).toBe(false);
+      expect(can(admin, 'createActivity', { pts })).toBe(false);
+    },
+  );
+
   it('mostra as notificações ao profissional e ao paciente, não ao admin', () => {
     expect(can(professional, 'viewNotifications')).toBe(true);
     expect(can(patient, 'viewNotifications')).toBe(true);

@@ -22,6 +22,8 @@ import {
   type PtsStartResponse,
 } from '@/lib/pts';
 import GoalsTab from '@/components/pts/GoalsTab';
+import ActivitiesTab from '@/components/pts/ActivitiesTab';
+import { useActivities } from '@/hooks/useActivities';
 import { useGoals } from '@/hooks/useGoals';
 import TimelineTab from '@/components/pts/TimelineTab';
 import PtsSheetCards from '../_components/PtsSheetCards';
@@ -33,7 +35,7 @@ import StartPtsDialog from '../_components/StartPtsDialog';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente';
 
-type Tab = 'visao' | 'metas' | 'equipe' | 'timeline';
+type Tab = 'visao' | 'metas' | 'equipe' | 'atividades' | 'timeline';
 
 // Como nos mockups, a aba ativa é o #hash da URL (`#timeline` é o atalho de historico.html).
 function currentHash() {
@@ -86,7 +88,7 @@ function professionalLabel(professional: PtsProfessional) {
 }
 
 // Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
-// Atividades, atendimentos e as ações do PTS entram com as tasks deles.
+// Atendimentos e as ações do PTS entram com as tasks deles.
 export default function PtsDetailPage({
   id,
   readOnly = false,
@@ -158,11 +160,16 @@ function PtsDetailContent({
   // O paciente não vê a ficha (RN028), então não tem a Visão geral.
   const [tab, setTab] = useHashTab(
     isPatient
-      ? ['metas', 'equipe', 'timeline']
-      : ['visao', 'metas', 'equipe', 'timeline'],
+      ? ['metas', 'equipe', 'atividades', 'timeline']
+      : ['visao', 'metas', 'equipe', 'atividades', 'timeline'],
   );
 
   const { goals, error: goalsError, reload: reloadGoals } = useGoals(id);
+  const {
+    activities,
+    error: activitiesError,
+    reload: reloadActivities,
+  } = useActivities(id);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -274,6 +281,11 @@ function PtsDetailContent({
     !isPatient &&
     can(account, 'manageGoals', { pts: permissionPts });
 
+  const canCreateActivity =
+    !readOnly &&
+    !isPatient &&
+    can(account, 'createActivity', { pts: permissionPts });
+
   const handleStarted = ({ status, beganAt }: PtsStartResponse) => {
     setPts((prev) => (prev ? { ...prev, status, beganAt } : prev));
     setIsStartOpen(false);
@@ -324,8 +336,6 @@ function PtsDetailContent({
             <Item label="Rejeitado em">{formatDate(pts.rejectedAt)}</Item>
           )}
         </dl>
-
-        {readOnly && <p className="hint">Visualização somente leitura.</p>}
 
         {(canOpenRecord || canEditPts) && (
           <div className="heading-actions">
@@ -408,6 +418,17 @@ function PtsDetailContent({
           <span className="tab-count">{members.length}</span>
         </a>
         <a
+          href="#atividades"
+          aria-current={tab === 'atividades' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setTab('atividades');
+          }}
+        >
+          Atividades
+          {activities && <span className="tab-count">{activities.length}</span>}
+        </a>
+        <a
           href="#timeline"
           aria-current={tab === 'timeline' ? 'page' : undefined}
           onClick={(event) => {
@@ -431,6 +452,27 @@ function PtsDetailContent({
               name,
             }))}
             isPatient={isPatient}
+          />
+        </section>
+      ) : tab === 'atividades' ? (
+        <section data-panel="atividades" id="atividades">
+          <ActivitiesTab
+            ptsId={pts.id}
+            activities={activities}
+            error={activitiesError}
+            reload={() => {
+              reloadActivities();
+              // A quantidade de atividades de cada meta muda.
+              reloadGoals();
+            }}
+            canCreate={canCreateActivity}
+            team={members.map((member) => ({
+              id: member.id,
+              name: member.name,
+              specialism: member.specialism.name,
+            }))}
+            goals={goals ?? []}
+            isAdmin={isAdmin}
           />
         </section>
       ) : tab === 'metas' ? (

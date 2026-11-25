@@ -30,5 +30,6 @@ import { TimelineModule } from '../timeline/timeline.module';
     { provide: PtsRepository, useClass: PtsRepositoryImpl },
     { provide: PtsGoalsRepository, useClass: PtsGoalsRepositoryImpl },
   ],
+  exports: [PtsGoalsRepository],
 })
 export class PtsModule {}
