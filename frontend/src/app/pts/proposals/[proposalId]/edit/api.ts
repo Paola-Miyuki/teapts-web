@@ -4,7 +4,6 @@ import type {
   ApiErrorBody,
   Professional,
   ProfessionalsResponse,
-  PtsProposal,
   UpdatePtsProposalPayload,
 } from './types';
 
@@ -38,25 +37,6 @@ async function createApiError(response: Response, fallbackMessage: string) {
   return new PtsProposalApiError(response.status, message, body?.status);
 }
 
-export async function getPtsProposal(
-  proposalId: string,
-  signal?: AbortSignal,
-): Promise<PtsProposal> {
-  const response = await apiFetch(`/pts/proposals/${proposalId}`, {
-    method: 'GET',
-    signal,
-  });
-
-  if (!response.ok) {
-    throw await createApiError(
-      response,
-      'Não foi possível carregar a proposta de PTS',
-    );
-  }
-
-  return (await response.json()) as PtsProposal;
-}
-
 export async function getProfessionalsForTeam(
   signal?: AbortSignal,
 ): Promise<Professional[]> {
@@ -86,7 +66,7 @@ export async function getProfessionalsForTeam(
 export async function updatePtsProposal(
   proposalId: string,
   payload: UpdatePtsProposalPayload,
-): Promise<PtsProposal> {
+): Promise<void> {
   const response = await apiFetch(`/pts/proposals/${proposalId}`, {
     method: 'PATCH',
     headers: {
@@ -101,6 +81,4 @@ export async function updatePtsProposal(
       'Não foi possível atualizar a proposta de PTS',
     );
   }
-
-  return (await response.json()) as PtsProposal;
 }

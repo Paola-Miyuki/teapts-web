@@ -531,6 +531,7 @@ function PtsDetailContent({
             error={goalsError}
             reload={reloadGoals}
             nextReviewAt={pts.nextReviewAt}
+            previousVersion={pts.previousPts?.version}
             canManage={canManageGoals}
             authors={
               isAdmin
