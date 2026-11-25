@@ -54,21 +54,25 @@ describe('getNavigation', () => {
     ]);
   });
 
-  it('mostra propostas de PTS com rótulo claro para o paciente', () => {
-    expect(labels(account({ patientProfileId: 'patient' }))).toContain(
-      'Propostas de PTS',
-    );
-    expect(labels(account({ patientProfileId: 'patient' }))).not.toContain(
-      'PTS',
-    );
-    expect(
-      labels(account({ professionalProfileIds: ['professional'] })),
-    ).toContain('PTS');
-    expect(labels(account({ role: 'admin' }))).toContain('PTS');
-    expect(labels(account({}))).not.toContain('PTS');
+  it('mostra um só item "PTS" para o paciente, com o ícone do profissional', () => {
+    const patient = account({ patientProfileId: 'patient' });
+    const professional = getNavigation(
+      account({ professionalProfileIds: ['professional'] }),
+      '/pts',
+    ).find((item) => item.label === 'PTS');
+
+    expect(labels(patient).filter((label) => label === 'PTS')).toHaveLength(1);
+    expect(labels(patient)).not.toContain('Propostas de PTS');
+    expect(getNavigation(patient, '/pts')).toContainEqual({
+      href: '/pts',
+      icon: 'clipboard',
+      label: 'PTS',
+      current: true,
+    });
+    expect(professional?.icon).toBe('clipboard');
   });
 
-  it('usa ícones diferentes para medicações e propostas de PTS', () => {
+  it('usa ícones diferentes para medicações e PTS', () => {
     const navigation = getNavigation(
       account({ patientProfileId: 'patient' }),
       '/pts',
@@ -77,9 +81,9 @@ describe('getNavigation', () => {
     expect(navigation.find((item) => item.href === '/medications')?.icon).toBe(
       'pill',
     );
-    expect(
-      navigation.find((item) => item.href === '/pts/proposals')?.icon,
-    ).toBe('clipboard');
+    expect(navigation.find((item) => item.href === '/pts')?.icon).toBe(
+      'clipboard',
+    );
   });
 
   it('mostra o link para propostas nos outros perfis, mas não para conta sem perfil', () => {
@@ -90,21 +94,22 @@ describe('getNavigation', () => {
     expect(labels(account({}))).not.toContain('PTS');
   });
 
-  it('mostra "Meu PTS" só para o paciente (RFPTS004)', () => {
+  it('leva o paciente ao PTS em /pts e os outros perfis a /pts/proposals (RFPTS004)', () => {
     expect(
-      getNavigation(account({ patientProfileId: 'patient' }), '/pts'),
-    ).toContainEqual({
-      href: '/pts',
-      icon: 'check',
-      label: 'Meu PTS',
-      current: true,
-    });
+      getNavigation(account({ patientProfileId: 'patient' }), '/pts').map(
+        (item) => item.href,
+      ),
+    ).not.toContain('/pts/proposals');
 
-    expect(
-      labels(account({ professionalProfileIds: ['professional'] })),
-    ).not.toContain('Meu PTS');
+    for (const other of [
+      account({ professionalProfileIds: ['professional'] }),
+      account({ role: 'admin' }),
+    ]) {
+      const hrefs = getNavigation(other, '/pts').map((item) => item.href);
 
-    expect(labels(account({ role: 'admin' }))).not.toContain('Meu PTS');
+      expect(hrefs).toContain('/pts/proposals');
+      expect(hrefs).not.toContain('/pts');
+    }
   });
 
   it('mantém o menu alinhado aos acessos de cada perfil', () => {
@@ -122,9 +127,8 @@ describe('getNavigation', () => {
 
     expect(labels(account({ patientProfileId: 'patient' }))).toEqual([
       'Início',
-      'Meu PTS',
+      'PTS',
       'Medicações',
-      'Propostas de PTS',
     ]);
 
     expect(labels(account())).toEqual(['Início']);

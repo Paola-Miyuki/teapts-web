@@ -3,7 +3,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { type EntityManager, QueryFailedError, Repository } from 'typeorm';
 import { StoredObject } from './entities/stored-object.entity';
 import { StorageTokenService } from './services/storage-token.service';
 import { STORAGE_CONFIG, type StorageConfig } from './storage.config';
@@ -12,6 +12,7 @@ import {
   type SignedUrl,
   StorageObjectAlreadyExistsError,
   StorageService,
+  type StoredObjectInfo,
 } from './storage.service';
 
 /** Código do Postgres para violação de chave única (`unique_violation`). */
@@ -68,5 +69,25 @@ export class PostgresStorage extends StorageService {
 
       throw error;
     }
+  }
+
+  async headObject(fileKey: string): Promise<StoredObjectInfo | null> {
+    const object = await this.objects.findOne({
+      where: { fileKey },
+      select: { fileKey: true, mimeType: true, sizeBytes: true },
+    });
+
+    return object
+      ? { mimeType: object.mimeType, sizeBytes: object.sizeBytes }
+      : null;
+  }
+
+  async activateObject(
+    fileKey: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const objects = manager?.getRepository(StoredObject) ?? this.objects;
+
+    await objects.update({ fileKey }, { active: true });
   }
 }

@@ -1,20 +1,31 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import AuthenticatedPage from '@/components/AuthenticatedPage';
 import Icon from '@/components/Icon';
 import type { Account } from '@/lib/account';
 import { can } from '@/lib/permissions';
 
-import PatientProposals from './_components/PatientProposals';
 import ProposalTable from './_components/ProposalTable';
 
-// Propostas de `propostas-pts.html`: tabela para o profissional e o admin,
-// cartões para o paciente decidir.
+// Propostas de `propostas-pts.html`: tabela para o profissional e o admin. O
+// paciente decide nos cartões da aba "Propostas de PTS" de /pts.
 function ProposalsContent({ account }: { account: Account }) {
+  const router = useRouter();
   const isPatient = account.patientProfileId !== null;
+
+  useEffect(() => {
+    if (isPatient) {
+      router.replace('/pts#propostas');
+    }
+  }, [isPatient, router]);
+
+  if (isPatient) {
+    return null;
+  }
 
   return (
     <>
@@ -33,13 +44,9 @@ function ProposalsContent({ account }: { account: Account }) {
         )}
       </div>
 
-      {isPatient ? (
-        <PatientProposals />
-      ) : (
-        <Suspense fallback={null}>
-          <ProposalTable account={account} />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <ProposalTable account={account} />
+      </Suspense>
     </>
   );
 }

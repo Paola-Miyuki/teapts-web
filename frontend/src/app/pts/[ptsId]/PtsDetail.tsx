@@ -325,8 +325,6 @@ function PtsDetailContent({
           )}
         </dl>
 
-        {readOnly && <p className="hint">Visualização somente leitura.</p>}
-
         {(canOpenRecord || canEditPts) && (
           <div className="heading-actions">
             {canOpenRecord && (

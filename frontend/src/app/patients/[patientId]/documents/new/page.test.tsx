@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 
 import { ApiError } from '@/lib/api';
@@ -17,6 +18,7 @@ jest.mock('@/lib/documents', () => ({
 
 const mockedUploadFile = uploadFile as jest.Mock;
 const replace = jest.fn();
+const push = jest.fn();
 
 function mockResponse({
   status = 200,
@@ -58,10 +60,31 @@ const CREATED = {
   expiresAt: '2026-12-01T12:15:00.000Z',
 };
 
+const CONFIRMED = {
+  id: 'doc-1',
+  title: 'Laudo neurológico',
+  category: 'medical_report',
+  mimeType: 'application/pdf',
+  sizeBytes: 4,
+  createdAt: '2026-12-01T12:00:00.000Z',
+};
+const PROFESSIONALS = {
+  data: [
+    {
+      id: 'pro-1',
+      accountId: 'account-pro-1',
+      name: 'Ana Souza',
+      specialism: { id: 'psychologist', name: 'Psicólogo' },
+    },
+  ],
+  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+};
+
 type Routes = {
   account?: object;
   readOnly?: boolean;
   uploadUrl?: () => Promise<Response>;
+  confirm?: () => Promise<Response>;
 };
 
 // /me, GET /patients/:id e POST .../upload-url respondem pelos dublês.
@@ -70,6 +93,8 @@ function mockApi({
   readOnly = false,
   uploadUrl = () =>
     Promise.resolve(mockResponse({ status: 201, data: CREATED })),
+  confirm = () =>
+    Promise.resolve(mockResponse({ status: 201, data: CONFIRMED })),
 }: Routes = {}) {
   (global.fetch as jest.Mock).mockImplementation((url: string) => {
     if (url.endsWith('/me')) {
@@ -78,6 +103,14 @@ function mockApi({
 
     if (url.endsWith('/upload-url')) {
       return uploadUrl();
+    }
+
+    if (url.endsWith('/documents')) {
+      return confirm();
+    }
+
+    if (url.includes('/professionals')) {
+      return Promise.resolve(mockResponse({ data: PROFESSIONALS }));
     }
 
     return Promise.resolve(
@@ -103,7 +136,7 @@ const pdf = () => new File(['%PDF'], 'laudo.pdf', { type: 'application/pdf' });
 describe('UploadDocumentPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (useRouter as jest.Mock).mockReturnValue({ replace });
+    (useRouter as jest.Mock).mockReturnValue({ replace, push });
     global.fetch = jest.fn();
     mockedUploadFile.mockResolvedValue(undefined);
   });
@@ -142,7 +175,6 @@ describe('UploadDocumentPage', () => {
       expect.any(File),
       expect.objectContaining({ onProgress: expect.any(Function) }),
     );
-    expect(screen.getByRole('button', { name: 'Continuar' })).toBeDisabled();
     expect(screen.getByText('laudo.pdf')).toBeInTheDocument();
   });
 
@@ -191,7 +223,7 @@ describe('UploadDocumentPage', () => {
 
     expect(
       await screen.findByText(
-        'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX.',
+        'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX',
       ),
     ).toBeInTheDocument();
     expect(uploadCalls()).toHaveLength(0);
@@ -209,7 +241,7 @@ describe('UploadDocumentPage', () => {
     chooseFile(big);
 
     expect(
-      await screen.findByText('O arquivo deve ter no máximo 5 MB.'),
+      await screen.findByText('O arquivo deve ter no máximo 5 MB'),
     ).toBeInTheDocument();
     expect(uploadCalls()).toHaveLength(0);
   });
@@ -332,5 +364,314 @@ describe('UploadDocumentPage', () => {
     render(<UploadDocumentPage patientId="patient-2" />);
 
     expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
+  });
+
+  describe('confirmation (RFDOC002)', () => {
+    function confirmCalls() {
+      return (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          String(url).endsWith('/documents') && init?.method === 'POST',
+      );
+    }
+
+    async function uploadFirst() {
+      await screen.findByLabelText('Arquivo');
+      chooseFile(pdf());
+      await screen.findByText('Arquivo enviado.');
+    }
+
+    it('keeps the send button disabled until the file is uploaded', async () => {
+      mockApi();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await screen.findByLabelText('Arquivo');
+
+      expect(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      ).toBeDisabled();
+
+      chooseFile(pdf());
+      await screen.findByText('Arquivo enviado.');
+
+      expect(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      ).toBeEnabled();
+    });
+
+    it('validates the required title and category before calling the API', async () => {
+      mockApi();
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      expect(
+        await screen.findByText('Informe o título do documento'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Escolha a categoria do documento'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/Título/)).toHaveFocus();
+      expect(confirmCalls()).toHaveLength(0);
+    });
+
+    it('confirms with the outside issuer and goes back to the patient', async () => {
+      mockApi();
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), ' Laudo neurológico ');
+      await user.selectOptions(
+        screen.getByLabelText(/Categoria/),
+        'medical_report',
+      );
+      await user.type(screen.getByLabelText('Data de emissão'), '2026-11-20');
+      await user.click(screen.getByRole('radio', { name: 'Alguém de fora' }));
+      await user.type(
+        screen.getByLabelText('Emissor de fora'),
+        'Dra. Marta Reis, CRM-PR 12345',
+      );
+      await user.type(screen.getByLabelText('Descrição'), 'Laudo de 2026');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      await waitFor(() =>
+        expect(push).toHaveBeenCalledWith('/patients/patient-1'),
+      );
+
+      const [url, init] = confirmCalls()[0];
+
+      expect(url).toBe('http://localhost:3000/patients/patient-1/documents');
+      expect(init.credentials).toBe('include');
+      expect(JSON.parse(init.body)).toEqual({
+        fileKey: CREATED.fileKey,
+        title: 'Laudo neurológico',
+        category: 'medical_report',
+        issueDate: '2026-11-20',
+        issuerName: 'Dra. Marta Reis, CRM-PR 12345',
+        description: 'Laudo de 2026',
+      });
+    });
+
+    it('sends only the required fields when the optional ones are empty', async () => {
+      mockApi({ account: PROFESSIONAL });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Receita');
+      await user.selectOptions(
+        screen.getByLabelText(/Categoria/),
+        'prescription',
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      await waitFor(() => expect(push).toHaveBeenCalled());
+      expect(JSON.parse(confirmCalls()[0][1].body)).toEqual({
+        fileKey: CREATED.fileKey,
+        title: 'Receita',
+        category: 'prescription',
+      });
+    });
+
+    it('shows only the field of the chosen issuer for the admin', async () => {
+      mockApi();
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await screen.findByLabelText('Arquivo');
+
+      expect(
+        screen.getByPlaceholderText('Busque o profissional pelo nome'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText('Emissor de fora'),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('radio', { name: 'Alguém de fora' }));
+
+      expect(screen.getByLabelText('Emissor de fora')).toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText('Busque o profissional pelo nome'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('sends the account of the professional the admin picked', async () => {
+      mockApi();
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByPlaceholderText('Busque o profissional pelo nome'),
+      );
+      await user.click(
+        await screen.findByRole('option', { name: /Ana Souza/ }),
+      );
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      await waitFor(() => expect(push).toHaveBeenCalled());
+      expect(JSON.parse(confirmCalls()[0][1].body)).toEqual({
+        fileKey: CREATED.fileKey,
+        title: 'Laudo',
+        category: 'exam',
+        issuerAccountId: 'account-pro-1',
+      });
+    });
+
+    it('offers only the outside issuer to the professional and the patient', async () => {
+      mockApi({ account: PROFESSIONAL });
+
+      const { unmount } = render(<UploadDocumentPage patientId="patient-1" />);
+      await screen.findByLabelText('Emissor de fora');
+
+      expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText('Busque o profissional pelo nome'),
+      ).not.toBeInTheDocument();
+      unmount();
+
+      mockApi({ account: PATIENT });
+      render(<UploadDocumentPage patientId="patient-1" />);
+
+      expect(
+        await screen.findByLabelText('Emissor de fora'),
+      ).toBeInTheDocument();
+    });
+
+    it('sends the patient back to the home after confirming', async () => {
+      mockApi({ account: PATIENT });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      await waitFor(() => expect(push).toHaveBeenCalledWith('/home'));
+    });
+
+    it('shows the loading on the button while confirming', async () => {
+      mockApi({ confirm: () => new Promise(() => {}) });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      const button = await screen.findByRole('button', { name: 'Enviando...' });
+
+      expect(button).toBeDisabled();
+      expect(screen.getByLabelText(/Título/)).toBeDisabled();
+    });
+
+    it('shows the API message and keeps the form when confirming fails', async () => {
+      mockApi({
+        confirm: () =>
+          Promise.resolve(
+            mockResponse({
+              status: 403,
+              ok: false,
+              data: { status: 'FORBIDDEN', message: 'Sem acesso ao paciente.' },
+            }),
+          ),
+      });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      expect(
+        await screen.findByText('Sem acesso ao paciente.'),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/Título/)).toHaveValue('Laudo');
+      expect(push).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      ).toBeEnabled();
+    });
+
+    it('goes back to the file step when the upload is not found', async () => {
+      mockApi({
+        confirm: () =>
+          Promise.resolve(
+            mockResponse({
+              status: 400,
+              ok: false,
+              data: {
+                status: 'UPLOAD_NOT_FOUND',
+                message:
+                  'O arquivo não foi encontrado no storage. Envie-o novamente.',
+              },
+            }),
+          ),
+      });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      expect(
+        await screen.findByText(
+          'O arquivo não foi encontrado no storage. Envie-o novamente.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Arquivo enviado.')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      ).toBeDisabled();
+    });
+
+    it('sends to the login when the session expired while confirming', async () => {
+      mockApi({
+        confirm: () =>
+          Promise.resolve(
+            mockResponse({
+              status: 401,
+              ok: false,
+              data: { status: 'UNAUTHORISED', message: 'Sessão inválida' },
+            }),
+          ),
+      });
+      const user = userEvent.setup();
+
+      render(<UploadDocumentPage patientId="patient-1" />);
+      await uploadFirst();
+      await user.type(screen.getByLabelText(/Título/), 'Laudo');
+      await user.selectOptions(screen.getByLabelText(/Categoria/), 'exam');
+      await user.click(
+        screen.getByRole('button', { name: 'Enviar documento' }),
+      );
+
+      await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    });
   });
 });

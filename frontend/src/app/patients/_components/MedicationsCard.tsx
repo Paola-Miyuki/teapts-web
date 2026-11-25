@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
+import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import {
@@ -34,6 +35,28 @@ type MedicationForm = {
 type Editor = { kind: 'add' } | { kind: 'edit'; medication: Medication } | null;
 
 type Filter = 'active' | 'stopped' | 'all';
+
+// Estado vazio de cada aba, no modelo do "Nenhum PTS ativo".
+const EMPTY_STATES: Record<Filter, { title: string; message: string }> = {
+  all: {
+    title: 'Nenhuma medicação',
+    message: 'Ainda não há medicações registradas.',
+  },
+  active: {
+    title: 'Nenhuma medicação em uso',
+    message: 'Não há medicações em uso no momento.',
+  },
+  stopped: {
+    title: 'Nenhuma medicação suspensa',
+    message: 'Nenhuma medicação foi suspensa até agora.',
+  },
+};
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Todas' },
+  { value: 'active', label: 'Em uso' },
+  { value: 'stopped', label: 'Suspensas' },
+];
 
 const EMPTY_FORM: MedicationForm = {
   drugName: '',
@@ -258,7 +281,7 @@ export default function MedicationsCard({
         reason,
         editor?.kind === 'edit'
           ? 'Não foi possível atualizar a medicação'
-          : 'Não foi possível adicionar a medicação.',
+          : 'Não foi possível adicionar a medicação',
       );
     } finally {
       setSaving(false);
@@ -329,22 +352,36 @@ export default function MedicationsCard({
         </div>
       ) : (
         <>
-          <div className={styles.field}>
-            <label htmlFor="medication-filter">Mostrar</label>
-            <select
-              id="medication-filter"
-              className={ui.input}
-              value={filter}
-              onChange={(event) => setFilter(event.target.value as Filter)}
-            >
-              <option value="all">Todas</option>
-              <option value="active">Em uso</option>
-              <option value="stopped">Suspensas</option>
-            </select>
-          </div>
+          <nav className="tabs ux-ptabs" aria-label="Situação das medicações">
+            {FILTERS.map(({ value, label }) => (
+              <a
+                key={value}
+                href={`#${value}`}
+                aria-current={filter === value ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setFilter(value);
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
 
           {visibleMedications.length === 0 ? (
-            <p className="hint">Nenhuma medicação encontrada.</p>
+            <div className={styles.emptyState} role="status">
+              <div className={styles.emptyStateIcon}>
+                <Icon name="pill" />
+              </div>
+
+              <h3>{EMPTY_STATES[filter].title}</h3>
+              <p>
+                {EMPTY_STATES[filter].message}
+                {canWrite && filter !== 'stopped'
+                  ? ' Use "Adicionar medicação" para registrar.'
+                  : ''}
+              </p>
+            </div>
           ) : (
             <ul className="mini-list">
               {visibleMedications.map((medication) => (

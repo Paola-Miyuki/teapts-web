@@ -193,7 +193,7 @@ describe('PtsProposalsPage para o admin', () => {
     );
 
     expect(
-      await screen.findByText('Proposta aprovada. O PTS está em planejamento.'),
+      await screen.findByText('Proposta aprovada, o PTS está em planejamento'),
     ).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:3000/pts/proposals/proposal-1/approve',
@@ -204,57 +204,16 @@ describe('PtsProposalsPage para o admin', () => {
 });
 
 describe('PtsProposalsPage para o paciente', () => {
-  const patient = account({ patientProfileId: PATIENT_ID });
-
-  it('mostra a proposta com a equipe e rejeita', async () => {
-    mockApi(patient, [{ ...proposal, socialSituation: undefined }]);
+  it('leva o paciente à aba de propostas de /pts', async () => {
+    mockApi(account({ patientProfileId: PATIENT_ID }));
 
     render(<PtsProposalsPage />);
 
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/pts#propostas'),
+    );
     expect(
-      await screen.findByRole('heading', { name: 'Proposta de PTS para você' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Criada em 28/10/2026 por Ana Souza'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Psicólogo, responsável')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: 'Criar proposta' }),
+      screen.queryByRole('heading', { name: 'Propostas de PTS' }),
     ).not.toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Rejeitar proposta' }),
-    );
-    await userEvent.click(
-      within(
-        screen.getByRole('dialog', { name: 'Rejeitar a proposta?' }),
-      ).getByRole('button', { name: 'Rejeitar proposta' }),
-    );
-
-    expect(await screen.findByText('Proposta rejeitada.')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Nenhuma proposta aguardando você' }),
-    ).toBeInTheDocument();
-  });
-
-  it('mostra o erro da API na decisão e mantém o diálogo aberto', async () => {
-    mockApi(patient, [proposal], {
-      status: 409,
-      body: { message: 'A proposta já foi decidida.' },
-    });
-
-    render(<PtsProposalsPage />);
-
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aprovar proposta' }),
-    );
-    const dialog = screen.getByRole('dialog', { name: 'Aprovar a proposta?' });
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Aprovar proposta' }),
-    );
-
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'A proposta já foi decidida.',
-    );
   });
 });

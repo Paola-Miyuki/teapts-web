@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -8,13 +8,27 @@ import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
 import { ApiError } from '@/lib/api';
 import type { Account } from '@/lib/account';
-import { createUploadUrl, uploadFile, validateFile } from '@/lib/documents';
+import {
+  confirmDocument,
+  createUploadUrl,
+  uploadFile,
+  validateFile,
+  type ConfirmDocumentInput,
+} from '@/lib/documents';
 import { can } from '@/lib/permissions';
 import { getPatient } from '@/lib/patients';
 import styles from '../patients.module.css';
+import DocumentForm, {
+  EMPTY_DOCUMENT_VALUES,
+  type DocumentFormErrors,
+  type DocumentFormValues,
+} from './DocumentForm';
 import FileDropzone from './FileDropzone';
 
 const SEND_ERROR = 'Não foi possível enviar o arquivo';
+const CONFIRM_ERROR = 'Não foi possível enviar o documento';
+const TITLE_ERROR = 'Informe o título do documento';
+const CATEGORY_ERROR = 'Escolha a categoria do documento';
 const LOAD_ERROR = 'Não foi possível carregar o paciente';
 
 // Estados do envio: nada escolhido, pedindo a URL, enviando, enviado.
@@ -26,10 +40,11 @@ function formatSize(bytes: number) {
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-// Passo "Arquivo" de `enviar-documento.html` (RFDOC001): valida tipo e tamanho,
-// pede a URL, envia o arquivo com progresso e guarda a `fileKey`. Os dados do
-// documento e a confirmação (RFDOC002) entram com a #130. O profissional só
-// envia se tiver PTS ativo com o paciente (`readOnly` da API); a API confere.
+// `enviar-documento.html`. Passo "Arquivo" (RFDOC001): valida tipo e tamanho,
+// pede a URL, envia o arquivo com progresso e guarda a `fileKey`. Passo "Dados
+// do documento" e botão "Enviar documento" (RFDOC002): confirma o documento e
+// volta ao paciente (ou ao início, para o paciente). O profissional só envia
+// se tiver PTS ativo com o paciente (`readOnly` da API); a API confere.
 export default function UploadDocument({
   account,
   patientId,
@@ -48,6 +63,12 @@ export default function UploadDocument({
   const [fileKey, setFileKey] = useState('');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+  const [values, setValues] = useState<DocumentFormValues>(
+    EMPTY_DOCUMENT_VALUES,
+  );
+  const [fieldErrors, setFieldErrors] = useState<DocumentFormErrors>({});
+  const [confirmError, setConfirmError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Admin e paciente não precisam da consulta do paciente.
@@ -87,6 +108,7 @@ export default function UploadDocument({
 
   const cancelHref = isPatient ? '/home' : `/patients/${patientId}`;
   const busy = step === 'requesting' || step === 'uploading';
+  const isAdmin = account.role === 'admin';
 
   async function send(chosen: File) {
     const controller = new AbortController();
@@ -160,6 +182,103 @@ export default function UploadDocument({
     void send(chosen);
   }
 
+  function handleChange(changes: Partial<DocumentFormValues>) {
+    setValues((current) => ({ ...current, ...changes }));
+    setFieldErrors((current) => {
+      const next = { ...current };
+
+      if (changes.title !== undefined) delete next.title;
+      if (changes.category !== undefined) delete next.category;
+
+      return next;
+    });
+  }
+
+  // Só o emissor da escolha vai na requisição, e o que está vazio nem é enviado.
+  function toInput(): ConfirmDocumentInput {
+    const input: ConfirmDocumentInput = {
+      fileKey,
+      title: values.title.trim(),
+      category: values.category as ConfirmDocumentInput['category'],
+    };
+    const issuerName = values.issuerName.trim();
+    const description = values.description.trim();
+
+    if (values.issueDate) {
+      input.issueDate = values.issueDate;
+    }
+
+    if (isAdmin && values.issuerKind === 'professional') {
+      if (values.issuerAccountId) {
+        input.issuerAccountId = values.issuerAccountId;
+      }
+    } else if (issuerName) {
+      input.issuerName = issuerName;
+    }
+
+    if (description) {
+      input.description = description;
+    }
+
+    return input;
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (submitting || busy || !fileKey) {
+      return;
+    }
+
+    const errors: DocumentFormErrors = {};
+
+    if (!values.title.trim()) {
+      errors.title = TITLE_ERROR;
+    }
+
+    if (!values.category) {
+      errors.category = CATEGORY_ERROR;
+    }
+
+    setFieldErrors(errors);
+    setConfirmError('');
+
+    if (errors.title || errors.category) {
+      document
+        .getElementById(errors.title ? 'doc-title' : 'doc-category')
+        ?.focus();
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await confirmDocument(patientId, toInput());
+      router.push(cancelHref);
+    } catch (reason: unknown) {
+      if (reason instanceof ApiError && reason.status === 401) {
+        router.replace('/login');
+        return;
+      }
+
+      // O objeto sumiu do storage: volta ao passo do arquivo para enviar de novo.
+      if (reason instanceof ApiError && reason.code === 'UPLOAD_NOT_FOUND') {
+        setFile(null);
+        setFileKey('');
+        setStep('idle');
+        setError(reason.apiMessage ?? CONFIRM_ERROR);
+      } else {
+        setConfirmError(
+          reason instanceof ApiError && reason.apiMessage
+            ? reason.apiMessage
+            : CONFIRM_ERROR,
+        );
+      }
+
+      setSubmitting(false);
+    }
+  }
+
   if (loadError) {
     return (
       <div className={ui.empty} role="alert">
@@ -196,11 +315,7 @@ export default function UploadDocument({
   }
 
   return (
-    <form
-      className="ux-formcard"
-      noValidate
-      onSubmit={(event) => event.preventDefault()}
-    >
+    <form className="ux-formcard" noValidate onSubmit={handleSubmit}>
       <div className="ux-formcard-head">
         <div>
           <h2>Novo documento</h2>
@@ -226,7 +341,7 @@ export default function UploadDocument({
           ) : null}
 
           <FileDropzone
-            disabled={busy}
+            disabled={busy || submitting}
             invalid={Boolean(error)}
             describedBy={error ? 'upload-error' : undefined}
             onSelect={handleSelect}
@@ -261,24 +376,36 @@ export default function UploadDocument({
         </div>
       </section>
 
+      <DocumentForm
+        values={values}
+        errors={fieldErrors}
+        disabled={submitting}
+        canPickProfessional={isAdmin}
+        onChange={handleChange}
+      />
+
+      {confirmError ? (
+        <div role="alert" className={`${ui.alert} ${ui.alertError}`}>
+          <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
+            <Icon name="alertCircle" />
+          </div>
+          <span>{confirmError}</span>
+        </div>
+      ) : null}
+
       <div className="ux-formcard-foot">
         <Link className="btn" href={cancelHref}>
           Cancelar
         </Link>
-        {/* O formulário de dados e a confirmação (RFDOC002) vêm com a #130. */}
         <button
           type="submit"
           className="btn btn-primary"
-          disabled
-          aria-disabled="true"
-          data-file-key={fileKey || undefined}
-          title={
-            fileKey
-              ? 'O preenchimento dos dados do documento ainda não está disponível'
-              : 'Envie um arquivo primeiro'
-          }
+          disabled={!fileKey || busy || submitting}
+          aria-busy={submitting || undefined}
+          title={fileKey ? undefined : 'Envie um arquivo primeiro'}
         >
-          Continuar
+          <Icon name="upload" className="icon-sm" />
+          {submitting ? 'Enviando...' : 'Enviar documento'}
         </button>
       </div>
     </form>

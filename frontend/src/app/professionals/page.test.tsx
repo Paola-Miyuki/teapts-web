@@ -825,7 +825,7 @@ describe('ProfessionalsPage: editar especialidade', () => {
       within(dialog).getByRole('button', { name: 'Salvar alterações' }),
     );
 
-    expect(await screen.findByText('Especialidade atualizada.')).toBeVisible();
+    expect(await screen.findByText('Especialidade atualizada')).toBeVisible();
 
     const [url, init] = patch.mock.calls[0];
 
@@ -896,7 +896,7 @@ describe('ProfessionalsPage: editar especialidade', () => {
       within(dialog).getByRole('button', { name: 'Salvar alterações' }),
     );
 
-    await screen.findByText('Especialidade atualizada.');
+    await screen.findByText('Especialidade atualizada');
 
     expect(JSON.parse(patch.mock.calls[0][1].body)).toEqual({
       specialism: 'nurse',
@@ -973,7 +973,7 @@ describe('ProfessionalsPage: editar especialidade', () => {
     expect(
       await within(dialog).findByText('Profissional não encontrado.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Especialidade atualizada.')).toBeNull();
+    expect(screen.queryByText('Especialidade atualizada')).toBeNull();
   });
 
   it('redireciona para o login quando a sessão expira', async () => {
@@ -1127,7 +1127,7 @@ describe('ProfessionalsPage: desativar profissional', () => {
       within(dialog).getByRole('button', { name: 'Desativar profissional' }),
     );
 
-    expect(await screen.findByText('Profissional desativado.')).toBeVisible();
+    expect(await screen.findByText('Profissional desativado')).toBeVisible();
 
     const row = screen.getByText('Ana').closest('tr')!;
 

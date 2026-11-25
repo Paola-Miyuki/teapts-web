@@ -6,6 +6,8 @@ import { AccountRole } from '../../accounts/enums/account-role.enum';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AuthGuard } from '../../auth/guards/auth.guard';
 import { createValidationPipe } from '../../common/validation/create-validation-pipe';
+import type { DocumentResponseDto } from '../dto/document-response.dto';
+import { DocumentsService } from '../services/documents.service';
 import type { CreateUploadUrlResponseDto } from '../dto/create-upload-url-response.dto';
 import { DocumentUploadService } from '../services/document-upload.service';
 import { PatientDocumentsController } from './patient-documents.controller';
@@ -28,7 +30,23 @@ const created: CreateUploadUrlResponseDto = {
   expiresAt: '2026-12-01T12:15:00.000Z',
 };
 
-describe('POST /patients/:id/documents/upload-url', () => {
+const confirmBody = {
+  fileKey: `${patientId}/abc-laudo.pdf`,
+  title: 'Laudo neurológico',
+  category: 'medical_report',
+  issueDate: '2026-11-20',
+  issuerName: 'Dra. Marta Reis',
+};
+const confirmed: DocumentResponseDto = {
+  id: '4e3d2c1b-0a9f-4e8d-9c7b-6a5f4e3d2c1b',
+  title: 'Laudo neurológico',
+  category: 'medical_report' as DocumentResponseDto['category'],
+  mimeType: 'application/pdf',
+  sizeBytes: 1024,
+  createdAt: '2026-12-01T12:00:00.000Z',
+};
+
+describe('PatientDocumentsController', () => {
   let app: INestApplication;
   let uploads: {
     createUploadUrl: jest.Mock<
@@ -39,15 +57,28 @@ describe('POST /patients/:id/documents/upload-url', () => {
       ) => Promise<CreateUploadUrlResponseDto>
     >;
   };
+  let documents: {
+    confirm: jest.Mock<
+      (
+        account: AccountContext,
+        patientId: string,
+        input: unknown,
+      ) => Promise<DocumentResponseDto>
+    >;
+  };
   let allowed: boolean;
 
   beforeEach(async () => {
     allowed = true;
     uploads = { createUploadUrl: jest.fn(async () => created) };
+    documents = { confirm: jest.fn(async () => confirmed) };
 
     const moduleRef = await Test.createTestingModule({
       controllers: [PatientDocumentsController],
-      providers: [{ provide: DocumentUploadService, useValue: uploads }],
+      providers: [
+        { provide: DocumentUploadService, useValue: uploads },
+        { provide: DocumentsService, useValue: documents },
+      ],
     })
       .overrideGuard(AuthGuard)
       .useValue({
@@ -125,5 +156,70 @@ describe('POST /patients/:id/documents/upload-url', () => {
 
     expect(response.status).toBe(403);
     expect(uploads.createUploadUrl).not.toHaveBeenCalled();
+  });
+
+  describe('POST /patients/:id/documents', () => {
+    it('answers 201 with the confirmed document', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/documents`)
+        .send(confirmBody);
+
+      expect(response.status).toBe(201);
+      expect(response.body).toEqual(confirmed);
+      expect(documents.confirm).toHaveBeenCalledWith(
+        account,
+        patientId,
+        confirmBody,
+      );
+    });
+
+    it('answers 400 VALIDATION_ERROR without a title', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/documents`)
+        .send({ ...confirmBody, title: '' });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o título.',
+      });
+      expect(documents.confirm).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR with both issuers', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/documents`)
+        .send({
+          ...confirmBody,
+          issuerAccountId: '4e3d2c1b-0a9f-4e8d-9c7b-6a5f4e3d2c1b',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.status).toBe('VALIDATION_ERROR');
+      expect(documents.confirm).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 VALIDATION_ERROR for an id that is not a UUID', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/patients/123/documents')
+        .send(confirmBody);
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Parâmetro inválido: id',
+      });
+    });
+
+    it('does not call the service when the guard blocks the request', async () => {
+      allowed = false;
+
+      const response = await request(app.getHttpServer())
+        .post(`/patients/${patientId}/documents`)
+        .send(confirmBody);
+
+      expect(response.status).toBe(403);
+      expect(documents.confirm).not.toHaveBeenCalled();
+    });
   });
 });

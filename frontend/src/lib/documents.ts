@@ -23,8 +23,8 @@ export const ACCEPTED_EXTENSIONS = FILE_TYPES.flatMap(
   .join(',');
 
 export const FILE_TYPE_ERROR =
-  'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX.';
-export const FILE_SIZE_ERROR = 'O arquivo deve ter no máximo 5 MB.';
+  'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX';
+export const FILE_SIZE_ERROR = 'O arquivo deve ter no máximo 5 MB';
 
 /**
  * Tipo do arquivo para a API: o que o navegador informa, ou o da extensão
@@ -53,7 +53,7 @@ export function validateFile(file: File): string {
   }
 
   if (file.size === 0) {
-    return 'O arquivo está vazio.';
+    return 'O arquivo está vazio';
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -82,6 +82,59 @@ export function createUploadUrl(patientId: string, file: File) {
         mimeType: mimeTypeOf(file),
         sizeBytes: file.size,
       }),
+    },
+  );
+}
+
+// Categorias do documento (RFDOC002), com os rótulos de propriedades-front.md.
+export const DOCUMENT_CATEGORIES = [
+  { value: 'medical_report', label: 'Laudo médico' },
+  { value: 'exam', label: 'Exame' },
+  { value: 'prescription', label: 'Receita' },
+  { value: 'therapy_report', label: 'Relatório terapêutico' },
+  { value: 'school_report', label: 'Relatório escolar' },
+  { value: 'pei', label: 'PEI' },
+  { value: 'discharge_report', label: 'Relatório de alta' },
+  { value: 'tcle', label: 'TCLE' },
+  { value: 'image_authorization', label: 'Autorização de uso de imagem' },
+  { value: 'other', label: 'Outro' },
+] as const;
+
+export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number]['value'];
+
+// Corpo do POST /patients/:id/documents: no máximo um emissor, e os campos
+// opcionais vazios nem são enviados.
+export type ConfirmDocumentInput = {
+  fileKey: string;
+  title: string;
+  category: DocumentCategory;
+  issueDate?: string;
+  issuerAccountId?: string;
+  issuerName?: string;
+  description?: string;
+};
+
+export type ConfirmedDocument = {
+  id: string;
+  title: string;
+  category: DocumentCategory;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+};
+
+// POST /patients/:id/documents: confirma o envio e cria o documento. Repetir a
+// `fileKey` devolve o documento já criado.
+export function confirmDocument(
+  patientId: string,
+  input: ConfirmDocumentInput,
+) {
+  return request<ConfirmedDocument>(
+    `/patients/${encodeURIComponent(patientId)}/documents`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
     },
   );
 }

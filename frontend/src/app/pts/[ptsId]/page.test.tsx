@@ -413,8 +413,8 @@ describe('PtsDetail', () => {
       await screen.findByRole('heading', { name: '1º PTS' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Visualização somente leitura.'),
-    ).toBeInTheDocument();
+      screen.queryByText('Visualização somente leitura.'),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Editar PTS' }),
     ).not.toBeInTheDocument();
@@ -439,13 +439,13 @@ describe('PtsDetail', () => {
     const sidebar = within(
       screen.getByRole('navigation', { name: 'Menu principal' }),
     );
-    expect(sidebar.getByRole('link', { name: 'Meu PTS' })).toHaveAttribute(
+    expect(sidebar.getByRole('link', { name: 'PTS' })).toHaveAttribute(
       'aria-current',
       'page',
     );
     expect(
-      sidebar.getByRole('link', { name: 'Propostas de PTS' }),
-    ).not.toHaveAttribute('aria-current');
+      sidebar.queryByRole('link', { name: 'Propostas de PTS' }),
+    ).not.toBeInTheDocument();
 
     const breadcrumb = within(
       screen.getByRole('navigation', { name: 'Caminho da página' }),
