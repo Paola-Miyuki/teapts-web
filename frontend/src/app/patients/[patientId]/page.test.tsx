@@ -123,6 +123,54 @@ describe('PatientDetail', () => {
     );
   });
 
+  it('carrega o histórico paginado na aba do prontuário e abre em somente leitura', async () => {
+    const historyItem = {
+      id: 'pts-old',
+      version: 1,
+      status: 'concluded',
+      responsible: {
+        id: 'professional-1',
+        name: 'Ana Souza',
+        specialism: 'Psicologia',
+      },
+      team: [{ id: 'professional-2', name: 'João Lima' }],
+      createdAt: '2025-03-01T12:00:00.000Z',
+      acceptedAt: '2025-03-05T12:00:00.000Z',
+      beganAt: '2025-03-10T12:00:00.000Z',
+      closedAt: '2025-12-30T12:00:00.000Z',
+      goalsResult: null,
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/me')
+          ? respond(200, PROFESSIONAL)
+          : url.includes('/patients/patient-1/pts')
+            ? respond(200, {
+                data: [historyItem],
+                pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+              })
+            : respond(200, PATIENT),
+      ),
+    ) as jest.Mock;
+
+    render(<PatientDetail id="patient-1" />);
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    await userEvent
+      .setup()
+      .click(screen.getByRole('link', { name: 'Histórico de PTS' }));
+
+    expect(await screen.findByText('v1')).toBeInTheDocument();
+    expect(screen.getByText('Concluído')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Abrir PTS' })).toHaveAttribute(
+      'href',
+      '/pts/pts-old?readonly=1&version=1',
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/patient-1/pts?page=1&limit=25`,
+      expect.anything(),
+    );
+  });
+
   it('não mostra o link para o PTS no perfil, nem com PTS ativo', async () => {
     mockApi(
       respond(200, {
