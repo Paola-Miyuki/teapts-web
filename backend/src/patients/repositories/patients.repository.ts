@@ -56,6 +56,27 @@ export type AuthorizedPatientsQuery = {
   order?: SortOrder;
 };
 
+/** Colunas do cadastro do paciente que o "Editar paciente" grava. */
+export type PatientDataValues = Partial<
+  Pick<
+    Patient,
+    | 'guardianName'
+    | 'guardianPhone'
+    | 'addressZipCode'
+    | 'addressStreet'
+    | 'addressNumber'
+    | 'addressComplement'
+    | 'addressDistrict'
+    | 'addressCity'
+    | 'addressState'
+    | 'filiation1'
+    | 'filiation2'
+    | 'referenceUnit'
+    | 'educationLevel'
+    | 'schoolName'
+  >
+>;
+
 /** Filtros e paginação da busca de pacientes elegíveis para uma proposta. */
 export type EligiblePatientsQuery = {
   page: number;
@@ -733,6 +754,26 @@ export class PatientsRepository {
     return manager.findOne(Patient, {
       where: { accountId: patientId },
     });
+  }
+
+  /**
+   * Atualiza os dados cadastrais do paciente (tutor, endereço, filiação,
+   * unidade, escolaridade e instituição); só as colunas informadas mudam.
+   */
+  async updatePatientData(
+    patientId: string,
+    values: PatientDataValues,
+    updatedByAccountId: string,
+  ): Promise<void> {
+    await this.patientRepository.manager.update(
+      Patient,
+      { accountId: patientId },
+      {
+        ...values,
+        updatedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
   }
 
   /**

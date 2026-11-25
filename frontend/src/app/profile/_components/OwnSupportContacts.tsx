@@ -14,10 +14,8 @@ const LOAD_ERROR = 'Não foi possível carregar seus contatos de suporte';
 // (RFPAC003): quem edita é o admin ou a equipe do PTS ativo.
 export default function OwnSupportContacts({
   patientId,
-  patientName,
 }: {
   patientId: string;
-  patientName: string;
 }) {
   const router = useRouter();
   const [contacts, setContacts] = useState<SupportContact[] | null>(null);
@@ -60,13 +58,5 @@ export default function OwnSupportContacts({
     return null;
   }
 
-  return (
-    <SupportContactsCard
-      patientId={patientId}
-      patientName={patientName}
-      contacts={contacts}
-      canEdit={false}
-      onChange={setContacts}
-    />
-  );
+  return <SupportContactsCard contacts={contacts} />;
 }

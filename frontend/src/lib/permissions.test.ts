@@ -102,6 +102,18 @@ describe('can', () => {
     expect(can(waiting, 'viewProfessionalDirectory')).toBe(false);
   });
 
+  it('permite editar o paciente ao admin e ao profissional com PTS ativo', () => {
+    expect(can(admin, 'editPatient')).toBe(true);
+    expect(can(professional, 'editPatient', { patientReadOnly: false })).toBe(
+      true,
+    );
+    expect(can(professional, 'editPatient', { patientReadOnly: true })).toBe(
+      false,
+    );
+    expect(can(patient, 'editPatient', { patientReadOnly: false })).toBe(false);
+    expect(can(waiting, 'editPatient', { patientReadOnly: false })).toBe(false);
+  });
+
   it('mostra a lista de PTS só ao admin e ao profissional', () => {
     expect(can(admin, 'viewPtsList')).toBe(true);
     expect(can(professional, 'viewPtsList')).toBe(true);

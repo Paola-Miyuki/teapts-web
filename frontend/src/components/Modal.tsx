@@ -12,7 +12,7 @@ type ModalProps = {
   description?: string;
   // Ícone redondo antes do título (`span.avatar` do mockup).
   icon?: IconName;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
   // Enquanto true, o Esc, o clique no fundo e o X não fecham.
   busy?: boolean;
   footer: ReactNode;
@@ -59,7 +59,7 @@ export default function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={`modal${size === 'sm' ? ' modal-sm' : ''}`}
+      className={`modal${size === 'md' ? '' : ` modal-${size}`}`}
       aria-labelledby={`${id}-title`}
       onCancel={(event) => {
         event.preventDefault();

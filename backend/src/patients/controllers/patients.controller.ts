@@ -58,6 +58,7 @@ import {
   SupportContactResponseDto,
 } from '../dto/support-contact-response.dto';
 import { SupportContactDto } from '../dto/support-contact.dto';
+import { UpdatePatientRequestDto } from '../dto/update-patient-request.dto';
 import { UpdateClinicalDataRequestDto } from '../dto/update-clinical-data-request.dto';
 import { UpdateSupportContactRequestDto } from '../dto/update-support-contact-request.dto';
 import { PatientsService } from '../services/patients.service';
@@ -289,6 +290,62 @@ export class PatientsController {
     @Body() body: CreatePatientRequestDto,
   ): Promise<PatientResponseDto> {
     return this.patientsService.create(body);
+  }
+
+  /**
+   * Atualiza o cadastro do paciente ("Editar paciente"): o administrador
+   * também altera os dados da conta; o profissional de PTS ativo (RN024), só
+   * os do paciente.
+   */
+  @Patch('patients/:patientId')
+  @UseGuards(AuthGuard)
+  @ApiOkResponse({ type: PatientDetailResponseDto })
+  @ApiBadRequestResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'VALIDATION_ERROR',
+      message: 'Informe o responsável tutelar: o paciente é menor de 18 anos.',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'FORBIDDEN',
+      message: 'Só o administrador altera os dados da conta do paciente.',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    example: {
+      status: 'PATIENT_NOT_FOUND',
+      message: 'Paciente não encontrado.',
+    },
+  })
+  @ApiConflictResponse({
+    type: ErrorResponseDto,
+    examples: {
+      EMAIL_ALREADY_EXISTS: {
+        summary: 'EMAIL_ALREADY_EXISTS',
+        value: {
+          status: 'EMAIL_ALREADY_EXISTS',
+          message: 'Este e-mail já está cadastrado.',
+        },
+      },
+      CPF_ALREADY_EXISTS: {
+        summary: 'CPF_ALREADY_EXISTS',
+        value: {
+          status: 'CPF_ALREADY_EXISTS',
+          message: 'Este CPF já está cadastrado.',
+        },
+      },
+    },
+  })
+  async update(
+    @CurrentAccount() account: AccountContext,
+    @Param('patientId', parsePatientId) patientId: string,
+    @Body() body: UpdatePatientRequestDto,
+  ): Promise<PatientDetailResponseDto> {
+    return this.patientsService.update(account, patientId, body);
   }
 
   /**
