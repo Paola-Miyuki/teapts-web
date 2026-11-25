@@ -24,8 +24,15 @@ import {
 import {
   assertActivityArchivable,
   assertActivityEditable,
+  assertActivitySuggested,
+  assertActivityTransition,
+  ACTIVITY_DECISIONS,
+  ACTIVITY_TRANSITIONS,
+  type ActivityStatusAction,
 } from '../activity-rules';
+import type { ActivityDecisionResponseDto } from '../dto/activity-decision.dto';
 import type { ActivityResponseDto } from '../dto/activity-response.dto';
+import type { ActivityStatusResponseDto } from '../dto/activity-status.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
 import type { ActivityFrequencyDto } from '../dto/create-activity.dto';
 import { ActivityDocumentEntity } from '../entities/activity-document.entity';
@@ -37,7 +44,9 @@ import { ActivityState } from '../enums/activity.enums';
 import {
   ActivitiesRepository,
   type ArchiveActivityInput,
+  type ChangeActivityStatusInput,
   type CreateActivityInput,
+  type DecideActivityInput,
   type FindActivitiesInput,
   type FindActivitiesResult,
   type StoredActivity,
@@ -67,6 +76,12 @@ function toStoredFrequency(frequency: ActivityFrequencyDto): StoredFrequency {
     duration_minutes: frequency.durationMinutes,
   };
 }
+
+const STATUS_EVENTS: Record<ActivityStatusAction, TimelineRecordType> = {
+  suspend: TimelineRecordType.ActivitySuspended,
+  resume: TimelineRecordType.ActivityResumed,
+  conclude: TimelineRecordType.ActivityConcluded,
+};
 
 @Injectable()
 export class ActivitiesRepositoryImpl extends ActivitiesRepository {
@@ -133,7 +148,7 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
     const documents =
       documentIds.length > 0
         ? await this.dataSource.manager.find(DocumentEntity, {
-            where: { id: In(documentIds) },
+            where: { id: In(documentIds), deletedAt: IsNull() },
             select: { id: true, title: true },
           })
         : [];
@@ -303,6 +318,82 @@ export class ActivitiesRepositoryImpl extends ActivitiesRepository {
         status: ActivityState.Archived,
         archivedAt: archivedAt.toISOString(),
       };
+    });
+  }
+
+  async changeStatus(
+    input: ChangeActivityStatusInput,
+  ): Promise<ActivityStatusResponseDto> {
+    const { ptsId, activityId, action } = input;
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockPts(manager, ptsId);
+      const activity = await this.lockActivity(manager, ptsId, activityId);
+
+      assertActivityTransition(action, activity.status);
+
+      const status = ACTIVITY_TRANSITIONS[action].to;
+      const changedAt = new Date();
+      await manager.update(
+        ActivityEntity,
+        { id: activityId, ptsId },
+        {
+          status,
+          ...(action === 'suspend' && { suspendedAt: changedAt }),
+          ...(action === 'conclude' && { concludedAt: changedAt }),
+          // Ao retomar ou concluir, o motivo da suspensão deixa de valer.
+          statusReason: input.reason,
+          statusChangedByAccountId: input.executedByAccountId,
+          updatedAt: changedAt,
+        },
+      );
+      await this.record(
+        manager,
+        STATUS_EVENTS[action],
+        input,
+        input.description,
+      );
+
+      return { id: activityId, status, changedAt: changedAt.toISOString() };
+    });
+  }
+
+  async decide(
+    input: DecideActivityInput,
+  ): Promise<ActivityDecisionResponseDto> {
+    const { ptsId, activityId, decision } = input;
+
+    return this.dataSource.transaction(async (manager) => {
+      await this.lockPts(manager, ptsId);
+      const activity = await this.lockActivity(manager, ptsId, activityId);
+
+      assertActivitySuggested(activity.status);
+
+      const status = ACTIVITY_DECISIONS[decision];
+      const decidedAt = new Date();
+      await manager.update(
+        ActivityEntity,
+        { id: activityId, ptsId },
+        {
+          status,
+          ...(decision === 'approve'
+            ? { approvedAt: decidedAt }
+            : { rejectedAt: decidedAt }),
+          statusReason: input.reason,
+          statusChangedByAccountId: input.executedByAccountId,
+          updatedAt: decidedAt,
+        },
+      );
+      await this.record(
+        manager,
+        decision === 'approve'
+          ? TimelineRecordType.ActivityApproved
+          : TimelineRecordType.ActivityRejected,
+        input,
+        input.description,
+      );
+
+      return { id: activityId, status, decidedAt: decidedAt.toISOString() };
     });
   }
 

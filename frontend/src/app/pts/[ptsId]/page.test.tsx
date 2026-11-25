@@ -284,6 +284,40 @@ describe('PtsDetail', () => {
       });
     });
 
+    it('"Limpar" volta os filtros ao padrão, inclusive quem executa', async () => {
+      await openActivities({ status: 'running' }, PROFESSIONAL);
+      const lastSearch = () =>
+        new URL(
+          (global.fetch as jest.Mock).mock.calls
+            .map(([url]) => String(url))
+            .filter((url) => url.includes('/activities?'))
+            .at(-1)!,
+        ).searchParams;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+      for (const label of ['Sugerida', 'Em andamento', 'Suspensa']) {
+        fireEvent.click(screen.getByLabelText(label));
+      }
+      fireEvent.change(screen.getByLabelText('Quem executa'), {
+        target: { value: 'family' },
+      });
+      // Nenhum status marcado vale como "Todos".
+      await waitFor(() => {
+        expect(lastSearch().getAll('status')).toEqual([]);
+        expect(lastSearch().get('executor')).toBe('family');
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+      await waitFor(() => {
+        expect(lastSearch().getAll('status')).toEqual([
+          'suggested',
+          'running',
+          'suspended',
+        ]);
+        expect(lastSearch().get('executor')).toBeNull();
+      });
+    });
+
     it('mostra todos os status por padrão em um PTS encerrado', async () => {
       await openActivities({ status: 'concluded' }, PROFESSIONAL);
 

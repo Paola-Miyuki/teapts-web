@@ -9,11 +9,16 @@ import {
   ActivityState,
   ActivityType,
 } from '../enums/activity.enums';
+import type { ActivityStatusResponseDto } from '../dto/activity-status.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
+import type { ActivityDecisionResponseDto } from '../dto/activity-decision.dto';
+import { ACTIVITY_DECISIONS, ACTIVITY_TRANSITIONS } from '../activity-rules';
 import {
   ActivitiesRepository,
   type ArchiveActivityInput,
+  type ChangeActivityStatusInput,
   type CreateActivityInput,
+  type DecideActivityInput,
   type StoredActivity,
   type UpdateActivityInput,
 } from '../repositories/activities.repository';
@@ -61,6 +66,8 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
   created: CreateActivityInput[] = [];
   updated: UpdateActivityInput[] = [];
   archived: ArchiveActivityInput[] = [];
+  statusChanges: ChangeActivityStatusInput[] = [];
+  decisions: DecideActivityInput[] = [];
   activities: StoredActivity[] = [];
   documents: { id: string; patientId: string }[] = [];
 
@@ -164,5 +171,31 @@ export class InMemoryActivitiesRepository extends ActivitiesRepository {
       status: ActivityState.Archived,
       archivedAt: '2026-12-06T12:00:00.000Z',
     };
+  }
+
+  async changeStatus(
+    input: ChangeActivityStatusInput,
+  ): Promise<ActivityStatusResponseDto> {
+    this.statusChanges.push(input);
+    const activity = this.activities.find(
+      (item) => item.id === input.activityId,
+    )!;
+    const status = ACTIVITY_TRANSITIONS[input.action].to;
+    activity.status = status;
+
+    return { id: activity.id, status, changedAt: '2026-12-07T12:00:00.000Z' };
+  }
+
+  async decide(
+    input: DecideActivityInput,
+  ): Promise<ActivityDecisionResponseDto> {
+    this.decisions.push(input);
+    const activity = this.activities.find(
+      (item) => item.id === input.activityId,
+    )!;
+    const status = ACTIVITY_DECISIONS[input.decision];
+    activity.status = status;
+
+    return { id: activity.id, status, decidedAt: '2026-12-02T12:00:00.000Z' };
   }
 }

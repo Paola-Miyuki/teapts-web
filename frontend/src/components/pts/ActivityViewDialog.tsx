@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 import Modal from '@/components/Modal';
@@ -23,6 +23,8 @@ const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
 type ActivityViewDialogProps = {
   activityId: string;
   team: { id: string; name: string }[];
+  // Ações da pessoa na atividade, no rodapé.
+  actions?: ReactNode;
   onClose: () => void;
 };
 
@@ -33,6 +35,7 @@ function specialismLabel(value: string) {
 export default function ActivityViewDialog({
   activityId,
   team,
+  actions,
   onClose,
 }: ActivityViewDialogProps) {
   const router = useRouter();
@@ -45,18 +48,38 @@ export default function ActivityViewDialog({
     setError(null);
     setRetryKey((current) => current + 1);
   }, []);
-  const executorIds =
-    activity && activity.executorProfessionalIds.length === 0
-      ? activity.authorProfessionalId
-        ? [activity.authorProfessionalId]
-        : []
-      : (activity?.executorProfessionalIds ?? []);
+  const memberName = (id: string | null) =>
+    team.find((member) => member.id === id)?.name ?? 'Fora da equipe atual';
+
+  // Só a equipe tem profissionais executores; vazio, vale o autor.
+  function executorNames({
+    executor,
+    executorProfessionalIds,
+    authorProfessionalId,
+  }: ActivityDetails) {
+    if (executor !== 'team') {
+      return '';
+    }
+
+    const ids =
+      executorProfessionalIds.length > 0
+        ? executorProfessionalIds
+        : authorProfessionalId
+          ? [authorProfessionalId]
+          : [];
+
+    return ids.map(memberName).join(', ');
+  }
 
   useEffect(() => {
     const controller = new AbortController();
 
     getActivity(activityId, controller.signal)
-      .then(setActivity)
+      .then((response) => {
+        if (!controller.signal.aborted) {
+          setActivity(response);
+        }
+      })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) {
           return;
@@ -80,9 +103,12 @@ export default function ActivityViewDialog({
       title={activity?.title ?? 'Visualizar atividade'}
       onClose={onClose}
       footer={
-        <button type="button" className="btn" onClick={onClose}>
-          Fechar
-        </button>
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Fechar
+          </button>
+          {activity && actions}
+        </>
       }
     >
       {error ? (
@@ -156,20 +182,13 @@ export default function ActivityViewDialog({
             <h3>Quem executa</h3>
             <dl className="data-grid">
               <div>
-                <dt>Executor</dt>
+                <dt>Executa</dt>
                 <dd>{ACTIVITY_EXECUTOR_LABELS[activity.executor]}</dd>
               </div>
-              {executorIds.length > 0 && (
+              {executorNames(activity) && (
                 <div className="full">
-                  <dt>Profissionais</dt>
-                  <dd>
-                    {executorIds
-                      .map(
-                        (id) =>
-                          team.find((member) => member.id === id)?.name ?? id,
-                      )
-                      .join(', ')}
-                  </dd>
+                  <dt>Profissionais executores</dt>
+                  <dd>{executorNames(activity)}</dd>
                 </div>
               )}
             </dl>
@@ -178,6 +197,14 @@ export default function ActivityViewDialog({
           <section>
             <h3>Registro</h3>
             <dl className="data-grid">
+              <div>
+                <dt>Sugerida por</dt>
+                <dd>
+                  {activity.authorProfessionalId
+                    ? memberName(activity.authorProfessionalId)
+                    : 'Não informado'}
+                </dd>
+              </div>
               <div>
                 <dt>Criada em</dt>
                 <dd>{formatDate(activity.createdAt)}</dd>

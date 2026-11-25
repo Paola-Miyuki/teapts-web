@@ -141,4 +141,27 @@ describe('SignupPage', () => {
       'Este CPF já está cadastrado.',
     );
   });
+
+  it.each([
+    ['Criar senha', 'Mostrar senha', 'Ocultar senha'],
+    [
+      'Repita a senha',
+      'Mostrar confirmação da senha',
+      'Ocultar confirmação da senha',
+    ],
+  ])(
+    'em "%s", mostra o olho aberto só com a senha visível',
+    (label, show, hide) => {
+      const input = screen.getByLabelText(label);
+      const button = screen.getByRole('button', { name: show });
+
+      expect(input).toHaveAttribute('type', 'password');
+      expect(button.querySelector('circle')).toBeNull();
+
+      fireEvent.click(button);
+      expect(input).toHaveAttribute('type', 'text');
+      expect(button).toHaveAccessibleName(hide);
+      expect(button.querySelector('circle')).not.toBeNull();
+    },
+  );
 });

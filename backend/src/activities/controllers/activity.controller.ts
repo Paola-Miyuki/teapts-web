@@ -38,10 +38,14 @@ import { errors } from '../../pts/swagger-errors';
 import {
   activitiesViewForbidden,
   activityArchiveForbidden,
+  activityDecisionForbidden,
   activityEditForbidden,
   activityNotArchivable,
   activityNotEditable,
   activityNotFound,
+  activityNotSuggested,
+  activityStatusForbidden,
+  invalidActivityTransition,
   invalidFrequency,
 } from '../activities.errors';
 import {
@@ -52,6 +56,14 @@ import {
   ArchiveActivityRequestDto,
   ArchiveActivityResponseDto,
 } from '../dto/archive-activity.dto';
+import {
+  ActivityStatusResponseDto,
+  SuspendActivityRequestDto,
+} from '../dto/activity-status.dto';
+import {
+  ActivityDecisionResponseDto,
+  RejectActivityRequestDto,
+} from '../dto/activity-decision.dto';
 import { UpdateActivityRequestDto } from '../dto/update-activity.dto';
 import { ActivitiesService } from '../services/activities.service';
 
@@ -128,5 +140,116 @@ export class ActivityController {
     @CurrentAccount() account: AccountContext,
   ): Promise<ArchiveActivityResponseDto> {
     return this.activitiesService.archiveActivity(id, dto, account);
+  }
+
+  @Post(':id/suspend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Suspende uma atividade em andamento (RFACT009)',
+    description:
+      'Equipe do PTS ou admin, com motivo opcional. Grava activity_suspended na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async suspendActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: SuspendActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'suspend',
+      dto,
+      account,
+    );
+  }
+
+  @Post(':id/resume')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Retoma uma atividade suspensa (RFACT009)',
+    description: 'Equipe do PTS ou admin. Grava activity_resumed na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async resumeActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'resume',
+      {},
+      account,
+    );
+  }
+
+  @Post(':id/conclude')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Conclui uma atividade em andamento ou suspensa (RFACT009)',
+    description:
+      'Equipe do PTS ou admin. A concluída não volta a running. Grava activity_concluded na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityStatusResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityStatusForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(invalidActivityTransition(), ptsNotEditable()))
+  async concludeActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityStatusResponseDto> {
+    return this.activitiesService.changeActivityStatus(
+      id,
+      'conclude',
+      {},
+      account,
+    );
+  }
+
+  @Post(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Aprova uma atividade sugerida (RFACT003)',
+    description:
+      'Equipe do PTS (autor e responsável inclusive) ou admin. A aprovada entra em execução (running). Grava activity_approved na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityDecisionResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityDecisionForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotSuggested(), ptsNotEditable()))
+  async approveActivity(
+    @Param('id', parseActivityId) id: string,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDecisionResponseDto> {
+    return this.activitiesService.decideActivity(id, 'approve', {}, account);
+  }
+
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Rejeita uma atividade sugerida (RFACT003)',
+    description:
+      'Equipe do PTS (autor e responsável inclusive) ou admin, com motivo opcional. Grava activity_rejected na timeline.',
+  })
+  @ApiOkResponse({ type: ActivityDecisionResponseDto })
+  @ApiBadRequestResponse(errors(validationError([])))
+  @ApiForbiddenResponse(errors(activityDecisionForbidden()))
+  @ApiNotFoundResponse(errors(activityNotFound(), ptsNotFound()))
+  @ApiConflictResponse(errors(activityNotSuggested(), ptsNotEditable()))
+  async rejectActivity(
+    @Param('id', parseActivityId) id: string,
+    @Body() dto: RejectActivityRequestDto,
+    @CurrentAccount() account: AccountContext,
+  ): Promise<ActivityDecisionResponseDto> {
+    return this.activitiesService.decideActivity(id, 'reject', dto, account);
   }
 }

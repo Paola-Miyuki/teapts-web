@@ -2,7 +2,10 @@ import type {
   ActivityDetailsResponseDto,
   ActivityResponseDto,
 } from '../dto/activity-response.dto';
+import type { ActivityDecisionResponseDto } from '../dto/activity-decision.dto';
+import type { ActivityStatusResponseDto } from '../dto/activity-status.dto';
 import type { ArchiveActivityResponseDto } from '../dto/archive-activity.dto';
+import type { ActivityDecision, ActivityStatusAction } from '../activity-rules';
 import type { ActivityState } from '../enums/activity.enums';
 import type { ActivityExecutor } from '../enums/activity.enums';
 
@@ -80,6 +83,30 @@ export interface ArchiveActivityInput {
   description: string;
 }
 
+export interface ChangeActivityStatusInput {
+  ptsId: string;
+  activityId: string;
+  action: ActivityStatusAction;
+  /** Motivo opcional da suspensão; nulo nas outras ações. */
+  reason: string | null;
+  /** Autoria e texto do evento. */
+  authorProfessionalId: string | null;
+  executedByAccountId: string;
+  description: string;
+}
+
+export interface DecideActivityInput {
+  ptsId: string;
+  activityId: string;
+  decision: ActivityDecision;
+  /** Motivo opcional da rejeição; nulo na aprovação. */
+  reason: string | null;
+  /** Autoria e texto do evento. */
+  authorProfessionalId: string | null;
+  executedByAccountId: string;
+  description: string;
+}
+
 export abstract class ActivitiesRepository {
   abstract findByPts(input: FindActivitiesInput): Promise<FindActivitiesResult>;
   abstract findById(activityId: string): Promise<StoredActivity | null>;
@@ -93,6 +120,12 @@ export abstract class ActivitiesRepository {
   ): Promise<string[]>;
   abstract create(input: CreateActivityInput): Promise<ActivityResponseDto>;
   abstract update(input: UpdateActivityInput): Promise<ActivityResponseDto>;
+  abstract changeStatus(
+    input: ChangeActivityStatusInput,
+  ): Promise<ActivityStatusResponseDto>;
+  abstract decide(
+    input: DecideActivityInput,
+  ): Promise<ActivityDecisionResponseDto>;
   abstract archive(
     input: ArchiveActivityInput,
   ): Promise<ArchiveActivityResponseDto>;

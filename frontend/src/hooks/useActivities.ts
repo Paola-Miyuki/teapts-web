@@ -12,29 +12,25 @@ import { ApiError } from '@/lib/api';
 export function useActivities(ptsId: string, query: ActivityListQuery) {
   const router = useRouter();
   const [result, setResult] = useState<{
-    key: string;
+    ptsId: string;
     activities: Activity[] | null;
     pagination: ActivityPagination | null;
     error: unknown;
   } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const { status, executor, page, limit } = query;
-  const requestKey = JSON.stringify([
-    ptsId,
-    status,
-    executor,
-    page,
-    limit,
-    reloadKey,
-  ]);
 
   useEffect(() => {
     const controller = new AbortController();
 
     getActivities(ptsId, { status, executor, page, limit }, controller.signal)
       .then(({ data, pagination: resultPagination }) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setResult({
-          key: requestKey,
+          ptsId,
           activities: data,
           pagination: resultPagination,
           error: null,
@@ -51,7 +47,7 @@ export function useActivities(ptsId: string, query: ActivityListQuery) {
         }
 
         setResult({
-          key: requestKey,
+          ptsId,
           activities: null,
           pagination: null,
           error: reason,
@@ -59,10 +55,11 @@ export function useActivities(ptsId: string, query: ActivityListQuery) {
       });
 
     return () => controller.abort();
-  }, [ptsId, status, executor, page, limit, requestKey, reloadKey, router]);
+  }, [ptsId, status, executor, page, limit, reloadKey, router]);
 
   const reload = useCallback(() => setReloadKey((current) => current + 1), []);
-  const current = result?.key === requestKey ? result : null;
+  // Ao filtrar, paginar ou recarregar, a lista anterior fica até a nova chegar.
+  const current = result?.ptsId === ptsId ? result : null;
 
   return {
     activities: current?.activities ?? null,

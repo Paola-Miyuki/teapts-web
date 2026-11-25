@@ -51,6 +51,20 @@ export const activityNotArchivable = () =>
     'Atividade rejeitada, concluída ou já arquivada não pode ser arquivada.',
   );
 
+export const activityStatusForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem mudar o estado da atividade.',
+  );
+
+export const invalidActivityTransition = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'INVALID_ACTIVITY_TRANSITION',
+    'A atividade não está em um estado que permita esta ação.',
+  );
+
 export const activityNotEditable = () =>
   new PtsApiError(
     HttpStatus.CONFLICT,
@@ -81,3 +95,17 @@ export const invalidActivityAuthor = () =>
 
 export const missingVisitPlace = () =>
   invalidField('Informe o local da visita.');
+
+export const activityDecisionForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem aprovar ou rejeitar atividades.',
+  );
+
+export const activityNotSuggested = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'ACTIVITY_NOT_SUGGESTED',
+    'Só uma atividade sugerida recebe decisão.',
+  );

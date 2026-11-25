@@ -84,8 +84,14 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/timeline', 'get'],
   ['/pts/{id}/activities', 'get'],
   ['/pts/{id}/activities', 'post'],
+  ['/activities/{id}', 'get'],
   ['/activities/{id}', 'patch'],
   ['/activities/{id}/archive', 'post'],
+  ['/activities/{id}/approve', 'post'],
+  ['/activities/{id}/reject', 'post'],
+  ['/activities/{id}/suspend', 'post'],
+  ['/activities/{id}/resume', 'post'],
+  ['/activities/{id}/conclude', 'post'],
   ['/notifications', 'get'],
   ['/notifications/unread-count', 'get'],
   ['/notifications/{id}/read', 'post'],
@@ -345,15 +351,38 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/activities', 'post', '404'],
     ['/pts/{id}/activities', 'post', '409'],
     ['/pts/{id}/activities', 'post', '422'],
+    ['/activities/{id}', 'get', '400'],
+    ['/activities/{id}', 'get', '403'],
+    ['/activities/{id}', 'get', '404'],
     ['/activities/{id}', 'patch', '400'],
     ['/activities/{id}', 'patch', '403'],
     ['/activities/{id}', 'patch', '404'],
     ['/activities/{id}', 'patch', '409'],
     ['/activities/{id}', 'patch', '422'],
+    ['/activities/{id}/suspend', 'post', '400'],
+    ['/activities/{id}/suspend', 'post', '403'],
+    ['/activities/{id}/suspend', 'post', '404'],
+    ['/activities/{id}/suspend', 'post', '409'],
+    ['/activities/{id}/resume', 'post', '400'],
+    ['/activities/{id}/resume', 'post', '403'],
+    ['/activities/{id}/resume', 'post', '404'],
+    ['/activities/{id}/resume', 'post', '409'],
+    ['/activities/{id}/conclude', 'post', '400'],
+    ['/activities/{id}/conclude', 'post', '403'],
+    ['/activities/{id}/conclude', 'post', '404'],
+    ['/activities/{id}/conclude', 'post', '409'],
     ['/activities/{id}/archive', 'post', '400'],
     ['/activities/{id}/archive', 'post', '403'],
     ['/activities/{id}/archive', 'post', '404'],
     ['/activities/{id}/archive', 'post', '409'],
+    ['/activities/{id}/approve', 'post', '400'],
+    ['/activities/{id}/approve', 'post', '403'],
+    ['/activities/{id}/approve', 'post', '404'],
+    ['/activities/{id}/approve', 'post', '409'],
+    ['/activities/{id}/reject', 'post', '400'],
+    ['/activities/{id}/reject', 'post', '403'],
+    ['/activities/{id}/reject', 'post', '404'],
+    ['/activities/{id}/reject', 'post', '409'],
     ['/notifications', 'get', '400'],
     ['/notifications/{id}/read', 'post', '400'],
     ['/notifications/{id}/read', 'post', '404'],
@@ -777,6 +806,23 @@ describe('Swagger (e2e)', () => {
     }
   });
 
+  it('documents GET /activities/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const { get } = paths['/activities/{id}'];
+
+    expect(responseSchema(get, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityDetailsResponseDto',
+    );
+    expect(components.schemas.ActivityDetailsResponseDto.required).toEqual(
+      expect.arrayContaining(['goal', 'documents', 'appointmentsCount']),
+    );
+    expect(
+      Object.keys(
+        get.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+  });
+
   it('documents PATCH /activities/{id}', async () => {
     const { paths } = await getDocument();
     const { patch } = paths['/activities/{id}'];
@@ -799,6 +845,60 @@ describe('Swagger (e2e)', () => {
       ).toEqual(codes);
     }
   });
+
+  it.each(['suspend', 'resume', 'conclude'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityStatusResponseDto',
+      );
+      expect(components.schemas.ActivityStatusResponseDto.required).toEqual([
+        'id',
+        'status',
+        'changedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'INVALID_ACTIVITY_TRANSITION',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
+
+  it.each(['approve', 'reject'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityDecisionResponseDto',
+      );
+      expect(components.schemas.ActivityDecisionResponseDto.required).toEqual([
+        'id',
+        'status',
+        'decidedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'ACTIVITY_NOT_SUGGESTED',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
 
   it('documents POST /activities/{id}/archive', async () => {
     const { paths, components } = await getDocument();

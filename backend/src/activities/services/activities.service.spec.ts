@@ -641,3 +641,249 @@ describe('ActivitiesService.archiveActivity (RFACT008)', () => {
     await expectApiError(() => archive(), 409, 'PTS_NOT_EDITABLE');
   });
 });
+
+describe('ActivitiesService.changeActivityStatus (RFACT009)', () => {
+  let repo: InMemoryActivitiesRepository;
+  let service: ActivitiesService;
+
+  function setup(status: ActivityState, ptsStatus = PtsStateEnum.RUNNING) {
+    repo = new InMemoryActivitiesRepository();
+    repo.activities.push(storedActivity({ status }));
+    service = new ActivitiesService(repo, seededGoalsRepo(ptsStatus));
+  }
+
+  const ALLOWED = [
+    ['suspend', ActivityState.Running, 'suspended', 'suspendeu'],
+    ['resume', ActivityState.Suspended, 'running', 'retomou'],
+    ['conclude', ActivityState.Running, 'concluded', 'concluiu'],
+    ['conclude', ActivityState.Suspended, 'concluded', 'concluiu'],
+  ] as const;
+
+  it.each(ALLOWED)(
+    '%s: de %s para %s, com data e evento',
+    async (action, from, to, verb) => {
+      setup(from);
+
+      expect(
+        await service.changeActivityStatus('act-1', action, {}, member),
+      ).toEqual({
+        id: 'act-1',
+        status: to,
+        changedAt: '2026-12-07T12:00:00.000Z',
+      });
+      expect(repo.statusChanges).toEqual([
+        {
+          ptsId: 'pts-1',
+          activityId: 'act-1',
+          action,
+          reason: null,
+          authorProfessionalId: 'prof-2',
+          executedByAccountId: 'acc-2',
+          description: `João Lima ${verb} a atividade Integração sensorial`,
+        },
+      ]);
+    },
+  );
+
+  it.each(['suspend', 'resume', 'conclude'] as const)(
+    '%s: recusa os outros estados, até para o admin',
+    async (action) => {
+      const allowed = ALLOWED.filter(([name]) => name === action).map(
+        ([, from]) => from as ActivityState,
+      );
+
+      for (const status of Object.values(ActivityState)) {
+        if (allowed.includes(status)) {
+          continue;
+        }
+
+        setup(status);
+        for (const account of [member, admin]) {
+          const error = await expectApiError(
+            () => service.changeActivityStatus('act-1', action, {}, account),
+            409,
+            'INVALID_ACTIVITY_TRANSITION',
+          );
+          expect(error.message).toBe(
+            'A atividade não está em um estado que permita esta ação.',
+          );
+        }
+        expect(repo.activities[0].status).toBe(status);
+      }
+    },
+  );
+
+  it('na suspensão, grava o motivo aparado e o põe no evento', async () => {
+    setup(ActivityState.Running);
+
+    await service.changeActivityStatus(
+      'act-1',
+      'suspend',
+      { reason: '  reforma da sala ' },
+      responsible,
+    );
+
+    expect(repo.statusChanges[0]).toMatchObject({
+      reason: 'reforma da sala',
+      description:
+        'Ana Souza suspendeu a atividade Integração sensorial (reforma da sala)',
+    });
+  });
+
+  it('o admin muda sem profissional atribuído (RN029)', async () => {
+    setup(ActivityState.Running);
+
+    await service.changeActivityStatus('act-1', 'conclude', {}, admin);
+
+    expect(repo.statusChanges[0]).toMatchObject({
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+    });
+  });
+
+  it('nega a quem é de fora e ao paciente', async () => {
+    setup(ActivityState.Running);
+
+    for (const account of [outsider, patient]) {
+      await expectApiError(
+        () => service.changeActivityStatus('act-1', 'suspend', {}, account),
+        403,
+        'FORBIDDEN',
+      );
+    }
+    expect(repo.statusChanges).toHaveLength(0);
+  });
+
+  it('responde 404 e, com o PTS encerrado, 409 PTS_NOT_EDITABLE', async () => {
+    setup(ActivityState.Running, PtsStateEnum.CONCLUDED);
+
+    await expectApiError(
+      () => service.changeActivityStatus('act-x', 'suspend', {}, member),
+      404,
+      'ACTIVITY_NOT_FOUND',
+    );
+    await expectApiError(
+      () => service.changeActivityStatus('act-1', 'suspend', {}, member),
+      409,
+      'PTS_NOT_EDITABLE',
+    );
+  });
+});
+
+describe('ActivitiesService.decideActivity (RFACT003)', () => {
+  let repo: InMemoryActivitiesRepository;
+  let service: ActivitiesService;
+
+  function setup(
+    status = ActivityState.Suggested,
+    ptsStatus = PtsStateEnum.RUNNING,
+  ) {
+    repo = new InMemoryActivitiesRepository();
+    repo.activities.push(storedActivity({ status }));
+    service = new ActivitiesService(repo, seededGoalsRepo(ptsStatus));
+  }
+
+  beforeEach(() => setup());
+
+  it('a equipe aprova a sugerida, que entra em execução', async () => {
+    expect(
+      await service.decideActivity(
+        'act-1',
+        'approve',
+        { reason: 'ignorado' },
+        responsible,
+      ),
+    ).toEqual({
+      id: 'act-1',
+      status: 'running',
+      decidedAt: '2026-12-02T12:00:00.000Z',
+    });
+    expect(repo.decisions).toEqual([
+      {
+        ptsId: 'pts-1',
+        activityId: 'act-1',
+        decision: 'approve',
+        reason: null,
+        authorProfessionalId: 'prof-1',
+        executedByAccountId: 'acc-1',
+        description: 'Ana Souza aprovou a atividade Integração sensorial',
+      },
+    ]);
+  });
+
+  it('o autor rejeita a própria sugestão com o motivo aparado', async () => {
+    expect(
+      await service.decideActivity(
+        'act-1',
+        'reject',
+        { reason: '  Já existe atividade equivalente.  ' },
+        member,
+      ),
+    ).toMatchObject({ status: 'rejected' });
+    expect(repo.decisions[0]).toMatchObject({
+      decision: 'reject',
+      reason: 'Já existe atividade equivalente.',
+      authorProfessionalId: 'prof-2',
+      description:
+        'João Lima rejeitou a atividade Integração sensorial (Já existe atividade equivalente.)',
+    });
+  });
+
+  it('rejeita sem motivo, e o admin decide sem autor no evento (RN029)', async () => {
+    await service.decideActivity('act-1', 'reject', { reason: '  ' }, admin);
+
+    expect(repo.decisions[0]).toMatchObject({
+      reason: null,
+      authorProfessionalId: null,
+      executedByAccountId: 'acc-admin',
+      description: 'Kaio rejeitou a atividade Integração sensorial',
+    });
+  });
+
+  it.each(['approve', 'reject'] as const)(
+    '%s: recusa a atividade fora de suggested com 409, até para o admin',
+    async (decision) => {
+      for (const status of Object.values(ActivityState)) {
+        if (status === ActivityState.Suggested) {
+          continue;
+        }
+
+        setup(status);
+
+        const error = await expectApiError(
+          () => service.decideActivity('act-1', decision, {}, admin),
+          409,
+          'ACTIVITY_NOT_SUGGESTED',
+        );
+        expect(error.message).toBe('Só uma atividade sugerida recebe decisão.');
+      }
+      expect(repo.decisions).toHaveLength(0);
+    },
+  );
+
+  it('nega a quem é de fora da equipe e ao paciente', async () => {
+    for (const account of [outsider, patient, accountOf()]) {
+      await expectApiError(
+        () => service.decideActivity('act-1', 'approve', {}, account),
+        403,
+        'FORBIDDEN',
+      );
+    }
+    expect(repo.decisions).toHaveLength(0);
+  });
+
+  it('responde 404 e, com o PTS encerrado, 409 PTS_NOT_EDITABLE', async () => {
+    await expectApiError(
+      () => service.decideActivity('act-x', 'approve', {}, admin),
+      404,
+      'ACTIVITY_NOT_FOUND',
+    );
+
+    setup(ActivityState.Suggested, PtsStateEnum.CONCLUDED);
+    await expectApiError(
+      () => service.decideActivity('act-1', 'reject', {}, member),
+      409,
+      'PTS_NOT_EDITABLE',
+    );
+  });
+});
