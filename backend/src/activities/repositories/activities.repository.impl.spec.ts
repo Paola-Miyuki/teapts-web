@@ -7,6 +7,7 @@ import {
   type Repository,
 } from 'typeorm';
 
+import { AppointmentEntity } from '../../appointments/entities/appointment.entity';
 import { DocumentEntity } from '../../documents/entities/document.entity';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import { expectApiError } from '../../pts/__tests__/test-utils';
@@ -659,12 +660,13 @@ describe('ActivitiesRepositoryImpl.decide (RFACT003)', () => {
 });
 
 describe('ActivitiesRepositoryImpl.findDetailsById (RFACT002)', () => {
-  it('traz só os documentos não excluídos', async () => {
+  it('traz só os documentos não excluídos e a quantidade de atendimentos', async () => {
     const { activities, recorder } = setup();
     const find = jest.fn(async () => [{ id: 'doc-1', title: 'Laudo' }]);
     const findOne = jest.fn(async () => null);
+    const countBy = jest.fn(async () => 3);
     const repository = new ActivitiesRepositoryImpl(
-      { manager: { find, findOne } } as unknown as DataSource,
+      { manager: { find, findOne, countBy } } as unknown as DataSource,
       activities as unknown as Repository<ActivityEntity>,
       recorder as unknown as TimelineRecorderService,
     );
@@ -678,5 +680,11 @@ describe('ActivitiesRepositoryImpl.findDetailsById (RFACT002)', () => {
       }),
     );
     expect(details?.documents).toEqual([{ id: 'doc-1', title: 'Laudo' }]);
+    // A retificação não conta como outro atendimento.
+    expect(countBy).toHaveBeenCalledWith(AppointmentEntity, {
+      activityId: 'act-1',
+      rectifiesAppointmentId: IsNull(),
+    });
+    expect(details?.appointmentsCount).toBe(3);
   });
 });

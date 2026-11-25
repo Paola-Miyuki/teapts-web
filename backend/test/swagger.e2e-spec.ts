@@ -86,6 +86,7 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/activities', 'post'],
   ['/activities/{id}', 'get'],
   ['/activities/{id}', 'patch'],
+  ['/activities/{id}/appointments', 'post'],
   ['/activities/{id}/archive', 'post'],
   ['/activities/{id}/approve', 'post'],
   ['/activities/{id}/reject', 'post'],
@@ -280,6 +281,7 @@ describe('Swagger (e2e)', () => {
         '/patients/{patientId}/support-contacts',
         '/pts/{id}/goals',
         '/pts/{id}/activities',
+        '/activities/{id}/appointments',
         '/patients/{id}/documents/upload-url',
       ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
@@ -371,6 +373,10 @@ describe('Swagger (e2e)', () => {
     ['/activities/{id}/conclude', 'post', '403'],
     ['/activities/{id}/conclude', 'post', '404'],
     ['/activities/{id}/conclude', 'post', '409'],
+    ['/activities/{id}/appointments', 'post', '400'],
+    ['/activities/{id}/appointments', 'post', '403'],
+    ['/activities/{id}/appointments', 'post', '404'],
+    ['/activities/{id}/appointments', 'post', '409'],
     ['/activities/{id}/archive', 'post', '400'],
     ['/activities/{id}/archive', 'post', '403'],
     ['/activities/{id}/archive', 'post', '404'],
@@ -899,6 +905,45 @@ describe('Swagger (e2e)', () => {
       ]);
     },
   );
+
+  it('documents POST /activities/{id}/appointments', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/activities/{id}/appointments'];
+    const examples = (status: string) =>
+      Object.keys(
+        post.responses[status]?.content?.['application/json']?.examples ?? {},
+      );
+
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/AppointmentResponseDto',
+    );
+    expect(components.schemas.CreateAppointmentRequestDto.required).toEqual([
+      'appointmentDate',
+      'startTime',
+      'modality',
+      'attendance',
+    ]);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual(['ACTIVITY_NOT_RUNNING', 'PTS_NOT_ACTIVE']);
+    // Todas as recusas de 400 têm o mesmo status: um exemplo para cada.
+    expect(examples('400')).toEqual([
+      'INCOMPLETE',
+      'SOAP_NOT_ALLOWED',
+      'INVALID_END',
+      'FUTURE_DATE',
+      'VISIT_PLACE',
+      'INVALID_AUTHOR',
+      'INVALID_ID',
+    ]);
+
+    const { properties } = components.schemas.CreateAppointmentRequestDto as {
+      properties: Record<string, { description?: string }>;
+    };
+    for (const [name, property] of Object.entries(properties)) {
+      expect([name, property.description]).toEqual([name, expect.any(String)]);
+    }
+  });
 
   it('documents POST /activities/{id}/archive', async () => {
     const { paths, components } = await getDocument();

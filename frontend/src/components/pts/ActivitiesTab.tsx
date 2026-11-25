@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 import Icon, { type IconName } from '@/components/Icon';
 import KebabMenu from '@/components/table/KebabMenu';
@@ -21,6 +22,7 @@ import {
   type ActivityStatusAction,
 } from '@/lib/activities';
 import { ApiError } from '@/lib/api';
+import { newAppointmentHref } from '@/lib/appointments';
 import { formatDate } from '@/lib/format';
 import { SPECIALISMS } from '@/lib/professionals';
 
@@ -113,6 +115,8 @@ type ActivitiesTabProps = {
   canEdit: (activity: Activity) => boolean;
   // RFACT008 – equipe e admin, na sugerida, em andamento ou suspensa.
   canArchive: (activity: Activity) => boolean;
+  // RFACT004 – equipe e admin, na em andamento de um PTS ativo.
+  canRegister: (activity: Activity) => boolean;
   // RFACT009 – equipe e admin, conforme o estado da atividade.
   canChangeStatus: (
     activity: Activity,
@@ -148,6 +152,7 @@ export default function ActivitiesTab({
   canCreate,
   canEdit,
   canArchive,
+  canRegister,
   canChangeStatus,
   team,
   goals,
@@ -378,6 +383,17 @@ export default function ActivitiesTab({
                             </button>
                           </li>
                         )}
+                        {canRegister(activity) && (
+                          <li>
+                            <Link
+                              role="menuitem"
+                              href={newAppointmentHref(ptsId, activity.id)}
+                            >
+                              <Icon name="session" className="icon-sm" />
+                              Registrar atendimento
+                            </Link>
+                          </li>
+                        )}
                         {statusActions(activity).map((action) => (
                           <li key={action}>
                             <button
@@ -522,6 +538,15 @@ export default function ActivitiesTab({
                   {STATUS_ACTIONS[action].label}
                 </button>
               ))}
+              {canRegister(dialog.activity) && (
+                <Link
+                  className="btn btn-primary"
+                  href={newAppointmentHref(ptsId, dialog.activity.id)}
+                >
+                  <Icon name="session" className="icon-sm" />
+                  Registrar atendimento
+                </Link>
+              )}
             </>
           }
           onClose={() => setDialog(null)}

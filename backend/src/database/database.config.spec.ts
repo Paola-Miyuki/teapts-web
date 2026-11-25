@@ -38,6 +38,8 @@ import { ActivityDocumentEntity as ActivityDocument } from '../activities/entiti
 import { AddPtsClosingColumns1791149080000 } from './migrations/1791149080000-AddPtsClosingColumns';
 import { AddPtsVersion1791149100000 } from './migrations/1791149100000-AddPtsVersion';
 import { AddPtsReassessmentColumns1791149110000 } from './migrations/1791149110000-AddPtsReassessmentColumns';
+import { CreateAppointment1791149120000 } from './migrations/1791149120000-CreateAppointment';
+import { AppointmentEntity as Appointment } from '../appointments/entities/appointment.entity';
 import { SupportContact } from '../patients/entities/support-contact.entity';
 
 const DATABASE_KEYS = [
@@ -103,6 +105,7 @@ describe('getDatabaseOptions', () => {
         Account,
         Activity,
         ActivityDocument,
+        Appointment,
         Medication,
         Notification,
         Patient,
@@ -141,6 +144,7 @@ describe('getDatabaseOptions', () => {
         AddPatientProfileFields1791149090000,
         AddPtsVersion1791149100000,
         AddPtsReassessmentColumns1791149110000,
+        CreateAppointment1791149120000,
       ],
     });
   });

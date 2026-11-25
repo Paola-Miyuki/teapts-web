@@ -24,5 +24,6 @@ import { ActivitiesService } from './services/activities.service';
     ActivitiesService,
     { provide: ActivitiesRepository, useClass: ActivitiesRepositoryImpl },
   ],
+  exports: [ActivitiesRepository],
 })
 export class ActivitiesModule {}
