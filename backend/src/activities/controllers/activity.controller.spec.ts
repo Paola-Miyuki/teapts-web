@@ -92,4 +92,27 @@ describe('ActivityController (RFACT002, RFACT005, RFACT008)', () => {
       repo.statusChanges.map(({ executedByAccountId }) => executedByAccountId),
     ).toEqual([member.accountId, member.accountId, member.accountId]);
   });
+
+  it('aprova e rejeita pela conta da sessão (RFACT003)', async () => {
+    const repo = new InMemoryActivitiesRepository();
+    repo.activities.push(
+      storedActivity(),
+      storedActivity({ id: 'act-2', title: 'Outra' }),
+    );
+    const controller = new ActivityController(
+      new ActivitiesService(repo, seededGoalsRepo()),
+    );
+
+    expect(await controller.approveActivity('act-1', member)).toEqual({
+      id: 'act-1',
+      status: 'running',
+      decidedAt: '2026-12-02T12:00:00.000Z',
+    });
+    expect(
+      await controller.rejectActivity('act-2', { reason: 'Repetida' }, member),
+    ).toMatchObject({ id: 'act-2', status: 'rejected' });
+    expect(
+      repo.decisions.map(({ executedByAccountId }) => executedByAccountId),
+    ).toEqual([member.accountId, member.accountId]);
+  });
 });
