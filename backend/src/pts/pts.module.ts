@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AccountsModule } from '../accounts/accounts.module';
 import { PtsController } from './controllers/pts.controller';
+import { PtsHistoryController } from './controllers/pts-history.controller';
 import { PtsEntity } from './entities/pts.entity';
 import { PtsRepository } from './repositories/pts.repository';
 import { PtsRepositoryImpl } from './repositories/pts.repository.impl';
@@ -17,7 +18,7 @@ import { TimelineModule } from '../timeline/timeline.module';
     TypeOrmModule.forFeature([PtsEntity, Professional, Patient]),
     TimelineModule,
   ],
-  controllers: [PtsController],
+  controllers: [PtsController, PtsHistoryController],
   providers: [
     PtsService,
     { provide: PtsRepository, useClass: PtsRepositoryImpl },

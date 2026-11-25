@@ -127,6 +127,13 @@ export const ptsForbidden = () =>
     'Você não tem acesso a este PTS.',
   );
 
+export const ptsHistoryForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Você não tem acesso ao histórico deste paciente.',
+  );
+
 export const ptsNotFound = () =>
   new PtsApiError(HttpStatus.NOT_FOUND, 'PTS_NOT_FOUND', 'PTS não encontrado.');
 

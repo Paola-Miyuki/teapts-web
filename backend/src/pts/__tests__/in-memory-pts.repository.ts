@@ -2,6 +2,7 @@ import { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
+import type { PtsHistoryItemDto } from '../dto/pts-history.dto';
 import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
 import type { UpdatePtsProposalInput } from '../repositories/pts.repository';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
@@ -12,6 +13,8 @@ import {
   PtsRepository,
   type FindPtsProposalsInput,
   type FindPtsProposalsResult,
+  type FindPtsHistoryInput,
+  type FindPtsHistoryResult,
   type RemoveTeamMemberInput,
   type AddTeamMembersInput,
   type PtsSheetTarget,
@@ -161,6 +164,51 @@ export class InMemoryPtsRepository extends PtsRepository {
 
   async findPtsById(id: string): Promise<PtsDetailResponseDto | null> {
     return this.ptsById.get(id) ?? null;
+  }
+
+  async findPtsHistory(
+    input: FindPtsHistoryInput,
+  ): Promise<FindPtsHistoryResult> {
+    const allForPatient = [...this.ptsById.values()]
+      .filter((pts) => pts.patient.id === input.patientId)
+      .sort(
+        (a, b) =>
+          Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+          a.id.localeCompare(b.id),
+      );
+    const versionById = new Map(
+      allForPatient.map((pts, index) => [pts.id, index + 1]),
+    );
+    const accessible = allForPatient.filter(
+      (pts) =>
+        input.professionalProfileIds.length === 0 ||
+        input.professionalProfileIds.includes(pts.responsible.id) ||
+        pts.team.some((member) =>
+          input.professionalProfileIds.includes(member.id),
+        ),
+    );
+    const descending = accessible.reverse();
+    const start = (input.page - 1) * input.limit;
+    const rows: PtsHistoryItemDto[] = descending
+      .slice(start, start + input.limit)
+      .map((pts) => ({
+        id: pts.id,
+        version: versionById.get(pts.id) ?? 1,
+        status: pts.status,
+        responsible: {
+          id: pts.responsible.id,
+          name: pts.responsible.name,
+          specialism: pts.responsible.specialism.name,
+        },
+        team: pts.team.map(({ id, name }) => ({ id, name })),
+        createdAt: pts.createdAt,
+        acceptedAt: pts.acceptedAt,
+        beganAt: pts.beganAt,
+        closedAt: pts.concludedAt ?? pts.cancelledAt ?? pts.rejectedAt,
+        goalsResult: null,
+      }));
+
+    return { rows, total: accessible.length };
   }
 
   async findProposalById(id: string): Promise<PtsProposalResponseDto | null> {
