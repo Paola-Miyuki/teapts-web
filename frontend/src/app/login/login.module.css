@@ -126,15 +126,6 @@
   height: 19px;
 }
 
-.revealButton[aria-pressed='true']::after {
-  content: '';
-  position: absolute;
-  width: 21px;
-  height: 1.5px;
-  background: currentColor;
-  transform: rotate(-45deg);
-}
-
 .options {
   margin: -6px 0 24px;
   display: flex;

@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import EmailPassword from 'supertokens-web-js/recipe/emailpassword';
 import LoginPage from './page';
@@ -70,5 +73,25 @@ describe('LoginPage', () => {
         { id: 'password', value: 'teapts123' },
       ],
     });
+  });
+
+  it('mostra o olho aberto com a senha visível e fechado com ela oculta', () => {
+    const input = screen.getByLabelText('Senha');
+    const button = screen.getByRole('button', { name: 'Mostrar senha' });
+
+    // O olho aberto tem a pupila (circle); o fechado, não.
+    expect(input).toHaveAttribute('type', 'password');
+    expect(button.querySelector('circle')).toBeNull();
+
+    fireEvent.click(button);
+    expect(input).toHaveAttribute('type', 'text');
+    expect(button).toHaveAccessibleName('Ocultar senha');
+    expect(button.querySelector('circle')).not.toBeNull();
+  });
+
+  it('não desenha um risco sobre o olho', () => {
+    const css = readFileSync(join(__dirname, 'login.module.css'), 'utf8');
+
+    expect(css).not.toMatch(/.revealButton[^{]*::(after|before)/);
   });
 });
