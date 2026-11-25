@@ -79,7 +79,7 @@ function canDeactivate(professional: Professional) {
 }
 
 function blockedNote(name: string) {
-  return `Desativar fica bloqueado: ${name} é responsável por PTS ativo. Transfira a responsabilidade antes.`;
+  return `Desativar fica bloqueado: ${name} é responsável por PTS ativo. Transfira a responsabilidade antes`;
 }
 
 // "Visualizar" do admin: perfil profissional e conta, com "Editar
@@ -328,7 +328,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         : current,
     );
     setEditing(null);
-    setNotice('Especialidade atualizada.');
+    setNotice('Especialidade atualizada');
   }
 
   // A linha passa para "Inativo" sem recarregar a lista.
@@ -346,7 +346,7 @@ export default function Professionals({ isAdmin }: { isAdmin: boolean }) {
         : current,
     );
     setDeactivating(null);
-    setNotice('Profissional desativado.');
+    setNotice('Profissional desativado');
   }
 
   const hasFilters = Boolean(specialismKey || councilKey || uf || statusKey);

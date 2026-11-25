@@ -150,7 +150,7 @@ describe('abas do PTS do paciente', () => {
       ).getByRole('button', { name: 'Rejeitar proposta' }),
     );
 
-    expect(await screen.findByText('Proposta rejeitada.')).toBeInTheDocument();
+    expect(await screen.findByText('Proposta rejeitada')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Nenhuma proposta aguardando você' }),
     ).toBeInTheDocument();

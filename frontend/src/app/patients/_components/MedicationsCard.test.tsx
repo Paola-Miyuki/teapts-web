@@ -111,7 +111,7 @@ describe('MedicationsCard', () => {
 
     render(<MedicationsCard patientId="patient-1" canEdit />);
 
-    await screen.findByText('Nenhuma medicação encontrada.');
+    expect(await screen.findByText('Nenhuma medicação')).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -328,7 +328,7 @@ describe('MedicationsCard', () => {
 
     render(<MedicationsCard patientId="patient-1" canEdit />);
 
-    await screen.findByText('Nenhuma medicação encontrada.');
+    expect(await screen.findByText('Nenhuma medicação')).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -409,5 +409,26 @@ describe('MedicationsCard', () => {
 
     expect(screen.queryByText('Risperidona')).not.toBeInTheDocument();
     expect(screen.getByText('Melatonina')).toBeInTheDocument();
+  });
+
+  it('mostra um estado vazio em cada aba sem medicações', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(respond(200, { data: [MEDICATION] }));
+
+    render(<MedicationsCard patientId="patient-1" canEdit={false} />);
+
+    await screen.findByText('Risperidona');
+
+    const tabs = screen.getByRole('navigation', {
+      name: 'Situação das medicações',
+    });
+
+    fireEvent.click(within(tabs).getByText('Suspensas'));
+
+    expect(screen.getByText('Nenhuma medicação suspensa')).toBeInTheDocument();
+    expect(
+      screen.getByText('Nenhuma medicação foi suspensa até agora.'),
+    ).toBeInTheDocument();
   });
 });

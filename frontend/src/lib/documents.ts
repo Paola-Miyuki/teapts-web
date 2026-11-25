@@ -23,8 +23,8 @@ export const ACCEPTED_EXTENSIONS = FILE_TYPES.flatMap(
   .join(',');
 
 export const FILE_TYPE_ERROR =
-  'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX.';
-export const FILE_SIZE_ERROR = 'O arquivo deve ter no máximo 5 MB.';
+  'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX';
+export const FILE_SIZE_ERROR = 'O arquivo deve ter no máximo 5 MB';
 
 /**
  * Tipo do arquivo para a API: o que o navegador informa, ou o da extensão
@@ -53,7 +53,7 @@ export function validateFile(file: File): string {
   }
 
   if (file.size === 0) {
-    return 'O arquivo está vazio.';
+    return 'O arquivo está vazio';
   }
 
   if (file.size > MAX_FILE_SIZE_BYTES) {

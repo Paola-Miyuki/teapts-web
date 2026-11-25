@@ -193,7 +193,7 @@ describe('PtsProposalsPage para o admin', () => {
     );
 
     expect(
-      await screen.findByText('Proposta aprovada. O PTS está em planejamento.'),
+      await screen.findByText('Proposta aprovada, o PTS está em planejamento'),
     ).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       'http://localhost:3000/pts/proposals/proposal-1/approve',

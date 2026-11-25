@@ -223,7 +223,7 @@ describe('UploadDocumentPage', () => {
 
     expect(
       await screen.findByText(
-        'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX.',
+        'Tipo de arquivo não permitido. Envie PDF, PNG, JPG, DOC ou DOCX',
       ),
     ).toBeInTheDocument();
     expect(uploadCalls()).toHaveLength(0);
@@ -241,7 +241,7 @@ describe('UploadDocumentPage', () => {
     chooseFile(big);
 
     expect(
-      await screen.findByText('O arquivo deve ter no máximo 5 MB.'),
+      await screen.findByText('O arquivo deve ter no máximo 5 MB'),
     ).toBeInTheDocument();
     expect(uploadCalls()).toHaveLength(0);
   });

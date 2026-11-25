@@ -146,7 +146,7 @@ export default function PtsHistoryTab({ patientId }: { patientId: string }) {
     const message =
       state.error instanceof ApiError && state.error.apiMessage
         ? state.error.apiMessage
-        : 'Verifique sua conexão e tente novamente.';
+        : 'Verifique sua conexão e tente novamente';
 
     return (
       <div className={ui.empty} role="alert">
@@ -175,10 +175,6 @@ export default function PtsHistoryTab({ patientId }: { patientId: string }) {
           <h2 id="pts-history-title">Histórico de PTS</h2>
           <p className="count" aria-live="polite">
             {state.total} PTS
-          </p>
-          <p>
-            Cada linha representa um PTS do paciente, em qualquer status. Abra
-            uma linha para consultar os detalhes em modo somente leitura.
           </p>
         </div>
       </div>
