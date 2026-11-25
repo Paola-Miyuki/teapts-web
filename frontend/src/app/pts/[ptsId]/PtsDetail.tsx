@@ -466,6 +466,11 @@ function PtsDetailContent({
               reloadGoals();
             }}
             canCreate={canCreateActivity}
+            canEdit={(activity) =>
+              !readOnly &&
+              !isPatient &&
+              can(account, 'editActivity', { pts: permissionPts, activity })
+            }
             team={members.map((member) => ({
               id: member.id,
               name: member.name,
