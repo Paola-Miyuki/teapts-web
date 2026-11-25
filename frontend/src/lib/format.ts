@@ -139,3 +139,15 @@ export function initials(name: string) {
 export function formatCep(cep: string) {
   return cep.replace(/^(\d{5})(\d{3})$/, '$1-$2');
 }
+
+/** Data `AAAA-MM-DD` alguns meses depois; dia que não existe vira o último do mês. */
+export function addMonths(date: string, months: number) {
+  const [year, month, day] = date.split('-').map(Number);
+  const result = new Date(Date.UTC(year, month - 1 + months, day));
+
+  if (result.getUTCDate() !== day) {
+    result.setUTCDate(0);
+  }
+
+  return result.toISOString().slice(0, 10);
+}
