@@ -24,6 +24,7 @@ export type PermissionAction =
   | 'editPts'
   | 'manageGoals'
   | 'createActivity'
+  | 'editActivity'
   | 'removePtsTeamMember'
   | 'createPts'
   | 'approvePtsProposal'
@@ -43,8 +44,14 @@ export type PtsPermissionData = {
   teamProfessionalIds?: readonly string[];
 };
 
+export type ActivityPermissionData = {
+  status: string;
+  authorProfessionalId: string | null;
+};
+
 export type PermissionContext = {
   pts?: PtsPermissionData;
+  activity?: ActivityPermissionData;
   // O profissional só tem PTS encerrado com o paciente (`readOnly` da API).
   patientReadOnly?: boolean;
 };
@@ -80,6 +87,11 @@ function isEditablePts(pts?: PtsPermissionData) {
   return pts?.status?.toLowerCase() === 'draft' || isActivePts(pts);
 }
 
+// Rejeitada ou arquivada não muda, nem pelo admin (RFACT005).
+function isLockedActivity(activity?: ActivityPermissionData) {
+  return ['rejected', 'archived'].includes(activity?.status ?? '');
+}
+
 function isProposalMember(user: PermissionUser, pts: PtsPermissionData) {
   const memberIds = [
     pts.responsibleProfessionalId,
@@ -98,7 +110,7 @@ export function can(
   const admin = kind === 'admin';
   const professional = kind === 'professional';
   const patient = kind === 'patient';
-  const { pts } = context;
+  const { pts, activity } = context;
 
   // RN022 – o administrador acessa todo o sistema. Ficam de fora o que só
   // escolhe o início (paciente e conta sem perfil) e a regra de estado:
@@ -123,6 +135,12 @@ export function can(
       case 'manageGoals':
       case 'createActivity':
         return isEditablePts(pts);
+      case 'editActivity':
+        return (
+          isEditablePts(pts) &&
+          activity !== undefined &&
+          !isLockedActivity(activity)
+        );
       default:
         return true;
     }
@@ -205,6 +223,33 @@ export function can(
         isEditablePts(pts) &&
         isProposalMember(user, pts)
       );
+
+    case 'editActivity': {
+      // RFACT005 – o autor edita a sugerida; o responsável do PTS, a sugerida
+      // ou em andamento. Os dois precisam seguir na equipe.
+      if (
+        !professional ||
+        pts === undefined ||
+        activity === undefined ||
+        !isEditablePts(pts)
+      ) {
+        return false;
+      }
+
+      const memberIds = [
+        pts.responsibleProfessionalId,
+        ...(pts.teamProfessionalIds ?? []),
+      ];
+      const isOwn = (id?: string | null) =>
+        Boolean(id) &&
+        memberIds.includes(id) &&
+        user.professionalProfileIds.includes(id ?? '');
+      const responsible = isOwn(pts.responsibleProfessionalId);
+
+      return activity.status === 'suggested'
+        ? responsible || isOwn(activity.authorProfessionalId)
+        : activity.status === 'running' && responsible;
+    }
 
     case 'removePtsTeamMember':
       // RFEM003 – profissional responsável, com o PTS em planejamento ou execução.
