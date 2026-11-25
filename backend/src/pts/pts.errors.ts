@@ -214,3 +214,38 @@ export const newResponsibleInvalid = () =>
     'NEW_RESPONSIBLE_INVALID',
     'O profissional indicado para assumir a responsabilidade é inválido ou já é o responsável atual.',
   );
+
+export const goalForbidden = () =>
+  new PtsApiError(
+    HttpStatus.FORBIDDEN,
+    'FORBIDDEN',
+    'Somente a equipe do PTS e o administrador podem alterar as metas.',
+  );
+
+export const goalNotFound = () =>
+  new PtsApiError(
+    HttpStatus.NOT_FOUND,
+    'GOAL_NOT_FOUND',
+    'Meta não encontrada.',
+  );
+
+export const ptsNotEditable = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'PTS_NOT_EDITABLE',
+    'As metas só mudam com o PTS em proposta, em planejamento ou em andamento.',
+  );
+
+export const lastGoal = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'LAST_GOAL',
+    'O PTS precisa ter ao menos uma meta.',
+  );
+
+export const goalHasActivities = () =>
+  new PtsApiError(
+    HttpStatus.CONFLICT,
+    'GOAL_HAS_ACTIVITIES',
+    'A meta tem atividades ligadas. Desligue as atividades antes de excluir.',
+  );

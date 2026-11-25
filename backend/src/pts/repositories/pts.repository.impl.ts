@@ -1273,7 +1273,7 @@ export class PtsRepositoryImpl extends PtsRepository {
         pts.cancelledAt?.toISOString() ??
         pts.rejectedAt?.toISOString() ??
         null,
-      // O modelo pts_goal ainda não existe; a API mantém o campo nullable.
+      // O resultado das metas é dado na reavaliação (RFEVA005).
       goalsResult: null,
     };
   }
