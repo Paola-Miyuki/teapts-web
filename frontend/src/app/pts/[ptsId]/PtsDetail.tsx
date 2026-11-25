@@ -85,16 +85,35 @@ function professionalLabel(professional: PtsProfessional) {
 
 // Detalhe do PTS: `pts-detalhe.html` para a equipe e o admin, `pts.html` para o paciente.
 // Metas, atividades, atendimentos e as ações do PTS entram com as tasks deles.
-export default function PtsDetailPage({ id }: { id: string }) {
+export default function PtsDetailPage({
+  id,
+  readOnly = false,
+  version,
+}: {
+  id: string;
+  readOnly?: boolean;
+  version?: number;
+}) {
   const [patientName, setPatientName] = useState('');
 
   return (
     <AuthenticatedPage
-      currentHref="/pts/proposals"
-      breadcrumb={[
-        { label: 'PTS', href: '/pts/proposals' },
-        { label: patientName || 'Detalhe do PTS' },
-      ]}
+      currentHref={(kind) => (kind === 'patient' ? '/pts' : '/pts/proposals')}
+      breadcrumb={(kind) =>
+        kind === 'patient'
+          ? [
+              { label: 'Meu PTS', href: '/pts' },
+              {
+                label: version
+                  ? `${version}º PTS`
+                  : patientName || 'Detalhe do PTS',
+              },
+            ]
+          : [
+              { label: 'PTS', href: '/pts/proposals' },
+              { label: patientName || 'Detalhe do PTS' },
+            ]
+      }
       requiredAction="viewPts"
     >
       {(account, kind) => (
@@ -103,6 +122,8 @@ export default function PtsDetailPage({ id }: { id: string }) {
           onLoaded={setPatientName}
           isPatient={kind === 'patient'}
           account={account}
+          readOnly={readOnly}
+          version={version}
         />
       )}
     </AuthenticatedPage>
@@ -114,11 +135,15 @@ function PtsDetailContent({
   onLoaded,
   isPatient,
   account,
+  readOnly,
+  version,
 }: {
   id: string;
   onLoaded: (patientName: string) => void;
   isPatient: boolean;
   account: Account;
+  readOnly: boolean;
+  version?: number;
 }) {
   const router = useRouter();
   const canOpenRecord = can(account, 'viewAuthorizedPatients');
@@ -213,11 +238,13 @@ function PtsDetailContent({
   // RFEM001 – só o responsável ou o admin, e só com o PTS em planejamento ou
   // andamento (a API responde 409 PTS_NOT_ACTIVE fora disso).
   const canManageTeam =
+    !readOnly &&
     (isAdmin || currentUserProfileIds.includes(pts.responsible.id)) &&
     ['planning', 'running'].includes(pts.status);
 
   // RFPTS005 – equipe ou admin, com o PTS ativo; o paciente não edita.
   const canEditPts =
+    !readOnly &&
     !isPatient &&
     (isAdmin ||
       members.some((member) => currentUserProfileIds.includes(member.id))) &&
@@ -227,10 +254,13 @@ function PtsDetailContent({
     status: pts.status,
     responsibleProfessionalId: pts.responsible.id,
   };
-  const canStart = can(account, 'startPts', { pts: permissionPts });
-  const canReassess = can(account, 'registerPtsReassessment', {
-    pts: permissionPts,
-  });
+  const canStart =
+    !readOnly && can(account, 'startPts', { pts: permissionPts });
+  const canReassess =
+    !readOnly &&
+    can(account, 'registerPtsReassessment', {
+      pts: permissionPts,
+    });
 
   const handleStarted = ({ status, beganAt }: PtsStartResponse) => {
     setPts((prev) => (prev ? { ...prev, status, beganAt } : prev));
@@ -256,7 +286,9 @@ function PtsDetailContent({
             <Icon name="pts" />
           </span>
           <div>
-            <h1 id="pts-title">PTS de {pts.patient.name}</h1>
+            <h1 id="pts-title">
+              {version ? `${version}º PTS` : `PTS de ${pts.patient.name}`}
+            </h1>
             <div className="ux-badges">
               <PtsStatusBadge status={pts.status} />
             </div>
@@ -266,6 +298,9 @@ function PtsDetailContent({
         <dl className="ux-dl">
           <Item label="Responsável">{professionalLabel(pts.responsible)}</Item>
           <Item label="Criado em">{formatDate(pts.createdAt)}</Item>
+          {pts.acceptedAt && (
+            <Item label="Aceito em">{formatDate(pts.acceptedAt)}</Item>
+          )}
           <Item label="Início">{pts.beganAt && formatDate(pts.beganAt)}</Item>
           {pts.concludedAt && (
             <Item label="Concluído em">{formatDate(pts.concludedAt)}</Item>
@@ -277,6 +312,8 @@ function PtsDetailContent({
             <Item label="Rejeitado em">{formatDate(pts.rejectedAt)}</Item>
           )}
         </dl>
+
+        {readOnly && <p className="hint">Visualização somente leitura.</p>}
 
         {(canOpenRecord || canEditPts) && (
           <div className="heading-actions">

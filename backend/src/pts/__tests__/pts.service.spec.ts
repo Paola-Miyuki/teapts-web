@@ -1380,12 +1380,10 @@ describe('PtsService.findPtsById', () => {
     ).resolves.toMatchObject({ status: PtsStateEnum.REJECTED });
   });
 
-  it('answers 403 to a team member of a rejected PTS', async () => {
-    await expectApiError(
-      () => service.findPtsById('pts-rejected', teamAccount),
-      403,
-      'FORBIDDEN',
-    );
+  it('returns a rejected PTS to a member of its team (RN016)', async () => {
+    await expect(
+      service.findPtsById('pts-rejected', teamAccount),
+    ).resolves.toMatchObject({ status: PtsStateEnum.REJECTED });
   });
 
   it('answers 403 to a professional outside the team and to another patient', async () => {
@@ -1406,6 +1404,110 @@ describe('PtsService.findPtsById', () => {
       () => service.findPtsById('missing', adminAccount),
       404,
       'PTS_NOT_FOUND',
+    );
+  });
+});
+
+describe('PtsService.findPtsHistory', () => {
+  let repo: InMemoryPtsRepository;
+  let service: PtsService;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    repo.ptsById.set('pts-old', {
+      id: 'pts-old',
+      status: PtsStateEnum.CONCLUDED,
+      socialSituation: 'Confidencial',
+      caseStudyDate: '2025-01-01',
+      diagnosisSummary: 'Diagnóstico',
+      cid: null,
+      supportLevel: null,
+      strengths: null,
+      priorityNeeds: [],
+      vulnerabilities: null,
+      comorbidities: null,
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2025-12-01',
+      createdAt: '2025-01-01T12:00:00.000Z',
+      acceptedAt: '2025-01-02T12:00:00.000Z',
+      rejectedAt: null,
+      beganAt: '2025-01-03T12:00:00.000Z',
+      concludedAt: '2025-06-01T12:00:00.000Z',
+      cancelledAt: null,
+      patient: { id: 'patient-25', name: 'Paciente' },
+      responsible: {
+        id: 'prof-10',
+        name: 'Ana Souza',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'João Lima',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+    repo.ptsById.set('pts-current', {
+      ...repo.ptsById.get('pts-old')!,
+      id: 'pts-current',
+      status: PtsStateEnum.RUNNING,
+      createdAt: '2026-01-01T12:00:00.000Z',
+      concludedAt: null,
+    });
+    service = new PtsService(repo);
+  });
+
+  it('returns a paginated patient history in descending creation order', async () => {
+    const result = await service.findPtsHistory(
+      'patient-25',
+      { page: 1, limit: 1 },
+      adminAccount,
+    );
+
+    expect(result.data).toMatchObject([
+      { id: 'pts-current', version: 2, status: PtsStateEnum.RUNNING },
+    ]);
+    expect(result.pagination).toEqual({
+      page: 1,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+    });
+  });
+
+  it('restricts a professional to linked PTS, including rejected and concluded items', async () => {
+    const result = await service.findPtsHistory(
+      'patient-25',
+      { page: 1, limit: 20 },
+      teamAccount,
+    );
+
+    expect(result.data.map(({ id }) => id)).toEqual(['pts-current', 'pts-old']);
+  });
+
+  it('forbids professionals without a linked PTS', async () => {
+    await expectApiError(
+      () =>
+        service.findPtsHistory(
+          'patient-25',
+          { page: 1, limit: 20 },
+          otherProfessionalAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('returns 404 for a patient that does not exist', async () => {
+    await expectApiError(
+      () =>
+        service.findPtsHistory('missing', { page: 1, limit: 20 }, adminAccount),
+      404,
+      'PATIENT_NOT_FOUND',
     );
   });
 });

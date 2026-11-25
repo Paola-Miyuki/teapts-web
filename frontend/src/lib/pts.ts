@@ -144,6 +144,54 @@ export type PtsDetail = {
   team: PtsProfessional[];
 };
 
+export type PtsHistoryItem = {
+  id: string;
+  version: number;
+  status: PtsStatus;
+  responsible: {
+    id: string;
+    name: string;
+    specialism: string;
+  };
+  team: Array<{ id: string; name: string }>;
+  createdAt: string;
+  acceptedAt: string | null;
+  beganAt: string | null;
+  closedAt: string | null;
+  goalsResult: {
+    achieved: number;
+    partiallyAchieved: number;
+    notAchieved: number;
+  } | null;
+};
+
+export type PtsHistoryResponse = {
+  data: PtsHistoryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export function getPtsHistory(
+  patientId: string,
+  page: number,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  return request<PtsHistoryResponse>(
+    `/patients/${encodeURIComponent(patientId)}/pts?${params.toString()}`,
+    { signal },
+  );
+}
+
 export function getPts(id: string, signal?: AbortSignal) {
   return request<PtsDetail>(`/pts/${encodeURIComponent(id)}`, { signal });
 }

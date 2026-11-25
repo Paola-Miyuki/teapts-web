@@ -12,6 +12,7 @@ import { ApiError } from '@/lib/api';
 import type { Account } from '@/lib/account';
 import { formatDate, formatPhone } from '@/lib/format';
 import { can } from '@/lib/permissions';
+import PtsHistoryTab from '@/components/pts/PtsHistoryTab';
 import {
   getPatient,
   type PatientDetail as Patient,
@@ -72,7 +73,9 @@ function PatientDetailContent({
 }) {
   const router = useRouter();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [activeTab, setActiveTab] = useState<'dados' | 'medicacoes'>('dados');
+  const [activeTab, setActiveTab] = useState<
+    'dados' | 'historico' | 'medicacoes'
+  >('dados');
   const [supportContacts, setSupportContacts] = useState<SupportContact[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -161,6 +164,17 @@ function PatientDetailContent({
           }}
         >
           Dados do paciente
+        </a>
+
+        <a
+          href="#historico-pts"
+          aria-current={activeTab === 'historico' ? 'page' : undefined}
+          onClick={(event) => {
+            event.preventDefault();
+            setActiveTab('historico');
+          }}
+        >
+          Histórico de PTS
         </a>
 
         <a
@@ -329,6 +343,12 @@ function PatientDetailContent({
               patientReadOnly: patient.readOnly,
             })}
           />
+        </section>
+      )}
+
+      {activeTab === 'historico' && (
+        <section data-panel="historico-pts" id="historico-pts">
+          <PtsHistoryTab patientId={patient.id} />
         </section>
       )}
 

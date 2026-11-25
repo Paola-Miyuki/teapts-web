@@ -1,4 +1,5 @@
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
+import type { PtsHistoryItemDto } from '../dto/pts-history.dto';
 import type { CreatePtsResponseDto } from '../dto/create-pts.dto';
 import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
@@ -35,6 +36,18 @@ export interface FindPtsProposalsInput {
 
 export interface FindPtsProposalsResult {
   rows: PtsProposalResponseDto[];
+  total: number;
+}
+
+export interface FindPtsHistoryInput {
+  patientId: string;
+  professionalProfileIds: string[];
+  page: number;
+  limit: number;
+}
+
+export interface FindPtsHistoryResult {
+  rows: PtsHistoryItemDto[];
   total: number;
 }
 
@@ -156,6 +169,10 @@ export abstract class PtsRepository {
   abstract findProposalById(id: string): Promise<PtsProposalResponseDto | null>;
 
   abstract findPtsById(id: string): Promise<PtsDetailResponseDto | null>;
+
+  abstract findPtsHistory(
+    input: FindPtsHistoryInput,
+  ): Promise<FindPtsHistoryResult>;
 
   abstract updateDraftProposal(
     input: UpdatePtsProposalInput,

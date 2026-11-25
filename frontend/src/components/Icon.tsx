@@ -24,6 +24,12 @@ const glyphs = {
       <path d="M9 3h6v3H9zM9 11h6m-6 4h6" />
     </>
   ),
+  pill: (
+    <>
+      <path d="M6.5 17.5a5 5 0 0 1 0-7.07l5.66-5.66a5 5 0 0 1 7.07 7.07l-5.66 5.66a5 5 0 0 1-7.07 0Z" />
+      <path d="m9 9 6 6" />
+    </>
+  ),
   logout: <path d="M9 3H4v18h5M10 12h11m-4-4 4 4-4 4" />,
   profile: (
     <>

@@ -139,6 +139,11 @@ export class PtsController {
   @ApiCookieAuth()
   @ApiBearerAuth()
   @ApiOkResponse({ type: PtsDetailResponseDto })
+  @ApiOperation({
+    summary: 'Consulta um PTS em qualquer estado (RFPTS009)',
+    description:
+      'Retorna o detalhe somente para leitura a quem tem acesso ao PTS. Para o paciente, omite a ficha e a situação social (RN028).',
+  })
   @ApiBadRequestResponse({ type: ErrorResponseDto })
   @ApiForbiddenResponse({ type: ErrorResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto })

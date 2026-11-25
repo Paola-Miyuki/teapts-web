@@ -31,7 +31,10 @@ import {
   type AddTeamMembersInput,
   type TransferResponsibilityInput,
   type StartPtsInput,
+  type FindPtsHistoryInput,
+  type FindPtsHistoryResult,
 } from './pts.repository';
+import type { PtsHistoryItemDto } from '../dto/pts-history.dto';
 import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
 import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
 import type { PtsProposalResponseDto } from '../dto/pts-proposal-response.dto';
@@ -367,6 +370,61 @@ export class PtsRepositoryImpl extends PtsRepository {
       .getOne();
 
     return pts ? this.toDetailResponse(pts) : null;
+  }
+
+  async findPtsHistory(
+    input: FindPtsHistoryInput,
+  ): Promise<FindPtsHistoryResult> {
+    const query = this.ptsRepository
+      .createQueryBuilder('pts')
+      .leftJoinAndSelect('pts.responsible', 'responsible')
+      .leftJoinAndSelect('responsible.account', 'responsibleAccount')
+      .leftJoinAndSelect('pts.team', 'team')
+      .leftJoinAndSelect('team.account', 'teamAccount')
+      .where('pts.patientId = :patientId', { patientId: input.patientId });
+
+    if (input.professionalProfileIds.length > 0) {
+      query.andWhere(
+        new Brackets((where) => {
+          where
+            .where('pts.responsibleProfessionalId IN (:...profileIds)', {
+              profileIds: input.professionalProfileIds,
+            })
+            .orWhere('team.id IN (:...profileIds)', {
+              profileIds: input.professionalProfileIds,
+            });
+        }),
+      );
+    }
+
+    const [ptsRows, total] = await query
+      .orderBy('pts.createdAt', 'DESC')
+      .addOrderBy('pts.id', 'DESC')
+      .skip((input.page - 1) * input.limit)
+      .take(input.limit)
+      .getManyAndCount();
+
+    const versionRows = await this.ptsRepository
+      .createQueryBuilder('versioned')
+      .select('versioned.id', 'id')
+      .addSelect(
+        'ROW_NUMBER() OVER (ORDER BY versioned.createdAt ASC, versioned.id ASC)',
+        'version',
+      )
+      .where('versioned.patientId = :patientId', {
+        patientId: input.patientId,
+      })
+      .orderBy('versioned.createdAt', 'ASC')
+      .addOrderBy('versioned.id', 'ASC')
+      .getRawMany<{ id: string; version: string }>();
+    const versions = new Map(
+      versionRows.map((row) => [row.id, Number(row.version)]),
+    );
+
+    return {
+      rows: ptsRows.map((pts) => this.toHistoryItem(pts, versions)),
+      total,
+    };
   }
 
   async updateDraftProposal(
@@ -1185,6 +1243,38 @@ export class PtsRepositoryImpl extends PtsRepository {
       rejectedAt: pts.rejectedAt?.toISOString() ?? null,
       concludedAt: pts.concludedAt?.toISOString() ?? null,
       cancelledAt: pts.cancelledAt?.toISOString() ?? null,
+    };
+  }
+
+  private toHistoryItem(
+    pts: PtsEntity,
+    versions: Map<string, number>,
+  ): PtsHistoryItemDto {
+    const responsible = this.mapProfessional(pts.responsible);
+
+    return {
+      id: pts.id,
+      version: versions.get(pts.id) ?? 1,
+      status: pts.status,
+      responsible: {
+        id: responsible.id,
+        name: responsible.name,
+        specialism: responsible.specialism.name,
+      },
+      team: (pts.team ?? []).map((member) => ({
+        id: member.id,
+        name: member.account?.name ?? '',
+      })),
+      createdAt: pts.createdAt.toISOString(),
+      acceptedAt: pts.acceptedAt?.toISOString() ?? null,
+      beganAt: pts.beganAt?.toISOString() ?? null,
+      closedAt:
+        pts.concludedAt?.toISOString() ??
+        pts.cancelledAt?.toISOString() ??
+        pts.rejectedAt?.toISOString() ??
+        null,
+      // O modelo pts_goal ainda não existe; a API mantém o campo nullable.
+      goalsResult: null,
     };
   }
 

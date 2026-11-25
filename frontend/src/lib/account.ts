@@ -147,13 +147,17 @@ export function getNavigation(account: Account, currentHref: string) {
   if (can(account, 'viewOwnCare')) {
     items.push({
       href: '/medications',
-      icon: 'clipboard',
+      icon: 'pill',
       label: 'Medicações',
     });
   }
 
   if (can(account, 'viewPtsProposals')) {
-    items.push({ href: '/pts/proposals', icon: 'clipboard', label: 'PTS' });
+    items.push({
+      href: '/pts/proposals',
+      icon: 'clipboard',
+      label: account.patientProfileId !== null ? 'Propostas de PTS' : 'PTS',
+    });
   }
 
   if (can(account, 'viewAuthorizedPatients')) {

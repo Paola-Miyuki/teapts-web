@@ -13,6 +13,10 @@ import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
 import type { PtsSheetViewDto } from '../dto/update-pts-sheet.dto';
 import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
 import type {
+  GetPtsHistoryResponseDto,
+  PtsHistoryQueryDto,
+} from '../dto/pts-history.dto';
+import type {
   UpdatePtsSheetRequestDto,
   UpdatePtsSheetResponseDto,
 } from '../dto/update-pts-sheet.dto';
@@ -39,6 +43,7 @@ import {
   activePtsNotFound,
   ptsNotActive,
   ptsForbidden,
+  ptsHistoryForbidden,
   ptsNotFound,
   ptsNotPlanning,
   ptsStartForbidden,
@@ -257,11 +262,7 @@ export class PtsService {
     return activePts;
   }
 
-  /**
-- Retorna um PTS em qualquer estado (RFPTS009). O admin vê todos (RN022); o
-- paciente, os próprios, sem a ficha, só com a próxima revisão (RN028); o profissional, os
-- de cuja equipe faz parte, menos o rejeitado (RN016).
-   */
+  /** Retorna um PTS em qualquer estado, dentro do escopo de acesso (RFPTS009). */
   async findPtsById(
     id: string,
     account: AccountContext,
@@ -276,21 +277,60 @@ export class PtsService {
       return pts;
     }
 
+    if (account.patientProfileId === pts.patient.id) {
+      return withoutSheet(pts);
+    }
+
     const profileIds = account.professionalProfileIds;
     const isProfessionalOnPts =
-      pts.status !== PtsStateEnum.REJECTED &&
-      (profileIds.includes(pts.responsible.id) ||
-        pts.team.some((member) => profileIds.includes(member.id)));
+      profileIds.includes(pts.responsible.id) ||
+      pts.team.some((member) => profileIds.includes(member.id));
 
     if (isProfessionalOnPts) {
       return pts;
     }
 
-    if (account.patientProfileId === pts.patient.id) {
-      return withoutSheet(pts);
+    throw ptsForbidden();
+  }
+
+  async findPtsHistory(
+    patientId: string,
+    query: PtsHistoryQueryDto,
+    account: AccountContext,
+  ): Promise<GetPtsHistoryResponseDto> {
+    if (!(await this.ptsRepository.patientExists(patientId))) {
+      throw patientNotFound();
     }
 
-    throw ptsForbidden();
+    const admin = isAdmin(account);
+    const isPatientOwner = account.patientProfileId === patientId;
+    const professionalProfileIds =
+      admin || isPatientOwner ? [] : account.professionalProfileIds;
+
+    if (!admin && !isPatientOwner && professionalProfileIds.length === 0) {
+      throw ptsHistoryForbidden();
+    }
+
+    const result = await this.ptsRepository.findPtsHistory({
+      patientId,
+      professionalProfileIds,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    if (!admin && !isPatientOwner && result.total === 0) {
+      throw ptsHistoryForbidden();
+    }
+
+    return {
+      data: result.rows,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / query.limit),
+      },
+    };
   }
 
   async updatePtsProposal(
