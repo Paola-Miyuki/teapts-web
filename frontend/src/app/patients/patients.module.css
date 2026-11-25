@@ -257,3 +257,24 @@
   opacity: 0.6;
   transition: opacity 0.15s ease;
 }
+
+/* Estado do envio do arquivo (`enviar-documento.html`, passo "Arquivo"). */
+.uploadStatus {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.uploadStatus small {
+  color: var(--muted);
+}
+
+.uploadStatus progress {
+  width: 100%;
+}
+
+.uploadStatus p {
+  margin: 0;
+}

@@ -16,7 +16,7 @@ Scripts: `dev`, `build`, `start`, `test`, `test:cov`, `lint`, `typecheck`, `form
 src/
   app/            rotas; `_components/` guarda os componentes de cada tela
     login/ signup/ home/ profile/ accounts/ professionals/ medications/
-    patients/     lista e [patientId]/ (+ pts/)
+    patients/     lista e [patientId]/ (+ pts/, documents/new/)
     pts/          Meu PTS, [ptsId]/ (+ edit/), novo/, proposals/ ([proposalId]/edit/)
   components/     AppShell, AuthenticatedPage, Modal, ... (+ pts/, table/)
   hooks/  lib/    lib: clientes da API, permissions.ts, supertokens.ts
@@ -37,6 +37,7 @@ Toda tela autenticada usa `AuthenticatedPage`: sem sessão vai para `/login`; se
 | `/patients`                 | Pacientes e "Adicionar paciente"                                                                          | admin e profissional                           | `pacientes`, `criar-paciente`                    |
 | `/patients/:id`             | Dados, Medicações e contatos de suporte                                                                   | admin e profissional com acesso                | `paciente`                                       |
 | `/patients/:id/pts`         | PTS ativo do paciente                                                                                     | equipe e admin                                 | `pts-detalhe`                                    |
+| `/patients/:id/documents/new` | Enviar documento: arquivo (PDF, PNG, JPG, DOC, DOCX; até 5 MB) com progresso | admin, profissional com PTS ativo e o próprio paciente | `enviar-documento` |
 | `/medications`              | Minhas medicações                                                                                         | paciente                                       | `paciente`                                       |
 | `/professionals`            | Profissionais (botão "Adicionar profissional" e ações "Editar especialidade" e "Desativar" só para o admin)| admin e profissional                           | `profissionais`                                  |
 | `/professionals/new`        | Adicionar profissional: conta sem perfil, profissão (20), registro, instituição e CNES                    | admin                                          | `criar-profissional`                             |

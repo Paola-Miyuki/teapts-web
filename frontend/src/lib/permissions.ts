@@ -14,6 +14,7 @@ export type PermissionAction =
   | 'viewAuthorizedPatients'
   | 'viewPatientRegistry'
   | 'viewProfessionalDirectory'
+  | 'uploadDocument'
   | 'createProfessional'
   | 'manageAccounts'
   | 'viewPtsProposals'
@@ -155,6 +156,10 @@ export function can(
     case 'createProfessional':
       // RFPRO002 – só o administrador cria o perfil profissional.
       return admin;
+    case 'uploadDocument':
+      // RFDOC001, RN028 – o paciente envia os próprios documentos (a API
+      // confere o id); o profissional, só com PTS ativo do paciente.
+      return patient || (professional && context.patientReadOnly === false);
     case 'viewProfessionalDirectory':
       // RFPRO001 – profissional; administrador só para seleção.
       return admin || professional;
