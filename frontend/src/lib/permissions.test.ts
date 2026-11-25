@@ -168,6 +168,33 @@ describe('can', () => {
     },
   );
 
+  it.each(['draft', 'planning', 'running'])(
+    'deixa a equipe e o admin criarem atividade no PTS em %s',
+    (status) => {
+      const pts = { ...draft, status };
+
+      expect(can(professional, 'createActivity', { pts })).toBe(true);
+      expect(
+        can(professional, 'createActivity', {
+          pts: { ...pts, teamProfessionalIds: [] },
+        }),
+      ).toBe(false);
+      expect(can(admin, 'createActivity', { pts })).toBe(true);
+      expect(can(patient, 'createActivity', { pts })).toBe(false);
+      expect(can(waiting, 'createActivity', { pts })).toBe(false);
+    },
+  );
+
+  it.each(['rejected', 'concluded', 'cancelled'])(
+    'não deixa ninguém criar atividade no PTS em %s',
+    (status) => {
+      const pts = { ...draft, status };
+
+      expect(can(professional, 'createActivity', { pts })).toBe(false);
+      expect(can(admin, 'createActivity', { pts })).toBe(false);
+    },
+  );
+
   it('deixa o paciente e o admin decidirem, e só proposta em draft', () => {
     for (const action of ['approvePtsProposal', 'rejectPtsProposal'] as const) {
       expect(can(patient, action, { pts: draft })).toBe(true);

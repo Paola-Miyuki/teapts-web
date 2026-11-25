@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ActivitiesModule } from './activities/activities.module';
 import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { getDatabaseOptions } from './database/database.config';
@@ -31,6 +32,7 @@ import { TimelineModule } from './timeline/timeline.module';
     }),
 
     AccountsModule,
+    ActivitiesModule,
     AuthModule,
     DocumentsModule,
     HealthModule,

@@ -10,6 +10,7 @@ import { Professional } from '../src/professionals/entities/professional.entity'
 import { PtsEntity } from '../src/pts/entities/pts.entity';
 import { StoredObject } from '../src/storage/entities/stored-object.entity';
 import { STORAGE_CONFIG } from '../src/storage/storage.config';
+import { ActivityEntity } from '../src/activities/entities/activity.entity';
 import { PtsGoalEntity } from '../src/pts/entities/pts-goal.entity';
 import { TimelineRecordEntity } from '../src/timeline/entities/timeline-record.entity';
 import { AppModule } from '../src/app.module';
@@ -79,6 +80,8 @@ const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/pts/{id}/start', 'post'],
   ['/pts/{id}/team/{professionalId}', 'delete'],
   ['/pts/{id}/timeline', 'get'],
+  ['/pts/{id}/activities', 'get'],
+  ['/pts/{id}/activities', 'post'],
   ['/pts/{id}/goals', 'get'],
   ['/pts/{id}/goals', 'post'],
   ['/pts/{id}/goals/{goalId}', 'patch'],
@@ -124,6 +127,8 @@ describe('Swagger (e2e)', () => {
       .overrideProvider(getRepositoryToken(Patient))
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(ActivityEntity))
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsGoalEntity))
       .useValue({})
@@ -258,6 +263,7 @@ describe('Swagger (e2e)', () => {
         '/professionals',
         '/patients/{patientId}/support-contacts',
         '/pts/{id}/goals',
+        '/pts/{id}/activities',
         '/patients/{id}/documents/upload-url',
       ].includes(path);
       const success = method === 'post' && created ? '201' : '200';
@@ -313,6 +319,14 @@ describe('Swagger (e2e)', () => {
     ['/pts/{id}/timeline', 'get', '400'],
     ['/pts/{id}/timeline', 'get', '403'],
     ['/pts/{id}/timeline', 'get', '404'],
+    ['/pts/{id}/activities', 'get', '400'],
+    ['/pts/{id}/activities', 'get', '403'],
+    ['/pts/{id}/activities', 'get', '404'],
+    ['/pts/{id}/activities', 'post', '400'],
+    ['/pts/{id}/activities', 'post', '403'],
+    ['/pts/{id}/activities', 'post', '404'],
+    ['/pts/{id}/activities', 'post', '409'],
+    ['/pts/{id}/activities', 'post', '422'],
     ['/pts/{id}/goals', 'get', '400'],
     ['/pts/{id}/goals', 'get', '403'],
     ['/pts/{id}/goals', 'get', '404'],
@@ -619,6 +633,39 @@ describe('Swagger (e2e)', () => {
     expect(examples('403')).toEqual(['FORBIDDEN']);
     expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
     expect(examples('409')).toEqual(['PTS_NOT_PLANNING']);
+  });
+
+  it('documents the /pts/{id}/activities routes', async () => {
+    const { paths, components } = await getDocument();
+    const { get, post } = paths['/pts/{id}/activities'];
+
+    expect(responseSchema(get, '200')?.$ref).toBe(
+      '#/components/schemas/GetActivitiesResponseDto',
+    );
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/ActivityResponseDto',
+    );
+    expect(components.schemas.CreateActivityRequestDto.required).toEqual([
+      'title',
+      'description',
+      'type',
+      'specialism',
+      'frequency',
+      'modality',
+    ]);
+    for (const [status, code] of [
+      ['400', 'VALIDATION_ERROR'],
+      ['403', 'FORBIDDEN'],
+      ['404', 'PTS_NOT_FOUND'],
+      ['409', 'PTS_NOT_EDITABLE'],
+      ['422', 'INVALID_FREQUENCY'],
+    ]) {
+      expect(
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        ),
+      ).toEqual([code]);
+    }
   });
 
   it('documents the /pts/{id}/goals routes', async () => {

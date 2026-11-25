@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { isAdmin } from '../../auth/account-context';
-import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 import type { CreateGoalRequestDto } from '../dto/create-goal.dto';
 import type {
   DeleteGoalResponseDto,
@@ -12,31 +11,20 @@ import type {
 import type { UpdateGoalRequestDto } from '../dto/update-goal.dto';
 import {
   assertGoalRemovable,
-  assertGoalsEditable,
+  assertPtsEditable,
   assertTargetDate,
 } from '../goal-rules';
 import {
   goalForbidden,
   goalNotFound,
-  ptsForbidden,
   ptsNotFound,
   validationError,
 } from '../pts.errors';
+import { assertCanViewPts, ownTeamProfile, teamIds } from '../pts-access';
 import {
   PtsGoalsRepository,
   type GoalPtsTarget,
 } from '../repositories/pts-goals.repository';
-
-function teamIds(pts: GoalPtsTarget): string[] {
-  return [pts.responsibleProfessionalId, ...pts.teamProfessionalIds];
-}
-
-function ownTeamProfile(
-  pts: GoalPtsTarget,
-  account: AccountContext,
-): string | undefined {
-  return teamIds(pts).find((id) => account.professionalProfileIds.includes(id));
-}
 
 @Injectable()
 export class PtsGoalsService {
@@ -47,17 +35,8 @@ export class PtsGoalsService {
     account: AccountContext,
   ): Promise<GetGoalsResponseDto> {
     const pts = await this.findPts(ptsId);
-    const isPatientOwner =
-      account.patientProfileId !== null &&
-      account.patientProfileId === pts.patientId;
-    // A equipe não abre PTS rejeitado (RN016).
-    const isTeam =
-      pts.status !== PtsStateEnum.REJECTED &&
-      ownTeamProfile(pts, account) !== undefined;
 
-    if (!isAdmin(account) && !isPatientOwner && !isTeam) {
-      throw ptsForbidden();
-    }
+    assertCanViewPts(pts, account);
 
     return { data: await this.goalsRepository.findByPts(ptsId) };
   }
@@ -176,7 +155,7 @@ export class PtsGoalsService {
       throw goalForbidden();
     }
 
-    assertGoalsEditable(pts.status);
+    assertPtsEditable(pts.status);
 
     const executorName =
       (await this.goalsRepository.findAccountDisplayName(account.accountId)) ??
