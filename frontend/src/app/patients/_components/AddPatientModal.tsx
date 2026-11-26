@@ -4,13 +4,15 @@ import { useEffect, useRef } from 'react';
 
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import styles from '../patients.module.css';
+import type { AccountOption } from '@/lib/patients';
 import AddPatientForm from './AddPatientForm';
 
 type AddPatientModalProps = {
   open: boolean;
   onClose: () => void;
   onAdded: (name: string) => void;
+  canCreate: boolean;
+  initialAccount?: AccountOption | null;
 };
 
 // <dialog> nativo: showModal() prende o foco e o Esc fecha (evento close).
@@ -20,6 +22,8 @@ export default function AddPatientModal({
   open,
   onClose,
   onAdded,
+  canCreate,
+  initialAccount = null,
 }: AddPatientModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -40,7 +44,7 @@ export default function AddPatientModal({
   return (
     <dialog
       ref={dialogRef}
-      className={styles.dialog}
+      className={ui.dialog}
       aria-labelledby="add-patient-title"
       onClose={onClose}
       onClick={(event) => {
@@ -50,11 +54,11 @@ export default function AddPatientModal({
         }
       }}
     >
-      {open && (
+      {open && canCreate && (
         <>
           <button
             type="button"
-            className={`${styles.iconButton} ${styles.dialogClose}`}
+            className={`${ui.iconButton} ${ui.dialogClose}`}
             aria-label="Fechar janela"
             onClick={onClose}
           >
@@ -68,7 +72,11 @@ export default function AddPatientModal({
             parte da rede de apoio.
           </p>
 
-          <AddPatientForm onCancel={onClose} onAdded={onAdded} />
+          <AddPatientForm
+            initialAccount={initialAccount}
+            onCancel={onClose}
+            onAdded={onAdded}
+          />
         </>
       )}
     </dialog>

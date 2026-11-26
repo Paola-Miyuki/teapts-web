@@ -1,10 +1,10 @@
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import type { SupportContact } from '@/lib/patients';
+import type { SupportContactInput } from '@/lib/patients';
 import styles from '../patients.module.css';
 
 type SupportContactListProps = {
-  contacts: SupportContact[];
+  contacts: SupportContactInput[];
   onRemove: (index: number) => void;
 };
 
@@ -38,11 +38,17 @@ export default function SupportContactList({
                 </dd>
               </div>
             ))}
+            {contact.isEmergency && (
+              <div>
+                <dt>Emergência</dt>
+                <dd>Contato de emergência</dd>
+              </div>
+            )}
           </dl>
 
           <button
             type="button"
-            className={styles.iconButton}
+            className={ui.iconButton}
             aria-label={`Remover contato ${contact.name}`}
             onClick={() => onRemove(index)}
           >

@@ -24,11 +24,30 @@ const glyphs = {
       <path d="M9 3h6v3H9zM9 11h6m-6 4h6" />
     </>
   ),
+  pill: (
+    <>
+      <path d="M6.5 17.5a5 5 0 0 1 0-7.07l5.66-5.66a5 5 0 0 1 7.07 7.07l-5.66 5.66a5 5 0 0 1-7.07 0Z" />
+      <path d="m9 9 6 6" />
+    </>
+  ),
   logout: <path d="M9 3H4v18h5M10 12h11m-4-4 4 4-4 4" />,
+  profile: (
+    <>
+      <circle cx="12" cy="7" r="4" />
+      <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+    </>
+  ),
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   chevronLeft: <path d="m15 6-6 6 6 6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
+  up: <path d="m6 15 6-6 6 6" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,
+  bell: (
+    <>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -43,12 +62,10 @@ const glyphs = {
       <circle cx="12" cy="12" r="2.5" />
     </>
   ),
-  eyeOff: (
+  eyeClosed: (
     <>
-      <path d="M13.36 13.36a3 3 0 0 1-4.72-4.72" />
-      <path d="M2 12s3.6-6 10-6a9.97 9.97 0 0 1 5.97 1.94" />
-      <path d="M22 12s-3.6 6-10 6a9.97 9.97 0 0 1-5.97-1.94" />
-      <path d="m3 3 18 18" />
+      <path d="M3 12c2.5 2.5 5.5 3.75 9 3.75s6.5-1.25 9-3.75" />
+      <path d="M7 14.5 5.5 17M12 15.75V18M17 14.5l1.5 2.5" />
     </>
   ),
   help: (
@@ -57,6 +74,7 @@ const glyphs = {
       <path d="M9.6 9a2.4 2.4 0 0 1 4.8 0c0 2-2.4 2-2.4 4M12 16v1" />
     </>
   ),
+  upload: <path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6" />,
   lock: (
     <>
       <rect x="6" y="10" width="12" height="10" rx="2" />
@@ -86,6 +104,76 @@ const glyphs = {
   ),
   plus: <path d="M12 4v16M4 12h16" />,
   trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />,
+  edit: (
+    <>
+      <path d="M4 20h4L19 9l-4-4L4 16Z" />
+      <path d="m13 7 4 4" />
+    </>
+  ),
+  filter: <path d="M4 5h16l-6 8v6l-4-2v-4Z" />,
+  more: (
+    <>
+      <circle cx="12" cy="5" r="1.3" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="12" cy="19" r="1.3" />
+    </>
+  ),
+  sortUp: <path d="M12 20V4m-6 6 6-6 6 6" />,
+  sortDown: <path d="M12 4v16m-6-6 6 6 6-6" />,
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </>
+  ),
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3.5 6.5 8.5 6.5 8.5-6.5" />
+    </>
+  ),
+  phone: (
+    <path d="M5 4h3.5l1.5 4-2.2 1.4a11 11 0 0 0 5.8 5.8L15 13l4 1.5V18a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z" />
+  ),
+  pts: (
+    <>
+      <path d="M12 3 4 7v6c0 4 3.5 7 8 8 4.5-1 8-4 8-8V7Z" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+  team: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M2 20v-1a6 6 0 0 1 12 0v1M14 20v-1a4 4 0 0 1 8 0v1" />
+    </>
+  ),
+  activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
+  session: (
+    <>
+      <rect x="4" y="5" width="16" height="16" rx="2" />
+      <path d="M8 3v4m8-4v4M4 11h16m-8 3v4m-2-2h4" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M5 3h9l5 5v13H5Z" />
+      <path d="M14 3v6h5" />
+    </>
+  ),
+  accounts: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="11" r="2.5" />
+      <path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 10h3m-3 4h3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M15 9V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h4" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof glyphs;

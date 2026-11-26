@@ -1,0 +1,707 @@
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+
+import { useRouter } from 'next/navigation';
+
+import type { Account } from '@/lib/account';
+import { personalData } from '@/test-utils/account';
+
+import PtsDetailPage from './PtsDetail';
+
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
+
+const PROFESSIONAL: Account = {
+  accountId: 'professional-uuid',
+  name: 'Paula Profissional',
+  email: 'paula@example.com',
+  role: 'user',
+  ...personalData,
+  patientProfileId: null,
+  professionalProfileIds: ['prof-1'],
+};
+
+const PTS = {
+  id: 'pts-1',
+  status: 'running',
+  socialSituation: 'Mora com a mãe; concluindo o ensino médio.',
+  createdAt: '2026-07-01T13:00:00.000Z',
+  acceptedAt: '2026-07-05T13:00:00.000Z',
+  rejectedAt: null,
+  beganAt: '2026-08-01T13:00:00.000Z',
+  concludedAt: null,
+  cancelledAt: null,
+  patient: { id: 'patient-1', name: 'Luna Ferreira' },
+  responsible: {
+    id: 'prof-1',
+    name: 'Ana Souza',
+    specialism: { id: 'psychologist', name: 'Psicologia' },
+    registration: { council: 'CRP', number: '12345', state: 'pr' },
+  },
+  team: [
+    {
+      id: 'prof-2',
+      name: 'Beatriz Lopes',
+      specialism: { id: 'physiotherapist', name: 'Fisioterapia' },
+      registration: null,
+    },
+  ],
+};
+
+function respond(status: number, data: unknown) {
+  return {
+    ok: status < 400,
+    status,
+    json: jest.fn().mockResolvedValue(data),
+  } as unknown as Response;
+}
+
+const PATIENT: Account = {
+  accountId: 'patient-1',
+  name: 'Luna Ferreira',
+  email: 'luna@example.com',
+  role: 'user',
+  ...personalData,
+  patientProfileId: 'patient-1',
+  professionalProfileIds: [],
+};
+
+const TIMELINE = {
+  data: [
+    {
+      id: 'rec-1',
+      type: 'document_uploaded',
+      targetType: 'document',
+      targetId: 'doc-1',
+      description: 'Ana Souza enviou o documento Laudo neurológico',
+      happenedAt: '2026-11-12T17:45:00.000Z',
+      author: { id: 'acc-1', name: 'Ana Souza' },
+      assignedTo: null,
+    },
+  ],
+  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+};
+
+const GOALS = {
+  data: [
+    {
+      id: 'goal-1',
+      title: 'Ampliar a comunicação funcional',
+      description: 'Fazer pedidos simples.',
+      term: 'short',
+      area: 'communication',
+      measureCriterion: '5 pedidos por dia',
+      targetDate: '2099-11-30',
+      status: 'in_progress',
+      resultNote: null,
+      origin: 'new',
+      activitiesCount: 0,
+      registeredBy: { id: 'prof-1', name: 'Ana Souza' },
+      createdAt: '2026-02-14T12:00:00.000Z',
+    },
+  ],
+};
+
+const ACTIVITIES = {
+  data: [
+    {
+      id: 'act-1',
+      title: 'Integração sensorial',
+      description: 'Circuito sensorial.',
+      type: 'individual_session',
+      specialism: 'occupational_therapist',
+      frequency: { quantity: 1, period: 'weekly', durationMinutes: 45 },
+      modality: 'in_person',
+      visitPlace: null,
+      executor: 'team',
+      executorProfessionalIds: [],
+      goalId: 'goal-1',
+      documentIds: [],
+      status: 'suggested',
+      createdAt: '2026-12-01T13:00:00.000Z',
+    },
+  ],
+  pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+};
+
+function mockApi(
+  detail: Response,
+  account: Account = PROFESSIONAL,
+  timeline: unknown = TIMELINE,
+) {
+  global.fetch = jest.fn((url: string) =>
+    Promise.resolve(
+      url.endsWith('/me')
+        ? respond(200, account)
+        : url.includes('/timeline')
+          ? respond(200, timeline)
+          : url.endsWith('/goals')
+            ? respond(200, GOALS)
+            : url.split('?')[0].endsWith('/activities')
+              ? respond(200, ACTIVITIES)
+              : detail,
+    ),
+  ) as jest.Mock;
+}
+
+describe('PtsDetail', () => {
+  const replace = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
+    window.history.replaceState(null, '', '/pts/pts-1');
+  });
+
+  it('mostra o cabeçalho do PTS, a situação social e o link do prontuário', async () => {
+    mockApi(respond(200, PTS));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'PTS de Luna Ferreira' }),
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/pts/pts-1',
+      expect.anything(),
+    );
+    expect(screen.getByText('Em andamento')).toBeInTheDocument();
+    expect(screen.getByText('Ana Souza, Psicologia')).toBeInTheDocument();
+    expect(screen.getByText('01/07/2026')).toBeInTheDocument();
+    expect(screen.getByText('01/08/2026')).toBeInTheDocument();
+    expect(
+      screen.getByText('Mora com a mãe; concluindo o ensino médio.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Prontuário' })).toHaveAttribute(
+      'href',
+      '/patients/patient-1',
+    );
+    expect(
+      within(
+        screen.getByRole('navigation', { name: 'Caminho da página' }),
+      ).getByText('Luna Ferreira'),
+    ).toBeInTheDocument();
+  });
+
+  it('lista a equipe com registro, especialidade e papel, e filtra pela busca', async () => {
+    mockApi(respond(200, PTS));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+
+    const ana = screen.getByText('Ana Souza').closest('tr')!;
+    expect(within(ana).getByText('CRP-PR 12345')).toBeInTheDocument();
+    expect(within(ana).getByText('Responsável')).toBeInTheDocument();
+
+    const beatriz = screen.getByText('Beatriz Lopes').closest('tr')!;
+    expect(within(beatriz).getByText('Fisioterapia')).toBeInTheDocument();
+    expect(within(beatriz).getByText('Membro')).toBeInTheDocument();
+    expect(screen.getByText('2 profissionais')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Nome ou registro'), {
+      target: { value: 'crp-pr' },
+    });
+    expect(screen.queryByText('Beatriz Lopes')).not.toBeInTheDocument();
+  });
+
+  it('abre a aba Timeline com os eventos do PTS', async () => {
+    mockApi(respond(200, PTS));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Timeline' }));
+
+    expect(
+      await screen.findByText('Ana Souza enviou o documento Laudo neurológico'),
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/pts/pts-1/timeline?page=1&limit=10',
+      expect.anything(),
+    );
+    expect(screen.getByRole('link', { name: 'Timeline' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('link', { name: 'Ver documento' })).toHaveAttribute(
+      'href',
+      '/patients/patient-1#documentos',
+    );
+  });
+
+  it('a aba segue o #hash da URL, como nos mockups', async () => {
+    mockApi(respond(200, PTS));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+    expect(window.location.hash).toBe('#equipe');
+    expect(screen.getByText('2 profissionais')).toBeInTheDocument();
+
+    act(() => {
+      window.history.replaceState(null, '', '/pts/pts-1#timeline');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(
+      await screen.findByText('Ana Souza enviou o documento Laudo neurológico'),
+    ).toBeInTheDocument();
+  });
+
+  describe('aba "Atividades" (RFACT001)', () => {
+    async function openActivities(
+      pts: Partial<typeof PTS>,
+      account: Account,
+      readOnly = false,
+    ) {
+      mockApi(respond(200, { ...PTS, ...pts }), account);
+      render(<PtsDetailPage id="pts-1" readOnly={readOnly} />);
+      fireEvent.click(await screen.findByRole('link', { name: /Atividades/ }));
+      await screen.findByText('Integração sensorial');
+    }
+
+    const newButton = () =>
+      screen.queryByRole('button', { name: 'Nova atividade' });
+
+    it('filtra por Sugerida, Em andamento e Suspensa por padrão', async () => {
+      await openActivities({ status: 'running' }, PROFESSIONAL);
+
+      await waitFor(() => {
+        const request = (global.fetch as jest.Mock).mock.calls
+          .map(([url]) => String(url))
+          .filter((url) => url.includes('/activities?'))
+          .at(-1);
+        const statuses = new URL(request!).searchParams.getAll('status');
+
+        expect(statuses).toEqual(['suggested', 'running', 'suspended']);
+      });
+    });
+
+    it('"Limpar" volta os filtros ao padrão, inclusive quem executa', async () => {
+      await openActivities({ status: 'running' }, PROFESSIONAL);
+      const lastSearch = () =>
+        new URL(
+          (global.fetch as jest.Mock).mock.calls
+            .map(([url]) => String(url))
+            .filter((url) => url.includes('/activities?'))
+            .at(-1)!,
+        ).searchParams;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Filtros' }));
+      for (const label of ['Sugerida', 'Em andamento', 'Suspensa']) {
+        fireEvent.click(screen.getByLabelText(label));
+      }
+      fireEvent.change(screen.getByLabelText('Quem executa'), {
+        target: { value: 'family' },
+      });
+      // Nenhum status marcado vale como "Todos".
+      await waitFor(() => {
+        expect(lastSearch().getAll('status')).toEqual([]);
+        expect(lastSearch().get('executor')).toBe('family');
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Limpar' }));
+      await waitFor(() => {
+        expect(lastSearch().getAll('status')).toEqual([
+          'suggested',
+          'running',
+          'suspended',
+        ]);
+        expect(lastSearch().get('executor')).toBeNull();
+      });
+    });
+
+    it('ao voltar do registro, confirma o atendimento (RFACT004)', async () => {
+      mockApi(respond(200, PTS), PROFESSIONAL);
+      window.history.replaceState(null, '', '/pts/pts-1#atividades');
+      render(<PtsDetailPage id="pts-1" appointmentRegistered />);
+
+      expect(
+        await screen.findByText('Atendimento registrado'),
+      ).toBeInTheDocument();
+    });
+
+    it('mostra todos os status por padrão em um PTS encerrado', async () => {
+      await openActivities({ status: 'concluded' }, PROFESSIONAL);
+
+      await waitFor(() => {
+        const request = (global.fetch as jest.Mock).mock.calls
+          .map(([url]) => String(url))
+          .filter((url) => url.includes('/activities?'))
+          .at(-1);
+
+        expect(new URL(request!).searchParams.getAll('status')).toEqual([]);
+      });
+    });
+
+    it.each(['draft', 'planning', 'running'])(
+      'a equipe cria com o PTS em %s, com as metas e a equipe no modal',
+      async (status) => {
+        await openActivities({ status }, PROFESSIONAL);
+        expect(window.location.hash).toBe('#atividades');
+        fireEvent.click(newButton()!);
+
+        expect(
+          screen.getByRole('option', {
+            name: 'Ampliar a comunicação funcional',
+          }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole('checkbox', { name: /Beatriz Lopes/ }),
+        ).toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      ['paciente', {}, PATIENT, false],
+      ['PTS concluído', { status: 'concluded' }, PROFESSIONAL, false],
+      ['modo somente leitura', {}, PROFESSIONAL, true],
+    ])('só mostra a lista: %s', async (_name, pts, account, readOnly) => {
+      await openActivities(pts, account, readOnly);
+      expect(newButton()).not.toBeInTheDocument();
+    });
+
+    it('recarrega atividades e metas depois de criar', async () => {
+      await openActivities({}, PROFESSIONAL);
+      const loads = (path: string) =>
+        (global.fetch as jest.Mock).mock.calls.filter(
+          ([url, init]) =>
+            url.split('?')[0].endsWith(path) &&
+            (init?.method ?? 'GET') === 'GET',
+        ).length;
+      const goalsBefore = loads('/goals');
+
+      fireEvent.click(newButton()!);
+      for (const label of [/^Título/, /^Descrição/]) {
+        fireEvent.change(screen.getByLabelText(label), {
+          target: { value: 'Texto' },
+        });
+      }
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Sugerir atividade' }),
+      );
+
+      await waitFor(() => expect(loads('/activities')).toBe(2));
+      await waitFor(() => expect(loads('/goals')).toBe(goalsBefore + 1));
+    });
+  });
+
+  describe('aba "Metas terapêuticas" (RFPTS012)', () => {
+    const MEMBER = { ...PROFESSIONAL, professionalProfileIds: ['prof-2'] };
+    const OUTSIDER = { ...PROFESSIONAL, professionalProfileIds: ['prof-9'] };
+    const ADMIN: Account = {
+      ...PROFESSIONAL,
+      role: 'admin',
+      professionalProfileIds: [],
+    };
+
+    async function openGoals(
+      pts: Partial<typeof PTS>,
+      account: Account,
+      readOnly = false,
+    ) {
+      mockApi(respond(200, { ...PTS, ...pts }), account);
+      render(<PtsDetailPage id="pts-1" readOnly={readOnly} />);
+      fireEvent.click(await screen.findByRole('link', { name: /Metas/ }));
+      await screen.findByText('Ampliar a comunicação funcional');
+    }
+
+    const addButton = () =>
+      screen.queryByRole('button', { name: 'Adicionar meta' });
+
+    it('abre as metas com a quantidade na aba e o #metas da timeline', async () => {
+      await openGoals({}, PROFESSIONAL);
+
+      expect(window.location.hash).toBe('#metas');
+      expect(
+        screen.getByRole('link', { name: /^Metas terapêuticas\s*1$/ }),
+      ).toHaveAttribute('aria-current', 'page');
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/pts/pts-1/goals',
+        expect.objectContaining({ credentials: 'include' }),
+      );
+    });
+
+    it.each(['draft', 'planning', 'running'])(
+      'a equipe e o admin editam com o PTS em %s',
+      async (status) => {
+        await openGoals({ status }, MEMBER);
+        expect(addButton()).toBeInTheDocument();
+      },
+    );
+
+    it('o admin escolhe o autor entre a equipe (RN029)', async () => {
+      await openGoals({}, ADMIN);
+      fireEvent.click(addButton()!);
+
+      const author = screen.getByLabelText(/^Autor/);
+      expect(
+        within(author)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual([
+        'Sem atribuir (fica com a sua conta)',
+        'Ana Souza, Psicologia',
+        'Beatriz Lopes, Fisioterapia',
+      ]);
+    });
+
+    it.each([
+      ['paciente', {}, PATIENT, false],
+      ['profissional de fora', {}, OUTSIDER, false],
+      ['PTS concluído', { status: 'concluded' }, ADMIN, false],
+      ['modo somente leitura', {}, PROFESSIONAL, true],
+    ])('não deixa editar: %s', async (_name, pts, account, readOnly) => {
+      await openGoals(pts, account, readOnly);
+      expect(addButton()).not.toBeInTheDocument();
+    });
+
+    it('recarrega a lista depois de cadastrar', async () => {
+      await openGoals({}, PROFESSIONAL);
+      const loads = () =>
+        (global.fetch as jest.Mock).mock.calls.filter(
+          ([url, init]) =>
+            url.endsWith('/goals') && (init?.method ?? 'GET') === 'GET',
+        ).length;
+      expect(loads()).toBe(1);
+
+      fireEvent.click(addButton()!);
+      for (const [label, value] of [
+        [/^Meta \(título\)/, 'Nova'],
+        [/^Meta \(descrição\)/, 'Descrição'],
+        [/^Critério de medida/, 'Critério'],
+        [/^Data-alvo/, '2027-01-10'],
+      ] as const) {
+        fireEvent.change(screen.getByLabelText(label), { target: { value } });
+      }
+      fireEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: 'Adicionar meta',
+        }),
+      );
+
+      await waitFor(() => expect(loads()).toBe(2));
+    });
+  });
+
+  it('abre direto na Timeline pelo atalho #timeline', async () => {
+    window.location.hash = '#timeline';
+    mockApi(respond(200, PTS));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(
+      await screen.findByText('Ana Souza enviou o documento Laudo neurológico'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Mora com a mãe; concluindo o ensino médio.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mostra ao paciente o PTS sem a ficha, sem o prontuário e a timeline sem link de documento', async () => {
+    const patientPts = { ...PTS };
+    delete (patientPts as Partial<typeof PTS>).socialSituation;
+    mockApi(respond(200, patientPts), PATIENT, {
+      ...TIMELINE,
+      data: [{ ...TIMELINE.data[0], targetId: null }],
+    });
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'PTS de Luna Ferreira' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Visão geral' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Prontuário' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByText('Ampliar a comunicação funcional'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Timeline' }));
+
+    expect(
+      await screen.findByText('Ana Souza enviou o documento Laudo neurológico'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Ver documento' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('não abre o PTS para a conta sem perfil', async () => {
+    mockApi(respond(200, PTS), {
+      ...PATIENT,
+      patientProfileId: null,
+    });
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Acesso restrito' }),
+    ).toBeInTheDocument();
+  });
+
+  it('mostra a data de conclusão do PTS encerrado', async () => {
+    mockApi(
+      respond(200, {
+        ...PTS,
+        status: 'concluded',
+        concludedAt: '2026-05-30T13:00:00.000Z',
+      }),
+    );
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(await screen.findByText('Encerrado em')).toBeInTheDocument();
+    expect(screen.getByText('30/05/2026')).toBeInTheDocument();
+  });
+
+  it('não mostra ações de edição ou status quando aberto pelo histórico', async () => {
+    mockApi(respond(200, { ...PTS, status: 'planning' }));
+
+    render(<PtsDetailPage id="pts-1" readOnly version={1} />);
+
+    expect(
+      await screen.findByRole('heading', { name: '1º PTS' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Visualização somente leitura.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Editar PTS' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Iniciar execução' }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+    expect(
+      screen.queryByRole('button', { name: /Adicionar profissional/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mantém o paciente em Meu PTS e mostra o caminho do histórico no detalhe', async () => {
+    mockApi(respond(200, PTS), PATIENT);
+
+    render(<PtsDetailPage id="pts-1" readOnly version={1} />);
+
+    expect(
+      await screen.findByRole('heading', { name: '1º PTS' }),
+    ).toBeInTheDocument();
+    const sidebar = within(
+      screen.getByRole('navigation', { name: 'Menu principal' }),
+    );
+    expect(sidebar.getByRole('link', { name: 'PTS' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(
+      sidebar.queryByRole('link', { name: 'Propostas de PTS' }),
+    ).not.toBeInTheDocument();
+
+    const breadcrumb = within(
+      screen.getByRole('navigation', { name: 'Caminho da página' }),
+    );
+    expect(breadcrumb.getByRole('link', { name: 'Meu PTS' })).toHaveAttribute(
+      'href',
+      '/pts',
+    );
+    expect(breadcrumb.getByText('1º PTS')).toBeInTheDocument();
+  });
+
+  it('mostra o acesso negado da API', async () => {
+    mockApi(
+      respond(403, {
+        status: 'FORBIDDEN',
+        message: 'Você não tem acesso a este PTS.',
+      }),
+    );
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Sem acesso a este PTS' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Você não tem acesso a este PTS.'),
+    ).toBeInTheDocument();
+  });
+
+  it('redireciona para o login sem sessão', async () => {
+    mockApi(respond(401, { message: 'unauthorised' }));
+
+    render(<PtsDetailPage id="pts-1" />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+  });
+
+  describe('botão "Adicionar profissional" (RFEM001)', () => {
+    const ADMIN: Account = {
+      ...PROFESSIONAL,
+      accountId: 'admin-uuid',
+      role: 'admin',
+      professionalProfileIds: [],
+    };
+    const MEMBER: Account = {
+      ...PROFESSIONAL,
+      professionalProfileIds: ['prof-2'],
+    };
+
+    async function openTeam(pts: unknown, account: Account) {
+      mockApi(respond(200, pts), account);
+
+      render(<PtsDetailPage id="pts-1" />);
+
+      fireEvent.click(await screen.findByRole('link', { name: /Equipe/ }));
+      await screen.findByRole('heading', { name: 'Equipe multidisciplinar' });
+    }
+
+    const addButton = () =>
+      screen.queryByRole('button', { name: /adicionar profissional/i });
+
+    it.each(['planning', 'running'])(
+      'aparece para o responsável com o PTS em %s',
+      async (status) => {
+        await openTeam({ ...PTS, status }, PROFESSIONAL);
+
+        expect(addButton()).toBeInTheDocument();
+      },
+    );
+
+    it('aparece para o admin (RN022)', async () => {
+      await openTeam(PTS, ADMIN);
+
+      expect(addButton()).toBeInTheDocument();
+    });
+
+    it('não aparece para membro da equipe que não é o responsável', async () => {
+      await openTeam(PTS, MEMBER);
+
+      expect(addButton()).not.toBeInTheDocument();
+    });
+
+    it.each(['draft', 'concluded', 'cancelled', 'rejected'])(
+      'não aparece, nem para o responsável nem para o admin, com o PTS em %s',
+      async (status) => {
+        await openTeam({ ...PTS, status }, PROFESSIONAL);
+        expect(addButton()).not.toBeInTheDocument();
+      },
+    );
+
+    it('não aparece para o admin com o PTS encerrado', async () => {
+      await openTeam({ ...PTS, status: 'concluded' }, ADMIN);
+
+      expect(addButton()).not.toBeInTheDocument();
+    });
+  });
+});

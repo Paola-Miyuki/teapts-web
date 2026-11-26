@@ -1,13 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { ActivitiesModule } from './activities/activities.module';
 import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { getDatabaseOptions } from './database/database.config';
+import { DocumentsModule } from './documents/documents.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ProfessionalsModule } from './professionals/professionals.module';
 import { PatientsModule } from './patients/patients.module';
 import { PtsModule } from './pts/pts.module';
+import { StorageModule } from './storage/storage.module';
+import { TimelineModule } from './timeline/timeline.module';
 
 /**
  * Módulo raiz: configura o banco de dados e reúne os módulos da API.
@@ -27,11 +33,17 @@ import { PtsModule } from './pts/pts.module';
     }),
 
     AccountsModule,
+    ActivitiesModule,
+    AppointmentsModule,
     AuthModule,
+    DocumentsModule,
     HealthModule,
+    NotificationsModule,
     ProfessionalsModule,
     PatientsModule,
     PtsModule,
+    StorageModule,
+    TimelineModule,
   ],
 })
 export class AppModule {}

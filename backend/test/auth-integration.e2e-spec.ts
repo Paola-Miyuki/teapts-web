@@ -23,7 +23,12 @@ type CapturedConfig = {
     signUpFeature?: {
       formFields: Array<{
         id: string;
-        validate: (value: unknown) => Promise<string | undefined>;
+        optional?: boolean;
+        validate: (
+          value: unknown,
+          tenantId: string,
+          userContext: Payload,
+        ) => Promise<string | undefined>;
       }>;
     };
     override?: {
@@ -42,6 +47,8 @@ const revokeAllSessionsForUser =
   jest.fn<(userId: string) => Promise<string[]>>();
 
 jest.unstable_mockModule('supertokens-node', () => ({
+  // O AccountsService importa esta função por nome.
+  convertToRecipeUserId: jest.fn((userId: string) => userId),
   default: {
     init: supertokensInit,
     deleteUser,
@@ -90,6 +97,7 @@ type AccountsModule =
   typeof import('../src/accounts/services/accounts.service.js');
 type SupertokensModule =
   typeof import('../src/auth/services/supertokens.service.js');
+type SignUpFieldsModule = typeof import('../src/auth/sign-up-fields.js');
 
 let AccountIntegrityError: AccountsModule['AccountIntegrityError'];
 let AccountsService: AccountsModule['AccountsService'];
@@ -97,8 +105,7 @@ let AuthController: (typeof import('../src/auth/controllers/auth.controller.js')
 let AuthGuard: (typeof import('../src/auth/guards/auth.guard.js'))['AuthGuard'];
 let SupertokensService: SupertokensModule['SupertokensService'];
 let ACCOUNT_CONTEXT_FLAG: SupertokensModule['ACCOUNT_CONTEXT_FLAG'];
-let SIGN_UP_NAME_KEY: SupertokensModule['SIGN_UP_NAME_KEY'];
-let validateName: SupertokensModule['validateName'];
+let SIGN_UP_ACCOUNT_KEY: SignUpFieldsModule['SIGN_UP_ACCOUNT_KEY'];
 let processLogout: SupertokensModule['processLogout'];
 
 beforeAll(async () => {
@@ -107,13 +114,9 @@ beforeAll(async () => {
   ({ AuthController } =
     await import('../src/auth/controllers/auth.controller.js'));
   ({ AuthGuard } = await import('../src/auth/guards/auth.guard.js'));
-  ({
-    ACCOUNT_CONTEXT_FLAG,
-    SIGN_UP_NAME_KEY,
-    SupertokensService,
-    processLogout,
-    validateName,
-  } = await import('../src/auth/services/supertokens.service.js'));
+  ({ ACCOUNT_CONTEXT_FLAG, SupertokensService, processLogout } =
+    await import('../src/auth/services/supertokens.service.js'));
+  ({ SIGN_UP_ACCOUNT_KEY } = await import('../src/auth/sign-up-fields.js'));
 });
 
 function field(formFields: FormField[], id: string): unknown {
@@ -137,6 +140,9 @@ describe('authentication integration', () => {
     resolveAccountContext: jest.Mock<(userId: string) => Promise<Payload>>;
     findById: jest.Mock<() => Promise<Payload>>;
     createAccount: jest.Mock<(input: Payload) => Promise<Payload>>;
+    isCpfTaken: jest.Mock<(cpf: string) => Promise<boolean>>;
+    isActive: jest.Mock<(accountId: string) => Promise<boolean>>;
+    isEmailDeactivated: jest.Mock<(email: string) => Promise<boolean>>;
   };
   let createNewSession: jest.Mock<Fn>;
   let originalSignUp: jest.Mock<Fn>;
@@ -151,6 +157,12 @@ describe('authentication integration', () => {
         { id: 'email', value: email },
         { id: 'password', value: 'Senha-de-teste-123!' },
         { id: 'name', value: name },
+        { id: 'socialName', value: '' },
+        { id: 'birthDate', value: '1990-05-20' },
+        { id: 'sex', value: 'female' },
+        { id: 'gender', value: 'cis_woman' },
+        { id: 'cpf', value: '529.982.247-25' },
+        { id: 'phone', value: '(11) 98765-4321' },
       ],
       userContext: {} as Payload,
     };
@@ -175,6 +187,11 @@ describe('authentication integration', () => {
         id: 'account-2',
         ...input,
       })),
+      isCpfTaken: jest.fn(async () => false),
+      isActive: jest.fn(async () => true),
+      isEmailDeactivated: jest.fn(
+        async (email: string) => email === 'inactive@example.com',
+      ),
     };
 
     supertokensInit.mockImplementation((config) => {
@@ -364,6 +381,22 @@ describe('authentication integration', () => {
       expect(response.body).toEqual({ status: 'WRONG_CREDENTIALS_ERROR' });
     });
 
+    it('refuses a deactivated account like wrong credentials, without a session', async () => {
+      const response = await request(app)
+        .post('/auth/signin')
+        .set('st-auth-mode', 'cookie')
+        .send({
+          formFields: [
+            { id: 'email', value: 'inactive@example.com' },
+            { id: 'password', value: 'correct-password' },
+          ],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: 'WRONG_CREDENTIALS_ERROR' });
+      expect(createNewSession).not.toHaveBeenCalled();
+    });
+
     it('relays a SuperTokens error without converting it to a generic error', async () => {
       const response = await request(app)
         .post('/auth/signin')
@@ -381,10 +414,43 @@ describe('authentication integration', () => {
   });
 
   describe('signup', () => {
-    it('validates the name form field', async () => {
-      await expect(validateName('Maria')).resolves.toBeUndefined();
-      await expect(validateName('   ')).resolves.toBe('Informe o nome');
-      await expect(validateName(42)).resolves.toBe('Informe o nome');
+    it('registers the account fields, with the optional ones marked', () => {
+      const [emailPasswordConfig] =
+        supertokensInit.mock.calls.at(-1)![0].recipeList;
+      const formFields = emailPasswordConfig.signUpFeature!.formFields;
+
+      expect(
+        formFields.map((formField) => [formField.id, !!formField.optional]),
+      ).toEqual([
+        ['name', false],
+        ['socialName', true],
+        ['birthDate', false],
+        ['sex', false],
+        ['gender', true],
+        ['cpf', false],
+        ['phone', true],
+      ]);
+    });
+
+    it('rejects a CPF that another account already uses', async () => {
+      const [emailPasswordConfig] =
+        supertokensInit.mock.calls.at(-1)![0].recipeList;
+      const cpfField = emailPasswordConfig.signUpFeature!.formFields.find(
+        (formField) => formField.id === 'cpf',
+      )!;
+
+      accountsService.isCpfTaken.mockResolvedValueOnce(true);
+      await expect(
+        cpfField.validate('529.982.247-25', 'public', {}),
+      ).resolves.toBe('Este CPF já está cadastrado');
+      expect(accountsService.isCpfTaken).toHaveBeenCalledWith('52998224725');
+
+      await expect(
+        cpfField.validate('529.982.247-25', 'public', {}),
+      ).resolves.toBeUndefined();
+      await expect(
+        cpfField.validate('111.111.111-11', 'public', {}),
+      ).resolves.toBe('CPF inválido');
     });
 
     it('creates the account before opening the session', async () => {
@@ -398,6 +464,12 @@ describe('authentication integration', () => {
         supertokensUserId: newUserId,
         name: 'Maria',
         email: 'maria@example.com',
+        socialName: null,
+        birthDate: '1990-05-20',
+        sex: 'female',
+        gender: 'cis_woman',
+        cpf: '52998224725',
+        phone: '11987654321',
       });
       expect(accountsService.resolveAccountContext).toHaveBeenCalledWith(
         newUserId,
@@ -432,7 +504,7 @@ describe('authentication integration', () => {
       expect(accountsService.createAccount).not.toHaveBeenCalled();
     });
 
-    it('refuses to create an identity without a name in the userContext', async () => {
+    it('refuses to create an identity without the account fields in the userContext', async () => {
       await expect(
         emailPasswordFunctions.signUp({
           email: 'maria@example.com',
@@ -445,12 +517,15 @@ describe('authentication integration', () => {
       expect(originalSignUp).not.toHaveBeenCalled();
     });
 
-    it('passes the name through the userContext', async () => {
+    it('passes the account fields through the userContext', async () => {
       const input = signUpInput('Maria');
 
       await emailPasswordApis.signUpPOST(input);
 
-      expect(input.userContext[SIGN_UP_NAME_KEY]).toBe('Maria');
+      expect(input.userContext[SIGN_UP_ACCOUNT_KEY]).toMatchObject({
+        name: 'Maria',
+        cpf: '52998224725',
+      });
     });
   });
 

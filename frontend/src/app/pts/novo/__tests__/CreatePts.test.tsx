@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '../api/http';
 import * as api from '../api/ptsApi';
@@ -10,6 +10,7 @@ import {
   mockProfessionals,
 } from '../api/mocks';
 import type { Account } from '@/lib/account';
+import { personalData } from '@/test-utils/account';
 
 jest.mock('../api/ptsApi', () => ({
   listEligiblePatients: jest.fn(),
@@ -19,6 +20,13 @@ jest.mock('../api/ptsApi', () => ({
 
 jest.mock('@/lib/supertokens', () => ({ initSuperTokens: jest.fn() }));
 
+// Mesmo objeto em todo render, como o useRouter do Next.
+const mockRouter = { replace: jest.fn() };
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+}));
+
 const SOCIAL = 'Paciente em situação de vulnerabilidade social.';
 
 const testAccount: Account = {
@@ -26,6 +34,7 @@ const testAccount: Account = {
   name: 'Kaio Felipe',
   email: 'kaio@example.com',
   role: 'user',
+  ...personalData,
   patientProfileId: null,
   professionalProfileIds: [MOCK_PROFESSIONAL_ID],
 };
@@ -51,37 +60,53 @@ const createdPts = {
   })),
 };
 
-async function renderScreen() {
-  render(<CreatePts account={testAccount} />);
-  await screen.findByLabelText(/^paciente$/i);
+async function renderScreen(account: Account = testAccount) {
+  render(<CreatePts account={account} />);
+  await waitFor(() =>
+    expect(screen.getByRole('combobox', { name: /Paciente/ })).toBeEnabled(),
+  );
 }
 
-async function fillForm(
-  user: ReturnType<typeof userEvent.setup>,
-  withTeam = true,
-) {
-  await user.selectOptions(
-    screen.getByLabelText(/^paciente$/i),
-    MOCK_PATIENT_ID,
+type User = ReturnType<typeof userEvent.setup>;
+
+async function choosePatient(user: User, name = 'Maria Silva') {
+  await user.type(screen.getByRole('combobox', { name: /Paciente/ }), 'ma');
+  await user.click(
+    await screen.findByRole('option', { name: new RegExp(`^${name}`) }),
   );
+}
 
-  if (withTeam) {
-    await user.click(screen.getByText(/selecione os profissionais/i));
-    await user.click(screen.getByLabelText(/Ana Lima/));
-    await user.click(screen.getByLabelText(/Bruno Souza/));
-  }
+async function next(user: User) {
+  await user.click(screen.getByRole('button', { name: /Próximo/ }));
+}
 
-  await user.type(screen.getByLabelText(/situação social/i), SOCIAL);
+async function addMember(user: User, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Adicionar membro' }));
+  await user.click(
+    await screen.findByRole('option', { name: new RegExp(`^${name}`) }),
+  );
+}
+
+// Passa pelos passos 1 e 2 e para no passo de equipe.
+async function fillUntilTeam(user: User) {
+  await choosePatient(user);
+  await next(user);
+  await user.type(
+    screen.getByRole('textbox', { name: /^Situação social/ }),
+    SOCIAL,
+  );
+  await next(user);
 }
 
 beforeEach(() => {
   jest.resetAllMocks();
 
   (api.listEligiblePatients as jest.Mock).mockResolvedValue([
-    { id: MOCK_PATIENT_ID, name: 'Maria Silva' },
+    { id: MOCK_PATIENT_ID, name: 'Maria Silva', email: 'maria@exemplo.com' },
     {
       id: MOCK_PATIENT_WITH_ACTIVE_PTS_ID,
       name: 'Diego Alves',
+      email: 'diego@exemplo.com',
     },
   ]);
 
@@ -89,41 +114,77 @@ beforeEach(() => {
 });
 
 describe('CreatePts', () => {
-  it('carrega os dados e não lista o próprio responsável na equipe', async () => {
-    await renderScreen();
-
-    expect(
-      screen.getByRole('option', { name: 'Maria Silva' }),
-    ).toBeInTheDocument();
-
-    expect(screen.getByLabelText(/Ana Lima/)).toBeInTheDocument();
-
-    const teamCheckboxes = screen.getAllByRole('checkbox');
-
-    expect(
-      teamCheckboxes.some(
-        (checkbox) => checkbox.getAttribute('value') === MOCK_PROFESSIONAL_ID,
-      ),
-    ).toBe(false);
-
-    expect(screen.getByLabelText(/seu perfil profissional/i)).toHaveValue(
-      `${mockProfessionals[0].name} · ${mockProfessionals[0].specialism.name}`,
-    );
-  });
-
-  it('valida campos obrigatórios e não chama a API', async () => {
+  it('mostra os passos e o profissional como responsável', async () => {
     const user = userEvent.setup();
     await renderScreen();
-    await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
-    expect(screen.getByText('Selecione o paciente.')).toBeInTheDocument();
     expect(
-      screen.getByText('Descreva a situação social do paciente.'),
+      screen.getByRole('list', { name: 'Passo 1 de 3' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Paciente', level: 2 }),
+    ).toBeInTheDocument();
+
+    await fillUntilTeam(user);
+
+    expect(
+      screen.getByRole('list', { name: 'Passo 3 de 3' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Profissional responsável')).toHaveValue(
+      `${mockProfessionals[0].name} · ${mockProfessionals[0].specialism.name}`,
+    );
+
+    // O responsável não aparece entre os membros.
+    await user.click(
+      screen.getByRole('combobox', { name: 'Adicionar membro' }),
+    );
+    expect(
+      within(
+        screen.getByRole('listbox', { name: 'Profissionais' }),
+      ).getAllByRole('option'),
+    ).toHaveLength(mockProfessionals.length - 1);
+  });
+
+  it('busca os pacientes elegíveis no servidor só a partir de 2 caracteres', async () => {
+    const user = userEvent.setup();
+    await renderScreen();
+
+    expect(api.listEligiblePatients).not.toHaveBeenCalled();
+
+    (api.listEligiblePatients as jest.Mock).mockResolvedValueOnce([
+      { id: 'patient-x', name: 'Mariana Costa', email: 'mariana@exemplo.com' },
+    ]);
+
+    await user.type(screen.getByRole('combobox', { name: /Paciente/ }), 'mari');
+
+    expect(
+      await screen.findByRole('option', {
+        name: 'Mariana Costa · mariana@exemplo.com',
+      }),
+    ).toBeInTheDocument();
+    expect(api.listEligiblePatients).toHaveBeenLastCalledWith({
+      q: 'mari',
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('não avança sem paciente nem sem situação social', async () => {
+    const user = userEvent.setup();
+    await renderScreen();
+
+    await next(user);
+    expect(screen.getByText('Selecione o paciente')).toBeInTheDocument();
+
+    await choosePatient(user);
+    await next(user);
+    await next(user);
+    expect(
+      screen.getByText('Descreva a situação social do paciente'),
     ).toBeInTheDocument();
     expect(api.createPts).not.toHaveBeenCalled();
   });
 
-  it('cria com o payload correto, mostra loading e informa DRAFT', async () => {
+  it('cria com o payload correto e informa que aguarda o paciente', async () => {
     const user = userEvent.setup();
     let resolve!: (v: typeof createdPts) => void;
     (api.createPts as jest.Mock).mockReturnValue(
@@ -131,44 +192,47 @@ describe('CreatePts', () => {
     );
 
     await renderScreen();
-    await fillForm(user);
+    await fillUntilTeam(user);
+    expect(
+      screen.getByText('Nenhum membro além do responsável.'),
+    ).toBeInTheDocument();
+    await addMember(user, 'Ana Lima');
+    await addMember(user, 'Bruno Souza');
+
+    expect(
+      screen.getByRole('button', { name: 'Remover Ana Lima da equipe' }),
+    ).toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
-    const ana = mockProfessionals.find(
-      (professional) => professional.name === 'Ana Lima',
-    );
+    const ana = mockProfessionals.find((p) => p.name === 'Ana Lima')!;
+    const bruno = mockProfessionals.find((p) => p.name === 'Bruno Souza')!;
 
-    const bruno = mockProfessionals.find(
-      (professional) => professional.name === 'Bruno Souza',
-    );
-
-    expect(ana).toBeDefined();
-    expect(bruno).toBeDefined();
-
+    expect(
+      screen.getByRole('button', { name: 'Criando proposta...' }),
+    ).toBeDisabled();
     expect(api.createPts).toHaveBeenCalledWith({
       professionalId: MOCK_PROFESSIONAL_ID,
       patientId: MOCK_PATIENT_ID,
       socialSituation: SOCIAL,
-      teamProfessionalIds: [ana!.id, bruno!.id],
+      teamProfessionalIds: [ana.id, bruno.id],
     });
 
     resolve(createdPts);
     expect(await screen.findByTestId('pts-created')).toHaveTextContent(
       'A proposta para Maria Silva foi criada e aguarda a aprovação do paciente',
     );
-    expect(
-      screen.getByRole('link', { name: /ver propostas do paciente/i }),
-    ).toHaveAttribute('href', `/pts/proposals?patientId=${MOCK_PATIENT_ID}`);
+    expect(screen.getByRole('link', { name: 'Ver propostas' })).toHaveAttribute(
+      'href',
+      '/pts/proposals',
+    );
   });
 
   it('permite criar sem equipe (opcional)', async () => {
     const user = userEvent.setup();
-    (api.createPts as jest.Mock).mockResolvedValue({
-      ...createdPts,
-      team: [],
-    });
+    (api.createPts as jest.Mock).mockResolvedValue({ ...createdPts, team: [] });
     await renderScreen();
-    await fillForm(user, false);
+    await fillUntilTeam(user);
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
     await waitFor(() =>
@@ -178,7 +242,7 @@ describe('CreatePts', () => {
     );
   });
 
-  it('trata PTS_ACTIVE_EXISTS e destaca o campo paciente', async () => {
+  it('trata PTS_ACTIVE_EXISTS e volta ao passo do paciente', async () => {
     const user = userEvent.setup();
     (api.createPts as jest.Mock).mockRejectedValue(
       new ApiError(
@@ -188,19 +252,16 @@ describe('CreatePts', () => {
       ),
     );
     await renderScreen();
-    await fillForm(user, false);
+    await fillUntilTeam(user);
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
     expect(
       await screen.findByText('Este paciente já tem um PTS ativo'),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/^paciente$/i)).toHaveAttribute(
+    expect(screen.getByRole('combobox', { name: /Paciente/ })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
-    expect(
-      screen.getByRole('button', { name: /criar proposta/i }),
-    ).toBeEnabled();
   });
 
   it('trata profissional sem autorização para o perfil (403)', async () => {
@@ -209,7 +270,7 @@ describe('CreatePts', () => {
       new ApiError(403, 'PROFESSIONAL_NOT_AUTHORIZED'),
     );
     await renderScreen();
-    await fillForm(user, false);
+    await fillUntilTeam(user);
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
     expect(
@@ -223,17 +284,20 @@ describe('CreatePts', () => {
       new ApiError(500, 'INTERNAL', 'Falha interna.'),
     );
     await renderScreen();
-    await fillForm(user, false);
+    await fillUntilTeam(user);
     await user.click(screen.getByRole('button', { name: /criar proposta/i }));
 
     expect(await screen.findByText('Falha interna.')).toBeInTheDocument();
-    expect(screen.getByLabelText(/situação social/i)).toHaveValue(SOCIAL);
+    await user.click(screen.getByRole('button', { name: /Voltar/ }));
+    expect(
+      screen.getByRole('textbox', { name: /^Situação social/ }),
+    ).toHaveValue(SOCIAL);
   });
 
   it('permite tentar de novo quando o carregamento inicial falha', async () => {
     const user = userEvent.setup();
 
-    (api.listEligiblePatients as jest.Mock).mockRejectedValueOnce(
+    (api.listProfessionals as jest.Mock).mockRejectedValueOnce(
       new ApiError(0, 'NETWORK_ERROR'),
     );
 
@@ -243,6 +307,55 @@ describe('CreatePts', () => {
       await screen.findByRole('button', { name: /tentar novamente/i }),
     );
 
-    expect(await screen.findByLabelText(/^paciente$/i)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: /Paciente/ })).toBeEnabled(),
+    );
+  });
+});
+
+describe('CreatePts com administrador (RN022)', () => {
+  const adminAccount: Account = {
+    accountId: '00000000-0000-4000-8000-0000000000aa',
+    name: 'Admin',
+    email: 'admin@example.com',
+    role: 'admin',
+    ...personalData,
+    patientProfileId: null,
+    professionalProfileIds: [],
+  };
+
+  it('escolhe o profissional responsável entre todos e envia o professionalId', async () => {
+    const user = userEvent.setup();
+    (api.createPts as jest.Mock).mockResolvedValue(createdPts);
+
+    await renderScreen(adminAccount);
+    expect(
+      screen.queryByText(/sem perfil profissional/i),
+    ).not.toBeInTheDocument();
+
+    await fillUntilTeam(user);
+
+    const select = screen.getByLabelText('Profissional responsável');
+    expect(within(select).getAllByRole('option')).toHaveLength(
+      mockProfessionals.length + 1,
+    );
+
+    await user.click(screen.getByRole('button', { name: /criar proposta/i }));
+    expect(
+      screen.getByText('Selecione o profissional responsável'),
+    ).toBeInTheDocument();
+    expect(api.createPts).not.toHaveBeenCalled();
+
+    await user.selectOptions(select, mockProfessionals[1].id);
+    await user.click(screen.getByRole('button', { name: /criar proposta/i }));
+
+    await waitFor(() =>
+      expect(api.createPts).toHaveBeenCalledWith({
+        professionalId: mockProfessionals[1].id,
+        patientId: MOCK_PATIENT_ID,
+        socialSituation: SOCIAL,
+        teamProfessionalIds: [],
+      }),
+    );
   });
 });

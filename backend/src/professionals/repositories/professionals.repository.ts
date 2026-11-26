@@ -1,4 +1,4 @@
-// Este arquivo concentra a consulta de profissionais no banco.
+// Este arquivo concentra a consulta e a gravação de profissionais no banco.
 // A busca usa Professional e Account existentes, com filtros combináveis,
 // paginação e projeção explícita dos campos públicos da resposta.
 
@@ -6,24 +6,54 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
+import type { Uf } from '../enums/uf.enum';
+import { SPECIALISM_NAMES } from '../professional-registration';
+import { escapeLike } from '../../common/search/escape-like';
+import {
+  type Council,
+  specialismsOfCouncils,
+} from '../professional-registration';
+
+/** Nome da especialidade, para ordenar pelo texto mostrado na tela. */
+// Ordena pelo nome exibido da especialidade, o mesmo do mapa do código.
+const SPECIALISM_ORDER_SQL = `CASE professional.specialism ${Object.entries(
+  SPECIALISM_NAMES,
+)
+  .map(([specialism, name]) => `WHEN '${specialism}' THEN '${name}'`)
+  .join(' ')} END`;
 
 /** Filtros e paginação já validados da consulta de profissionais. */
 export type FindProfessionalsQuery = {
   page: number;
   limit: number;
-  name?: string;
-  specialism?: Specialism;
+  q?: string;
+  specialism?: Specialism[];
+  council?: Council[];
+  councilState?: Uf;
+  /** Situação da conta; só o administrador filtra por ela. */
+  status?: AccountStatus[];
+  sort?: 'name' | 'specialism';
+  order?: 'asc' | 'desc';
   ids?: string[];
+  /** Só o administrador vê o profissional de conta desativada (RFAUT005). */
+  includeInactive?: boolean;
 };
 
 /** Linha projetada pela consulta, só com os campos públicos. */
 export type ProfessionalRow = {
   professional_id: string;
+  professional_account_id: string;
   professional_specialism: Specialism;
+  professional_council_number: string | null;
+  professional_council_state: Uf | null;
+  professional_institution: string | null;
+  professional_cnes: string | null;
   account_name: string;
   account_email: string;
+  account_status: AccountStatus;
 };
 
 /** Página de linhas e total de profissionais compatíveis com os filtros. */
@@ -57,23 +87,62 @@ export class ProfessionalsRepository {
   ): Promise<ProfessionalsPage> {
     const query = this.professionalRepository
       .createQueryBuilder('professional')
-      .innerJoin(Account, 'account', 'account.id = professional."accountId"')
+      .innerJoin(Account, 'account', 'account.id = professional.accountId')
       .select([
         'professional.id AS professional_id',
+        'professional.accountId AS professional_account_id',
         'professional.specialism AS professional_specialism',
+        'professional.councilNumber AS professional_council_number',
+        'professional.councilState AS professional_council_state',
+        'professional.institution AS professional_institution',
+        'professional.cnes AS professional_cnes',
         'account.name AS account_name',
         'account.email AS account_email',
+        'account.status AS account_status',
       ]);
 
-    if (filters.name !== undefined) {
-      query.andWhere('LOWER(account.name) LIKE LOWER(:name)', {
-        name: `%${filters.name}%`,
+    // O perfil segue a situação da conta: o de conta desativada sai da
+    // consulta e da seleção de equipes, e só o administrador o vê.
+    if (filters.status !== undefined) {
+      query.andWhere('account.status IN (:...statuses)', {
+        statuses: filters.status,
+      });
+    } else if (filters.includeInactive !== true) {
+      query.andWhere('account.status = :activeStatus', {
+        activeStatus: AccountStatus.Active,
       });
     }
 
-    if (filters.specialism !== undefined) {
-      query.andWhere('professional.specialism = :specialism', {
-        specialism: filters.specialism,
+    if (filters.q !== undefined) {
+      query.andWhere(
+        `(account.name ILIKE :q ESCAPE '\\' OR account.email ILIKE :q ESCAPE '\\' OR professional.councilNumber ILIKE :q ESCAPE '\\')`,
+        { q: `%${escapeLike(filters.q)}%` },
+      );
+    }
+
+    // Profissão e conselho combinam: vale a interseção das duas listas.
+    let specialisms = filters.specialism;
+
+    if (filters.council !== undefined) {
+      const ofCouncils = specialismsOfCouncils(filters.council);
+      specialisms = specialisms
+        ? specialisms.filter((item) => ofCouncils.includes(item))
+        : ofCouncils;
+    }
+
+    if (specialisms !== undefined) {
+      if (specialisms.length === 0) {
+        query.andWhere('1 = 0');
+      } else {
+        query.andWhere('professional.specialism IN (:...specialisms)', {
+          specialisms,
+        });
+      }
+    }
+
+    if (filters.councilState !== undefined) {
+      query.andWhere('professional.councilState = :councilState', {
+        councilState: filters.councilState,
       });
     }
 
@@ -81,7 +150,17 @@ export class ProfessionalsRepository {
       query.andWhere('professional.id IN (:...ids)', { ids: filters.ids });
     }
 
-    query.orderBy('account.name', 'ASC').addOrderBy('professional.id', 'ASC');
+    const direction = filters.order === 'desc' ? 'DESC' : 'ASC';
+
+    if (filters.sort === 'specialism') {
+      query
+        .orderBy(SPECIALISM_ORDER_SQL, direction)
+        .addOrderBy('account.name', 'ASC');
+    } else {
+      query.orderBy('account.name', direction);
+    }
+
+    query.addOrderBy('professional.id', 'ASC');
 
     const total = await query.clone().getCount();
     const rows = await query
@@ -90,5 +169,74 @@ export class ProfessionalsRepository {
       .getRawMany<ProfessionalRow>();
 
     return { rows, total };
+  }
+
+  /**
+   * Busca um perfil profissional com a conta dele.
+   *
+   * @param id id do perfil
+   * @returns o perfil, ou `null` quando não existe
+   * @throws erro do banco, sem tratamento (o service decide a resposta)
+   */
+  async findById(id: string): Promise<Professional | null> {
+    return this.professionalRepository.findOne({
+      where: { id },
+      relations: { account: true },
+    });
+  }
+
+  /**
+   * Troca a especialidade e o registro do perfil e grava `updated_at`.
+   *
+   * @param id id do perfil
+   * @param changes especialidade e registro já decididos pelo service
+   * @throws erro do banco, sem tratamento (o service decide a resposta)
+   */
+  async update(
+    id: string,
+    changes: Pick<
+      Professional,
+      'specialism' | 'councilNumber' | 'councilState'
+    >,
+  ): Promise<void> {
+    await this.professionalRepository.update(id, {
+      specialism: changes.specialism,
+      councilNumber: changes.councilNumber,
+      councilState: changes.councilState,
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
+   * Grava o perfil profissional.
+   *
+   * @param professional conta e especialidade já validadas pelo service
+   * @returns id gerado para o perfil
+   * @throws erro do banco, sem tratamento (ex.: `23505` na restrição única
+   *   `UQ_professional_account`)
+   */
+  async insert(
+    professional: Pick<
+      Professional,
+      | 'accountId'
+      | 'specialism'
+      | 'councilNumber'
+      | 'councilState'
+      | 'institution'
+      | 'cnes'
+      | 'createdByAccountId'
+    >,
+  ): Promise<string> {
+    const result = await this.professionalRepository.insert({
+      accountId: professional.accountId,
+      specialism: professional.specialism,
+      councilNumber: professional.councilNumber,
+      councilState: professional.councilState,
+      institution: professional.institution,
+      cnes: professional.cnes,
+      createdByAccountId: professional.createdByAccountId,
+    });
+
+    return (result.identifiers[0] as { id: string }).id;
   }
 }

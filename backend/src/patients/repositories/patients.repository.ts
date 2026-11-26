@@ -3,30 +3,160 @@
 
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, IsNull, Repository, type SelectQueryBuilder } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
+import type { Gender } from '../../accounts/enums/gender.enum';
+import type { Sex } from '../../accounts/enums/sex.enum';
+import { DocumentEntity } from '../../documents/entities/document.entity';
+import { DocumentCategory } from '../../documents/enums/document-category.enum';
+import type { Uf } from '../../professionals/enums/uf.enum';
+import type { EducationLevel } from '../enums/education-level.enum';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
+import { escapeLike } from '../../common/search/escape-like';
 import { PtsStateEnum } from '../../database/enums/pts-state.enum';
+import { Professional } from '../../professionals/entities/professional.entity';
+import { PtsEntity } from '../../pts/entities/pts.entity';
+import type {
+  PatientPtsStatusFilter,
+  PatientSortField,
+  SortOrder,
+} from '../dto/get-authorized-patients-request.dto';
 import type { SupportContactDto } from '../dto/support-contact.dto';
+import { Medication } from '../entities/medication.entity';
 import { Patient } from '../entities/patient.entity';
+import { SupportContact } from '../entities/support-contact.entity';
 
 /** Estados de PTS considerados ativos para a consulta. */
 export const ACTIVE_PTS_STATES = [PtsStateEnum.PLANNING, PtsStateEnum.RUNNING];
+
+/**
+ * Estados de PTS que dão ao profissional acesso ao paciente (RN016): os ativos,
+ * com edição, e os encerrados, só para leitura e sem prazo.
+ */
+export const PROFESSIONAL_ACCESS_PTS_STATES = [
+  ...ACTIVE_PTS_STATES,
+  PtsStateEnum.CONCLUDED,
+  PtsStateEnum.CANCELLED,
+];
+
+/** Quem consulta: o administrador vê todos; o profissional, pelo vínculo. */
+export type PatientScope =
+  { kind: 'all' } | { kind: 'professional'; accountId: string };
 
 /** Filtros e paginação já validados da consulta de pacientes autorizados. */
 export type AuthorizedPatientsQuery = {
   page: number;
   limit: number;
+  q?: string;
+  status?: PatientPtsStatusFilter[];
+  responsibleProfessionalId?: string;
+  registeredFrom?: string;
+  registeredTo?: string;
+  sort?: PatientSortField;
+  order?: SortOrder;
 };
 
-/** Linha projetada pela consulta, só com os campos públicos. */
-export type AuthorizedPatientRow = {
+/** Colunas do cadastro do paciente que o "Editar paciente" grava. */
+export type PatientDataValues = Partial<
+  Pick<
+    Patient,
+    | 'guardianName'
+    | 'guardianPhone'
+    | 'addressZipCode'
+    | 'addressStreet'
+    | 'addressNumber'
+    | 'addressComplement'
+    | 'addressDistrict'
+    | 'addressCity'
+    | 'addressState'
+    | 'filiation1'
+    | 'filiation2'
+    | 'referenceUnit'
+    | 'educationLevel'
+    | 'schoolName'
+  >
+>;
+
+/** Filtros e paginação da busca de pacientes elegíveis para uma proposta. */
+export type EligiblePatientsQuery = {
+  page: number;
+  limit: number;
+  q?: string;
+};
+
+/** Linha projetada pela busca de pacientes elegíveis (sem o CPF, DP011). */
+export type EligiblePatientRow = {
+  patient_id: string;
+  display_name: string;
+  email: string;
+};
+
+/** Página de linhas e total de pacientes elegíveis. */
+export type EligiblePatientsPage = {
+  rows: EligiblePatientRow[];
+  total: number;
+};
+
+/** Linha da lista e do detalhe do paciente, já com o status do PTS. */
+export type PatientRow = {
   patient_id: string;
   account_name: string;
+  social_name: string | null;
+  email: string;
+  phone: string | null;
+  cpf: string | null;
+  cns: string | null;
+  guardian_name: string | null;
+  registered_at: Date | string;
+  pts_status: PtsStateEnum | null;
+  active_pts_id: string | null;
+  read_only: boolean;
 };
 
-/** Página de linhas e total de pacientes autorizados. */
-export type AuthorizedPatientsPage = {
-  rows: AuthorizedPatientRow[];
+export type PatientDetailRow = PatientRow & {
+  birth_date: string | null;
+  sex: Sex | null;
+  gender: Gender | null;
+  guardian_phone: string | null;
+  address_zip_code: string | null;
+  address_street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  address_district: string | null;
+  address_city: string | null;
+  address_state: Uf | null;
+  filiation_1: string | null;
+  filiation_2: string | null;
+  education_level: EducationLevel | null;
+  school_name: string | null;
+  reference_unit: string | null;
+  clinical_history: string | null;
+  surgical_history: string | null;
+  family_history: string | null;
+  habits: string | null;
+  developmental_milestones: string | null;
+  allergies: string | null;
+  no_known_allergies: boolean;
+};
+
+/** Ficha do PTS atual do paciente. */
+export type CurrentPtsRow = Pick<
+  PtsEntity,
+  | 'id'
+  | 'status'
+  | 'caseStudyDate'
+  | 'diagnosisSummary'
+  | 'cid'
+  | 'supportLevel'
+  | 'strengths'
+  | 'priorityNeeds'
+  | 'socialSituation'
+  | 'nextReviewAt'
+>;
+
+/** Página de linhas e total da lista de pacientes. */
+export type PatientsPage = {
+  rows: PatientRow[];
   total: number;
 };
 
@@ -35,6 +165,87 @@ export type NewPatient = {
   accountId: string;
   supportContacts: SupportContactDto[];
 };
+
+/** Campos de um contato de suporte a gravar, já normalizados. */
+export type SupportContactValues = {
+  name: string;
+  description: string | null;
+  email: string | null;
+  phone: string | null;
+  isEmergency: boolean;
+};
+
+export type ClinicalDataValues = {
+  clinicalHistory: string | null;
+  surgicalHistory: string | null;
+  familyHistory: string | null;
+  habits: string | null;
+  developmentalMilestones: string | null;
+  allergies: string | null;
+  noKnownAllergies: boolean;
+};
+
+export type MedicationValues = {
+  drugName: string;
+  dose: string;
+  frequency: string;
+  prescriber: string | null;
+  reason: string | null;
+  startDate: string;
+  endDate: string | null;
+};
+const PROFESSIONAL_STATUS_FILTERS: PatientPtsStatusFilter[] =
+  PROFESSIONAL_ACCESS_PTS_STATES;
+
+const SORT_COLUMNS: Record<PatientSortField, string> = {
+  name: 'listed.account_name',
+  registeredAt: 'listed.registered_at',
+};
+
+/**
+ * Busca parcial por nome, nome social, e-mail, CNS ou CPF (NFUS003). Quando o
+ * termo só tem dígitos e pontuação, compara também os dígitos do CNS e do CPF.
+ * Com `withCns` falso (busca de paciente elegível), o CNS fica fora.
+ */
+function applySearch(
+  query: SelectQueryBuilder<Patient>,
+  q: string | undefined,
+  withCns = true,
+): void {
+  if (q === undefined) {
+    return;
+  }
+
+  const digits = q.replace(/\D/g, '');
+  const onlyDigits = digits.length > 0 && /^[\d\s.\-/]+$/.test(q);
+
+  query.andWhere(
+    new Brackets((where) => {
+      for (const column of [
+        'account.name',
+        'account.social_name',
+        'account.email',
+        ...(withCns ? ['patient.cns'] : []),
+        'account.cpf',
+      ]) {
+        where.orWhere(`${column} ILIKE :term ESCAPE '\\'`);
+      }
+
+      if (onlyDigits) {
+        where.orWhere(
+          `regexp_replace(account.cpf, '\\D', '', 'g') LIKE :digits`,
+        );
+
+        if (withCns) {
+          where.orWhere(
+            `regexp_replace(patient.cns, '\\D', '', 'g') LIKE :digits`,
+          );
+        }
+      }
+    }),
+    { term: `%${escapeLike(q)}%`, digits: `%${digits}%` },
+  );
+}
 
 /**
  * Acesso aos dados de pacientes.
@@ -47,83 +258,629 @@ export class PatientsRepository {
   ) {}
 
   /**
-   * Busca pacientes de PTS ativos aos quais a conta tem acesso.
+   * Lista os pacientes do escopo, com o status do PTS de cada um, a busca, os
+   * filtros, a ordenação e a paginação.
    *
-   * O responsável do PTS conta como membro da equipe, conforme a RN005.
-   * A consulta usa offset/limit porque getRawMany ignora skip/take quando
-   * há JOIN.
+   * A consulta do escopo vira uma subconsulta (`listed`) para que o filtro e a
+   * ordenação usem o status do PTS já calculado. Offset/limit em vez de
+   * skip/take, porque getRawMany ignora skip/take.
    *
-   * @param accountId identificador da conta autenticada
+   * @param scope todos (admin) ou os do vínculo do profissional (RN016)
    * @param filters filtros e paginação já validados
-   * @returns linhas da página pedida e total de pacientes autorizados
+   * @returns linhas da página pedida e total filtrado
    * @throws erro do banco, sem tratamento
    */
-  async findAuthorizedPaginated(
-    accountId: string,
+  async findPatientsPaginated(
+    scope: PatientScope,
     filters: AuthorizedPatientsQuery,
-  ): Promise<AuthorizedPatientsPage> {
+  ): Promise<PatientsPage> {
+    const inner = this.scopedPatients(scope);
+    // Conta desativada sai da lista (RFAUT005); o detalhe segue acessível.
+    inner.andWhere('account.status = :activeStatus', {
+      activeStatus: AccountStatus.Active,
+    });
+    applySearch(inner, filters.q);
+
+    if (filters.responsibleProfessionalId !== undefined) {
+      const responsiblePts = inner
+        .subQuery()
+        .select('1')
+        .from(PtsEntity, 'responsible_pts')
+        .where('responsible_pts.patient_id = patient.accountId')
+        .andWhere(
+          'responsible_pts.responsible_professional_id = :responsibleProfessionalId',
+        )
+        .andWhere('responsible_pts.status <> :rejectedState')
+        .getQuery();
+      inner.andWhere(`EXISTS ${responsiblePts}`, {
+        responsibleProfessionalId: filters.responsibleProfessionalId,
+        rejectedState: PtsStateEnum.REJECTED,
+      });
+    }
+
+    if (filters.registeredFrom !== undefined) {
+      inner.andWhere('patient.registered_at >= CAST(:registeredFrom AS date)', {
+        registeredFrom: filters.registeredFrom,
+      });
+    }
+
+    if (filters.registeredTo !== undefined) {
+      inner.andWhere(
+        'patient.registered_at < CAST(:registeredTo AS date) + 1',
+        { registeredTo: filters.registeredTo },
+      );
+    }
+
+    const listed = this.patientRepository.manager
+      .createQueryBuilder()
+      .from(`(${inner.getQuery()})`, 'listed')
+      .setParameters(inner.getParameters());
+
+    const statuses =
+      scope.kind === 'professional'
+        ? (filters.status ?? PROFESSIONAL_STATUS_FILTERS).filter((status) =>
+            PROFESSIONAL_STATUS_FILTERS.includes(status),
+          )
+        : filters.status;
+
+    if (statuses !== undefined) {
+      const states = statuses.filter((status) => status !== 'none');
+      listed.andWhere(
+        new Brackets((where) => {
+          where.where('1 = 0');
+
+          if (states.length > 0) {
+            where.orWhere('listed.pts_status IN (:...statusFilter)', {
+              statusFilter: states,
+            });
+          }
+
+          if (statuses.includes('none')) {
+            where.orWhere('listed.pts_status IS NULL');
+          }
+        }),
+      );
+    }
+
+    const total = await listed
+      .clone()
+      .select('COUNT(*)', 'total')
+      .getRawOne<{ total: string }>();
+    const rows = await listed
+      .select('listed.*')
+      .orderBy(
+        SORT_COLUMNS[filters.sort ?? 'name'],
+        filters.order === 'desc' ? 'DESC' : 'ASC',
+      )
+      .addOrderBy('listed.patient_id', 'ASC')
+      .offset((filters.page - 1) * filters.limit)
+      .limit(filters.limit)
+      .getRawMany<PatientRow>();
+
+    return { rows, total: Number(total?.total ?? 0) };
+  }
+
+  /**
+   * Busca um paciente dentro do escopo de quem consulta.
+   *
+   * @param scope todos (admin) ou os do vínculo do profissional (RN016)
+   * @param patientId identificador do paciente (a conta)
+   * @returns a linha do paciente, ou `null` fora do escopo
+   * @throws erro do banco, sem tratamento
+   */
+  async findPatient(
+    scope: PatientScope,
+    patientId: string,
+  ): Promise<PatientDetailRow | null> {
+    const row = await this.scopedPatients(scope)
+      .addSelect([
+        `to_char(account.birth_date, 'YYYY-MM-DD') AS birth_date`,
+        'account.sex AS sex',
+        'account.gender AS gender',
+        'patient.guardian_phone AS guardian_phone',
+        'patient.address_zip_code AS address_zip_code',
+        'patient.address_street AS address_street',
+        'patient.address_number AS address_number',
+        'patient.address_complement AS address_complement',
+        'patient.address_district AS address_district',
+        'patient.address_city AS address_city',
+        'patient.address_state AS address_state',
+        'patient.filiation_1 AS filiation_1',
+        'patient.filiation_2 AS filiation_2',
+        'patient.education_level AS education_level',
+        'patient.school_name AS school_name',
+        'patient.reference_unit AS reference_unit',
+        'patient.clinical_history AS clinical_history',
+        'patient.surgical_history AS surgical_history',
+        'patient.family_history AS family_history',
+        'patient.habits AS habits',
+        'patient.developmental_milestones AS developmental_milestones',
+        'patient.allergies AS allergies',
+        'patient.no_known_allergies AS no_known_allergies',
+      ])
+      .andWhere('patient.accountId = :patientId', { patientId })
+      .getRawOne<PatientDetailRow>();
+
+    return row ?? null;
+  }
+
+  /**
+   * PTS que a tela do paciente mostra como atual (diagnóstico em comum,
+   * RN030): o ativo; sem ele, o mais recente sem contar os rejeitados.
+   *
+   * @param patientId identificador do paciente (a conta)
+   * @returns a ficha do PTS, ou `null` quando o paciente não tem PTS
+   * @throws erro do banco, sem tratamento
+   */
+  async findCurrentPts(patientId: string): Promise<CurrentPtsRow | null> {
+    const rows = await this.patientRepository.manager
+      .getRepository(PtsEntity)
+      .createQueryBuilder('pts')
+      .select([
+        'pts.id',
+        'pts.status',
+        'pts.caseStudyDate',
+        'pts.diagnosisSummary',
+        'pts.cid',
+        'pts.supportLevel',
+        'pts.strengths',
+        'pts.priorityNeeds',
+        'pts.socialSituation',
+        'pts.nextReviewAt',
+      ])
+      .where('pts.patient_id = :patientId', { patientId })
+      .andWhere('pts.status <> :rejected', { rejected: PtsStateEnum.REJECTED })
+      .orderBy('pts.createdAt', 'DESC')
+      .getMany();
+
+    return (
+      rows.find((pts) => ACTIVE_PTS_STATES.includes(pts.status)) ??
+      rows[0] ??
+      null
+    );
+  }
+
+  /**
+   * Diz se o paciente tem documento ativo da categoria TCLE (selo "Sem TCLE").
+   *
+   * @throws erro do banco, sem tratamento
+   */
+  async hasTcle(patientId: string): Promise<boolean> {
+    return this.patientRepository.manager.getRepository(DocumentEntity).exists({
+      where: {
+        patientId,
+        category: DocumentCategory.TCLE,
+        deletedAt: IsNull(),
+      },
+    });
+  }
+
+  /**
+   * Diz se existe perfil de paciente para a conta, sem olhar o escopo.
+   *
+   * @param patientId identificador do paciente (a conta)
+   * @throws erro do banco, sem tratamento
+   */
+  async patientExists(patientId: string): Promise<boolean> {
+    return this.patientRepository.exists({ where: { accountId: patientId } });
+  }
+
+  /**
+   * Monta a consulta dos pacientes do escopo com o status do PTS de cada um:
+   * o PTS ativo; sem ele, o mais recente sem contar os rejeitados; só com
+   * rejeitados, `rejected`; sem PTS, nulo. O responsável conta como membro da
+   * equipe (RN005).
+   */
+  private scopedPatients(scope: PatientScope): SelectQueryBuilder<Patient> {
     const query = this.patientRepository
       .createQueryBuilder('patient')
-      .innerJoin(Account, 'account', 'account.id = patient."accountId"')
+      .innerJoin(Account, 'account', 'account.id = patient.accountId');
+
+    const latestPtsColumn = (column: string, condition: string): string =>
+      query
+        .subQuery()
+        .select(`latest_pts.${column}`)
+        .from(PtsEntity, 'latest_pts')
+        .where('latest_pts.patient_id = patient.accountId')
+        .andWhere(condition)
+        .orderBy('latest_pts.createdAt', 'DESC')
+        .limit(1)
+        .getQuery();
+
+    const activePtsId = latestPtsColumn(
+      'id',
+      'latest_pts.status IN (:...activeStates)',
+    );
+    const ptsStatus = `COALESCE(${latestPtsColumn(
+      'status',
+      'latest_pts.status IN (:...activeStates)',
+    )}, ${latestPtsColumn(
+      'status',
+      'latest_pts.status <> :rejectedState',
+    )}, ${latestPtsColumn('status', 'latest_pts.status = :rejectedState')})`;
+
+    query
       .select([
-        'patient."accountId" AS patient_id',
+        'patient.accountId AS patient_id',
         'account.name AS account_name',
+        'account.social_name AS social_name',
+        'account.email AS email',
+        'account.phone AS phone',
+        'account.cpf AS cpf',
+        'patient.cns AS cns',
+        'patient.guardian_name AS guardian_name',
+        'patient.registered_at AS registered_at',
       ])
-      /*.where(
-        `patient."accountId" IN (
-    SELECT pts.patient_id
+      .addSelect(activePtsId, 'active_pts_id')
+      .addSelect(ptsStatus, 'pts_status')
+      .setParameters({
+        activeStates: ACTIVE_PTS_STATES,
+        rejectedState: PtsStateEnum.REJECTED,
+      });
+
+    if (scope.kind === 'all') {
+      return query.addSelect('false', 'read_only');
+    }
+
+    const linkedPts = (states: string): string => {
+      const ownProfiles = query
+        .subQuery()
+        .select('own.id')
+        .from(Professional, 'own')
+        .where('own.accountId = :accountId')
+        .getQuery();
+      const teamMembership = query
+        .subQuery()
+        .select('1')
+        .from('professional_participating_on_therapeutic_journey', 'membership')
+        .innerJoin(
+          Professional,
+          'member',
+          'member.id = membership.professional_id',
+        )
+        .where('membership.therapeutic_journey_id = linked_pts.id')
+        .andWhere('member.accountId = :accountId')
+        .getQuery();
+
+      return query
+        .subQuery()
+        .select('1')
+        .from(PtsEntity, 'linked_pts')
+        .where('linked_pts.patient_id = patient.accountId')
+        .andWhere(`linked_pts.status IN (:...${states})`)
+        .andWhere(
+          `(linked_pts.responsible_professional_id IN ${ownProfiles} OR EXISTS ${teamMembership})`,
+        )
+        .getQuery();
+    };
+
+    return query
+      .addSelect(`NOT EXISTS ${linkedPts('activeStates')}`, 'read_only')
+      .andWhere(`EXISTS ${linkedPts('accessStates')}`)
+      .setParameters({
+        accountId: scope.accountId,
+        accessStates: PROFESSIONAL_ACCESS_PTS_STATES,
+      });
+  }
+
+  /**
+   * Busca os pacientes elegíveis para uma nova proposta de PTS (RN011): sem PTS
+   * em `planning` ou `running` e sem rascunho (`draft` não excluído). A busca
+   * (NFUS003) é por nome, nome social, e-mail ou CPF; o CPF não é projetado.
+   *
+   * @param filters busca e paginação já validadas
+   * @returns linhas da página pedida e total filtrado
+   * @throws erro do banco, sem tratamento
+   */
+  async findEligibleForProposalPaginated(
+    filters: EligiblePatientsQuery,
+  ): Promise<EligiblePatientsPage> {
+    const query = this.patientRepository
+      .createQueryBuilder('patient')
+      .innerJoin(Account, 'account', 'account.id = patient.accountId')
+      .select([
+        'patient.accountId AS patient_id',
+        'COALESCE(account.social_name, account.name) AS display_name',
+        'account.email AS email',
+      ])
+      .where(
+        `NOT EXISTS (
+    SELECT 1
     FROM projeto_terapeutico_singular pts
-    WHERE pts.status IN (:...states)
+    WHERE pts.patient_id = patient.account_id
       AND (
-        pts.responsible_professional_id IN (
-          SELECT id FROM professional WHERE "accountId" = :accountId
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM professional_participating_on_therapeutic_journey participation
-          INNER JOIN professional ON professional.id = participation.professional_id
-          WHERE participation.therapeutic_journey_id = pts.id
-            AND professional."accountId" = :accountId
-        )
+        pts.status IN (:...activeStates)
+        OR (pts.status = :draftState AND pts.deleted_at IS NULL)
       )
   )`,
-        { accountId, states: ACTIVE_PTS_STATES },
-      )*/
-      .orderBy('account.name', 'ASC')
-      .addOrderBy('patient."accountId"', 'ASC');
+        { activeStates: ACTIVE_PTS_STATES, draftState: PtsStateEnum.DRAFT },
+      );
+
+    applySearch(query, filters.q, false);
+
+    query
+      .orderBy('COALESCE(account.social_name, account.name)', 'ASC')
+      .addOrderBy('patient.accountId', 'ASC');
 
     const total = await query.clone().getCount();
     const rows = await query
       .offset((filters.page - 1) * filters.limit)
       .limit(filters.limit)
-      .getRawMany<AuthorizedPatientRow>();
+      .getRawMany<EligiblePatientRow>();
 
     return { rows, total };
   }
 
   /**
-   * Grava o perfil de paciente.
+   * Lista os contatos de suporte do paciente, na ordem em que foram gravados.
    *
-   * O TypeORM grava coluna jsonb com JSON.stringify do valor inteiro, o que
-   * gera um literal inválido para `jsonb[]` ("malformed array literal"). Por
-   * isso cada contato vai como texto JSON, e o banco converte a lista.
+   * @param patientId identificador do paciente (a conta)
+   * @throws erro do banco, sem tratamento
+   */
+  async findSupportContacts(patientId: string): Promise<SupportContact[]> {
+    return this.patientRepository.manager.find(SupportContact, {
+      where: { patientId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+  }
+
+  /**
+   * Grava o perfil de paciente e os contatos de suporte numa transação.
    *
    * @param patient conta e contatos já normalizados
    * @throws erro do banco, sem tratamento (ex.: `23505` na PK duplicada)
    */
   async insert(patient: NewPatient): Promise<void> {
-    await this.patientRepository
-      .createQueryBuilder()
-      .insert()
-      .into(Patient)
-      .values({
-        accountId: patient.accountId,
-        supportContacts: () => 'CAST(:supportContacts AS jsonb[])',
-      })
-      .setParameter(
-        'supportContacts',
-        patient.supportContacts.map((contact) => JSON.stringify(contact)),
-      )
-      .execute();
+    await this.patientRepository.manager.transaction(async (manager) => {
+      await manager.insert(Patient, { accountId: patient.accountId });
+
+      if (patient.supportContacts.length > 0) {
+        await manager.insert(
+          SupportContact,
+          patient.supportContacts.map((contact) => ({
+            patientId: patient.accountId,
+            name: contact.name,
+            description: contact.description ?? null,
+            email: contact.email ?? null,
+            phone: contact.phone ?? null,
+            isEmergency: contact.isEmergency ?? false,
+          })),
+        );
+      }
+    });
+  }
+
+  /**
+   * Busca um contato de suporte do paciente.
+   *
+   * @param patientId identificador do paciente (a conta)
+   * @param contactId identificador do contato
+   * @returns o contato, ou `null` se não existe ou é de outro paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async findSupportContact(
+    patientId: string,
+    contactId: string,
+  ): Promise<SupportContact | null> {
+    return this.patientRepository.manager.findOne(SupportContact, {
+      where: { id: contactId, patientId },
+    });
+  }
+
+  /**
+   * Cria um contato de suporte do paciente.
+   *
+   * @throws erro do banco, sem tratamento
+   */
+  async insertSupportContact(
+    patientId: string,
+    values: SupportContactValues,
+  ): Promise<SupportContact> {
+    const manager = this.patientRepository.manager;
+
+    return manager.save(
+      SupportContact,
+      manager.create(SupportContact, { ...values, patientId }),
+    );
+  }
+
+  /**
+   * Atualiza um contato de suporte e marca o `updated_at`.
+   *
+   * @returns o contato atualizado, ou `null` se não existe ou é de outro
+   *   paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async updateSupportContact(
+    patientId: string,
+    contactId: string,
+    values: SupportContactValues,
+  ): Promise<SupportContact | null> {
+    const manager = this.patientRepository.manager;
+    const result = await manager.update(
+      SupportContact,
+      { id: contactId, patientId },
+      { ...values, updatedAt: () => 'now()' },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findSupportContact(patientId, contactId);
+  }
+
+  /**
+   * Remove um contato de suporte do paciente.
+   *
+   * @returns `false` se o contato não existe ou é de outro paciente
+   * @throws erro do banco, sem tratamento
+   */
+  async deleteSupportContact(
+    patientId: string,
+    contactId: string,
+  ): Promise<boolean> {
+    const result = await this.patientRepository.manager.delete(SupportContact, {
+      id: contactId,
+      patientId,
+    });
+
+    return (result.affected ?? 0) > 0;
+  }
+  /**
+   * Atualiza os dados clinicos do paciente (RFPAC007).
+   */
+  async updateClinicalData(
+    patientId: string,
+    values: ClinicalDataValues,
+    updatedByAccountId: string,
+  ): Promise<Patient | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Patient,
+      { accountId: patientId },
+      {
+        ...values,
+        updatedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return manager.findOne(Patient, {
+      where: { accountId: patientId },
+    });
+  }
+
+  /**
+   * Atualiza os dados cadastrais do paciente (tutor, endereço, filiação,
+   * unidade, escolaridade e instituição); só as colunas informadas mudam.
+   */
+  async updatePatientData(
+    patientId: string,
+    values: PatientDataValues,
+    updatedByAccountId: string,
+  ): Promise<void> {
+    await this.patientRepository.manager.update(
+      Patient,
+      { accountId: patientId },
+      {
+        ...values,
+        updatedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
+  }
+
+  /**
+   * Lista as medicacoes do paciente.
+   */
+  async findMedications(patientId: string): Promise<Medication[]> {
+    return this.patientRepository.manager.find(Medication, {
+      where: { patientId },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * Busca uma medicacao especifica do paciente.
+   */
+  async findMedication(
+    patientId: string,
+    medicationId: string,
+  ): Promise<Medication | null> {
+    return this.patientRepository.manager.findOne(Medication, {
+      where: {
+        id: medicationId,
+        patientId,
+      },
+    });
+  }
+
+  /**
+   * Cadastra uma medicacao para o paciente.
+   */
+  async insertMedication(
+    patientId: string,
+    values: MedicationValues,
+    registeredByAccountId: string,
+  ): Promise<Medication> {
+    const manager = this.patientRepository.manager;
+
+    return manager.save(
+      Medication,
+      manager.create(Medication, {
+        ...values,
+        patientId,
+        registeredByAccountId,
+        stoppedByAccountId: null,
+      }),
+    );
+  }
+
+  /**
+   * Atualiza uma medicacao do paciente.
+   */
+  async updateMedication(
+    patientId: string,
+    medicationId: string,
+    values: MedicationValues,
+  ): Promise<Medication | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Medication,
+      {
+        id: medicationId,
+        patientId,
+      },
+      {
+        ...values,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findMedication(patientId, medicationId);
+  }
+
+  /**
+   * Suspende uma medicacao sem apagar o registro.
+   */
+  async stopMedication(
+    patientId: string,
+    medicationId: string,
+    stoppedByAccountId: string,
+    endDate: string,
+  ): Promise<Medication | null> {
+    const manager = this.patientRepository.manager;
+
+    const result = await manager.update(
+      Medication,
+      {
+        id: medicationId,
+        patientId,
+      },
+      {
+        endDate,
+        stoppedByAccountId,
+        updatedAt: () => 'now()',
+      },
+    );
+
+    if (!result.affected) {
+      return null;
+    }
+
+    return this.findMedication(patientId, medicationId);
   }
 }

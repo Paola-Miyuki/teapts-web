@@ -1,0 +1,32 @@
+/** Siglas, em minúsculas, das unidades federativas (`uf_e`), para a UF do registro no conselho. */
+export const UFS = [
+  'ac',
+  'al',
+  'ap',
+  'am',
+  'ba',
+  'ce',
+  'df',
+  'es',
+  'go',
+  'ma',
+  'mt',
+  'ms',
+  'mg',
+  'pa',
+  'pb',
+  'pr',
+  'pe',
+  'pi',
+  'rj',
+  'rn',
+  'rs',
+  'ro',
+  'rr',
+  'sc',
+  'sp',
+  'se',
+  'to',
+] as const;
+
+export type Uf = (typeof UFS)[number];

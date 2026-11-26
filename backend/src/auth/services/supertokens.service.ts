@@ -11,9 +11,22 @@ import {
   AccountIntegrityError,
   AccountsService,
 } from '../../accounts/services/accounts.service';
+import {
+  onlyDigits,
+  readSignUpFields,
+  SIGN_UP_ACCOUNT_KEY,
+  SIGN_UP_FIELD_IDS,
+  type SignUpAccountFields,
+  validateBirthDate,
+  validateCpf,
+  validateGender,
+  validateName,
+  validatePhone,
+  validateSex,
+  validateSocialName,
+} from '../sign-up-fields';
 
 export const ACCOUNT_CONTEXT_FLAG = 'teapts.accountContext';
-export const SIGN_UP_NAME_KEY = 'teapts.signUpName';
 
 const logoutLogger = new Logger('Logout');
 
@@ -43,16 +56,6 @@ export async function processLogout(
     `Logout concluído. userId=${userId} allSessions=${allSessions}`,
   );
 }
-export async function validateName(
-  value: unknown,
-): Promise<string | undefined> {
-  if (typeof value !== 'string' || value.trim() === '') {
-    return 'Informe o nome';
-  }
-
-  return undefined;
-}
-
 @Injectable()
 export class SupertokensService {
   private readonly logger = new Logger(SupertokensService.name);
@@ -78,18 +81,51 @@ export class SupertokensService {
       recipeList: [
         EmailPassword.init({
           signUpFeature: {
-            formFields: [{ id: 'name', validate: validateName }],
+            formFields: [
+              { id: SIGN_UP_FIELD_IDS.name, validate: validateName },
+              {
+                id: SIGN_UP_FIELD_IDS.socialName,
+                validate: validateSocialName,
+                optional: true,
+              },
+              { id: SIGN_UP_FIELD_IDS.birthDate, validate: validateBirthDate },
+              { id: SIGN_UP_FIELD_IDS.sex, validate: validateSex },
+              {
+                id: SIGN_UP_FIELD_IDS.gender,
+                validate: validateGender,
+                optional: true,
+              },
+              {
+                id: SIGN_UP_FIELD_IDS.cpf,
+                // CPF único entre as contas (RN001).
+                validate: async (value: unknown) =>
+                  (await validateCpf(value)) ??
+                  ((await accountsServiceRef.isCpfTaken(
+                    onlyDigits(value as string),
+                  ))
+                    ? 'Este CPF já está cadastrado'
+                    : undefined),
+              },
+              {
+                id: SIGN_UP_FIELD_IDS.phone,
+                validate: validatePhone,
+                optional: true,
+              },
+            ],
           },
           override: {
             functions: (originalImplementation) => ({
               ...originalImplementation,
 
               signUp: async function (input) {
-                // Lê o nome diretamente do userContext preenchido pela camada de API (signUpPOST)
-                const name = input.userContext[SIGN_UP_NAME_KEY];
+                // Lê os dados da conta do userContext preenchido pela camada de API (signUpPOST)
+                const fields = input.userContext[SIGN_UP_ACCOUNT_KEY] as
+                  SignUpAccountFields | undefined;
 
-                if (typeof name !== 'string' || name.trim() === '') {
-                  logger.error('Cadastro sem nome no userContext.');
+                if (!fields) {
+                  logger.error(
+                    'Cadastro sem os dados da conta no userContext.',
+                  );
                   throw new InternalServerErrorException(
                     'Não foi possível concluir o cadastro',
                   );
@@ -103,8 +139,8 @@ export class SupertokensService {
 
                 try {
                   await accountsServiceRef.createAccount({
+                    ...fields,
                     supertokensUserId: response.user.id,
-                    name: name.trim(),
                     email: input.email.trim().toLowerCase(),
                   });
                 } catch (error) {
@@ -142,16 +178,10 @@ export class SupertokensService {
                   );
                 }
 
-                const nameValue = input.formFields.find(
-                  (field) =>
-                    field.id === 'name' ||
-                    field.id === 'fullName' ||
-                    field.id === 'nome',
-                )?.value;
+                const fields = readSignUpFields(input.formFields);
 
-                if (nameValue) {
-                  input.userContext[SIGN_UP_NAME_KEY] = nameValue;
-                  input.userContext.name = nameValue;
+                if (fields) {
+                  input.userContext[SIGN_UP_ACCOUNT_KEY] = fields;
                 }
 
                 input.userContext[ACCOUNT_CONTEXT_FLAG] = true;
@@ -167,6 +197,20 @@ export class SupertokensService {
                     throw new Error(
                       'A implementação original de signInPOST não está disponível',
                     );
+                  }
+
+                  // Conta desativada (RFAUT005) não autentica; a resposta é a
+                  // mesma de credenciais erradas, sem revelar o motivo.
+                  const email = input.formFields.find(
+                    (field) => field.id === 'email',
+                  )?.value;
+
+                  if (
+                    typeof email === 'string' &&
+                    (await accountsServiceRef.isEmailDeactivated(email))
+                  ) {
+                    logger.warn('Login recusado: conta desativada');
+                    return { status: 'WRONG_CREDENTIALS_ERROR' };
                   }
 
                   const response =

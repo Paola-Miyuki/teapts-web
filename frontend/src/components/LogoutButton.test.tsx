@@ -99,7 +99,7 @@ describe('LogoutButton', () => {
     fireEvent.click(button);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente.',
+      'Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente',
     );
   });
 });

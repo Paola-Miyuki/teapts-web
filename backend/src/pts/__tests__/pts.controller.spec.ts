@@ -4,6 +4,7 @@ import { InMemoryPtsRepository, seededRepo } from './in-memory-pts.repository';
 import { expectApiError } from './test-utils';
 import type { AccountContext } from '../../accounts/services/accounts.service';
 import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
 
 const body = {
   professionalId: 'prof-10',
@@ -17,6 +18,75 @@ const accountOf = (accountId: string): AccountContext => ({
   role: AccountRole.User,
   patientProfileId: null,
   professionalProfileIds: [],
+});
+
+const responsibleAccount: AccountContext = {
+  accountId: 'acc-1',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['prof-10'],
+};
+
+const teamAccount: AccountContext = {
+  accountId: 'acc-2',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['prof-11'],
+};
+
+describe('PtsController GET /pts/active', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.activePts.push({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      socialSituation: 'Situação social confidencial.',
+      caseStudyDate: '2026-10-01',
+      diagnosisSummary: 'Diagnóstico em comum confidencial.',
+      cid: 'F84.0',
+      supportLevel: 2,
+      strengths: null,
+      priorityNeeds: ['Comunicação'],
+      vulnerabilities: null,
+      comorbidities: null,
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2027-10-01',
+      createdAt: '2026-10-15T12:00:00.000Z',
+      acceptedAt: '2026-10-15T12:30:00.000Z',
+      beganAt: null,
+      patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+      responsible: {
+        id: 'prof-10',
+        name: 'Profissional responsável',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [],
+    });
+  });
+
+  it('retorna a consulta do PTS ativo para o paciente', async () => {
+    const result = await controller.findActive(
+      { patientId: 'acc-patient-25' },
+      {
+        accountId: 'acc-patient-25',
+        role: AccountRole.User,
+        patientProfileId: 'acc-patient-25',
+        professionalProfileIds: [],
+      },
+    );
+
+    expect(result).toMatchObject({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+    });
+    expect(result).not.toHaveProperty('socialSituation');
+  });
 });
 
 describe('PtsController POST /pts', () => {
@@ -58,5 +128,483 @@ describe('PtsController POST /pts', () => {
       409,
       'PTS_ACTIVE_EXISTS',
     );
+  });
+});
+
+describe('PtsController PATCH /pts/proposals/:id', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  it('atualiza uma proposta pela rota de edição', async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+
+    const result = await controller.updateProposal(
+      proposal.id,
+      { socialSituation: 'Situação social atualizada.' },
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      socialSituation: 'Situação social atualizada.',
+      status: PtsStateEnum.DRAFT,
+    });
+  });
+
+  it('rejeita edição por integrante da equipe', async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+
+    await expectApiError(
+      () =>
+        controller.updateProposal(
+          proposal.id,
+          { socialSituation: 'Alteração indevida.' },
+          teamAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+});
+
+describe('PtsController PATCH /pts/:id/sheet', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.sheetTargets.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsibleProfessionalId: 'prof-10',
+      teamProfessionalIds: ['prof-11'],
+    });
+  });
+
+  it('atualiza a ficha pela rota', async () => {
+    await expect(
+      controller.updatePtsSheet(
+        'pts-100',
+        {
+          caseStudyDate: '2026-10-01',
+          diagnosisSummary: 'Diagnóstico em comum.',
+          socialSituation: 'Mora com a mãe e a avó.',
+          nextReviewAt: '2027-10-01',
+        },
+        teamAccount,
+      ),
+    ).resolves.toMatchObject({
+      id: 'pts-100',
+      diagnosisSummary: 'Diagnóstico em comum.',
+      socialSituation: 'Mora com a mãe e a avó.',
+      priorityNeeds: [],
+      cid: null,
+      nextReviewAt: '2027-10-01',
+    });
+  });
+});
+
+describe('PtsController POST /pts/proposals/:id/approve|reject', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  const patientAccount: AccountContext = {
+    ...accountOf('acc-patient-25'),
+    patientProfileId: 'acc-patient-25',
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  const createDraft = async () => {
+    const proposal = await controller.create(body, accountOf('acc-1'));
+    proposal.patient.id = 'acc-patient-25';
+    return proposal;
+  };
+
+  it('aprova a proposta pela rota de aprovação', async () => {
+    const proposal = await createDraft();
+
+    const result = await controller.approveProposal(
+      proposal.id,
+      patientAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.PLANNING,
+    });
+  });
+
+  it('rejeita a proposta pela rota de rejeição', async () => {
+    const proposal = await createDraft();
+
+    const result = await controller.rejectProposal(proposal.id, patientAccount);
+
+    expect(result).toMatchObject({
+      id: proposal.id,
+      status: PtsStateEnum.REJECTED,
+    });
+  });
+
+  it('nega a decisão a quem não é o paciente', async () => {
+    const proposal = await createDraft();
+
+    await expectApiError(
+      () => controller.approveProposal(proposal.id, responsibleAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+});
+
+describe('PtsController DELETE /pts/proposals/:id', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+  });
+
+  it('exclui a proposta pela rota e responde { status: OK }', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expect(
+      controller.deleteProposal(proposal.id, responsibleAccount),
+    ).resolves.toEqual({ status: 'OK' });
+    await expectApiError(
+      () => controller.findDraftProposalById(proposal.id, responsibleAccount),
+      404,
+      'PTS_NOT_FOUND',
+    );
+  });
+
+  it('nega a exclusão a quem não é o responsável', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga o 409 para proposta fora de DRAFT', async () => {
+    const proposal = await controller.create(body, responsibleAccount);
+    proposal.status = PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () => controller.deleteProposal(proposal.id, responsibleAccount),
+      409,
+      'PTS_NOT_DRAFT',
+    );
+  });
+});
+
+describe('PtsController POST /pts/:id/team', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.activePts.push({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      socialSituation: 'Situação social confidencial.',
+      caseStudyDate: '2026-10-01',
+      diagnosisSummary: 'Diagnóstico em comum confidencial.',
+      cid: 'F84.0',
+      supportLevel: 2,
+      strengths: null,
+      priorityNeeds: ['Comunicação'],
+      vulnerabilities: null,
+      comorbidities: null,
+      sensoryProfile: null,
+      communicationMethod: null,
+      nextReviewAt: '2027-10-01',
+      createdAt: '2026-10-15T12:00:00.000Z',
+      acceptedAt: '2026-10-15T12:30:00.000Z',
+      beganAt: null,
+      patient: { id: 'acc-patient-25', name: 'Priscila Martins' },
+      responsible: {
+        id: 'prof-10',
+        name: 'Profissional responsável',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Profissional da equipe',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  });
+
+  it('adiciona profissionais à equipe pela rota POST /pts/:id/team', async () => {
+    const result = await controller.addTeamMembers(
+      'active-100',
+      { professionalIds: ['prof-15'] },
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'active-100',
+      status: PtsStateEnum.PLANNING,
+      responsible: { id: 'prof-10' },
+      team: [{ id: 'prof-11' }, { id: 'prof-15' }],
+    });
+  });
+
+  it('nega a alteração da equipe a quem não é o responsável', async () => {
+    await expectApiError(
+      () =>
+        controller.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          teamAccount,
+        ),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga 409 PTS_NOT_ACTIVE quando o PTS não está em PLANNING ou RUNNING', async () => {
+    repo.activePts[0].status = PtsStateEnum.DRAFT as PtsStateEnum.PLANNING;
+
+    await expectApiError(
+      () =>
+        controller.addTeamMembers(
+          'active-100',
+          { professionalIds: ['prof-15'] },
+          responsibleAccount,
+        ),
+      409,
+      'PTS_NOT_ACTIVE',
+    );
+  });
+});
+
+describe('PtsController DELETE /pts/:id/team/:professionalId', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  });
+
+  describe('PtsController POST /pts/:id/team/transfer-responsibility', () => {
+    let repo: InMemoryPtsRepository;
+    let controller: PtsController;
+
+    beforeEach(() => {
+      repo = seededRepo();
+      controller = new PtsController(new PtsService(repo));
+      repo.ptsTeams.set('pts-100', {
+        id: 'pts-100',
+        status: PtsStateEnum.RUNNING,
+        responsible: {
+          id: 'prof-10',
+          name: 'Kaio Segunda Conta',
+          specialism: { id: 'psychologist', name: 'Psicologia' },
+          registration: null,
+        },
+        team: [
+          {
+            id: 'prof-11',
+            name: 'Ana Souza',
+            specialism: { id: 'doctor', name: 'Medicina' },
+            registration: null,
+          },
+        ],
+      });
+    });
+
+    it('transfere pela rota e devolve o responsável e a equipe atualizados', async () => {
+      const result = await controller.transferResponsibility(
+        'pts-100',
+        { newResponsibleId: 'prof-11' },
+        responsibleAccount,
+      );
+
+      expect(result).toMatchObject({
+        id: 'pts-100',
+        responsible: { id: 'prof-11' },
+        team: [],
+      });
+      expect(repo.transferredRecords).toHaveLength(1);
+    });
+
+    it('nega a transferência a quem não é o responsável', async () => {
+      await expectApiError(
+        () =>
+          controller.transferResponsibility(
+            'pts-100',
+            { newResponsibleId: 'prof-15' },
+            teamAccount,
+          ),
+        403,
+        'FORBIDDEN',
+      );
+      expect(repo.transferredRecords).toHaveLength(0);
+    });
+  });
+
+  it('remove o membro pela rota e devolve a equipe atualizada', async () => {
+    const result = await controller.removeTeamMember(
+      'pts-100',
+      'prof-11',
+      responsibleAccount,
+    );
+
+    expect(result).toMatchObject({
+      id: 'pts-100',
+      responsible: { id: 'prof-10' },
+      team: [],
+    });
+    expect(repo.timelineRecords).toHaveLength(1);
+  });
+
+  it('nega a remoção a quem não é o responsável', async () => {
+    await expectApiError(
+      () => controller.removeTeamMember('pts-100', 'prof-11', teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+  });
+
+  it('propaga o 409 ao tentar remover o responsável', async () => {
+    await expectApiError(
+      () =>
+        controller.removeTeamMember('pts-100', 'prof-10', responsibleAccount),
+      409,
+      'CANNOT_REMOVE_RESPONSIBLE',
+    );
+  });
+});
+
+describe('PtsController POST /pts/:id/start', () => {
+  let repo: InMemoryPtsRepository;
+  let controller: PtsController;
+
+  const seedPts = (status: PtsStateEnum) => {
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio Segunda Conta',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [
+        {
+          id: 'prof-11',
+          name: 'Ana Souza',
+          specialism: { id: 'doctor', name: 'Medicina' },
+          registration: null,
+        },
+      ],
+    });
+  };
+
+  beforeEach(() => {
+    repo = seededRepo();
+    controller = new PtsController(new PtsService(repo));
+    seedPts(PtsStateEnum.PLANNING);
+  });
+
+  it('inicia a execução pela rota e devolve id, status e beganAt', async () => {
+    const result = await controller.startPts('pts-100', responsibleAccount);
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      beganAt: '2026-12-01T13:00:00.000Z',
+    });
+    expect(repo.startedRecords).toHaveLength(1);
+  });
+
+  it('nega o início a quem não é o responsável', async () => {
+    await expectApiError(
+      () => controller.startPts('pts-100', teamAccount),
+      403,
+      'FORBIDDEN',
+    );
+    expect(repo.startedRecords).toHaveLength(0);
+  });
+
+  it('propaga o 409 para PTS fora de planning', async () => {
+    seedPts(PtsStateEnum.RUNNING);
+
+    await expectApiError(
+      () => controller.startPts('pts-100', responsibleAccount),
+      409,
+      'PTS_NOT_PLANNING',
+    );
+  });
+});
+
+describe('PtsController POST /pts/:id/close', () => {
+  it('encerra pela conta da sessão', async () => {
+    const repo = seededRepo();
+    const controller = new PtsController(new PtsService(repo));
+    repo.ptsTeams.set('pts-100', {
+      id: 'pts-100',
+      status: PtsStateEnum.RUNNING,
+      responsible: {
+        id: 'prof-10',
+        name: 'Kaio',
+        specialism: { id: 'psychologist', name: 'Psicologia' },
+        registration: null,
+      },
+      team: [],
+    });
+
+    const result = await controller.closePts(
+      'pts-100',
+      { outcome: 'cancelled', closingDate: '2026-12-10' },
+      responsibleAccount,
+    );
+
+    expect(result).toEqual({
+      id: 'pts-100',
+      status: 'cancelled',
+      closingDate: '2026-12-10',
+      closingReason: null,
+    });
+    expect(repo.closedRecords[0].executedByAccountId).toBe('acc-1');
   });
 });

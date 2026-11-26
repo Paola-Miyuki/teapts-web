@@ -32,6 +32,7 @@ describe('CreatePatientRequestDto', () => {
       description: 'Mãe',
       email: 'maria@exemplo.com',
       phone: '(11) 98765-4321',
+      isEmergency: true,
     };
 
     await expect(
@@ -43,15 +44,35 @@ describe('CreatePatientRequestDto', () => {
     const result = await normalize({
       accountId,
       supportContacts: [
-        { name: '  Maria  ', description: ' ', email: '', phone: ' 1234 ' },
+        {
+          name: '  Maria  ',
+          description: ' ',
+          email: '',
+          phone: ' (11) 98765-4321 ',
+        },
       ],
     });
 
     expect(result.supportContacts).toEqual([
-      expect.objectContaining({ name: 'Maria', phone: '1234' }),
+      expect.objectContaining({ name: 'Maria', phone: '(11) 98765-4321' }),
     ]);
     expect(result.supportContacts?.[0].email).toBeUndefined();
     expect(result.supportContacts?.[0].description).toBeUndefined();
+  });
+
+  it.each([
+    '11987654321',
+    '1198765432',
+    '(11) 98765-4321',
+    '11 9 8765 4321',
+    '+55 (11) 98765-4321',
+    '+5511987654321',
+    '5511987654321',
+    '(11) 3456.7890',
+  ])('accepts the phone %s with DDD', async (phone) => {
+    await expect(
+      normalize({ accountId, supportContacts: [{ name: 'Maria', phone }] }),
+    ).resolves.toBeDefined();
   });
 
   it.each([
@@ -85,6 +106,60 @@ describe('CreatePatientRequestDto', () => {
       'an invalid contact email',
       { accountId, supportContacts: [{ name: 'Maria', email: 'maria' }] },
       'Informe um e-mail válido para o contato.',
+    ],
+    [
+      'a phone without DDD',
+      { accountId, supportContacts: [{ name: 'Maria', phone: '98765-4321' }] },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with letters',
+      {
+        accountId,
+        supportContacts: [{ name: 'Maria', phone: '(11) 98765-43ab21' }],
+      },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with a plus sign in the middle',
+      {
+        accountId,
+        supportContacts: [{ name: 'Maria', phone: '11 +98765-4321' }],
+      },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a phone with too many digits',
+      {
+        accountId,
+        supportContacts: [{ name: 'Maria', phone: '551198765432100' }],
+      },
+      'Informe um telefone válido para o contato.',
+    ],
+    [
+      'a contact with neither e-mail nor phone',
+      { accountId, supportContacts: [{ name: 'Maria' }] },
+      'Informe o e-mail ou o telefone do contato.',
+    ],
+    [
+      'an emergency contact without phone',
+      {
+        accountId,
+        supportContacts: [
+          { name: 'Maria', email: 'maria@exemplo.com', isEmergency: true },
+        ],
+      },
+      'Informe o telefone do contato de emergência.',
+    ],
+    [
+      'an isEmergency that is not a boolean',
+      {
+        accountId,
+        supportContacts: [
+          { name: 'Maria', phone: '11987654321', isEmergency: 'sim' },
+        ],
+      },
+      'Informe se o contato é de emergência.',
     ],
   ])('rejects %s with VALIDATION_ERROR', async (_case, body, message) => {
     await expect(errorBody(body)).resolves.toEqual({

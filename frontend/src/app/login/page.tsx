@@ -35,14 +35,14 @@ function LoginForm() {
     const value = email.trim();
 
     if (!value) {
-      setEmailError('Informe seu e-mail.');
+      setEmailError('Informe seu e-mail');
       return false;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(value)) {
-      setEmailError('Informe um e-mail válido, como nome@exemplo.com.');
+      setEmailError('Informe um e-mail válido, como nome@exemplo.com');
 
       return false;
     }
@@ -53,7 +53,7 @@ function LoginForm() {
 
   function validatePassword() {
     if (!password.trim()) {
-      setPasswordError('Informe sua senha.');
+      setPasswordError('Informe sua senha');
       return false;
     }
 
@@ -99,16 +99,16 @@ function LoginForm() {
       }
 
       if (response.status === 'WRONG_CREDENTIALS_ERROR') {
-        setLoginError('E-mail ou senha inválidos.');
+        setLoginError('E-mail ou senha inválidos');
 
         return;
       }
 
-      setLoginError('Não foi possível concluir a autenticação.');
+      setLoginError('Não foi possível concluir a autenticação');
     } catch (error) {
       console.error('Erro ao realizar login:', error);
 
-      setLoginError('Não foi possível concluir a autenticação.');
+      setLoginError('Não foi possível concluir a autenticação');
     } finally {
       setLoading(false);
     }
@@ -132,7 +132,7 @@ function LoginForm() {
           <div className={styles.formWrapper}>
             <h1 id="login-title">Bem-vindo de volta!</h1>
 
-            <p className={styles.intro}>Acesse sua conta TEA-PTS.</p>
+            <p className={styles.intro}></p>
 
             {isRegistered && (
               <div className={`${ui.alert} ${ui.alertSuccess}`} role="status">
@@ -216,7 +216,7 @@ function LoginForm() {
                     aria-pressed={showPassword}
                     onClick={() => setShowPassword((current) => !current)}
                   >
-                    <Icon name={showPassword ? 'eyeOff' : 'eye'} />
+                    <Icon name={showPassword ? 'eye' : 'eyeClosed'} />
                   </button>
                 </div>
 
@@ -265,8 +265,6 @@ function LoginForm() {
           </div>
         </section>
       </main>
-
-      <footer className={styles.footer}>TEA-PTS</footer>
     </div>
   );
 }

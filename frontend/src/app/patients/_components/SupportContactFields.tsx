@@ -4,21 +4,23 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import Icon from '@/components/Icon';
 import ui from '@/components/ui.module.css';
-import { isValidPhone, type SupportContact } from '@/lib/patients';
+import { isValidPhone, type SupportContactInput } from '@/lib/patients';
 import styles from '../patients.module.css';
 
 type SupportContactFieldsProps = {
   onCancel: () => void;
-  onSave: (contact: SupportContact) => void;
+  onSave: (contact: SupportContactInput) => void;
 };
 
 type ContactField = 'name' | 'email' | 'phone';
 
+type ContactValues = Required<SupportContactInput>;
+
 const OPTIONAL_FIELDS = ['description', 'email', 'phone'] as const;
 
 // Monta o contato sem espaços externos e sem os campos opcionais vazios.
-function toContact(values: Required<SupportContact>): SupportContact {
-  const contact: SupportContact = { name: values.name.trim() };
+function toContact(values: ContactValues): SupportContactInput {
+  const contact: SupportContactInput = { name: values.name.trim() };
 
   for (const field of OPTIONAL_FIELDS) {
     const value = values[field].trim();
@@ -26,6 +28,10 @@ function toContact(values: Required<SupportContact>): SupportContact {
     if (value) {
       contact[field] = value;
     }
+  }
+
+  if (values.isEmergency) {
+    contact.isEmergency = true;
   }
 
   return contact;
@@ -41,11 +47,12 @@ export default function SupportContactFields({
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
 
-  const [values, setValues] = useState<Required<SupportContact>>({
+  const [values, setValues] = useState<ContactValues>({
     name: '',
     description: '',
     email: '',
     phone: '',
+    isEmergency: false,
   });
   const [error, setError] = useState('');
   const [invalidField, setInvalidField] = useState<ContactField | null>(null);
@@ -54,7 +61,7 @@ export default function SupportContactFields({
     nameRef.current?.focus();
   }, []);
 
-  function update(field: keyof SupportContact, value: string) {
+  function update(field: keyof ContactValues, value: string | boolean) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
@@ -68,17 +75,27 @@ export default function SupportContactFields({
 
   function handleSave() {
     if (!values.name.trim()) {
-      fail('name', 'Informe o nome do contato.');
+      fail('name', 'Informe o nome do contato');
       return;
     }
 
     if (values.email.trim() && !emailRef.current?.checkValidity()) {
-      fail('email', 'Informe um e-mail válido para o contato.');
+      fail('email', 'Informe um e-mail válido para o contato');
       return;
     }
 
     if (values.phone.trim() && !isValidPhone(values.phone.trim())) {
-      fail('phone', 'Informe um telefone válido para o contato.');
+      fail('phone', 'Informe um telefone válido para o contato');
+      return;
+    }
+
+    if (!values.email.trim() && !values.phone.trim()) {
+      fail('email', 'Informe o e-mail ou o telefone do contato');
+      return;
+    }
+
+    if (values.isEmergency && !values.phone.trim()) {
+      fail('phone', 'Informe o telefone do contato de emergência');
       return;
     }
 
@@ -129,7 +146,7 @@ export default function SupportContactFields({
 
         <div className={ui.field}>
           <label htmlFor="contact-email" className={ui.label}>
-            E-mail <span className={styles.optional}>(opcional)</span>
+            E-mail <span className={styles.optional}>(ou telefone)</span>
           </label>
 
           <input
@@ -146,7 +163,8 @@ export default function SupportContactFields({
 
         <div className={ui.field}>
           <label htmlFor="contact-phone" className={ui.label}>
-            Telefone <span className={styles.optional}>(opcional)</span>
+            Telefone{' '}
+            <span className={styles.optional}>(obrigatório na emergência)</span>
           </label>
 
           <input
@@ -181,6 +199,15 @@ export default function SupportContactFields({
             onChange={(event) => update('description', event.target.value)}
           />
         </div>
+
+        <label className={`${styles.fullWidth} ux-check`}>
+          <input
+            type="checkbox"
+            checked={values.isEmergency}
+            onChange={(event) => update('isEmergency', event.target.checked)}
+          />
+          Contato de emergência
+        </label>
       </div>
 
       <div className={styles.contactActions}>
@@ -189,7 +216,7 @@ export default function SupportContactFields({
           className={`${ui.btn} ${ui.btnSecondary}`}
           onClick={onCancel}
         >
-          Descartar contato
+          Excluir contato
         </button>
 
         <button

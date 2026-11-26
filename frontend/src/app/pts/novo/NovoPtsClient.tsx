@@ -7,7 +7,11 @@ export default function NovoPtsClient() {
   return (
     <AuthenticatedPage
       currentHref="/pts/proposals"
-      breadcrumb="Criar proposta de PTS"
+      breadcrumb={[
+        { label: 'PTS', href: '/pts/proposals' },
+        { label: 'Criar proposta' },
+      ]}
+      requiredAction="createPts"
     >
       {(account) => <CreatePts account={account} />}
     </AuthenticatedPage>

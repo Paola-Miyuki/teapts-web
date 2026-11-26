@@ -38,9 +38,10 @@ ENV HOSTNAME=0.0.0.0
 
 # standalone traz server.js e só os módulos que o servidor carrega.
 # static/ fica fora do standalone e precisa ser copiado à parte.
-# Este projeto não tem frontend/public/, então não há o terceiro COPY de praxe.
+# public/ (imagens em /assets) também fica fora do standalone.
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
 
 USER node
 

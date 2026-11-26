@@ -1,22 +1,43 @@
+'use client';
+
+import { Suspense } from 'react';
+import Link from 'next/link';
+
 import AuthenticatedPage from '@/components/AuthenticatedPage';
-import ui from '@/components/ui.module.css';
+import Icon from '@/components/Icon';
+import AddedNotice from './_components/AddedNotice';
 import Professionals from './_components/Professionals';
 
 export default function ProfessionalsPage() {
   return (
-    <AuthenticatedPage currentHref="/professionals" breadcrumb="Profissionais">
-      <div className={ui.heading}>
-        <p className={ui.eyebrow}>Equipe de cuidado</p>
+    <AuthenticatedPage
+      currentHref="/professionals"
+      breadcrumb="Profissionais"
+      requiredAction="viewProfessionalDirectory"
+    >
+      {(account) => (
+        <>
+          <div className="heading">
+            <div>
+              <h1>Profissionais</h1>
+            </div>
+            {account.role === 'admin' && (
+              <div className="heading-actions">
+                <Link className="btn btn-primary" href="/professionals/new">
+                  <Icon name="plus" className="icon-sm" />
+                  Adicionar profissional
+                </Link>
+              </div>
+            )}
+          </div>
 
-        <h1>Profissionais</h1>
-
-        <p>
-          Consulte os profissionais cadastrados e encontre integrantes para
-          compor a equipe multidisciplinar.
-        </p>
-      </div>
-
-      <Professionals />
+          {/* O useSearchParams (busca e filtros) exige um limite de Suspense. */}
+          <Suspense>
+            <AddedNotice />
+            <Professionals isAdmin={account.role === 'admin'} />
+          </Suspense>
+        </>
+      )}
     </AuthenticatedPage>
   );
 }

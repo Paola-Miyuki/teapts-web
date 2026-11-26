@@ -1,146 +1,57 @@
 # Frontend (Next.js)
 
-Interface web do TEA-PTS: Next.js 16 (App Router) + React 19, estilos com
-Tailwind CSS v4 e CSS Modules, autenticação pelo SDK web do SuperTokens.
-
-Este arquivo cobre só o que é do código do frontend. Para rodar a stack
-(banco, SuperTokens, backend), use o [README da raiz](../README.md); o fluxo
-de login do lado da API está na seção 6 ("Autenticação") de lá.
+Interface web do TEA-PTS: Next.js 16 (App Router) + React 19, Tailwind v4 e CSS Modules, SuperTokens (SDK web). Para subir a stack, veja o [README da raiz](../README.md).
 
 ## Rodar
 
-Com o backend no ar em `http://localhost:3000`:
+Com o backend no ar: `make env`, `pnpm install` e `pnpm dev -p 3001` (use a porta 3001: o CORS do backend só libera `WEBSITE_DOMAIN`). Login em `/login`, com `teste@teapts.local` / `teapts123`.
 
-```bash
-cp .env.example .env    # ou make env na raiz
-pnpm install
-pnpm dev -p 3001        # http://localhost:3001 (login em /login)
-```
-
-Use a porta 3001: o backend libera CORS e cookies só para
-`WEBSITE_DOMAIN` (padrão `http://localhost:3001`). O `PORT` do `.env` não
-vale para o `next dev`, que sobe o servidor antes de ler o `.env`.
-
-Conta para testar o login: `teste@teapts.local` / `teapts123`, criada pelo
-seed (seção 5.2 do README da raiz).
-
-> **Next 16 tem mudanças incompatíveis** com versões anteriores. Antes de
-> escrever código, confira o guia em `node_modules/next/dist/docs/`.
-
-## Scripts
-
-| Script                             | O que faz                                    |
-| ---------------------------------- | -------------------------------------------- |
-| `dev`                              | servidor de desenvolvimento (use `-p 3001`)  |
-| `build` / `start`                  | build de produção / serve o build            |
-| `test` / `test:cov` / `test:watch` | Jest + Testing Library (jsdom)               |
-| `lint` / `typecheck`               | ESLint / `tsc --noEmit`                      |
-| `format` / `format:check`          | Prettier, alterando ou só conferindo         |
-
-## Variáveis de ambiente
-
-| Variável              | Padrão                  | Uso                                              |
-| --------------------- | ----------------------- | ------------------------------------------------ |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | endereço da API usado pelo SDK                   |
-| `PORT`                | `3001`                  | ignorado pelo `next dev` (use `-p 3001`)         |
-
-As `NEXT_PUBLIC_*` entram no bundle no build: mudou o `.env`, pare o
-`pnpm dev` e suba de novo.
+Scripts: `dev`, `build`, `start`, `test`, `test:cov`, `lint`, `typecheck`, `format`. Variável: `NEXT_PUBLIC_API_URL` (`http://localhost:3000`); mudou o `.env`, reinicie o `pnpm dev`.
 
 ## Estrutura
 
-```
+```text
 src/
-  app/
-    layout.tsx             layout raiz e fontes
-    globals.css            @import 'tailwindcss' e estilos globais
-    page.tsx               página inicial
-    login/
-      page.tsx             tela de login (EmailPassword.signIn)
-      login.module.css     estilos da tela
-      page.test.tsx        testes da tela
-    patients/              pacientes (só admin): lista (GET /accounts?isPatient=true) e modal "Adicionar paciente"
-      _components/         PatientList, AddPatientModal/AddPatientForm (GET /accounts?isPatient=false e
-                           POST /patients), SupportContactFields/SupportContactList e AdminOnly
-  lib/
-    supertokens.ts         initSuperTokens(): configura o SDK uma vez
-    api.ts                 apiFetch/request<T> com cookies; ApiError com status, code e apiMessage
-    account.ts             GET /me e menu por perfil (o admin tem "Pacientes")
-    patients.ts            contas com e sem perfil de paciente, cadastro do perfil e isValidPhone
-design/                    layouts de referência (HTML estático)
-public/                    arquivos servidos na raiz do site
+  app/            rotas; `_components/` guarda os componentes de cada tela
+    login/ signup/ home/ profile/ accounts/ professionals/ medications/ my-documents/
+    patients/     lista e [patientId]/ (+ pts/, documents/new/)
+    pts/          /pts do paciente (abas Meu PTS, Propostas de PTS e Histórico de PTS), [ptsId]/ (+ edit/), novo/, proposals/ ([proposalId]/edit/)
+  components/     AppShell, AuthenticatedPage, Modal, ... (+ appointments/, documents/, pts/, table/)
+  hooks/  lib/    lib: clientes da API, permissions.ts, supertokens.ts
+  styles/         cópias de design/assets/
+design/           mockups HTML de referência (abra design/index.html)
 ```
 
-O alias `@/` aponta para `src/` (no `tsconfig.json` e no `jest.config.ts`).
+## Rotas
 
-O `request<T>` de `lib/api.ts` lança `ApiError` quando a resposta não é 2xx.
-Além do `status` HTTP, ele guarda o `code` e a `apiMessage` do corpo de erro
-`{ status, message }` da API, quando existem (ex.: `409`
-`PATIENT_PROFILE_ALREADY_EXISTS`). Use a `apiMessage` para mostrar o erro ao
-usuário, com um texto padrão quando ela não vier.
+Toda tela autenticada usa `AuthenticatedPage`: sem sessão vai para `/login`; sem a permissão de `requiredAction` (`src/lib/permissions.ts`) mostra "Acesso restrito". O admin tem todas (RN022), menos as de escolha do início.
 
-## Layouts (`design/`)
+| Rota                          | Tela                                                                                                                                                                                                                                                                                                                                                                                                        | Acesso                                                 | Layout (`design/`)                               |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `/login`, `/signup`           | Entrar, Criar conta                                                                                                                                                                                                                                                                                                                                                                                         | pública                                                | `teapts-login`, `cadastro`                       |
+| `/home`                       | Início por perfil ou Aguardando aprovação                                                                                                                                                                                                                                                                                                                                                                   | conta da sessão                                        | `inicio`, `inicio-paciente`, `aguardando-perfil` |
+| `/profile`, `/profile/edit`   | Meu perfil, Editar perfil e senha                                                                                                                                                                                                                                                                                                                                                                           | conta da sessão                                        | `meu-perfil`, `meu-perfil-editar`                |
+| `/accounts`                   | Contas: ver, tornar paciente, desativar                                                                                                                                                                                                                                                                                                                                                                     | admin                                                  | `contas`                                         |
+| `/patients`                   | Pacientes e "Adicionar paciente"                                                                                                                                                                                                                                                                                                                                                                            | admin e profissional                                   | `pacientes`, `criar-paciente`                    |
+| `/patients/:id`               | Dados do paciente (selos "Reavaliação aberta"/"vencida" e "Sem TCLE"; dados pessoais com endereço, escolaridade e unidade; contatos de suporte; histórico clínico; diagnóstico do PTS atual; os cartões são só leitura e o botão "Editar paciente" abre o modal com conta, dados do paciente, histórico clínico e contatos de suporte, e "Excluir paciente" é só do admin), Histórico de PTS, Medicações, Documentos e Termos e consentimentos (tabelas com busca, filtro de categoria, paginação, Visualizar e Baixar pelo link temporário; Excluir com confirmação só para o admin, que mantém o arquivo no histórico; situação do TCLE e da autorização de imagem) | admin e profissional com acesso                        | `paciente`                                       |
+| `/patients/:id/pts`           | PTS ativo do paciente                                                                                                                                                                                                                                                                                                                                                                                       | equipe e admin                                         | `pts-detalhe`                                    |
+| `/patients/:id/documents/new` | Enviar documento: arquivo (PDF, PNG, JPG, DOC, DOCX; até 5 MB) com progresso e dados (título, categoria, data de emissão, emissor, descrição); "Enviar documento" confirma e volta ao paciente (ao início, para o paciente); só o admin escolhe emissor "Profissional"                                                                                                                                      | admin, profissional com PTS ativo e o próprio paciente | `enviar-documento`                               |
+| `/notifications`              | Notificações: abas Todas e Não lidas, marcar como lida; sino com o contador no cabeçalho                                                                                                                                                                                                                                                                                                                    | profissional e paciente                                | `notificacoes`                                   |
+| `/medications`                | Medicações do paciente em tabela: busca, filtros (situação e período), ordenação, paginação e Visualizar em modal (só leitura)                                                                                                                                                                                                                                                                              | paciente                                               | `paciente`                                       |
+| `/my-documents`               | Documentos do paciente ("Meus documentos"): só o que ele enviou, com busca, filtro de categoria, paginação, Visualizar, Baixar e "Enviar documento" (sem editar nem excluir)                                                                                                                                                                                                                                | paciente                                               | `meus-documentos`                                |
+| `/professionals`              | Profissionais (botão "Adicionar profissional" e ações "Editar especialidade" e "Desativar" só para o admin)                                                                                                                                                                                                                                                                                                 | admin e profissional                                   | `profissionais`                                  |
+| `/professionals/new`          | Adicionar profissional: conta sem perfil, profissão (20), registro, instituição e CNES                                                                                                                                                                                                                                                                                                                      | admin                                                  | `criar-profissional`                             |
+| `/pts`                        | Admin e profissional: lista de PTS (`lista-pts`), com busca, filtros, ordenação e ações por estado, e o item "PTS" do menu; paciente: PTS em abas: Meu PTS (PTS ativo, equipe e Timeline), Propostas de PTS e Histórico de PTS                                                                                                                                                                              | paciente titular e equipe                              | `pts`                                            |
+| `/pts/:id`                    | Detalhe: Visão geral (ficha), Metas terapêuticas (equipe e admin editam), Atividades (lista paginada, com filtros e detalhe; equipe e admin criam, suspendem, retomam e concluem), Equipe e Timeline; "Iniciar execução" em planejamento e "Encerrar" no PTS ativo (responsável e admin)                                                                                                                    | admin, equipe e paciente titular (sem a ficha)         | `pts-detalhe`, `pts`                             |
+| `/pts/:id/edit`               | Editar PTS em 3 passos                                                                                                                                                                                                                                                                                                                                                                                      | equipe e admin, PTS ativo                              | `editar-pts`                                     |
+| `/pts/:id/reassessment`       | Registrar reavaliação: resultado das metas e encerrar o ciclo, com ou sem a próxima versão                                                                                                                                                                                                                                                                                                                  | responsável e admin                                    | `reavaliacao`                                    |
+| `/pts/novo`                   | Criar proposta                                                                                                                                                                                                                                                                                                                                                                                              | profissional e admin                                   | `criar-pts`                                      |
+| `/pts/proposals`              | Propostas (tabela; o paciente decide na aba de `/pts`, que `/pts/proposals` abre por redirect)                                                                                                                                                                                                                                                                                                              | paciente, profissional da proposta e admin             | `propostas-pts`                                  |
+| `/pts/proposals/:id/edit`     | Editar proposta em 4 passos: paciente, diagnóstico, metas, equipe e prazos (também o rascunho da próxima versão)                                                                                                                                                                                                                                                                                            | responsável ou admin, `draft`                          | `editar-proposta`                                |
+| `/appointments/new`           | Registrar atendimento: paciente e atividade em andamento (já escolhidos quando vem do PTS), autoria, sessão e SOAP ou motivo, com confirmação; só a desmarcação aceita data futura                                                                                                                                                                                                                          | admin e equipe do PTS ativo                            | `registrar-atendimento`                          |
 
-As telas a implementar estão em `design/` como HTML estático. Abra
-`design/index.html` no navegador para ver todas; as cores, fontes e regras da
-marca estão em `design/brand-spec.md`. Use esses arquivos como referência
-visual: não importe nada de `design/` no código do app.
+## Convenções
 
-## Estilos
-
-- **Tailwind CSS v4**: ligado pelo `postcss.config.mjs` (plugin
-  `@tailwindcss/postcss`) e pelo `@import 'tailwindcss'` em `globals.css`.
-  Não há `tailwind.config.js`; personalizações vão no CSS, com `@theme`.
-- **CSS Modules** (`*.module.css`) para estilos de uma tela, como no login.
-- **`<dialog>`**: o preflight do Tailwind zera o `margin` de todo elemento,
-  inclusive o `margin: auto` que centraliza o modal. Ponha `margin: auto` na
-  classe do dialog (ex.: `.dialog` em `patients/patients.module.css`).
-
-## Autenticação
-
-O SDK `supertokens-web-js` já está configurado em `src/lib/supertokens.ts`.
-Chame `initSuperTokens()` antes de usar o SDK; `src/app/login/page.tsx` é o
-exemplo.
-
-- **Login pelo SDK**, com `EmailPassword.signIn({ formFields: [...] })`. Não
-  chame `/auth/signin` com `fetch`/Axios na mão.
-- **Decida pelo `response.status`, não pelo HTTP**: a API responde `200`
-  mesmo com credenciais erradas.
-  - `OK`: login feito, o SDK já guardou a sessão;
-  - `WRONG_CREDENTIALS_ERROR`: mostre exatamente `E-mail ou senha inválidos.`,
-    sem dizer qual campo errou;
-  - qualquer outro: mensagem genérica de erro.
-- **A sessão fica em cookies `HttpOnly`**: o frontend não lê os cookies, não
-  guarda token no `localStorage` e não monta header `Authorization`.
-- **Chamadas à API precisam enviar os cookies**, porque frontend e API estão
-  em origens diferentes:
-
-  ```ts
-  // fetch
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/me`, {
-    credentials: 'include',
-  });
-
-  // Axios
-  const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL,
-    withCredentials: true,
-  });
-  ```
-
-- **`GET /me` com `401`** significa usuário deslogado: redirecione para
-  `/login`.
-
-O formato da resposta do `/me` e os demais status estão na seção 6 do README
-da raiz. O contrato completo da API (rotas, corpos e respostas) está no
-Swagger do backend, em `http://localhost:3000/docs`.
-
-## Testes
-
-Jest com `next/jest`, ambiente `jsdom` e Testing Library. Os testes ficam ao
-lado do componente (`*.test.tsx`) e mocam o SDK do SuperTokens e o
-`next/navigation`; veja `src/app/login/page.test.tsx`.
-
-O jsdom não implementa `showModal()`/`close()` do `<dialog>`; o
-`jest.setup.ts` os substitui para os testes de modal (ex.:
-`src/app/patients/page.test.tsx`).
+- **Estilos:** use as classes globais dos mockups (`src/styles/`, cópias de `design/assets/`; copie de novo ao mudar o original) e CSS Modules para o que é de uma tela. O que várias telas usam fica em `components/ui.module.css`. Modais usam `components/Modal.tsx`.
+- **Autenticação:** login pelo SDK (`EmailPassword.signIn`), decidindo pelo `response.status` (`OK` ou `WRONG_CREDENTIALS_ERROR`, que mostra `E-mail ou senha inválidos.`). A sessão fica em cookies `HttpOnly`: toda chamada à API usa `credentials: 'include'`, e `401` redireciona para `/login`.
+- **Testes:** Jest + Testing Library (jsdom), ao lado do componente (`*.test.tsx`); mocam o SuperTokens e o `next/navigation`.

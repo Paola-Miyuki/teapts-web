@@ -1,16 +1,7 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+import { API_URL, ApiError } from '@/lib/api';
 
-/** Erro padronizado para respostas não-2xx (httpStatus 0 = falha de rede). */
-export class ApiError extends Error {
-  constructor(
-    public readonly httpStatus: number,
-    public readonly code?: string,
-    message?: string,
-  ) {
-    super(message ?? 'Erro inesperado');
-    this.name = 'ApiError';
-  }
-}
+// O erro é o mesmo de `lib/api` (status 0 = falha de rede).
+export { ApiError };
 
 export async function request<T>(
   path: string,
@@ -19,7 +10,7 @@ export async function request<T>(
   let res: Response;
   try {
     // O SuperTokens (initSuperTokens) já intercepta fetch e envia/renova a sessão via cookies.
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(`${API_URL}${path}`, {
       credentials: 'include',
       ...init,
       headers: { 'Content-Type': 'application/json', ...init.headers },

@@ -1,0 +1,506 @@
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { useRouter } from 'next/navigation';
+
+import type { Account } from '@/lib/account';
+
+import PatientDetail from './PatientDetail';
+import { personalData } from '@/test-utils/account';
+import { patientProfileExtras } from '@/test-utils/patient';
+
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
+
+const API = 'http://localhost:3000';
+
+const PROFESSIONAL: Account = {
+  accountId: 'professional-uuid',
+  name: 'Paula Profissional',
+  email: 'paula@example.com',
+  role: 'user',
+  ...personalData,
+  patientProfileId: null,
+  professionalProfileIds: ['professional-profile'],
+};
+
+const PATIENT = {
+  ...patientProfileExtras,
+  id: 'patient-1',
+  name: 'Ana Clara Ribeiro',
+  socialName: null,
+  email: 'ribeiro.familia@gmail.com',
+  phone: '41998123344',
+  cpf: '11144477735',
+  cns: '700001234567891',
+  guardianName: 'Juliana Ribeiro',
+  registeredAt: '2026-02-14T12:00:00.000Z',
+  ptsStatus: 'concluded',
+  activePtsId: null,
+  readOnly: true,
+  supportContacts: [
+    {
+      id: 'contact-1',
+      name: 'Rosa Ribeiro',
+      description: 'Avó',
+      email: null,
+      phone: '41996772211',
+      isEmergency: false,
+    },
+  ],
+};
+
+function respond(status: number, data: unknown) {
+  return {
+    ok: status < 400,
+    status,
+    json: jest.fn().mockResolvedValue(data),
+  } as unknown as Response;
+}
+
+function mockApi(detail: Response) {
+  global.fetch = jest.fn((url: string) =>
+    Promise.resolve(url.endsWith('/me') ? respond(200, PROFESSIONAL) : detail),
+  ) as jest.Mock;
+}
+
+const ADMIN: Account = {
+  ...PROFESSIONAL,
+  accountId: 'admin-uuid',
+  name: 'Kaio Admin',
+  email: 'kaio.admin@example.com',
+  role: 'admin',
+  professionalProfileIds: [],
+};
+
+// Admin: /me responde a conta de admin, o DELETE /accounts/:id a resposta
+// pedida e o detalhe, o paciente.
+function mockAdminApi(deleteResponse?: Response) {
+  global.fetch = jest.fn((url: string, init?: RequestInit) => {
+    if (url.endsWith('/me')) {
+      return Promise.resolve(respond(200, ADMIN));
+    }
+
+    if (init?.method === 'DELETE') {
+      return Promise.resolve(
+        deleteResponse ??
+          respond(200, {
+            id: 'patient-1',
+            status: 'inactive',
+            deactivatedAt: '2026-11-24T12:00:00.000Z',
+          }),
+      );
+    }
+
+    return Promise.resolve(respond(200, PATIENT));
+  }) as jest.Mock;
+}
+
+describe('PatientDetail', () => {
+  const replace = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue({ replace });
+  });
+
+  it('mostra os dados do paciente, só leitura para PTS encerrado', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('111.444.777-35')).toBeInTheDocument();
+    expect(screen.getByText('700 0012 3456 7891')).toBeInTheDocument();
+    expect(screen.getAllByText('Juliana Ribeiro')).not.toHaveLength(0);
+    // O status do PTS saiu do cartão; ficam só os selos de alerta.
+    expect(screen.queryByText('Concluído')).not.toBeInTheDocument();
+    expect(screen.getByText('Reavaliação aberta')).toHaveClass(
+      'badge',
+      'draft',
+    );
+    expect(screen.queryByText('Sem TCLE')).not.toBeInTheDocument();
+    expect(screen.getByText('Rosa Ribeiro')).toBeInTheDocument();
+    expect(screen.getByText(/Somente leitura/)).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/patient-1`,
+      expect.objectContaining({ credentials: 'include' }),
+    );
+  });
+
+  it('carrega o histórico paginado na aba do prontuário e abre em somente leitura', async () => {
+    const historyItem = {
+      id: 'pts-old',
+      version: 1,
+      status: 'concluded',
+      responsible: {
+        id: 'professional-1',
+        name: 'Ana Souza',
+        specialism: 'Psicologia',
+      },
+      team: [{ id: 'professional-2', name: 'João Lima' }],
+      createdAt: '2025-03-01T12:00:00.000Z',
+      acceptedAt: '2025-03-05T12:00:00.000Z',
+      beganAt: '2025-03-10T12:00:00.000Z',
+      closedAt: '2025-12-30T12:00:00.000Z',
+      goalsResult: null,
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/me')
+          ? respond(200, PROFESSIONAL)
+          : url.includes('/patients/patient-1/pts')
+            ? respond(200, {
+                data: [historyItem],
+                pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+              })
+            : respond(200, PATIENT),
+      ),
+    ) as jest.Mock;
+
+    render(<PatientDetail id="patient-1" />);
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    await userEvent
+      .setup()
+      .click(screen.getByRole('link', { name: 'Histórico de PTS' }));
+
+    expect(await screen.findByText('v1')).toBeInTheDocument();
+    expect(screen.getByText('Concluído')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Abrir PTS' })).toHaveAttribute(
+      'href',
+      '/pts/pts-old?readonly=1&version=1',
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `${API}/patients/patient-1/pts?page=1&limit=25`,
+      expect.anything(),
+    );
+  });
+
+  it('abre as abas Documentos e Termos e consentimentos e lista os documentos', async () => {
+    const document = {
+      id: 'doc-1',
+      title: 'Laudo neurológico',
+      category: 'medical_report',
+      issuer: null,
+      issueDate: null,
+      mimeType: 'application/pdf',
+      sizeBytes: 1024,
+      uploadedBy: { id: 'a1', name: 'Paula Profissional', isPatient: false },
+      createdAt: '2026-02-14T12:00:00.000Z',
+    };
+    global.fetch = jest.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/me')
+          ? respond(200, PROFESSIONAL)
+          : url.includes('/patients/patient-1/documents')
+            ? respond(200, {
+                data: url.includes('limit=1&') ? [] : [document],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+              })
+            : respond(200, PATIENT),
+      ),
+    ) as jest.Mock;
+    const user = userEvent.setup();
+
+    render(<PatientDetail id="patient-1" />);
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    await user.click(screen.getByRole('link', { name: 'Documentos' }));
+
+    expect(await screen.findByText('Laudo neurológico')).toBeInTheDocument();
+    // Paciente com PTS encerrado: leitura sem prazo, mas sem enviar.
+    expect(
+      screen.queryByRole('link', { name: 'Enviar documento' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('link', { name: 'Termos e consentimentos' }),
+    );
+
+    expect(await screen.findByText('Situação dos termos')).toBeInTheDocument();
+    expect(await screen.findByText('Termos enviados')).toBeInTheDocument();
+  });
+
+  it('mostra o link Abrir PTS só no cartão do diagnóstico, com o PTS atual', async () => {
+    mockApi(
+      respond(200, {
+        ...PATIENT,
+        ptsStatus: 'running',
+        activePtsId: 'pts-2',
+        readOnly: false,
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+
+    const card = document.querySelector('#d-diag')!.closest('section')!;
+
+    expect(
+      within(card).getByRole('link', { name: 'Abrir PTS' }),
+    ).toHaveAttribute('href', '/pts/pts-2');
+    expect(screen.getAllByRole('link', { name: 'Abrir PTS' })).toHaveLength(1);
+  });
+
+  it('abre o PTS encerrado em somente leitura e esconde o cartão sem PTS', async () => {
+    mockApi(
+      respond(200, {
+        ...PATIENT,
+        diagnosis: { ...PATIENT.diagnosis, ptsStatus: 'concluded' },
+      }),
+    );
+
+    const { unmount } = render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    expect(screen.getByRole('link', { name: 'Abrir PTS' })).toHaveAttribute(
+      'href',
+      '/pts/pts-2?readonly=1',
+    );
+
+    unmount();
+    mockApi(respond(200, { ...PATIENT, diagnosis: null, reassessment: null }));
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    expect(screen.queryByText('Diagnóstico')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reavaliação aberta')).not.toBeInTheDocument();
+  });
+
+  it('mostra os dados pessoais completos como no mockup', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+
+    const card = document.querySelector('#d-personal')!.closest('section')!;
+    const dd = (label: string) =>
+      within(card).getByText(label, { selector: 'dt' }).nextElementSibling!;
+
+    expect(dd('Data de nascimento')).toHaveTextContent('18/04/2019');
+    expect(dd('Idade')).toHaveTextContent(/^\d+ anos?(, \d+ mes(es)?)?/);
+    expect(dd('Sexo')).toHaveTextContent('F');
+    expect(dd('Gênero')).toHaveTextContent('Mulher cisgênero');
+    expect(dd('CPF')).toHaveTextContent('111.444.777-35');
+    expect(dd('CNS (Cartão SUS)')).toHaveTextContent('700 0012 3456 7891');
+    expect(dd('Filiação 1')).toHaveTextContent('Juliana Ribeiro');
+    expect(dd('Filiação 2')).toHaveTextContent('Não declarado');
+    expect(dd('CEP')).toHaveTextContent('80045-140');
+    expect(dd('Logradouro')).toHaveTextContent('Rua Itupava');
+    expect(dd('Número')).toHaveTextContent('1240');
+    expect(dd('Complemento')).toHaveTextContent('ap. 32');
+    expect(dd('Bairro')).toHaveTextContent('Alto da XV');
+    expect(dd('Município')).toHaveTextContent('Curitiba');
+    expect(dd('UF')).toHaveTextContent('PR');
+    expect(dd('Responsável tutelar')).toHaveTextContent('Juliana Ribeiro');
+    expect(dd('Telefone do responsável tutelar')).toHaveTextContent(
+      '(41) 99701-5522',
+    );
+    expect(dd('Escolaridade')).toHaveTextContent('Ensino Fundamental cursando');
+    expect(dd('Instituição de ensino')).toHaveTextContent(
+      'Escola Municipal Papa João XXIII',
+    );
+    expect(dd('Unidade de referência')).toHaveTextContent('UBS Bairro Alto');
+    expect(
+      within(card).getByRole('button', {
+        name: 'Copiar CNS 700 0012 3456 7891',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('mostra o histórico clínico em cartões e o diagnóstico do PTS atual', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+
+    const tiles = document.querySelectorAll('.ux-anam-tile');
+
+    expect(
+      [...tiles].map((tile) => tile.querySelector('h3')?.textContent),
+    ).toEqual([
+      'Antecedentes clínicos',
+      'Antecedentes cirúrgicos',
+      'Antecedentes familiares',
+      'Hábitos',
+      'Marcos do desenvolvimento',
+      'Alergias e restrições',
+    ]);
+    expect(tiles[5]).toHaveClass('is-alert');
+    expect(tiles[5]).toHaveTextContent('Alergia a amoxicilina');
+
+    const diagnosis = document.querySelector('#d-diag')!.closest('section')!;
+
+    expect(within(diagnosis).getByText('F84.0')).toHaveClass('ux-cid');
+    expect(within(diagnosis).getByText('Autismo infantil')).toBeInTheDocument();
+    expect(
+      within(diagnosis).getByText(
+        'CID-10 · Nível de suporte 2 · Estudo de caso de 27/02/2026',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(diagnosis).getByText(/Transtorno do espectro autista/),
+    ).toBeInTheDocument();
+    expect(
+      within(diagnosis)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      'Comunicação funcional: fazer pedidos e pedir ajuda',
+      'Participação em atividades em grupo',
+    ]);
+    expect(
+      within(diagnosis).getByText('Mora com a mãe e a avó materna.'),
+    ).toBeInTheDocument();
+  });
+
+  it('mostra o selo Reavaliação vencida e Sem TCLE', async () => {
+    mockApi(
+      respond(200, {
+        ...PATIENT,
+        reassessment: { status: 'overdue', nextReviewAt: '2026-11-01' },
+        hasTcle: false,
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+
+    expect(screen.getByText('Reavaliação vencida')).toHaveClass(
+      'badge',
+      'rejected',
+    );
+    expect(screen.getByText('Sem TCLE')).toHaveClass('badge', 'none');
+  });
+
+  it('mostra E-mail, Telefone e Cadastrado em no cartão da conta', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    const facts = document.querySelector('.ux-idfacts') as HTMLElement;
+
+    expect(facts.querySelectorAll('.ux-idfact-ic')).toHaveLength(3);
+    expect(within(facts).getByText('E-mail')).toBeInTheDocument();
+    expect(
+      within(facts).getByText('ribeiro.familia@gmail.com'),
+    ).toBeInTheDocument();
+    expect(within(facts).getByText('Telefone')).toBeInTheDocument();
+    expect(within(facts).getByText('(41) 99812-3344')).toBeInTheDocument();
+    expect(within(facts).getByText('Cadastrado em')).toBeInTheDocument();
+    expect(within(facts).getByText('14/02/2026')).toBeInTheDocument();
+  });
+
+  it('mostra "—" no telefone quando a conta não tem', async () => {
+    mockApi(respond(200, { ...PATIENT, phone: null }));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    const facts = document.querySelector('.ux-idfacts') as HTMLElement;
+
+    expect(within(facts).getByLabelText('Não informado')).toBeInTheDocument();
+  });
+
+  it('não mostra "Excluir paciente" para o profissional', async () => {
+    mockApi(respond(200, PATIENT));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await screen.findByRole('heading', { name: 'Ana Clara Ribeiro' });
+    expect(
+      screen.queryByRole('button', { name: 'Excluir paciente' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('exclui o paciente pelo admin e volta para a lista', async () => {
+    const user = userEvent.setup();
+    mockAdminApi();
+
+    render(<PatientDetail id="patient-1" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('heading', {
+        name: 'Excluir o paciente Ana Clara Ribeiro?',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/O prontuário do paciente é mantido/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        `${API}/accounts/patient-1`,
+        expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+      ),
+    );
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/patients'));
+  });
+
+  it('mostra a mensagem da API e fica na página quando a exclusão falha', async () => {
+    const user = userEvent.setup();
+    mockAdminApi(
+      respond(409, {
+        status: 'ACCOUNT_ALREADY_DEACTIVATED',
+        message: 'A conta já está desativada.',
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Excluir paciente' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Excluir paciente' }),
+    );
+
+    expect(
+      await within(dialog).findByText('A conta já está desativada.'),
+    ).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalledWith('/patients');
+  });
+
+  it('mostra "Sem acesso" no 403', async () => {
+    mockApi(
+      respond(403, {
+        status: 'FORBIDDEN',
+        message: 'Acesso restrito ao profissional.',
+      }),
+    );
+
+    render(<PatientDetail id="patient-1" />);
+
+    expect(
+      await screen.findByText('Sem acesso a este paciente'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Voltar para pacientes' }),
+    ).toHaveAttribute('href', '/patients');
+  });
+
+  it('redireciona para o login no 401', async () => {
+    mockApi(respond(401, {}));
+
+    render(<PatientDetail id="patient-1" />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+  });
+});

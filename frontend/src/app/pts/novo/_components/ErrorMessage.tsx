@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
-import styles from '../novo.module.css';
-import { alertCls } from '../styles';
+import Icon from '@/components/Icon';
+import ui from '@/components/ui.module.css';
 
 interface Props {
   title?: string;
@@ -11,14 +11,28 @@ interface Props {
 export const ErrorMessage = forwardRef<HTMLDivElement, Props>(
   function ErrorMessage({ title, message, onRetry }, ref) {
     return (
-      <div className={alertCls} role="alert" tabIndex={-1} ref={ref}>
-        {title && <p className={styles.alertTitle}>{title}</p>}
-        <p className={styles.alertMessage}>{message}</p>
-        {onRetry && (
-          <button type="button" onClick={onRetry} className={styles.retry}>
-            Tentar novamente
-          </button>
-        )}
+      <div
+        className={`${ui.alert} ${ui.alertError}`}
+        role="alert"
+        tabIndex={-1}
+        ref={ref}
+      >
+        <div className={`${ui.alertIcon} ${ui.alertIconError}`}>
+          <Icon name="alertCircle" />
+        </div>
+        <div>
+          {title && <strong>{title}</strong>}
+          <p>{message}</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className={`${ui.btn} ${ui.btnSecondary}`}
+            >
+              Tentar novamente
+            </button>
+          )}
+        </div>
       </div>
     );
   },

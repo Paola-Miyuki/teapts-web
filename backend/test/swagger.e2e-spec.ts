@@ -8,6 +8,11 @@ import { Account } from '../src/accounts/entities/account.entity';
 import { Patient } from '../src/patients/entities/patient.entity';
 import { Professional } from '../src/professionals/entities/professional.entity';
 import { PtsEntity } from '../src/pts/entities/pts.entity';
+import { StoredObject } from '../src/storage/entities/stored-object.entity';
+import { STORAGE_CONFIG } from '../src/storage/storage.config';
+import { ActivityEntity } from '../src/activities/entities/activity.entity';
+import { PtsGoalEntity } from '../src/pts/entities/pts-goal.entity';
+import { TimelineRecordEntity } from '../src/timeline/entities/timeline-record.entity';
 import { AppModule } from '../src/app.module';
 import { setupSwagger } from '../src/common/swagger/setup-swagger';
 
@@ -27,7 +32,12 @@ type OpenApiParameter = {
   schema?: OpenApiSchema;
 };
 type OpenApiResponse = {
-  content?: { 'application/json'?: { schema?: OpenApiSchema } };
+  content?: {
+    'application/json'?: {
+      schema?: OpenApiSchema;
+      examples?: Record<string, { value: unknown }>;
+    };
+  };
 };
 type OpenApiOperation = {
   tags?: string[];
@@ -59,13 +69,54 @@ function responseSchema(
 const NEST_ROUTES: Array<[path: string, method: string]> = [
   ['/health', 'get'],
   ['/me', 'get'],
+  ['/me', 'patch'],
+  ['/me/password', 'post'],
   ['/auth/logout', 'post'],
   ['/professionals', 'get'],
   ['/pts/proposals', 'get'],
   ['/pts/proposals/{id}', 'get'],
+  ['/pts/active', 'get'],
+  ['/pts/proposals/{id}', 'patch'],
+  ['/pts/{id}/start', 'post'],
+  ['/pts/{id}/close', 'post'],
+  ['/pts/{id}/reassessment', 'post'],
+  ['/pts/{id}/team/{professionalId}', 'delete'],
+  ['/pts/{id}/timeline', 'get'],
+  ['/pts/{id}/activities', 'get'],
+  ['/pts/{id}/activities', 'post'],
+  ['/activities/{id}', 'get'],
+  ['/activities/{id}', 'patch'],
+  ['/activities/{id}/appointments', 'post'],
+  ['/activities/{id}/archive', 'post'],
+  ['/activities/{id}/approve', 'post'],
+  ['/activities/{id}/reject', 'post'],
+  ['/activities/{id}/suspend', 'post'],
+  ['/activities/{id}/resume', 'post'],
+  ['/activities/{id}/conclude', 'post'],
+  ['/appointments', 'get'],
+  ['/appointments/{id}', 'get'],
+  ['/appointments/{id}/rectify', 'post'],
+  ['/notifications', 'get'],
+  ['/notifications/unread-count', 'get'],
+  ['/notifications/{id}/read', 'post'],
+  ['/notifications/read-all', 'post'],
+  ['/pts/{id}/goals', 'get'],
+  ['/pts/{id}/goals', 'post'],
+  ['/pts/{id}/goals/{goalId}', 'patch'],
+  ['/pts/{id}/goals/{goalId}', 'delete'],
+  ['/pts/proposals/{id}', 'delete'],
   ['/patients/authorized', 'get'],
   ['/accounts', 'get'],
+  ['/accounts/{id}', 'get'],
+  ['/accounts/{id}', 'delete'],
+  ['/me', 'delete'],
   ['/patients', 'post'],
+  ['/patients/{patientId}/support-contacts', 'get'],
+  ['/patients/{patientId}/support-contacts', 'post'],
+  ['/patients/{patientId}/support-contacts/{contactId}', 'patch'],
+  ['/professionals', 'post'],
+  ['/patients/{id}/documents/upload-url', 'post'],
+  ['/documents/{id}', 'patch'],
 ];
 const PROTECTED_ROUTES = NEST_ROUTES.filter(([path]) => path !== '/health');
 const ERROR_SCHEMA_REF = '#/components/schemas/ErrorResponseDto';
@@ -96,6 +147,20 @@ describe('Swagger (e2e)', () => {
       .useValue({})
       .overrideProvider(getRepositoryToken(PtsEntity))
       .useValue({})
+      .overrideProvider(getRepositoryToken(ActivityEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(PtsGoalEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(TimelineRecordEntity))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(StoredObject))
+      .useValue({})
+      .overrideProvider(STORAGE_CONFIG)
+      .useValue({
+        tokenSecret: 'test-secret',
+        uploadUrlTtlMinutes: 15,
+        baseUrl: 'http://localhost:3000',
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -128,11 +193,15 @@ describe('Swagger (e2e)', () => {
 
     expect(paths['/health']).toHaveProperty('get');
     expect(paths['/me']).toHaveProperty('get');
+    expect(paths['/me']).toHaveProperty('patch');
+    expect(paths['/me/password']).toHaveProperty('post');
     expect(paths['/auth/logout']).toHaveProperty('post');
     expect(paths['/professionals']).toHaveProperty('get');
     expect(paths['/patients/authorized']).toHaveProperty('get');
     expect(paths['/accounts']).toHaveProperty('get');
     expect(paths['/patients']).toHaveProperty('post');
+    expect(paths['/professionals']).toHaveProperty('post');
+    expect(paths['/documents/{id}']).toHaveProperty('patch');
   });
 
   it('declares the cookie and bearer session schemes', async () => {
@@ -157,7 +226,17 @@ describe('Swagger (e2e)', () => {
     expect(
       parameters.filter((p) => p.in === 'query').map((p) => p.name),
     ).toEqual(
-      expect.arrayContaining(['page', 'limit', 'name', 'specialism', 'ids']),
+      expect.arrayContaining([
+        'page',
+        'limit',
+        'q',
+        'specialism',
+        'council',
+        'councilState',
+        'sort',
+        'order',
+        'ids',
+      ]),
     );
   });
 
@@ -171,8 +250,12 @@ describe('Swagger (e2e)', () => {
     );
 
     expect(byName.patientId).toMatchObject({
-      required: true,
+      required: false,
       schema: { type: 'string', format: 'uuid' },
+    });
+    expect(byName.q).toMatchObject({
+      required: false,
+      schema: { type: 'string' },
     });
 
     expect(byName.page).toMatchObject({
@@ -195,7 +278,17 @@ describe('Swagger (e2e)', () => {
     '%s %s has a tag and a success response schema',
     async (path, method) => {
       const operation = (await getDocument()).paths[path][method];
-      const success = method === 'post' && path === '/patients' ? '201' : '200';
+      const created = [
+        '/patients',
+        '/professionals',
+        '/patients/{patientId}/support-contacts',
+        '/pts/{id}/goals',
+        '/pts/{id}/activities',
+        '/activities/{id}/appointments',
+        '/appointments/{id}/rectify',
+        '/patients/{id}/documents/upload-url',
+      ].includes(path);
+      const success = method === 'post' && created ? '201' : '200';
 
       expect(operation.tags?.length).toBeGreaterThan(0);
       expect(responseSchema(operation, success)).toBeDefined();
@@ -237,13 +330,140 @@ describe('Swagger (e2e)', () => {
     ['/patients/authorized', 'get', '400'],
     ['/patients/authorized', 'get', '500'],
     ['/accounts', 'get', '400'],
+    ['/pts/{id}/close', 'post', '400'],
+    ['/pts/{id}/close', 'post', '403'],
+    ['/pts/{id}/close', 'post', '404'],
+    ['/pts/{id}/close', 'post', '409'],
+    ['/pts/{id}/reassessment', 'post', '400'],
+    ['/pts/{id}/reassessment', 'post', '403'],
+    ['/pts/{id}/reassessment', 'post', '404'],
+    ['/pts/{id}/reassessment', 'post', '409'],
+    ['/pts/{id}/start', 'post', '400'],
+    ['/pts/{id}/start', 'post', '403'],
+    ['/pts/{id}/start', 'post', '404'],
+    ['/pts/{id}/start', 'post', '409'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '400'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '403'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '404'],
+    ['/pts/{id}/team/{professionalId}', 'delete', '409'],
+    ['/pts/{id}/timeline', 'get', '400'],
+    ['/pts/{id}/timeline', 'get', '403'],
+    ['/pts/{id}/timeline', 'get', '404'],
+    ['/pts/{id}/activities', 'get', '400'],
+    ['/pts/{id}/activities', 'get', '403'],
+    ['/pts/{id}/activities', 'get', '404'],
+    ['/pts/{id}/activities', 'post', '400'],
+    ['/pts/{id}/activities', 'post', '403'],
+    ['/pts/{id}/activities', 'post', '404'],
+    ['/pts/{id}/activities', 'post', '409'],
+    ['/pts/{id}/activities', 'post', '422'],
+    ['/activities/{id}', 'get', '400'],
+    ['/activities/{id}', 'get', '403'],
+    ['/activities/{id}', 'get', '404'],
+    ['/activities/{id}', 'patch', '400'],
+    ['/activities/{id}', 'patch', '403'],
+    ['/activities/{id}', 'patch', '404'],
+    ['/activities/{id}', 'patch', '409'],
+    ['/activities/{id}', 'patch', '422'],
+    ['/activities/{id}/suspend', 'post', '400'],
+    ['/activities/{id}/suspend', 'post', '403'],
+    ['/activities/{id}/suspend', 'post', '404'],
+    ['/activities/{id}/suspend', 'post', '409'],
+    ['/activities/{id}/resume', 'post', '400'],
+    ['/activities/{id}/resume', 'post', '403'],
+    ['/activities/{id}/resume', 'post', '404'],
+    ['/activities/{id}/resume', 'post', '409'],
+    ['/activities/{id}/conclude', 'post', '400'],
+    ['/activities/{id}/conclude', 'post', '403'],
+    ['/activities/{id}/conclude', 'post', '404'],
+    ['/activities/{id}/conclude', 'post', '409'],
+    ['/activities/{id}/appointments', 'post', '400'],
+    ['/activities/{id}/appointments', 'post', '403'],
+    ['/activities/{id}/appointments', 'post', '404'],
+    ['/activities/{id}/appointments', 'post', '409'],
+    ['/appointments', 'get', '400'],
+    ['/appointments', 'get', '403'],
+    ['/appointments', 'get', '404'],
+    ['/appointments/{id}', 'get', '400'],
+    ['/appointments/{id}', 'get', '403'],
+    ['/appointments/{id}', 'get', '404'],
+    ['/appointments/{id}/rectify', 'post', '400'],
+    ['/appointments/{id}/rectify', 'post', '403'],
+    ['/appointments/{id}/rectify', 'post', '404'],
+    ['/activities/{id}/archive', 'post', '400'],
+    ['/activities/{id}/archive', 'post', '403'],
+    ['/activities/{id}/archive', 'post', '404'],
+    ['/activities/{id}/archive', 'post', '409'],
+    ['/activities/{id}/approve', 'post', '400'],
+    ['/activities/{id}/approve', 'post', '403'],
+    ['/activities/{id}/approve', 'post', '404'],
+    ['/activities/{id}/approve', 'post', '409'],
+    ['/activities/{id}/reject', 'post', '400'],
+    ['/activities/{id}/reject', 'post', '403'],
+    ['/activities/{id}/reject', 'post', '404'],
+    ['/activities/{id}/reject', 'post', '409'],
+    ['/notifications', 'get', '400'],
+    ['/notifications/{id}/read', 'post', '400'],
+    ['/notifications/{id}/read', 'post', '404'],
+    ['/pts/{id}/goals', 'get', '400'],
+    ['/pts/{id}/goals', 'get', '403'],
+    ['/pts/{id}/goals', 'get', '404'],
+    ['/pts/{id}/goals', 'post', '400'],
+    ['/pts/{id}/goals', 'post', '403'],
+    ['/pts/{id}/goals', 'post', '404'],
+    ['/pts/{id}/goals', 'post', '409'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '400'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '403'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '404'],
+    ['/pts/{id}/goals/{goalId}', 'patch', '409'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '400'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '403'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '404'],
+    ['/pts/{id}/goals/{goalId}', 'delete', '409'],
     ['/accounts', 'get', '403'],
     ['/accounts', 'get', '500'],
+    ['/accounts/{id}', 'get', '400'],
+    ['/accounts/{id}', 'get', '403'],
+    ['/accounts/{id}', 'get', '404'],
+    ['/accounts/{id}', 'get', '500'],
+    ['/accounts/{id}', 'delete', '400'],
+    ['/accounts/{id}', 'delete', '403'],
+    ['/accounts/{id}', 'delete', '404'],
+    ['/accounts/{id}', 'delete', '409'],
+    ['/accounts/{id}', 'delete', '500'],
+    ['/me', 'delete', '404'],
+    ['/me', 'delete', '409'],
+    ['/me', 'delete', '500'],
     ['/patients', 'post', '400'],
     ['/patients', 'post', '403'],
     ['/patients', 'post', '404'],
     ['/patients', 'post', '409'],
     ['/patients', 'post', '500'],
+    ['/patients/{patientId}/support-contacts', 'get', '400'],
+    ['/patients/{patientId}/support-contacts', 'get', '403'],
+    ['/patients/{patientId}/support-contacts', 'get', '404'],
+    ['/patients/{patientId}/support-contacts', 'get', '500'],
+    ['/patients/{patientId}/support-contacts', 'post', '400'],
+    ['/patients/{patientId}/support-contacts', 'post', '403'],
+    ['/patients/{patientId}/support-contacts', 'post', '404'],
+    ['/patients/{patientId}/support-contacts', 'post', '500'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '400'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '403'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '404'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'patch', '500'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '400'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '403'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '404'],
+    ['/patients/{patientId}/support-contacts/{contactId}', 'delete', '500'],
+    ['/professionals', 'post', '400'],
+    ['/professionals', 'post', '403'],
+    ['/professionals', 'post', '404'],
+    ['/professionals', 'post', '409'],
+    ['/professionals', 'post', '500'],
+    ['/pts/proposals/{id}', 'delete', '400'],
+    ['/pts/proposals/{id}', 'delete', '403'],
+    ['/pts/proposals/{id}', 'delete', '404'],
+    ['/pts/proposals/{id}', 'delete', '409'],
   ])('%s %s answers %s with the error body', async (path, method, status) => {
     const operation = (await getDocument()).paths[path][method];
 
@@ -263,19 +483,20 @@ describe('Swagger (e2e)', () => {
     });
     expect(byName.limit).toMatchObject({
       required: false,
-      schema: { type: 'integer', default: 10, minimum: 1, maximum: 100 },
+      schema: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
     });
     expect(byName.ids).toMatchObject({
       required: false,
       schema: { type: 'string' },
     });
-    expect(byName.name).toMatchObject({ required: false });
+    expect(byName.q).toMatchObject({ required: false });
     expect(byName.specialism).toMatchObject({ required: false });
   });
 
   it.each([
     ['/accounts', 20, 50],
-    ['/patients/authorized', 10, 100],
+    ['/patients/authorized', 20, 50],
+    ['/patients', 20, 50],
   ])(
     'documents the GET %s pagination defaults and limits',
     async (path, defaultLimit, maxLimit) => {
@@ -300,11 +521,17 @@ describe('Swagger (e2e)', () => {
     },
   );
 
-  it('documents the optional GET /accounts filters', async () => {
+  it('documents the optional GET /accounts search and filters', async () => {
     const parameters = (await getDocument()).paths['/accounts'].get.parameters;
     const byName = Object.fromEntries(
       (parameters ?? []).map((parameter) => [parameter.name, parameter]),
     );
+
+    expect(byName.q).toMatchObject({
+      required: false,
+      description: expect.stringContaining('e-mail'),
+      schema: { type: 'string' },
+    });
 
     expect(byName.isPatient).toMatchObject({
       required: false,
@@ -314,6 +541,635 @@ describe('Swagger (e2e)', () => {
       required: false,
       schema: { type: 'boolean' },
     });
+    expect(byName.profile).toMatchObject({
+      required: false,
+      schema: {
+        type: 'array',
+        items: { enum: ['none', 'patient', 'professional', 'admin'] },
+      },
+    });
+    expect(byName.status).toMatchObject({
+      required: false,
+      schema: { enum: ['active', 'inactive'] },
+    });
+    expect(byName.createdFrom).toMatchObject({ required: false });
+    expect(byName.createdTo).toMatchObject({ required: false });
+    expect(byName.sort).toMatchObject({
+      required: false,
+      schema: { enum: ['name', 'createdAt'], default: 'name' },
+    });
+    expect(byName.order).toMatchObject({
+      required: false,
+      schema: { enum: ['asc', 'desc'], default: 'asc' },
+    });
+  });
+
+  it('documents GET /accounts/{id} with the id and the account schema', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/accounts/{id}'].get;
+
+    expect(operation.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'id', in: 'path', required: true }),
+      ]),
+    );
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/GetAccountResponseDto',
+    );
+    expect(components.schemas.GetAccountResponseDto.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'fullName',
+        'socialName',
+        'birthDate',
+        'sex',
+        'gender',
+        'cpf',
+        'email',
+        'phone',
+        'role',
+        'status',
+        'createdAt',
+        'updatedAt',
+        'profile',
+      ]),
+    );
+  });
+
+  it('returns the email of each GET /accounts item', async () => {
+    const { components } = await getDocument();
+
+    expect(components.schemas.AccountSummaryResponseDto.required).toEqual(
+      expect.arrayContaining([
+        'id',
+        'name',
+        'socialName',
+        'email',
+        'cpf',
+        'role',
+        'profile',
+        'specialisms',
+        'status',
+        'createdAt',
+      ]),
+    );
+  });
+
+  it('documents DELETE of a support contact with 204 and the session', async () => {
+    const operation = (await getDocument()).paths[
+      '/patients/{patientId}/support-contacts/{contactId}'
+    ].delete;
+
+    expect(operation.tags?.length).toBeGreaterThan(0);
+    expect(operation.responses).toHaveProperty('204');
+    expect(operation.responses).toHaveProperty('401');
+  });
+
+  it('lists the three POST /patients conflicts', async () => {
+    const conflict = (await getDocument()).paths['/patients'].post.responses[
+      '409'
+    ];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'ADMIN_ACCOUNT_NOT_ALLOWED',
+      'ACCOUNT_HAS_PROFESSIONAL_PROFILE',
+      'PATIENT_PROFILE_ALREADY_EXISTS',
+    ]);
+  });
+
+  it('documents DELETE /pts/proposals/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/proposals/{id}'].delete;
+
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/DeletePtsProposalResponseDto',
+    );
+    expect(components.schemas.DeletePtsProposalResponseDto.required).toEqual([
+      'status',
+    ]);
+    expect(
+      Object.keys(
+        operation.responses['409']?.content?.['application/json']?.examples ??
+          {},
+      ),
+    ).toEqual(['PTS_NOT_DRAFT']);
+  });
+
+  it('documents DELETE /pts/{id}/team/{professionalId}', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/team/{professionalId}'].delete;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(
+      (operation.parameters ?? [])
+        .filter((parameter) => parameter.in === 'path')
+        .map((parameter) => parameter.name),
+    ).toEqual(['id', 'professionalId']);
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/PtsTeamResponseDto',
+    );
+    expect(components.schemas.PtsTeamResponseDto.required).toEqual([
+      'id',
+      'status',
+      'responsible',
+      'team',
+    ]);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND', 'TEAM_MEMBER_NOT_FOUND']);
+    expect(examples('409')).toEqual([
+      'PTS_NOT_ACTIVE',
+      'CANNOT_REMOVE_RESPONSIBLE',
+    ]);
+  });
+
+  it('documents the GOALS_INCOMPLETE of POST /pts/proposals/{id}/approve', async () => {
+    const { paths, components } = await getDocument();
+    const conflict = paths['/pts/proposals/{id}/approve'].post.responses['409'];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'PTS_NOT_DRAFT',
+      'ACTIVE_PTS_ALREADY_EXISTS',
+      'GOALS_INCOMPLETE',
+    ]);
+    expect(components.schemas.GoalsIncompleteErrorDto.required).toEqual([
+      'status',
+      'message',
+      'pendingGoals',
+    ]);
+    expect(
+      components.schemas.UpdatePtsProposalRequestDto.required,
+    ).toBeUndefined();
+  });
+
+  it('documents POST /pts/{id}/close', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/close'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ClosePtsResponseDto',
+    );
+    expect(components.schemas.ClosePtsRequestDto.required).toEqual([
+      'outcome',
+      'closingDate',
+    ]);
+    for (const [status, code] of [
+      ['400', 'VALIDATION_ERROR'],
+      ['403', 'FORBIDDEN'],
+      ['404', 'PTS_NOT_FOUND'],
+      ['409', 'PTS_NOT_ACTIVE'],
+    ]) {
+      expect(
+        Object.keys(
+          operation.responses[status]?.content?.['application/json']
+            ?.examples ?? {},
+        ),
+      ).toEqual([code]);
+    }
+  });
+
+  it('documents POST /pts/{id}/reassessment', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/reassessment'].post;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/RegisterReassessmentResponseDto',
+    );
+    expect(components.schemas.RegisterReassessmentRequestDto.required).toEqual([
+      'meetingDate',
+      'goals',
+      'createNextVersion',
+    ]);
+    expect(components.schemas.RegisterReassessmentResponseDto.required).toEqual(
+      ['id', 'status', 'reassessedAt', 'nextPtsId'],
+    );
+    expect(examples('400')).toEqual([
+      'VALIDATION_ERROR',
+      'GOALS_WITHOUT_RESULT',
+    ]);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual([
+      'PTS_NOT_RUNNING',
+      'DRAFT_ALREADY_EXISTS',
+    ]);
+  });
+
+  it('documents POST /pts/{id}/start', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/start'].post;
+    const examples = (status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(operation.requestBody).toBeUndefined();
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/PtsStartResponseDto',
+    );
+    expect(components.schemas.PtsStartResponseDto.required).toEqual([
+      'id',
+      'status',
+      'beganAt',
+    ]);
+    expect(examples('400')).toEqual(['VALIDATION_ERROR']);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual(['PTS_NOT_PLANNING']);
+  });
+
+  it('documents the /pts/{id}/activities routes', async () => {
+    const { paths, components } = await getDocument();
+    const { get, post } = paths['/pts/{id}/activities'];
+
+    expect(responseSchema(get, '200')?.$ref).toBe(
+      '#/components/schemas/GetActivitiesResponseDto',
+    );
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/ActivityResponseDto',
+    );
+    expect(components.schemas.CreateActivityRequestDto.required).toEqual([
+      'title',
+      'description',
+      'type',
+      'specialism',
+      'frequency',
+      'modality',
+    ]);
+    for (const [status, code] of [
+      ['400', 'VALIDATION_ERROR'],
+      ['403', 'FORBIDDEN'],
+      ['404', 'PTS_NOT_FOUND'],
+      ['409', 'PTS_NOT_EDITABLE'],
+      ['422', 'INVALID_FREQUENCY'],
+    ]) {
+      expect(
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        ),
+      ).toEqual([code]);
+    }
+  });
+
+  it('documents GET /activities/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const { get } = paths['/activities/{id}'];
+
+    expect(responseSchema(get, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityDetailsResponseDto',
+    );
+    expect(components.schemas.ActivityDetailsResponseDto.required).toEqual(
+      expect.arrayContaining(['goal', 'documents', 'appointmentsCount']),
+    );
+    expect(
+      Object.keys(
+        get.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+  });
+
+  it('documents PATCH /activities/{id}', async () => {
+    const { paths } = await getDocument();
+    const { patch } = paths['/activities/{id}'];
+
+    expect(responseSchema(patch, '200')?.$ref).toBe(
+      '#/components/schemas/ActivityResponseDto',
+    );
+    for (const [status, codes] of [
+      ['400', ['VALIDATION_ERROR']],
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_EDITABLE', 'PTS_NOT_EDITABLE']],
+      ['422', ['INVALID_FREQUENCY']],
+    ] as const) {
+      expect(
+        Object.keys(
+          patch.responses[status]?.content?.['application/json']?.examples ??
+            {},
+        ),
+      ).toEqual(codes);
+    }
+  });
+
+  it.each(['suspend', 'resume', 'conclude'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityStatusResponseDto',
+      );
+      expect(components.schemas.ActivityStatusResponseDto.required).toEqual([
+        'id',
+        'status',
+        'changedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'INVALID_ACTIVITY_TRANSITION',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
+
+  it.each(['approve', 'reject'])(
+    'documents POST /activities/{id}/%s',
+    async (action) => {
+      const { paths, components } = await getDocument();
+      const { post } = paths[`/activities/{id}/${action}`];
+      const examples = (status: string) =>
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        );
+
+      expect(responseSchema(post, '200')?.$ref).toBe(
+        '#/components/schemas/ActivityDecisionResponseDto',
+      );
+      expect(components.schemas.ActivityDecisionResponseDto.required).toEqual([
+        'id',
+        'status',
+        'decidedAt',
+      ]);
+      expect(examples('403')).toEqual(['FORBIDDEN']);
+      expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+      expect(examples('409')).toEqual([
+        'ACTIVITY_NOT_SUGGESTED',
+        'PTS_NOT_EDITABLE',
+      ]);
+    },
+  );
+
+  it('documents POST /activities/{id}/appointments', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/activities/{id}/appointments'];
+    const examples = (status: string) =>
+      Object.keys(
+        post.responses[status]?.content?.['application/json']?.examples ?? {},
+      );
+
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/AppointmentResponseDto',
+    );
+    expect(components.schemas.CreateAppointmentRequestDto.required).toEqual([
+      'appointmentDate',
+      'startTime',
+      'modality',
+      'attendance',
+    ]);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']);
+    expect(examples('409')).toEqual(['ACTIVITY_NOT_RUNNING', 'PTS_NOT_ACTIVE']);
+    // Todas as recusas de 400 têm o mesmo status: um exemplo para cada.
+    expect(examples('400')).toEqual([
+      'INCOMPLETE',
+      'SOAP_NOT_ALLOWED',
+      'INVALID_END',
+      'FUTURE_DATE',
+      'VISIT_PLACE',
+      'INVALID_AUTHOR',
+      'INVALID_ID',
+    ]);
+
+    const { properties } = components.schemas.CreateAppointmentRequestDto as {
+      properties: Record<string, { description?: string }>;
+    };
+    for (const [name, property] of Object.entries(properties)) {
+      expect([name, property.description]).toEqual([name, expect.any(String)]);
+    }
+  });
+
+  it('documents GET /appointments and GET /appointments/{id}', async () => {
+    const { paths, components } = await getDocument();
+    const list = paths['/appointments'].get;
+    const details = paths['/appointments/{id}'].get;
+    const names = (list.parameters ?? []).map(({ name }) => name);
+
+    expect(responseSchema(list, '200')?.$ref).toBe(
+      '#/components/schemas/AppointmentListResponseDto',
+    );
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'patientId',
+        'ptsId',
+        'activityId',
+        'authorId',
+        'attendance',
+        'specialism',
+        'modality',
+        'from',
+        'to',
+        'order',
+        'page',
+        'limit',
+      ]),
+    );
+    expect(components.schemas.AppointmentListItemResponseDto.required).toEqual(
+      expect.arrayContaining(['author', 'registeredBy']),
+    );
+    expect(responseSchema(details, '200')?.$ref).toBe(
+      '#/components/schemas/AppointmentDetailsResponseDto',
+    );
+    expect(components.schemas.AppointmentDetailsResponseDto.required).toEqual(
+      expect.arrayContaining(['rectified', 'rectifications', 'registeredBy']),
+    );
+    expect(
+      Object.keys(
+        details.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['APPOINTMENT_NOT_FOUND', 'PTS_NOT_FOUND']);
+  });
+
+  it('documents POST /appointments/{id}/rectify', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/appointments/{id}/rectify'];
+    const examples = (status: string) =>
+      Object.keys(
+        post.responses[status]?.content?.['application/json']?.examples ?? {},
+      );
+
+    expect(responseSchema(post, '201')?.$ref).toBe(
+      '#/components/schemas/RectifyAppointmentResponseDto',
+    );
+    expect(components.schemas.RectifyAppointmentRequestDto.required).toEqual(
+      expect.arrayContaining(['reason', 'appointmentDate', 'attendance']),
+    );
+    expect(components.schemas.RectifyAppointmentResponseDto.required).toEqual([
+      'id',
+      'rectifiesAppointmentId',
+      'createdAt',
+    ]);
+    expect(examples('400')).toEqual(['REASON', 'INVALID_ID']);
+    expect(examples('403')).toEqual(['FORBIDDEN']);
+    expect(examples('404')).toEqual(['APPOINTMENT_NOT_FOUND', 'PTS_NOT_FOUND']);
+  });
+
+  it('documents POST /activities/{id}/archive', async () => {
+    const { paths, components } = await getDocument();
+    const { post } = paths['/activities/{id}/archive'];
+
+    expect(responseSchema(post, '200')?.$ref).toBe(
+      '#/components/schemas/ArchiveActivityResponseDto',
+    );
+    expect(components.schemas.ArchiveActivityResponseDto.required).toEqual([
+      'id',
+      'status',
+      'archivedAt',
+    ]);
+    for (const [status, codes] of [
+      ['403', ['FORBIDDEN']],
+      ['404', ['ACTIVITY_NOT_FOUND', 'PTS_NOT_FOUND']],
+      ['409', ['ACTIVITY_NOT_ARCHIVABLE', 'PTS_NOT_EDITABLE']],
+    ] as const) {
+      expect(
+        Object.keys(
+          post.responses[status]?.content?.['application/json']?.examples ?? {},
+        ),
+      ).toEqual(codes);
+    }
+  });
+
+  it('documents the /notifications routes', async () => {
+    const { paths, components } = await getDocument();
+    const read = paths['/notifications/{id}/read'].post;
+
+    expect(responseSchema(paths['/notifications'].get, '200')?.$ref).toBe(
+      '#/components/schemas/GetNotificationsResponseDto',
+    );
+    expect(components.schemas.GetNotificationsResponseDto.required).toEqual([
+      'data',
+      'pagination',
+      'unreadCount',
+    ]);
+    expect(components.schemas.NotificationResponseDto.required).toEqual([
+      'id',
+      'type',
+      'message',
+      'ptsId',
+      'createdAt',
+      'readAt',
+    ]);
+    expect(
+      Object.keys(
+        read.responses['404']?.content?.['application/json']?.examples ?? {},
+      ),
+    ).toEqual(['NOTIFICATION_NOT_FOUND']);
+  });
+
+  it('documents the /pts/{id}/goals routes', async () => {
+    const { paths, components } = await getDocument();
+    const list = paths['/pts/{id}/goals'];
+    const item = paths['/pts/{id}/goals/{goalId}'];
+    const examples = (operation: OpenApiOperation, status: string) =>
+      Object.keys(
+        operation.responses[status]?.content?.['application/json']?.examples ??
+          {},
+      );
+
+    expect(responseSchema(list.get, '200')?.$ref).toBe(
+      '#/components/schemas/GetGoalsResponseDto',
+    );
+    expect(responseSchema(list.post, '201')?.$ref).toBe(
+      '#/components/schemas/GoalResponseDto',
+    );
+    expect(responseSchema(item.patch, '200')?.$ref).toBe(
+      '#/components/schemas/GoalResponseDto',
+    );
+    expect(responseSchema(item.delete, '200')?.$ref).toBe(
+      '#/components/schemas/DeleteGoalResponseDto',
+    );
+    expect(components.schemas.CreateGoalRequestDto.required).toEqual([
+      'title',
+      'description',
+      'term',
+      'area',
+      'measureCriterion',
+      'targetDate',
+    ]);
+    expect(components.schemas.UpdateGoalRequestDto.required).toBeUndefined();
+    expect(examples(list.post, '409')).toEqual(['PTS_NOT_EDITABLE']);
+    expect(examples(item.patch, '404')).toEqual([
+      'PTS_NOT_FOUND',
+      'GOAL_NOT_FOUND',
+    ]);
+    expect(examples(item.delete, '409')).toEqual([
+      'PTS_NOT_EDITABLE',
+      'LAST_GOAL',
+      'GOAL_HAS_ACTIVITIES',
+    ]);
+  });
+
+  it('documents GET /pts/{id}/timeline', async () => {
+    const { paths, components } = await getDocument();
+    const operation = paths['/pts/{id}/timeline'].get;
+    const parameters = operation.parameters ?? [];
+    const byName = Object.fromEntries(
+      parameters
+        .filter((parameter) => parameter.in === 'query')
+        .map((parameter) => [parameter.name, parameter]),
+    );
+
+    expect(operation.tags).toEqual(['timeline']);
+    expect(
+      parameters
+        .filter((parameter) => parameter.in === 'path')
+        .map((parameter) => parameter.name),
+    ).toEqual(['id']);
+    expect(Object.keys(byName)).toEqual(
+      expect.arrayContaining([
+        'q',
+        'type',
+        'authorId',
+        'from',
+        'to',
+        'order',
+        'page',
+        'limit',
+      ]),
+    );
+    expect(Object.values(byName).every((p) => p.required === false)).toBe(true);
+    expect(byName.page).toMatchObject({
+      schema: { type: 'integer', default: 1, minimum: 1 },
+    });
+    expect(byName.limit).toMatchObject({
+      schema: { type: 'integer', default: 20, minimum: 1, maximum: 50 },
+    });
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/GetTimelineResponseDto',
+    );
+    expect(components.schemas.GetTimelineResponseDto.required).toEqual([
+      'data',
+      'pagination',
+    ]);
+    expect(components.schemas.TimelineRecordDto.required).toEqual([
+      'id',
+      'type',
+      'targetType',
+      'targetId',
+      'description',
+      'happenedAt',
+      'author',
+      'assignedTo',
+    ]);
   });
 
   it('reads the POST /patients body from the DTO', async () => {
@@ -326,6 +1182,44 @@ describe('Swagger (e2e)', () => {
       'accountId',
     ]);
     expect(components.schemas.SupportContactDto.required).toEqual(['name']);
+  });
+
+  it('reads the POST /professionals body from the DTO', async () => {
+    const { paths, components } = await getDocument();
+    const schema =
+      paths['/professionals'].post.requestBody?.content['application/json']
+        ?.schema;
+
+    expect(schema?.$ref).toBe(
+      '#/components/schemas/CreateProfessionalRequestDto',
+    );
+    expect(components.schemas.CreateProfessionalRequestDto.required).toEqual([
+      'accountId',
+      'specialism',
+      'councilNumber',
+      'councilState',
+    ]);
+  });
+
+  it('documents the POST /me/password response with its own DTO', async () => {
+    const operation = (await getDocument()).paths['/me/password'].post;
+
+    expect(responseSchema(operation, '200')?.$ref).toBe(
+      '#/components/schemas/ChangePasswordResponseDto',
+    );
+  });
+
+  it('lists the three POST /professionals conflicts', async () => {
+    const conflict = (await getDocument()).paths['/professionals'].post
+      .responses['409'];
+
+    expect(
+      Object.keys(conflict?.content?.['application/json']?.examples ?? {}),
+    ).toEqual([
+      'ADMIN_ACCOUNT_NOT_ALLOWED',
+      'ACCOUNT_HAS_PATIENT_PROFILE',
+      'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
+    ]);
   });
 
   it.each(['/auth/signup', '/auth/signin'])(

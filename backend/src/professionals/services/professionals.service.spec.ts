@@ -1,4 +1,18 @@
 import { jest } from '@jest/globals';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { QueryFailedError, type Repository } from 'typeorm';
+import type { Account } from '../../accounts/entities/account.entity';
+import { AccountRole } from '../../accounts/enums/account-role.enum';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import type { Patient } from '../../patients/entities/patient.entity';
+import type { Professional } from '../entities/professional.entity';
 import { Specialism } from '../enums/specialism.enum';
 import type { GetProfessionalsRequestDto } from '../dto/get-professionals-request.dto';
 import type {
@@ -8,27 +22,62 @@ import type {
 } from '../repositories/professionals.repository';
 import { ProfessionalsService } from './professionals.service';
 
-// O teste substitui o repository para validar só a regra do service:
-// conversão para o contrato, paginação e erro seguro.
+// O teste substitui os repositories para validar só a regra do service:
+// conversão para o contrato, paginação, regras do cadastro e erro seguro.
 function createService() {
   const repository = {
     findPaginated:
       jest.fn<
         (filters: FindProfessionalsQuery) => Promise<ProfessionalsPage>
       >(),
+    findById: jest.fn<(id: string) => Promise<Professional | null>>(),
+    update:
+      jest.fn<
+        (
+          id: string,
+          changes: Pick<
+            Professional,
+            'specialism' | 'councilNumber' | 'councilState'
+          >,
+        ) => Promise<void>
+      >(),
+    insert:
+      jest.fn<
+        (
+          professional: Pick<Professional, 'accountId' | 'specialism'>,
+        ) => Promise<string>
+      >(),
+  };
+  const accountRepository = {
+    findOne: jest.fn<(options: unknown) => Promise<Partial<Account> | null>>(),
   };
   const service = new ProfessionalsService(
     repository as unknown as ProfessionalsRepository,
+    accountRepository as unknown as Repository<Account>,
   );
 
-  return { repository, service };
+  return { repository, accountRepository, service };
 }
+
+const professionalAccount: AccountContext = {
+  accountId: 'account-professional',
+  role: AccountRole.User,
+  patientProfileId: null,
+  professionalProfileIds: ['profile-1'],
+};
+
+const patientAccount: AccountContext = {
+  accountId: 'account-patient',
+  role: AccountRole.User,
+  patientProfileId: 'account-patient',
+  professionalProfileIds: [],
+};
 
 const request: GetProfessionalsRequestDto = {
   page: 2,
   limit: 10,
-  name: 'Maria',
-  specialism: Specialism.Psychologist,
+  q: 'Maria',
+  specialism: [Specialism.Psychologist],
   ids: ['550e8400-e29b-41d4-a716-446655440000'],
 };
 
@@ -39,24 +88,37 @@ describe('ProfessionalsService.findAll', () => {
       rows: [
         {
           professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
           professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'pr',
+          professional_institution: 'IMA',
+          professional_cnes: null,
           account_name: 'Maria Silva',
           account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
         },
       ],
       total: 11,
     });
 
-    await expect(service.findAll(request)).resolves.toEqual({
+    await expect(
+      service.findAll(professionalAccount, request),
+    ).resolves.toEqual({
       data: [
         {
           id: '550e8400-e29b-41d4-a716-446655440000',
+          accountId: null,
           name: 'Maria Silva',
           email: 'maria@example.com',
           specialism: {
             id: Specialism.Psychologist,
-            name: 'Psicologia',
+            name: 'Psicólogo',
           },
+          registration: { council: 'CRP', number: '12345', state: 'pr' },
+          institution: 'IMA',
+          cnes: null,
+          status: AccountStatus.Active,
         },
       ],
       pagination: {
@@ -67,7 +129,123 @@ describe('ProfessionalsService.findAll', () => {
       },
     });
 
-    expect(repository.findPaginated).toHaveBeenCalledWith(request);
+    expect(repository.findPaginated).toHaveBeenCalledWith({
+      ...request,
+      includeInactive: false,
+    });
+  });
+
+  it('lets the admin see the professionals of deactivated accounts', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
+
+    await service.findAll(
+      {
+        accountId: 'admin-1',
+        role: AccountRole.Admin,
+        patientProfileId: null,
+        professionalProfileIds: [],
+      },
+      request,
+    );
+
+    expect(repository.findPaginated).toHaveBeenCalledWith({
+      ...request,
+      includeInactive: true,
+    });
+  });
+
+  // A situação é filtro do admin: os demais só veem os ativos.
+  it('passes the status filter only for the admin', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
+    const filtered = { ...request, status: [AccountStatus.Inactive] };
+
+    await service.findAll(
+      {
+        accountId: 'admin-1',
+        role: AccountRole.Admin,
+        patientProfileId: null,
+        professionalProfileIds: [],
+      },
+      filtered,
+    );
+
+    expect(repository.findPaginated).toHaveBeenLastCalledWith({
+      ...filtered,
+      includeInactive: true,
+    });
+
+    await service.findAll(
+      {
+        accountId: 'prof-1',
+        role: AccountRole.User,
+        patientProfileId: null,
+        professionalProfileIds: ['prof-1'],
+      },
+      filtered,
+    );
+
+    expect(repository.findPaginated).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: undefined, includeInactive: false }),
+    );
+  });
+
+  // O e-mail do profissional não vai para o paciente (DP011).
+  it('hides the e-mail from an account that is not admin nor professional', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({
+      rows: [
+        {
+          professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
+          professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'pr',
+          professional_institution: 'IMA',
+          professional_cnes: null,
+          account_name: 'Maria Silva',
+          account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.findAll(patientAccount, request);
+
+    expect(result.data[0].email).toBeNull();
+  });
+
+  it('shows the e-mail to the admin', async () => {
+    const { repository, service } = createService();
+    repository.findPaginated.mockResolvedValue({
+      rows: [
+        {
+          professional_id: '550e8400-e29b-41d4-a716-446655440000',
+          professional_account_id: '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
+          professional_specialism: Specialism.Psychologist,
+          professional_council_number: '12345',
+          professional_council_state: 'pr',
+          professional_institution: 'IMA',
+          professional_cnes: null,
+          account_name: 'Maria Silva',
+          account_email: 'maria@example.com',
+          account_status: AccountStatus.Active,
+        },
+      ],
+      total: 1,
+    });
+
+    const result = await service.findAll(
+      { ...patientAccount, role: AccountRole.Admin, patientProfileId: null },
+      request,
+    );
+
+    expect(result.data[0].email).toBe('maria@example.com');
+    expect(result.data[0].accountId).toBe(
+      '6f1c2d3e-4b5a-4c7d-8e9f-0a1b2c3d4e5f',
+    );
   });
 
   it('returns an empty page when there are no matches', async () => {
@@ -75,7 +253,7 @@ describe('ProfessionalsService.findAll', () => {
     repository.findPaginated.mockResolvedValue({ rows: [], total: 0 });
 
     await expect(
-      service.findAll({ page: 3, limit: 10 }),
+      service.findAll(professionalAccount, { page: 3, limit: 10 }),
     ).resolves.toMatchObject({
       data: [],
       pagination: {
@@ -93,13 +271,349 @@ describe('ProfessionalsService.findAll', () => {
       new Error('database connection details'),
     );
 
-    await expect(service.findAll({ page: 1, limit: 10 })).rejects.toMatchObject(
-      {
-        response: {
-          status: 'ERROR',
-          message: 'Não foi possível consultar os profissionais.',
-        },
+    await expect(
+      service.findAll(professionalAccount, { page: 1, limit: 10 }),
+    ).rejects.toMatchObject({
+      response: {
+        status: 'ERROR',
+        message: 'Não foi possível consultar os profissionais.',
       },
+    });
+  });
+});
+
+describe('ProfessionalsService.create', () => {
+  const accountId = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
+  const professionalId = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+  const userAccount: Partial<Account> = {
+    id: accountId,
+    name: 'Kaio Felipe',
+    email: 'kaio@exemplo.com',
+    role: AccountRole.User,
+    patientProfile: null,
+    professionalProfiles: [],
+  };
+
+  function uniqueViolation() {
+    return new QueryFailedError(
+      'INSERT INTO "professional"',
+      [],
+      Object.assign(new Error('duplicate key value'), { code: '23505' }),
     );
+  }
+
+  const adminId = 'admin-account-1';
+  const createBody = {
+    accountId,
+    specialism: Specialism.Psychologist,
+    councilNumber: '12345',
+    councilState: 'pr' as const,
+  };
+
+  async function createError(service: ProfessionalsService) {
+    return service.create(createBody, adminId).catch((error: unknown) => error);
+  }
+
+  it('persists the profile linked to the account and returns it', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockResolvedValue(professionalId);
+
+    await expect(
+      service.create(
+        {
+          ...createBody,
+          councilNumber: ' 12345 ',
+          institution: ' CAPSi ',
+          cnes: '1234567',
+        },
+        adminId,
+      ),
+    ).resolves.toEqual({
+      id: professionalId,
+      accountId,
+      name: 'Kaio Felipe',
+      email: 'kaio@exemplo.com',
+      specialism: { id: Specialism.Psychologist, name: 'Psicólogo' },
+      registration: { council: 'CRP', number: '12345', state: 'pr' },
+      institution: 'CAPSi',
+      cnes: '1234567',
+      deactivatedAt: null,
+    });
+
+    expect(accountRepository.findOne).toHaveBeenCalledWith({
+      where: { id: accountId },
+      relations: { patientProfile: true, professionalProfiles: true },
+    });
+    expect(repository.insert).toHaveBeenCalledWith({
+      accountId,
+      specialism: Specialism.Psychologist,
+      councilNumber: '12345',
+      councilState: 'pr',
+      institution: 'CAPSi',
+      cnes: '1234567',
+      createdByAccountId: adminId,
+    });
+  });
+
+  it('saves null for the optional fields left out or blank', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockResolvedValue(professionalId);
+
+    await expect(
+      service.create({ ...createBody, institution: '   ' }, adminId),
+    ).resolves.toMatchObject({
+      registration: { council: 'CRP', number: '12345', state: 'pr' },
+      institution: null,
+      cnes: null,
+    });
+
+    expect(repository.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ institution: null, cnes: null }),
+    );
+  });
+
+  it('takes the council from the specialism', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockResolvedValue(professionalId);
+
+    await expect(
+      service.create(
+        { ...createBody, specialism: Specialism.SpeechTherapist },
+        adminId,
+      ),
+    ).resolves.toMatchObject({
+      specialism: { id: 'speech_therapist', name: 'Fonoaudiólogo' },
+      registration: { council: 'CRFa' },
+    });
+  });
+
+  it('returns 404 ACCOUNT_NOT_FOUND when the account does not exist', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(null);
+
+    const error = await createError(service);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toEqual({
+      status: 'ACCOUNT_NOT_FOUND',
+      message: 'Conta não encontrada.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 ADMIN_ACCOUNT_NOT_ALLOWED for an admin account', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      ...userAccount,
+      role: AccountRole.Admin,
+    });
+
+    const error = await createError(service);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      status: 'ADMIN_ACCOUNT_NOT_ALLOWED',
+      message: 'Conta de administrador não pode ter perfil profissional.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 ACCOUNT_HAS_PATIENT_PROFILE when the account is a patient', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      ...userAccount,
+      patientProfile: { accountId } as Patient,
+    });
+
+    const error = await createError(service);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      status: 'ACCOUNT_HAS_PATIENT_PROFILE',
+      message: 'A conta já possui um perfil de paciente.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  // Uma conta tem no máximo um perfil profissional (RN002), em qualquer
+  // especialidade.
+  it('returns 409 PROFESSIONAL_PROFILE_ALREADY_EXISTS when the account already has a profile', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue({
+      ...userAccount,
+      professionalProfiles: [
+        { accountId, specialism: Specialism.Doctor } as Professional,
+      ],
+    });
+
+    const error = await createError(service);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
+      message: 'A conta já possui um perfil profissional.',
+    });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when a simultaneous request created the profile first', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockRejectedValue(uniqueViolation());
+
+    await expect(service.create(createBody, adminId)).rejects.toMatchObject({
+      response: {
+        status: 'PROFESSIONAL_PROFILE_ALREADY_EXISTS',
+        message: 'A conta já possui um perfil profissional.',
+      },
+    });
+  });
+
+  it('returns a safe internal error when the insert fails', async () => {
+    const { accountRepository, repository, service } = createService();
+    accountRepository.findOne.mockResolvedValue(userAccount);
+    repository.insert.mockRejectedValue(
+      new Error('database connection details'),
+    );
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    const error = await createError(service);
+
+    expect(error).toBeInstanceOf(InternalServerErrorException);
+    expect((error as InternalServerErrorException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: 'Não foi possível cadastrar o perfil profissional.',
+    });
+  });
+});
+
+describe('ProfessionalsService.update', () => {
+  const id = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+  const current = {
+    id,
+    accountId: 'account-1',
+    specialism: Specialism.Physiotherapist,
+    councilNumber: '1234',
+    councilState: 'pr',
+    institution: 'CAPSi',
+    cnes: '1234567',
+    account: {
+      name: 'Kaio Felipe',
+      email: 'kaio@exemplo.com',
+      deactivatedAt: null,
+    },
+  } as unknown as Professional;
+
+  it('keeps the registration when the council stays the same', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(current);
+
+    await expect(
+      service.update(id, {
+        specialism: Specialism.OccupationalTherapist,
+        councilNumber: '9999',
+        councilState: 'sp',
+      }),
+    ).resolves.toEqual({
+      id,
+      accountId: 'account-1',
+      name: 'Kaio Felipe',
+      email: 'kaio@exemplo.com',
+      specialism: {
+        id: Specialism.OccupationalTherapist,
+        name: 'Terapeuta ocupacional',
+      },
+      registration: { council: 'Crefito', number: '1234', state: 'pr' },
+      institution: 'CAPSi',
+      cnes: '1234567',
+      deactivatedAt: null,
+    });
+
+    expect(repository.update).toHaveBeenCalledWith(id, {
+      specialism: Specialism.OccupationalTherapist,
+      councilNumber: '1234',
+      councilState: 'pr',
+    });
+  });
+
+  it('replaces the registration when the council changes', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(current);
+
+    const result = await service.update(id, {
+      specialism: Specialism.Psychologist,
+      councilNumber: ' 5678 ',
+      councilState: 'sp',
+    });
+
+    expect(result.registration).toEqual({
+      council: 'CRP',
+      number: '5678',
+      state: 'sp',
+    });
+    expect(repository.update).toHaveBeenCalledWith(id, {
+      specialism: Specialism.Psychologist,
+      councilNumber: '5678',
+      councilState: 'sp',
+    });
+  });
+
+  it.each([
+    ['both', {}],
+    ['the state', { councilNumber: '5678' }],
+    ['the number', { councilState: 'sp' as const }],
+  ])(
+    'returns 400 VALIDATION_ERROR when the council changes without %s',
+    async (_name, registration) => {
+      const { repository, service } = createService();
+      repository.findById.mockResolvedValue(current);
+
+      const error: unknown = await service
+        .update(id, { specialism: Specialism.Psychologist, ...registration })
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as BadRequestException).getResponse()).toEqual({
+        status: 'VALIDATION_ERROR',
+        message: 'Informe o número e a UF do registro no novo conselho.',
+      });
+      expect(repository.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns 404 PROFESSIONAL_NOT_FOUND when the profile does not exist', async () => {
+    const { repository, service } = createService();
+    repository.findById.mockResolvedValue(null);
+
+    const error: unknown = await service
+      .update(id, { specialism: Specialism.Nurse })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).getResponse()).toEqual({
+      status: 'PROFESSIONAL_NOT_FOUND',
+      message: 'Profissional não encontrado.',
+    });
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe internal error when the save fails', async () => {
+    const { repository, service } = createService();
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    repository.findById.mockResolvedValue(current);
+    repository.update.mockRejectedValue(new Error('connection lost'));
+
+    const error: unknown = await service
+      .update(id, { specialism: Specialism.OccupationalTherapist })
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(InternalServerErrorException);
+    expect((error as InternalServerErrorException).getResponse()).toEqual({
+      status: 'ERROR',
+      message: 'Não foi possível atualizar o perfil profissional.',
+    });
   });
 });

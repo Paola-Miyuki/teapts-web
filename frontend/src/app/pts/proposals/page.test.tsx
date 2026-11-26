@@ -1,14 +1,13 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import PtsProposalList from './_components/PtsProposalList';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
 import type { Account } from '@/lib/account';
-import { listEligiblePatients } from '../novo/api/ptsApi';
+import { personalData } from '@/test-utils/account';
+import PtsProposalsPage from './page';
 
 const mockReplace = jest.fn();
-
-const mockRouter = {
-  replace: mockReplace,
-};
-
+// O router do Next é estável entre renderizações.
+const mockRouter = { replace: mockReplace, push: jest.fn() };
 let mockSearchParams = new URLSearchParams();
 
 jest.mock('next/navigation', () => ({
@@ -16,15 +15,50 @@ jest.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
-jest.mock('../novo/api/ptsApi', () => ({
-  listProfessionals: jest.fn(() => Promise.resolve([])),
-  listEligiblePatients: jest.fn(() => Promise.resolve([])),
-}));
-
 const PATIENT_ID = '0b6f5a4e-2c1d-4e8f-9a7b-3c2d1e0f9a8b';
 const PROFESSIONAL_ID = '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
 
-function jsonResponse(body: unknown, status = 200) {
+function account(overrides: Partial<Account>): Account {
+  return {
+    accountId: 'account-uuid',
+    name: 'Conta Teste',
+    email: 'conta@example.com',
+    role: 'user',
+    ...personalData,
+    patientProfileId: null,
+    professionalProfileIds: [],
+    ...overrides,
+  };
+}
+
+const proposal = {
+  id: 'proposal-1',
+  status: 'draft',
+  socialSituation: 'Mora com a mãe.',
+  createdAt: '2026-10-28T12:00:00.000Z',
+  patient: { id: PATIENT_ID, name: 'Luna Ferreira' },
+  responsible: {
+    id: PROFESSIONAL_ID,
+    name: 'Ana Souza',
+    specialism: { id: 'psychologist', name: 'Psicólogo' },
+  },
+  team: [
+    {
+      id: 'pro-2',
+      name: 'Beatriz Lopes',
+      specialism: { id: 'nutritionist', name: 'Nutricionista' },
+    },
+  ],
+};
+
+function page(data: unknown[]) {
+  return {
+    data,
+    pagination: { page: 1, limit: 10, total: data.length, totalPages: 1 },
+  };
+}
+
+function json(status: number, body?: unknown) {
   return Promise.resolve({
     ok: status >= 200 && status < 300,
     status,
@@ -32,246 +66,180 @@ function jsonResponse(body: unknown, status = 200) {
   } as Response);
 }
 
-// Asserção segura com "as unknown as Account" para evitar o "any"
-function patientAccount(): Account {
-  return {
-    accountId: '11111111-1111-4111-8111-111111111111',
-    name: 'Conta Teste',
-    email: 'conta@example.com',
-    role: 'user',
-    patientProfileId: PATIENT_ID,
-    professionalProfileIds: [],
-  } as unknown as Account;
+// /me responde a conta; /pts/proposals, as propostas; o POST de decisão, `decide`.
+function mockApi(
+  me: Account,
+  proposals: unknown[] = [proposal],
+  decide: { status: number; body?: unknown } = { status: 200, body: {} },
+) {
+  global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+
+    if (url.pathname === '/me') return json(200, me);
+    if (init?.method === 'POST') return json(decide.status, decide.body);
+
+    return json(200, page(proposals));
+  }) as jest.Mock;
 }
 
-function professionalAccount(): Account {
-  return {
-    accountId: '22222222-2222-4222-8222-222222222222',
-    name: 'Profissional Teste',
-    email: 'profissional@example.com',
-    role: 'user',
-    patientProfileId: null,
-    professionalProfileIds: [PROFESSIONAL_ID],
-  } as unknown as Account;
+function proposalsCalls() {
+  return (global.fetch as jest.Mock).mock.calls
+    .map(([input]) => new URL(String(input)))
+    .filter((url) => url.pathname === '/pts/proposals');
 }
 
-function proposalResponse(page = 1, totalPages = 1) {
-  return {
-    data: [
-      {
-        id: '3f2e1d0c-9b8a-4765-a432-10fedcba9876',
-        status: 'draft',
-        socialSituation: 'Situação social de teste.',
-        createdAt: '2026-10-15T12:00:00.000Z',
-        patient: {
-          id: PATIENT_ID,
-          name: 'Paciente Teste',
-        },
-        responsible: {
-          id: PROFESSIONAL_ID,
-          name: 'Responsável Teste',
-          specialism: {
-            id: 'psychologist',
-            name: 'Psicologia',
-          },
-        },
-        team: [
-          {
-            id: '33333333-3333-4333-8333-333333333333',
-            name: 'Integrante Teste',
-            specialism: {
-              id: 'doctor',
-              name: 'Medicina',
-            },
-          },
-        ],
-      },
-    ],
-    pagination: {
-      page,
-      limit: 20,
-      total: totalPages,
-      totalPages,
-    },
-  };
-}
+beforeEach(() => {
+  mockSearchParams = new URLSearchParams();
+  mockReplace.mockReset();
+});
 
-describe('PtsProposalList', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockSearchParams = new URLSearchParams();
-    global.fetch = jest.fn();
-  });
+describe('PtsProposalsPage para o profissional', () => {
+  const professional = account({ professionalProfileIds: [PROFESSIONAL_ID] });
 
-  it('consulta as propostas do próprio paciente', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(proposalResponse()),
-    );
+  it('lista as propostas na tabela, sem exigir paciente', async () => {
+    mockApi(professional);
 
-    // O "as any" foi removido da renderização
-    render(<PtsProposalList account={patientAccount()} />);
+    render(<PtsProposalsPage />);
 
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
-    expect(screen.getByText('Paciente Teste')).toBeInTheDocument();
-    expect(screen.getByText('Situação social de teste.')).toBeInTheDocument();
-    expect(screen.getByText('Integrante Teste')).toBeInTheDocument();
+    const row = (await screen.findByText('Luna Ferreira')).closest('tr')!;
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=1&limit=20`,
-      { credentials: 'include' },
-    );
-  });
-
-  it('usa o patientId da URL para o profissional', async () => {
-    mockSearchParams = new URLSearchParams(`patientId=${PATIENT_ID}`);
-
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(proposalResponse()),
-    );
-
-    render(<PtsProposalList account={professionalAccount()} />);
-
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith(
-      `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=1&limit=20`,
-      { credentials: 'include' },
-    );
-  });
-
-  it('orienta o profissional quando patientId não foi informado', async () => {
-    render(<PtsProposalList account={professionalAccount()} />);
-
+    expect(within(row).getByText('Em proposta')).toBeInTheDocument();
+    expect(within(row).getByText('Ana Souza, Psicólogo')).toBeInTheDocument();
     expect(
-      await screen.findByText('Nenhum paciente selecionado'),
-    ).toBeInTheDocument();
-
-    expect(global.fetch).not.toHaveBeenCalled();
+      within(row).getByLabelText('Ana Souza, Psicólogo, responsável'),
+    ).toHaveTextContent('AS');
+    expect(within(row).getByText('28/10/2026')).toBeInTheDocument();
+    expect(screen.getByText('1 proposta')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Criar proposta' }),
+    ).toHaveAttribute('href', '/pts/novo');
+    expect(proposalsCalls()[0].searchParams.get('patientId')).toBeNull();
+    expect(proposalsCalls()[0].searchParams.get('limit')).toBe('10');
   });
 
-  it('redireciona para login quando a sessão não é válida (401 na API)', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse({ message: 'unauthorised' }, 401),
+  it('busca pelo nome do paciente da URL', async () => {
+    mockSearchParams = new URLSearchParams('q=luna');
+    mockApi(professional);
+
+    render(<PtsProposalsPage />);
+
+    await screen.findByText('Luna Ferreira');
+    expect(proposalsCalls()[0].searchParams.get('q')).toBe('luna');
+  });
+
+  it('abre a proposta e leva o responsável à edição', async () => {
+    mockApi(professional);
+
+    render(<PtsProposalsPage />);
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
+    );
+    expect(
+      screen.getByRole('menuitem', { name: 'Editar proposta' }),
+    ).toHaveAttribute('href', '/pts/proposals/proposal-1/edit');
+    expect(
+      screen.queryByRole('menuitem', { name: /em nome do paciente/ }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Ver proposta' }),
     );
 
-    render(<PtsProposalList account={patientAccount()} />);
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/login');
+    const dialog = screen.getByRole('dialog', {
+      name: 'Proposta de Luna Ferreira',
     });
+    expect(within(dialog).getByText('Mora com a mãe.')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Beatriz Lopes, Nutricionista'),
+    ).toBeInTheDocument();
   });
 
-  it('exibe a mensagem da API quando o acesso é proibido', async () => {
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(
-        {
-          status: 'FORBIDDEN',
-          message: 'Você não tem acesso às propostas deste paciente.',
-        },
-        403,
-      ),
+  it('mostra o estado vazio', async () => {
+    mockApi(professional, []);
+
+    render(<PtsProposalsPage />);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Nenhuma proposta aguardando',
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('PtsProposalsPage para o admin', () => {
+  it('aprova em nome do paciente e recarrega a lista', async () => {
+    mockApi(account({ role: 'admin' }));
+
+    render(<PtsProposalsPage />);
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Aprovar em nome do paciente' }),
     );
 
-    render(<PtsProposalList account={patientAccount()} />);
+    const dialog = screen.getByRole('dialog', {
+      name: 'Aprovar a proposta em nome de Luna Ferreira?',
+    });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Aprovar proposta' }),
+    );
 
     expect(
-      await screen.findByText(
-        'Você não tem acesso às propostas deste paciente.',
-      ),
+      await screen.findByText('Proposta aprovada, o PTS está em planejamento'),
     ).toBeInTheDocument();
-
-    expect(
-      screen.getByRole('button', { name: 'Tentar novamente' }),
-    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/pts/proposals/proposal-1/approve',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await waitFor(() => expect(proposalsCalls()).toHaveLength(2));
   });
 
-  it('consulta a próxima página', async () => {
-    (global.fetch as jest.Mock)
-      .mockImplementationOnce(() => jsonResponse(proposalResponse(1, 2)))
-      .mockImplementationOnce(() => jsonResponse(proposalResponse(2, 2)));
-
-    render(<PtsProposalList account={patientAccount()} />);
-
-    const nextButton = await screen.findByRole('button', {
-      name: 'Próxima',
+  it('mostra a mensagem da API quando faltam prazo ou data-alvo (RFPTS013)', async () => {
+    const message =
+      'Defina o prazo e a data-alvo de todas as metas antes de aprovar.';
+    mockApi(account({ role: 'admin' }), [proposal], {
+      status: 409,
+      body: { status: 'GOALS_INCOMPLETE', message, pendingGoals: 2 },
     });
 
-    fireEvent.click(nextButton);
+    render(<PtsProposalsPage />);
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=2&limit=20`,
-        { credentials: 'include' },
-      );
-    });
-  });
-
-  it('não consulta propostas quando patientId da URL é inválido', async () => {
-    mockSearchParams = new URLSearchParams('patientId=valor-invalido');
-
-    render(<PtsProposalList account={professionalAccount()} />);
-
-    expect(await screen.findByText('Paciente inválido')).toBeInTheDocument();
-
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('busca propostas quando encontra exatamente um paciente pelo nome', async () => {
-    mockSearchParams = new URLSearchParams('search=Paciente%20Teste');
-
-    jest
-      .mocked(listEligiblePatients)
-      .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
-
-    (global.fetch as jest.Mock).mockImplementationOnce(() =>
-      jsonResponse(proposalResponse()),
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Ações para proposta de Luna Ferreira',
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Aprovar em nome do paciente' }),
+    );
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Aprovar proposta' }),
     );
 
-    render(<PtsProposalList account={professionalAccount()} />);
+    expect(await within(dialog).findByText(message)).toBeInTheDocument();
+  });
+});
 
-    expect(await screen.findByText('Responsável Teste')).toBeInTheDocument();
+describe('PtsProposalsPage para o paciente', () => {
+  it('leva o paciente à aba de propostas de /pts', async () => {
+    mockApi(account({ patientProfileId: PATIENT_ID }));
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `http://localhost:3000/pts/proposals?patientId=${PATIENT_ID}&page=1&limit=20`,
-      { credentials: 'include' },
+    render(<PtsProposalsPage />);
+
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith('/pts#propostas'),
     );
-  });
-
-  it('mostra uma mensagem quando nenhum paciente corresponde à busca', async () => {
-    mockSearchParams = new URLSearchParams('search=Paciente%20Inexistente');
-
-    jest
-      .mocked(listEligiblePatients)
-      .mockResolvedValueOnce([{ id: PATIENT_ID, name: 'Paciente Teste' }]);
-
-    render(<PtsProposalList account={professionalAccount()} />);
-
     expect(
-      await screen.findByText('Nenhum paciente encontrado'),
-    ).toBeInTheDocument();
-
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('solicita um nome mais completo quando vários pacientes correspondem à busca', async () => {
-    const secondPatientId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-
-    mockSearchParams = new URLSearchParams('search=Maria');
-
-    jest.mocked(listEligiblePatients).mockResolvedValueOnce([
-      { id: PATIENT_ID, name: 'Maria Silva' },
-      { id: secondPatientId, name: 'Maria Souza' },
-    ]);
-
-    render(<PtsProposalList account={professionalAccount()} />);
-
-    expect(
-      await screen.findByText('Mais de um paciente encontrado'),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText(/Digite um nome mais completo/i),
-    ).toBeInTheDocument();
-
-    expect(global.fetch).not.toHaveBeenCalled();
+      screen.queryByRole('heading', { name: 'Propostas de PTS' }),
+    ).not.toBeInTheDocument();
   });
 });

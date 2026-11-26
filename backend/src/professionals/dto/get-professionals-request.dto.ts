@@ -6,25 +6,20 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEnum,
-  IsInt,
-  IsNotEmpty,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
-  Max,
-  Min,
   type ValidationOptions,
 } from 'class-validator';
+import {
+  invalidParameter,
+  PaginationQueryDto,
+} from '../../common/pagination/pagination-query.dto';
+import { AccountStatus } from '../../accounts/enums/account-status.enum';
 import { Specialism } from '../enums/specialism.enum';
-
-/** Página usada quando a consulta não informa paginação. */
-export const DEFAULT_PROFESSIONALS_PAGE = 1;
-
-/** Quantidade de profissionais retornada por página por padrão. */
-export const DEFAULT_PROFESSIONALS_LIMIT = 10;
-
-/** Maior quantidade de profissionais permitida em uma página. */
-export const MAX_PROFESSIONALS_LIMIT = 100;
+import { UFS, type Uf } from '../enums/uf.enum';
+import { COUNCILS, type Council } from '../professional-registration';
 
 /** Identificador UUID de um perfil profissional. */
 export type ProfessionalId = string;
@@ -35,28 +30,33 @@ export type ProfessionalSpecialism = Specialism;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/** Mensagem e status do erro de um parâmetro de consulta inválido. */
-function invalidParameter(parameter: string): ValidationOptions {
-  return {
-    message: `Parâmetro inválido: ${parameter}`,
-    context: { status: 'ERROR' },
-  };
+export const PROFESSIONAL_SORT_FIELDS = ['name', 'specialism'] as const;
+export type ProfessionalSortField = (typeof PROFESSIONAL_SORT_FIELDS)[number];
+
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+export type SortOrder = (typeof SORT_ORDERS)[number];
+
+function invalidEach(parameter: string): ValidationOptions {
+  return { ...invalidParameter(parameter), each: true };
 }
 
-/** Converte a paginação da query, usando o padrão quando vier vazia. */
-function toPageNumber(defaultValue: number) {
-  return ({ value }: { value: unknown }): unknown =>
-    value === undefined || value === '' ? defaultValue : Number(value);
+/** Texto opcional: espaços externos saem, e vazio equivale a sem filtro. */
+function toOptionalText({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() || undefined : value;
 }
 
-/** Remove espaços externos do nome; só espaços viram texto vazio (inválido). */
-function trimName({ value }: { value: unknown }): unknown {
-  return typeof value === 'string' ? value.trim() : value;
-}
+/** Aceita `a,b` ou `a&a=b`; vazio equivale a sem filtro. */
+function toList({ value }: { value: unknown }): unknown {
+  if (value === undefined) {
+    return undefined;
+  }
 
-/** Trata a especialidade vazia como filtro não informado. */
-function emptyToUndefined({ value }: { value: unknown }): unknown {
-  return value === '' ? undefined : value;
+  const values = (Array.isArray(value) ? value : [value])
+    .flatMap((item) => (typeof item === 'string' ? item.split(',') : [item]))
+    .map((item) => (typeof item === 'string' ? item.trim() : item))
+    .filter((item) => item !== '');
+
+  return values.length > 0 ? [...new Set(values)] : undefined;
 }
 
 /**
@@ -86,41 +86,67 @@ function toIdList({ value }: { value: unknown }): unknown {
  * A ordem das propriedades define a ordem da validação: o primeiro
  * parâmetro inválido é o reportado no erro.
  */
-export class GetProfessionalsRequestDto {
-  // page e limit têm valor padrão, então são opcionais na query; o plugin
-  // os marcaria como obrigatórios por não terem `?`.
+export class GetProfessionalsRequestDto extends PaginationQueryDto {
   @ApiPropertyOptional({
-    type: 'integer',
-    default: DEFAULT_PROFESSIONALS_PAGE,
-    minimum: 1,
+    description:
+      'Parte do nome, do e-mail ou do nº de registro no conselho, sem diferenciar maiúsculas; vazio equivale a sem busca.',
   })
-  @Transform(toPageNumber(DEFAULT_PROFESSIONALS_PAGE))
-  @IsInt(invalidParameter('page'))
-  @Min(1, invalidParameter('page'))
-  page: number = DEFAULT_PROFESSIONALS_PAGE;
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsString(invalidParameter('q'))
+  q?: string;
 
   @ApiPropertyOptional({
-    type: 'integer',
-    default: DEFAULT_PROFESSIONALS_LIMIT,
-    minimum: 1,
-    maximum: MAX_PROFESSIONALS_LIMIT,
+    description: 'Especialidades, separadas por vírgula.',
+    enum: Specialism,
+    isArray: true,
   })
-  @Transform(toPageNumber(DEFAULT_PROFESSIONALS_LIMIT))
-  @IsInt(invalidParameter('limit'))
-  @Min(1, invalidParameter('limit'))
-  @Max(MAX_PROFESSIONALS_LIMIT, invalidParameter('limit'))
-  limit: number = DEFAULT_PROFESSIONALS_LIMIT;
-
-  @Transform(trimName)
+  @Transform(toList)
   @IsOptional()
-  @IsString(invalidParameter('name'))
-  @IsNotEmpty(invalidParameter('name'))
-  name?: string;
+  @IsEnum(Specialism, invalidEach('specialism'))
+  specialism?: Specialism[];
 
-  @Transform(emptyToUndefined)
+  @ApiPropertyOptional({
+    description: 'Conselhos regionais, separados por vírgula.',
+    enum: COUNCILS,
+    isArray: true,
+  })
+  @Transform(toList)
   @IsOptional()
-  @IsEnum(Specialism, invalidParameter('specialism'))
-  specialism?: Specialism;
+  @IsIn(COUNCILS, invalidEach('council'))
+  council?: Council[];
+
+  @ApiPropertyOptional({
+    description: 'UF do registro no conselho.',
+    enum: UFS,
+  })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsIn(UFS, invalidParameter('councilState'))
+  councilState?: Uf;
+
+  @ApiPropertyOptional({
+    description:
+      'Situação da conta, separada por vírgula. Só o administrador filtra; para os demais, a consulta devolve apenas os ativos.',
+    enum: AccountStatus,
+    isArray: true,
+  })
+  @Transform(toList)
+  @IsOptional()
+  @IsEnum(AccountStatus, invalidEach('status'))
+  status?: AccountStatus[];
+
+  @ApiPropertyOptional({ enum: PROFESSIONAL_SORT_FIELDS, default: 'name' })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsIn(PROFESSIONAL_SORT_FIELDS, invalidParameter('sort'))
+  sort?: ProfessionalSortField;
+
+  @ApiPropertyOptional({ enum: SORT_ORDERS, default: 'asc' })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsIn(SORT_ORDERS, invalidParameter('order'))
+  order?: SortOrder;
 
   @ApiPropertyOptional({
     type: String,

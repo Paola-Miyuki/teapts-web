@@ -1,32 +1,136 @@
 import { Injectable } from '@nestjs/common';
 
 import { CreatePtsRequestDto } from '../dto/create-pts.dto';
+import type { UpdatePtsProposalRequestDto } from '../dto/update-pts-proposal.dto';
+import type { TransferPtsResponsibilityRequestDto } from '../dto/transfer-pts-responsibility.dto';
 import type { GetPtsProposalsQueryDto } from '../dto/get-pts-proposals-query.dto';
+import type { GetPtsListQueryDto } from '../dto/get-pts-list-query.dto';
+import type { GetPtsListResponseDto } from '../dto/pts-list-response.dto';
+import { toPagination } from '../../common/pagination/pagination';
 import type {
   GetPtsProposalsResponseDto,
   PtsProposalResponseDto,
 } from '../dto/pts-proposal-response.dto';
-import { PtsRepository } from '../repositories/pts.repository';
-import type { AccountContext } from '../../accounts/services/accounts.service';
+import type { GetActivePtsQueryDto } from '../dto/get-active-pts-query.dto';
+import type { ActivePtsResponseDto } from '../dto/active-pts-response.dto';
+import type { PtsSheetViewDto } from '../dto/update-pts-sheet.dto';
+import type { PtsDetailResponseDto } from '../dto/pts-detail-response.dto';
+import type {
+  GetPtsHistoryResponseDto,
+  PtsHistoryQueryDto,
+} from '../dto/pts-history.dto';
+import type {
+  UpdatePtsSheetRequestDto,
+  UpdatePtsSheetResponseDto,
+} from '../dto/update-pts-sheet.dto';
+import type {
+  ClosePtsRequestDto,
+  ClosePtsResponseDto,
+} from '../dto/close-pts.dto';
+import type { PtsStartResponseDto } from '../dto/pts-start-response.dto';
+import type { PtsTeamResponseDto } from '../dto/pts-team-response.dto';
+import type { PtsDecisionResponseDto } from '../dto/pts-decision-response.dto';
+import type { DeletePtsProposalResponseDto } from '../dto/delete-pts-proposal-response.dto';
+import type { AddPtsTeamMembersRequestDto } from '../dto/add-pts-team-members.dto';
 import {
+  PtsRepository,
+  type UpdatePtsProposalInput,
+} from '../repositories/pts.repository';
+import type { AccountContext } from '../../accounts/services/accounts.service';
+import { isAdmin } from '../../auth/account-context';
+import { PtsStateEnum } from '../../database/enums/pts-state.enum';
+import {
+  activePtsAlreadyExists,
   patientNotFound,
   professionalNotAuthorized,
   ptsActiveExists,
+  ptsProposalEditForbidden,
   ptsProposalForbidden,
+  ptsProposalNotDraft,
   ptsProposalNotFound,
+  ptsProposalNotPending,
+  activePtsForbidden,
+  activePtsNotFound,
+  goalsIncomplete,
+  ptsCloseForbidden,
+  ptsCloseNotActive,
+  ptsNotActive,
+  ptsForbidden,
+  ptsHistoryForbidden,
+  ptsNotFound,
+  ptsNotPlanning,
+  ptsStartForbidden,
+  cannotRemoveResponsible,
+  teamEditForbidden,
+  teamMemberNotFound,
+  ptsSheetForbidden,
   teamProfessionalNotFound,
+  validationError,
+  ptsProposalDeleteForbidden,
+  ptsProposalNotDraftForDelete,
+  teamDuplicateAccount,
+  newResponsibleNotFound,
+  newResponsibleInvalid,
 } from '../pts.errors';
+
+// O paciente não vê a ficha (RN028): só a próxima revisão.
+const SHEET_FIELDS_HIDDEN_FROM_PATIENT = [
+  'caseStudyDate',
+  'diagnosisSummary',
+  'cid',
+  'supportLevel',
+  'strengths',
+  'priorityNeeds',
+  'socialSituation',
+  'vulnerabilities',
+  'comorbidities',
+  'sensoryProfile',
+  'communicationMethod',
+] as const;
+
+function withoutSheet<T extends PtsSheetViewDto>(pts: T): T {
+  const patientView = { ...pts };
+
+  for (const field of SHEET_FIELDS_HIDDEN_FROM_PATIENT) {
+    delete patientView[field];
+  }
+
+  return patientView;
+}
+
+type ProposalSheet = Omit<UpdatePtsProposalRequestDto, 'teamProfessionalIds'>;
+
+/** Só os campos enviados, com os textos aparados; opcional vazio vira null. */
+function cleanSheet(fields: ProposalSheet): UpdatePtsProposalInput['sheet'] {
+  const entries = Object.entries(fields)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]: [string, unknown]) => {
+      if (Array.isArray(value)) {
+        return [
+          key,
+          (value as string[]).map((need) => need.trim()).filter(Boolean),
+        ];
+      }
+
+      return [key, typeof value === 'string' ? value.trim() || null : value];
+    });
+
+  return Object.fromEntries(entries) as UpdatePtsProposalInput['sheet'];
+}
 
 @Injectable()
 export class PtsService {
   constructor(private readonly ptsRepository: PtsRepository) {}
 
-  async createPts(dto: CreatePtsRequestDto, currentAccountId: string) {
+  async createPts(dto: CreatePtsRequestDto, account: AccountContext) {
     const professional = await this.ptsRepository.findProfessionalById(
       dto.professionalId,
     );
 
-    if (!professional || professional.accountId !== currentAccountId) {
+    if (
+      !professional ||
+      (!isAdmin(account) && professional.accountId !== account.accountId)
+    ) {
       throw professionalNotAuthorized();
     }
 
@@ -66,41 +170,94 @@ export class PtsService {
     query: GetPtsProposalsQueryDto,
     account: AccountContext,
   ): Promise<GetPtsProposalsResponseDto> {
-    const isPatient = account.patientProfileId === query.patientId;
+    const admin = isAdmin(account);
     const profileIds = account.professionalProfileIds;
+    // Sem paciente na consulta, o paciente vê só as próprias propostas.
+    const patientId =
+      query.patientId ??
+      (!admin && profileIds.length === 0 ? account.patientProfileId : null);
+    const isPatient =
+      account.patientProfileId !== null &&
+      account.patientProfileId === patientId;
 
-    if (!isPatient && profileIds.length === 0) {
+    if (!admin && !isPatient && profileIds.length === 0) {
       throw ptsProposalForbidden();
     }
 
     const result = await this.ptsRepository.findDraftProposals({
       accountId: account.accountId,
-      patientId: query.patientId,
+      patientId,
+      q: query.q ?? null,
       isPatient,
+      isAdmin: admin,
       professionalProfileIds: profileIds,
       page: query.page,
       limit: query.limit,
     });
 
     if (
+      patientId &&
+      !admin &&
       !isPatient &&
       result.total === 0 &&
-      !(await this.ptsRepository.hasProposalRelation(
-        query.patientId,
-        profileIds,
-      ))
+      !(await this.ptsRepository.hasProposalRelation(patientId, profileIds))
     ) {
       throw ptsProposalForbidden();
     }
 
+    // O paciente não vê a situação social (RN028).
+    const rows = isPatient
+      ? result.rows.map((row) => {
+          const patientRow: Partial<typeof row> = { ...row };
+          delete patientRow.socialSituation;
+          return patientRow as typeof row;
+        })
+      : result.rows;
+
     return {
-      data: result.rows,
+      data: rows,
       pagination: {
         page: query.page,
         limit: query.limit,
         total: result.total,
         totalPages: Math.ceil(result.total / query.limit),
       },
+    };
+  }
+
+  /**
+   * Lista os PTS de todos os estados (lista de PTS): o admin vê todos (RN022)
+   * e o profissional, só os de que é responsável ou membro da equipe.
+   *
+   * @throws PtsApiError `FORBIDDEN` para quem não é admin nem profissional
+   */
+  async findPtsList(
+    query: GetPtsListQueryDto,
+    account: AccountContext,
+  ): Promise<GetPtsListResponseDto> {
+    const admin = isAdmin(account);
+
+    if (!admin && account.professionalProfileIds.length === 0) {
+      throw ptsForbidden();
+    }
+
+    const result = await this.ptsRepository.findPtsList({
+      q: query.q ?? null,
+      status: query.status ?? null,
+      responsibleId: query.responsibleId ?? null,
+      memberId: query.memberId ?? null,
+      createdFrom: query.createdFrom ?? null,
+      createdTo: query.createdTo ?? null,
+      sort: query.sort ?? 'createdAt',
+      order: query.order ?? 'desc',
+      professionalProfileIds: admin ? null : account.professionalProfileIds,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    return {
+      data: result.rows,
+      pagination: toPagination(query, result.total),
     };
   }
 
@@ -123,8 +280,663 @@ export class PtsService {
       profileIds.includes(proposal.responsible.id) ||
       proposal.team.some((member) => profileIds.includes(member.id));
 
-    if (!isPatientOwner && !isProfessionalOnProposal) {
+    if (!isAdmin(account) && !isPatientOwner && !isProfessionalOnProposal) {
       throw ptsProposalForbidden();
+    }
+
+    return proposal;
+  }
+
+  async findActivePts(
+    query: GetActivePtsQueryDto,
+    account: AccountContext,
+  ): Promise<ActivePtsResponseDto> {
+    const admin = isAdmin(account);
+    const isPatientOwner = account.patientProfileId === query.patientId;
+
+    if (
+      !admin &&
+      !isPatientOwner &&
+      account.professionalProfileIds.length === 0
+    ) {
+      throw activePtsForbidden();
+    }
+
+    const activePts = await this.ptsRepository.findActivePtsByPatientId(
+      query.patientId,
+    );
+
+    if (!activePts) {
+      if (admin || isPatientOwner) {
+        throw activePtsNotFound();
+      }
+
+      throw activePtsForbidden();
+    }
+
+    const isProfessionalOnPts =
+      account.professionalProfileIds.includes(activePts.responsible.id) ||
+      activePts.team.some((member) =>
+        account.professionalProfileIds.includes(member.id),
+      );
+
+    if (!admin && !isPatientOwner && !isProfessionalOnPts) {
+      throw activePtsForbidden();
+    }
+
+    if (isPatientOwner) {
+      return withoutSheet(activePts);
+    }
+
+    return activePts;
+  }
+
+  /** Retorna um PTS em qualquer estado, dentro do escopo de acesso (RFPTS009). */
+  async findPtsById(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDetailResponseDto> {
+    const pts = await this.ptsRepository.findPtsById(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    if (isAdmin(account)) {
+      return pts;
+    }
+
+    if (account.patientProfileId === pts.patient.id) {
+      return withoutSheet(pts);
+    }
+
+    const profileIds = account.professionalProfileIds;
+    const isProfessionalOnPts =
+      profileIds.includes(pts.responsible.id) ||
+      pts.team.some((member) => profileIds.includes(member.id));
+
+    if (isProfessionalOnPts) {
+      return pts;
+    }
+
+    throw ptsForbidden();
+  }
+
+  async findPtsHistory(
+    patientId: string,
+    query: PtsHistoryQueryDto,
+    account: AccountContext,
+  ): Promise<GetPtsHistoryResponseDto> {
+    if (!(await this.ptsRepository.patientExists(patientId))) {
+      throw patientNotFound();
+    }
+
+    const admin = isAdmin(account);
+    const isPatientOwner = account.patientProfileId === patientId;
+    const professionalProfileIds =
+      admin || isPatientOwner ? [] : account.professionalProfileIds;
+
+    if (!admin && !isPatientOwner && professionalProfileIds.length === 0) {
+      throw ptsHistoryForbidden();
+    }
+
+    const result = await this.ptsRepository.findPtsHistory({
+      patientId,
+      professionalProfileIds,
+      page: query.page,
+      limit: query.limit,
+    });
+
+    if (!admin && !isPatientOwner && result.total === 0) {
+      throw ptsHistoryForbidden();
+    }
+
+    return {
+      data: result.rows,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / query.limit),
+      },
+    };
+  }
+
+  async updatePtsProposal(
+    id: string,
+    dto: UpdatePtsProposalRequestDto,
+    account: AccountContext,
+  ): Promise<PtsProposalResponseDto> {
+    const { teamProfessionalIds: requestedTeam, ...fields } = dto;
+    const sheet = cleanSheet(fields);
+
+    if (Object.keys(sheet).length === 0 && requestedTeam === undefined) {
+      throw validationError([
+        {
+          field: 'body',
+          message: 'Informe ao menos um campo da proposta.',
+        },
+      ]);
+    }
+
+    const proposal = await this.ptsRepository.findProposalById(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(proposal.responsible.id)
+    ) {
+      throw ptsProposalEditForbidden();
+    }
+
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotDraft();
+    }
+
+    if (sheet.nextReviewAt) {
+      const latestTarget = await this.ptsRepository.findLatestGoalTarget(id);
+
+      // RN031: nenhuma meta passa da data máxima.
+      if (latestTarget && latestTarget > sheet.nextReviewAt) {
+        throw validationError([
+          {
+            field: 'nextReviewAt',
+            message:
+              'A próxima revisão não pode ficar antes da data-alvo das metas.',
+          },
+        ]);
+      }
+    }
+
+    let teamProfessionalIds: string[] | undefined;
+
+    if (dto.teamProfessionalIds !== undefined) {
+      teamProfessionalIds = [...new Set(dto.teamProfessionalIds)].filter(
+        (professionalId) => professionalId !== proposal.responsible.id,
+      );
+
+      const existingIds =
+        await this.ptsRepository.findExistingProfessionalIds(
+          teamProfessionalIds,
+        );
+      const existingIdSet = new Set(existingIds);
+      const missingIds = teamProfessionalIds.filter(
+        (professionalId) => !existingIdSet.has(professionalId),
+      );
+
+      if (missingIds.length > 0) {
+        throw teamProfessionalNotFound(missingIds);
+      }
+    }
+
+    return this.ptsRepository.updateDraftProposal({
+      id,
+      sheet,
+      teamProfessionalIds,
+    });
+  }
+
+  /**
+   * Atualiza a ficha do PTS ativo (RFPTS005): equipe (inclusive o responsável)
+   * ou admin; o paciente cai no 403 por não ser da equipe.
+   */
+  async updatePtsSheet(
+    id: string,
+    dto: UpdatePtsSheetRequestDto,
+    account: AccountContext,
+  ): Promise<UpdatePtsSheetResponseDto> {
+    const diagnosisSummary = dto.diagnosisSummary?.trim();
+    const socialSituation = dto.socialSituation?.trim();
+
+    if (!diagnosisSummary) {
+      throw validationError([
+        {
+          field: 'diagnosisSummary',
+          message: 'O diagnóstico em comum é obrigatório.',
+        },
+      ]);
+    }
+
+    if (!socialSituation) {
+      throw validationError([
+        {
+          field: 'socialSituation',
+          message: 'A situação social é obrigatória.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findSheetTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const professionalOnPtsId = [
+      pts.responsibleProfessionalId,
+      ...pts.teamProfessionalIds,
+    ].find((professionalId) =>
+      account.professionalProfileIds.includes(professionalId),
+    );
+
+    if (!isAdmin(account) && !professionalOnPtsId) {
+      throw ptsSheetForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    // Opcional vazio não é gravado (vira null).
+    const optional = (value: string | null | undefined) =>
+      value?.trim() || null;
+
+    return this.ptsRepository.updateSheet({
+      ptsId: id,
+      sheet: {
+        caseStudyDate: dto.caseStudyDate,
+        diagnosisSummary,
+        cid: optional(dto.cid),
+        supportLevel: dto.supportLevel ?? null,
+        strengths: optional(dto.strengths),
+        priorityNeeds: (dto.priorityNeeds ?? [])
+          .map((need) => need.trim())
+          .filter(Boolean),
+        socialSituation,
+        vulnerabilities: optional(dto.vulnerabilities),
+        comorbidities: optional(dto.comorbidities),
+        sensoryProfile: optional(dto.sensoryProfile),
+        communicationMethod: optional(dto.communicationMethod),
+        nextReviewAt: dto.nextReviewAt,
+      },
+      // Admin não tem perfil profissional: sem autor no evento (RN029).
+      authorProfessionalId: isAdmin(account)
+        ? null
+        : (professionalOnPtsId ?? null),
+      executedByAccountId: account.accountId,
+      description: 'Ficha do PTS atualizada.',
+    });
+  }
+
+  async approveProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    const proposal = await this.findDecidableProposal(id, account);
+
+    if (await this.ptsRepository.hasApprovedActivePts(proposal.patientId)) {
+      throw activePtsAlreadyExists();
+    }
+
+    const pendingGoals = await this.ptsRepository.countPendingGoals(id);
+
+    if (pendingGoals > 0) {
+      throw goalsIncomplete(pendingGoals);
+    }
+
+    return this.ptsRepository.approveProposal(id, proposal.patientId);
+  }
+
+  async rejectProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsDecisionResponseDto> {
+    await this.findDecidableProposal(id, account);
+
+    return this.ptsRepository.rejectProposal(id);
+  }
+
+  async deleteProposal(
+    id: string,
+    account: AccountContext,
+  ): Promise<DeletePtsProposalResponseDto> {
+    // Proposta já excluída não é encontrada: responde 404.
+    const proposal = await this.ptsRepository.findProposalById(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(proposal.responsible.id)
+    ) {
+      throw ptsProposalDeleteForbidden();
+    }
+
+    // PTS aprovado não é excluído: é cancelado no encerramento (RFPTS010).
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotDraftForDelete();
+    }
+
+    await this.ptsRepository.softDeleteProposal(id);
+
+    return { status: 'OK' };
+  }
+
+  async addTeamMembers(
+    id: string,
+    dto: AddPtsTeamMembersRequestDto,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const uniqueIds = [...new Set(dto.professionalIds)];
+
+    if (
+      uniqueIds.length === 0 ||
+      uniqueIds.length !== dto.professionalIds.length
+    ) {
+      throw validationError([
+        {
+          field: 'professionalIds',
+          message:
+            'Informe ao menos um perfil profissional e sem IDs repetidos.',
+        },
+      ]);
+    }
+
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    const professionals =
+      await this.ptsRepository.findProfessionalsWithAccountByIds(uniqueIds);
+
+    const professionalMap = new Map(
+      professionals.map((professional) => [professional.id, professional]),
+    );
+
+    const missingIds = uniqueIds.filter(
+      (professionalId) => !professionalMap.has(professionalId),
+    );
+
+    if (missingIds.length > 0) {
+      throw teamProfessionalNotFound(missingIds);
+    }
+
+    const existingAccountIds = new Set<string>([
+      pts.responsibleAccountId,
+      ...pts.teamMembers.map((member) => member.accountId),
+    ]);
+
+    const seenNewAccountIds = new Set<string>();
+    const duplicateAccountProfessionalIds: string[] = [];
+
+    for (const professionalId of uniqueIds) {
+      const professional = professionalMap.get(professionalId)!;
+
+      if (
+        existingAccountIds.has(professional.accountId) ||
+        seenNewAccountIds.has(professional.accountId)
+      ) {
+        duplicateAccountProfessionalIds.push(professionalId);
+      } else {
+        seenNewAccountIds.add(professional.accountId);
+      }
+    }
+
+    if (duplicateAccountProfessionalIds.length > 0) {
+      throw teamDuplicateAccount(duplicateAccountProfessionalIds);
+    }
+
+    const admin = isAdmin(account);
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.addTeamMembers({
+      ptsId: id,
+      members: uniqueIds.map((professionalId) => ({
+        professionalId,
+        description: `${executorName} adicionou ${professionalMap.get(professionalId)!.name} à equipe`,
+      })),
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+    });
+  }
+
+  async removeTeamMember(
+    id: string,
+    professionalId: string,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeam(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RN006: só o responsável (ou o admin, RN022) altera a equipe.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsible.id)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    // RN007: a saída do responsável é feita pela transferência (RFEM002).
+    if (professionalId === pts.responsible.id) {
+      throw cannotRemoveResponsible();
+    }
+
+    const member = pts.team.find(
+      (professional) => professional.id === professionalId,
+    );
+
+    if (!member) {
+      throw teamMemberNotFound();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsible.name);
+
+    return this.ptsRepository.removeTeamMember({
+      ptsId: id,
+      professionalId,
+      authorProfessionalId: admin ? null : pts.responsible.id,
+      executedByAccountId: account.accountId,
+      description: `${executorName} removeu ${member.name} da equipe`,
+    });
+  }
+
+  async transferResponsibility(
+    id: string,
+    dto: TransferPtsResponsibilityRequestDto,
+    account: AccountContext,
+  ): Promise<PtsTeamResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw teamEditForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsNotActive();
+    }
+
+    const [newResponsible] =
+      await this.ptsRepository.findProfessionalsWithAccountByIds([
+        dto.newResponsibleId,
+      ]);
+
+    if (!newResponsible) {
+      throw newResponsibleNotFound();
+    }
+
+    if (
+      !newResponsible.accountId ||
+      newResponsible.id === pts.responsibleProfessionalId
+    ) {
+      throw newResponsibleInvalid();
+    }
+
+    const hasDuplicateAccountInTeam = pts.teamMembers.some(
+      (member) =>
+        member.professionalId !== newResponsible.id &&
+        member.accountId === newResponsible.accountId,
+    );
+
+    if (hasDuplicateAccountInTeam) {
+      throw teamDuplicateAccount([newResponsible.id]);
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.transferResponsibility({
+      ptsId: id,
+      newResponsibleId: newResponsible.id,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} transferiu a responsabilidade do PTS para ${newResponsible.name}`,
+    });
+  }
+
+  async startPts(
+    id: string,
+    account: AccountContext,
+  ): Promise<PtsStartResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RFPTS006: só o responsável (ou o admin, RN022) inicia a execução.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw ptsStartForbidden();
+    }
+
+    if (pts.status !== PtsStateEnum.PLANNING) {
+      throw ptsNotPlanning();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+
+    return this.ptsRepository.startPts({
+      ptsId: id,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} iniciou a execução do PTS`,
+    });
+  }
+
+  async closePts(
+    id: string,
+    dto: ClosePtsRequestDto,
+    account: AccountContext,
+  ): Promise<ClosePtsResponseDto> {
+    const pts = await this.ptsRepository.findPtsTeamTarget(id);
+
+    if (!pts) {
+      throw ptsNotFound();
+    }
+
+    const admin = isAdmin(account);
+
+    // RFPTS010: só o responsável (ou o admin, RN022) encerra.
+    if (
+      !admin &&
+      !account.professionalProfileIds.includes(pts.responsibleProfessionalId)
+    ) {
+      throw ptsCloseForbidden();
+    }
+
+    if (
+      pts.status !== PtsStateEnum.PLANNING &&
+      pts.status !== PtsStateEnum.RUNNING
+    ) {
+      throw ptsCloseNotActive();
+    }
+
+    const executorName =
+      (await this.ptsRepository.findAccountDisplayName(account.accountId)) ??
+      (admin ? 'Administrador' : pts.responsibleName);
+    const concluded = dto.outcome === 'concluded';
+    const closingReason = dto.reason?.trim() || null;
+
+    return this.ptsRepository.closePts({
+      ptsId: id,
+      outcome: dto.outcome,
+      closingDate: dto.closingDate,
+      closingReason,
+      authorProfessionalId: admin ? null : pts.responsibleProfessionalId,
+      executedByAccountId: account.accountId,
+      description: `${executorName} ${concluded ? 'concluiu' : 'cancelou'} o PTS${
+        closingReason ? ` (${closingReason})` : ''
+      }`,
+      activityDescription: (title) =>
+        `${executorName} ${concluded ? 'concluiu' : 'arquivou'} a atividade ${title}`,
+    });
+  }
+
+  private async findDecidableProposal(id: string, account: AccountContext) {
+    const proposal = await this.ptsRepository.findProposalForDecision(id);
+
+    if (!proposal) {
+      throw ptsProposalNotFound();
+    }
+
+    if (
+      !isAdmin(account) &&
+      (account.patientProfileId === null ||
+        proposal.patientId !== account.patientProfileId)
+    ) {
+      throw ptsProposalForbidden();
+    }
+
+    if (proposal.status !== PtsStateEnum.DRAFT) {
+      throw ptsProposalNotPending();
     }
 
     return proposal;

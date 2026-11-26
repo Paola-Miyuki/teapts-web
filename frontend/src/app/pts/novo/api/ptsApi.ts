@@ -1,9 +1,14 @@
 import { request } from './http';
-import { mockCreatePts, mockPatients, mockProfessionals } from './mocks';
+import {
+  mockCreatePts,
+  mockPatientEmail,
+  mockPatients,
+  mockProfessionals,
+} from './mocks';
 import type {
   CreatePtsPayload,
+  EligiblePatient,
   PaginatedResponse,
-  Patient,
   Professional,
   Pts,
 } from '../types';
@@ -20,9 +25,10 @@ export async function listProfessionals(
     );
   }
 
+  // 50 é o máximo da paginação compartilhada (NF).
   const params = new URLSearchParams({
     page: '1',
-    limit: '100',
+    limit: '50',
   });
 
   if (ids?.length) {
@@ -36,24 +42,41 @@ export async function listProfessionals(
   return Array.isArray(response) ? response : (response.data ?? []);
 }
 
-export async function listEligiblePatients(
-  signal?: AbortSignal,
-): Promise<Patient[]> {
+// Pacientes elegíveis para uma proposta (RN011), buscados no servidor por
+// nome, nome social, e-mail ou CPF (NFUS003); o CPF não volta na resposta.
+export async function listEligiblePatients({
+  q,
+  signal,
+}: {
+  q?: string;
+  signal?: AbortSignal;
+} = {}): Promise<EligiblePatient[]> {
+  const term = q?.trim() ?? '';
+
   if (USE_MOCKS) {
-    return mockPatients;
+    return mockPatients
+      .filter((patient) =>
+        patient.name.toLowerCase().includes(term.toLowerCase()),
+      )
+      .map((patient) => ({ ...patient, email: mockPatientEmail(patient) }));
   }
 
   const params = new URLSearchParams({
+    withActivePts: 'false',
     page: '1',
-    limit: '100',
+    limit: '20',
   });
 
-  const response = await request<PaginatedResponse<Patient> | Patient[]>(
-    `/patients/authorized?${params.toString()}`,
+  if (term) {
+    params.set('q', term);
+  }
+
+  const response = await request<PaginatedResponse<EligiblePatient>>(
+    `/patients?${params.toString()}`,
     { signal },
   );
 
-  return Array.isArray(response) ? response : (response.data ?? []);
+  return response.data ?? [];
 }
 
 export async function createPts(payload: CreatePtsPayload): Promise<Pts> {

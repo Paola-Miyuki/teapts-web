@@ -1,0 +1,21 @@
+/** Escolaridade do paciente (`education_level_e`); "Não informada" é o valor nulo. */
+export enum EducationLevel {
+  EarlyChildhoodDaycare = 'early_childhood_daycare',
+  EarlyChildhoodPreschool = 'early_childhood_preschool',
+  ElementaryIncomplete = 'elementary_incomplete',
+  ElementaryOngoing = 'elementary_ongoing',
+  ElementaryComplete = 'elementary_complete',
+  HighSchoolIncomplete = 'high_school_incomplete',
+  HighSchoolOngoing = 'high_school_ongoing',
+  HighSchoolComplete = 'high_school_complete',
+  TechnicalIncomplete = 'technical_incomplete',
+  TechnicalOngoing = 'technical_ongoing',
+  TechnicalComplete = 'technical_complete',
+  UndergraduateIncomplete = 'undergraduate_incomplete',
+  UndergraduateOngoing = 'undergraduate_ongoing',
+  UndergraduateComplete = 'undergraduate_complete',
+  PostgraduateSpecialization = 'postgraduate_specialization',
+  PostgraduateMba = 'postgraduate_mba',
+  PostgraduateMasters = 'postgraduate_masters',
+  PostgraduateDoctorate = 'postgraduate_doctorate',
+}

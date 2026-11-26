@@ -3,6 +3,7 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AccountsModule } from '../accounts/accounts.module';
 import { Account } from '../accounts/entities/account.entity';
 import { Professional } from './entities/professional.entity';
 import { ProfessionalsController } from './controllers/professionals.controller';
@@ -13,7 +14,7 @@ import { ProfessionalsService } from './services/professionals.service';
  * Registra os componentes responsáveis pela consulta de profissionais.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Account, Professional])],
+  imports: [AccountsModule, TypeOrmModule.forFeature([Account, Professional])],
   controllers: [ProfessionalsController],
   providers: [ProfessionalsRepository, ProfessionalsService],
 })
