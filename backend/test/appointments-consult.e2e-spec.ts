@@ -164,6 +164,7 @@ describe('consultar e retificar atendimentos (e2e - RFACT006 e RFACT007)', () =>
         expect.objectContaining({
           id: APPOINTMENT_ID,
           author: expect.objectContaining({ name: 'João Lima' }),
+          registeredBy: { id: 'acc-2', name: 'João Lima' },
           rectified: true,
         }),
       ]);
@@ -195,8 +196,21 @@ describe('consultar e retificar atendimentos (e2e - RFACT006 e RFACT007)', () =>
       ]);
     });
 
+    it('filtra pelo profissional autor e ordena do mais antigo', async () => {
+      signIn([], { role: 'admin' });
+
+      await get(`/appointments?authorId=${memberId}&order=asc`).expect(200);
+
+      expect(appointments.searches[0]).toMatchObject({
+        authorId: memberId,
+        order: 'asc',
+      });
+    });
+
     it.each([
       ['attendance', 'attendance=late'],
+      ['authorId', 'authorId=joao'],
+      ['order', 'order=newest'],
       ['specialism', 'specialism=astronaut'],
       ['from', 'from=2026-02-30'],
       ['page', 'page=0'],
@@ -315,6 +329,31 @@ describe('consultar e retificar atendimentos (e2e - RFACT006 e RFACT007)', () =>
       signIn([memberId]);
 
       await rectify(rectifyBody(), otherId).expect(404);
+    });
+
+    describe('registrado pelo admin sem autor (RN029)', () => {
+      beforeEach(() => {
+        Object.assign(appointments.appointments[0], {
+          author: null,
+          registeredBy: { id: 'account-1', name: 'Kaio' },
+        });
+      });
+
+      it('o admin que registrou retifica', async () => {
+        signIn([], { role: 'admin' });
+
+        await rectify().expect(201);
+        expect(appointments.rectifications[0]).toMatchObject({
+          authorProfessionalId: null,
+          executedByAccountId: 'account-1',
+        });
+      });
+
+      it('nega o profissional da equipe', async () => {
+        signIn([memberId]);
+
+        await rectify().expect(403);
+      });
     });
   });
 });

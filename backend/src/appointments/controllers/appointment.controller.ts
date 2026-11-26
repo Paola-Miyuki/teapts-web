@@ -114,7 +114,7 @@ export class AppointmentController {
   @ApiOperation({
     summary: 'Retifica um atendimento (RFACT007)',
     description:
-      'Só o autor, com justificativa. Cria um novo registro ligado ao original, que não muda (RN020), com as mesmas regras do registro. Grava appointment_rectified na timeline.',
+      'Só o autor, com justificativa; o admin retifica os que registrou sem atribuir autor, pois a autoria é da conta dele (RN029). Cria um novo registro ligado ao original, que não muda (RN020), com as mesmas regras do registro. Grava appointment_rectified na timeline.',
   })
   @ApiCreatedResponse({ type: RectifyAppointmentResponseDto })
   @ApiBadRequestResponse({

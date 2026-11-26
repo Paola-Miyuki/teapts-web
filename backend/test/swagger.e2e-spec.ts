@@ -972,14 +972,19 @@ describe('Swagger (e2e)', () => {
         'patientId',
         'ptsId',
         'activityId',
+        'authorId',
         'attendance',
         'specialism',
         'modality',
         'from',
         'to',
+        'order',
         'page',
         'limit',
       ]),
+    );
+    expect(components.schemas.AppointmentListItemResponseDto.required).toEqual(
+      expect.arrayContaining(['author', 'registeredBy']),
     );
     expect(responseSchema(details, '200')?.$ref).toBe(
       '#/components/schemas/AppointmentDetailsResponseDto',

@@ -166,6 +166,12 @@ export class AppointmentsRepositoryImpl extends AppointmentsRepository {
       });
     }
 
+    if (input.authorId) {
+      query.andWhere('appointment.authorProfessionalId = :authorId', {
+        authorId: input.authorId,
+      });
+    }
+
     if (input.attendance?.length) {
       query.andWhere('appointment.attendance IN (:...attendance)', {
         attendance: input.attendance,
@@ -194,12 +200,14 @@ export class AppointmentsRepositoryImpl extends AppointmentsRepository {
       query.andWhere('appointment.appointmentDate <= :to', { to: input.to });
     }
 
+    const order = input.order === 'asc' ? 'ASC' : 'DESC';
+
     // Cada atendimento tem uma atividade e um PTS: o join não repete linhas.
     const [appointments, total] = await query
-      .orderBy('appointment.appointmentDate', 'DESC')
-      .addOrderBy('appointment.startTime', 'DESC')
-      .addOrderBy('appointment.createdAt', 'DESC')
-      .addOrderBy('appointment.id', 'DESC')
+      .orderBy('appointment.appointmentDate', order)
+      .addOrderBy('appointment.startTime', order)
+      .addOrderBy('appointment.createdAt', order)
+      .addOrderBy('appointment.id', order)
       .offset((input.page - 1) * input.limit)
       .limit(input.limit)
       .getManyAndCount();

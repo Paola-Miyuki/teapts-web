@@ -63,11 +63,13 @@ export interface FindAppointmentsInput {
   patientId?: string;
   ptsId?: string;
   activityId?: string;
+  authorId?: string;
   attendance?: Attendance[];
   specialism?: Specialism[];
   modality?: ActivityModality[];
   from?: string;
   to?: string;
+  order?: 'asc' | 'desc';
   page: number;
   limit: number;
 }
@@ -83,7 +85,7 @@ export interface RectifyAppointmentInput {
   appointmentId: string;
   values: AppointmentValues;
   reason: string;
-  authorProfessionalId: string;
+  authorProfessionalId: string | null;
   executedByAccountId: string;
   description: string;
 }

@@ -203,7 +203,8 @@ export class AppointmentsService {
 
   /**
    * Registra a retificação (RFACT007): só o autor, com justificativa, e o
-   * original não muda (RN020).
+   * original não muda (RN020). Sem profissional autor, a autoria é da conta
+   * do admin que registrou (RN029), e só ele retifica.
    */
   async rectifyAppointment(
     id: string,
@@ -219,9 +220,12 @@ export class AppointmentsService {
 
     await this.assertCanView(appointment.ptsId, account, rectifyForbidden);
 
-    const authorId = appointment.author?.id;
+    const authorId = appointment.author?.id ?? null;
+    const author = authorId
+      ? account.professionalProfileIds.includes(authorId)
+      : isAdmin(account) && appointment.registeredBy.id === account.accountId;
 
-    if (!authorId || !account.professionalProfileIds.includes(authorId)) {
+    if (!author) {
       throw rectifyForbidden();
     }
 
@@ -273,6 +277,7 @@ export class AppointmentsService {
       pts: row.pts,
       activity: row.activity,
       author: row.author,
+      registeredBy: row.registeredBy,
       modality: row.modality,
       visitPlace: row.visitPlace,
       attendance: row.attendance,

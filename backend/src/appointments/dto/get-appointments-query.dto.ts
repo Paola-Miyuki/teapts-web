@@ -22,6 +22,9 @@ const MODALITIES = Object.values(ActivityModality);
 const SPECIALISMS = Object.values(Specialism);
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+export const APPOINTMENT_SORT_ORDERS = ['desc', 'asc'] as const;
+export type AppointmentSortOrder = (typeof APPOINTMENT_SORT_ORDERS)[number];
+
 function invalidEach(parameter: string): ValidationOptions {
   return { ...invalidParameter(parameter), each: true };
 }
@@ -72,6 +75,15 @@ export class GetAppointmentsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID('all', invalidParameter('activityId'))
   activityId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Atendimentos de um profissional autor (id do perfil).',
+  })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsUUID('all', invalidParameter('authorId'))
+  authorId?: string;
 
   @ApiPropertyOptional({
     enum: ATTENDANCES,
@@ -126,4 +138,14 @@ export class GetAppointmentsQueryDto extends PaginationQueryDto {
   @Matches(DATE_ONLY, invalidParameter('to'))
   @IsISO8601({ strict: true }, invalidParameter('to'))
   to?: string;
+
+  @ApiPropertyOptional({
+    enum: APPOINTMENT_SORT_ORDERS,
+    default: 'desc',
+    description: 'Ordem pela data do atendimento.',
+  })
+  @Transform(toOptionalText)
+  @IsOptional()
+  @IsIn(APPOINTMENT_SORT_ORDERS, invalidParameter('order'))
+  order?: AppointmentSortOrder;
 }

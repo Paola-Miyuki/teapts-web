@@ -90,6 +90,7 @@ describe('AppointmentsService – consultar atendimentos (RFACT006)', () => {
           name: 'João Lima',
           specialism: 'occupational_therapist',
         },
+        registeredBy: { id: 'acc-2', name: 'João Lima' },
         modality: 'in_person',
         visitPlace: null,
         attendance: 'done',
@@ -130,8 +131,10 @@ describe('AppointmentsService – consultar atendimentos (RFACT006)', () => {
         query({
           ptsId: 'pts-1',
           attendance: [Attendance.Missed],
+          authorId: 'prof-2',
           from: '2026-11-01',
           to: '2026-11-30',
+          order: 'asc',
           page: 2,
           limit: 10,
         }),
@@ -141,8 +144,10 @@ describe('AppointmentsService – consultar atendimentos (RFACT006)', () => {
       expect(repo.searches[0]).toMatchObject({
         ptsId: 'pts-1',
         attendance: ['missed'],
+        authorId: 'prof-2',
         from: '2026-11-01',
         to: '2026-11-30',
+        order: 'asc',
         page: 2,
         limit: 10,
       });

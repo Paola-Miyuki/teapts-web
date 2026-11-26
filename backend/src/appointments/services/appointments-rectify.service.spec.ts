@@ -109,10 +109,41 @@ describe('AppointmentsService.rectifyAppointment (RFACT007)', () => {
     expect(repo.rectifications).toHaveLength(0);
   });
 
-  it('nega quando o atendimento não tem autor', async () => {
-    repo.appointments[0].author = null;
+  describe('atendimento sem profissional autor (RN029)', () => {
+    beforeEach(() => {
+      repo.appointments[0].author = null;
+      repo.appointments[0].registeredBy = { id: 'acc-admin', name: 'Kaio' };
+    });
 
-    await expectApiError(() => rectify(), 403, 'FORBIDDEN');
+    it('o admin que registrou retifica, e a autoria segue com a conta dele', async () => {
+      await rectify(rectifyBody(), admin);
+
+      expect(repo.rectifications[0]).toMatchObject({
+        appointmentId: APPOINTMENT_ID,
+        authorProfessionalId: null,
+        executedByAccountId: 'acc-admin',
+        description:
+          'Kaio retificou o atendimento de 03/11/2026 da atividade Integração sensorial',
+      });
+    });
+
+    it('nega o admin que não registrou', async () => {
+      repo.appointments[0].registeredBy = {
+        id: 'acc-outro-admin',
+        name: 'Ana',
+      };
+
+      await expectApiError(
+        () => rectify(rectifyBody(), admin),
+        403,
+        'FORBIDDEN',
+      );
+      expect(repo.rectifications).toHaveLength(0);
+    });
+
+    it('nega o profissional da equipe', async () => {
+      await expectApiError(() => rectify(), 403, 'FORBIDDEN');
+    });
   });
 
   it.each([

@@ -84,6 +84,13 @@ export class AppointmentListItemResponseDto {
   @ApiProperty({ type: AppointmentAuthorResponseDto, nullable: true })
   author: AppointmentAuthorResponseDto | null;
 
+  @ApiProperty({
+    type: AppointmentPersonResponseDto,
+    description:
+      'Conta que registrou; sem autor, a autoria é dela (admin, RN029).',
+  })
+  registeredBy: AppointmentPersonResponseDto;
+
   @ApiProperty({ enum: ActivityModality, example: ActivityModality.InPerson })
   modality: ActivityModality;
 
