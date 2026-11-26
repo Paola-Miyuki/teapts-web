@@ -79,6 +79,8 @@ export type AppointmentListItem = {
   pts: { id: string; version: number };
   activity: { id: string; title: string; specialism: string };
   author: AppointmentAuthor | null;
+  // Sem autor, a autoria é da conta do admin que registrou (RN029).
+  registeredBy: AppointmentPerson;
   modality: ActivityModality;
   visitPlace: VisitPlace | null;
   attendance: Attendance;
@@ -132,11 +134,14 @@ export type AppointmentsQuery = {
   patientId?: string;
   ptsId?: string;
   activityId?: string;
+  authorId?: string;
   attendance?: Attendance[];
   specialism?: string[];
   modality?: ActivityModality[];
   from?: string;
   to?: string;
+  // Pela data do atendimento; sem ela, do mais recente ao mais antigo.
+  order?: 'asc' | 'desc';
 };
 
 export type RectifyAppointmentInput = AppointmentInput & { reason: string };
@@ -160,8 +165,10 @@ export function getAppointments(
     'patientId',
     'ptsId',
     'activityId',
+    'authorId',
     'from',
     'to',
+    'order',
   ] as const) {
     const value = query[key];
 

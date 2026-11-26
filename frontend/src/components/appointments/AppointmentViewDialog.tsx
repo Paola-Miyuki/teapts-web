@@ -16,6 +16,7 @@ import {
   type AppointmentRecord,
 } from '@/lib/appointments';
 import { formatDateOnly, formatDateTime } from '@/lib/format';
+import type { AppointmentPermissionData } from '@/lib/permissions';
 import RectifyAppointmentForm from './RectifyAppointmentForm';
 
 const LOAD_ERROR = 'Verifique sua conexão e tente novamente.';
@@ -24,7 +25,7 @@ type AppointmentViewDialogProps = {
   appointmentId: string;
   // Abre direto no formulário (ação "Retificar" da linha).
   startRectifying?: boolean;
-  canRectify: (appointment: { author: { id: string } | null }) => boolean;
+  canRectify: (appointment: AppointmentPermissionData) => boolean;
   onRectified: () => void;
   onClose: () => void;
 };

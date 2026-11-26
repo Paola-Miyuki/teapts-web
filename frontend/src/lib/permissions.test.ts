@@ -442,20 +442,40 @@ describe('can', () => {
       expect(can(waiting, 'viewAppointments')).toBe(false);
     });
 
+    const registeredBy = { id: 'professional-account' };
+
     it('deixa só o profissional autor retificar', () => {
-      const own = { appointment: { author: { id: 'professional-id' } } };
-      const other = { appointment: { author: { id: 'responsible-id' } } };
+      const own = {
+        appointment: { author: { id: 'professional-id' }, registeredBy },
+      };
+      const other = {
+        appointment: { author: { id: 'responsible-id' }, registeredBy },
+      };
 
       expect(can(professional, 'rectifyAppointment', own)).toBe(true);
       expect(can(professional, 'rectifyAppointment', other)).toBe(false);
       expect(
         can(professional, 'rectifyAppointment', {
-          appointment: { author: null },
+          appointment: { author: null, registeredBy },
         }),
       ).toBe(false);
       expect(can(professional, 'rectifyAppointment')).toBe(false);
       expect(can(admin, 'rectifyAppointment', own)).toBe(false);
       expect(can(patient, 'rectifyAppointment', own)).toBe(false);
+    });
+
+    it('deixa o admin retificar o que registrou sem autor (RN029)', () => {
+      const appointment = (accountId: string) => ({
+        appointment: { author: null, registeredBy: { id: accountId } },
+      });
+
+      expect(
+        can(admin, 'rectifyAppointment', appointment('admin-account')),
+      ).toBe(true);
+      expect(can(admin, 'rectifyAppointment', appointment('other-admin'))).toBe(
+        false,
+      );
+      expect(can(admin, 'rectifyAppointment')).toBe(false);
     });
   });
 

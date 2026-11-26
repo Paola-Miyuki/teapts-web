@@ -9,6 +9,7 @@ import Icon from '@/components/Icon';
 import KebabMenu from '@/components/table/KebabMenu';
 import MultiSelect from '@/components/table/MultiSelect';
 import Pagination, { PER_PAGE_OPTIONS } from '@/components/table/Pagination';
+import ProfessionalFilter from '@/components/table/ProfessionalFilter';
 import ui from '@/components/ui.module.css';
 import patientStyles from '@/app/patients/patients.module.css';
 import {
@@ -27,7 +28,11 @@ import {
   type Attendance,
 } from '@/lib/appointments';
 import { formatDateOnly } from '@/lib/format';
-import { can, type PermissionUser } from '@/lib/permissions';
+import {
+  can,
+  type AppointmentPermissionData,
+  type PermissionUser,
+} from '@/lib/permissions';
 import { SPECIALISMS } from '@/lib/professionals';
 import AppointmentViewDialog from './AppointmentViewDialog';
 
@@ -64,13 +69,13 @@ function daysAgo(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function Professional({ author }: { author: AppointmentListItem['author'] }) {
+function Professional({
+  author,
+  registeredBy,
+}: Pick<AppointmentListItem, 'author' | 'registeredBy'>) {
+  // Sem profissional autor, a autoria é da conta do admin (RN029).
   if (!author) {
-    return (
-      <span className="empty-cell" aria-label="Não informado">
-        —
-      </span>
-    );
+    return <>{registeredBy.name}</>;
   }
 
   return (
@@ -97,6 +102,8 @@ export default function AppointmentsTable({
   const [attendance, setAttendance] = useState<string[]>([]);
   const [modality, setModality] = useState<string[]>([]);
   const [specialism, setSpecialism] = useState<string[]>([]);
+  const [authorId, setAuthorId] = useState('');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [period, setPeriod] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -124,14 +131,21 @@ export default function AppointmentsTable({
     attendance.join(','),
     modality.join(','),
     specialism.join(','),
+    authorId,
     periodFrom,
     periodTo,
   ].join('\n');
 
   useEffect(() => {
     const controller = new AbortController();
-    const [attendanceKey, modalityKey, specialismKey, fromKey, toKey] =
-      filterKey.split('\n');
+    const [
+      attendanceKey,
+      modalityKey,
+      specialismKey,
+      authorKey,
+      fromKey,
+      toKey,
+    ] = filterKey.split('\n');
     const list = (value?: string) => (value ? value.split(',') : undefined);
 
     getAppointments(
@@ -144,8 +158,11 @@ export default function AppointmentsTable({
         attendance: list(attendanceKey) as Attendance[] | undefined,
         modality: list(modalityKey) as ActivityModality[] | undefined,
         specialism: list(specialismKey),
+        authorId: authorKey || undefined,
         from: fromKey || undefined,
         to: toKey || undefined,
+        // Decrescente é o padrão da API.
+        order: order === 'asc' ? order : undefined,
       },
       controller.signal,
     )
@@ -171,12 +188,23 @@ export default function AppointmentsTable({
       });
 
     return () => controller.abort();
-  }, [activityId, filterKey, limit, page, patientId, ptsId, retryKey, router]);
+  }, [
+    activityId,
+    filterKey,
+    limit,
+    order,
+    page,
+    patientId,
+    ptsId,
+    retryKey,
+    router,
+  ]);
 
   const hasFilters =
     attendance.length > 0 ||
     modality.length > 0 ||
     specialism.length > 0 ||
+    authorId !== '' ||
     period !== '';
   const total = result?.pagination.total ?? 0;
   const count = result
@@ -194,13 +222,14 @@ export default function AppointmentsTable({
       setAttendance([]);
       setModality([]);
       setSpecialism([]);
+      setAuthorId('');
       setPeriod('');
       setFrom('');
       setTo('');
     });
   }
 
-  function canRectify(appointment: { author: { id: string } | null }) {
+  function canRectify(appointment: AppointmentPermissionData) {
     return can(account, 'rectifyAppointment', { appointment });
   }
 
@@ -236,10 +265,42 @@ export default function AppointmentsTable({
               Limpar
             </button>
           )}
+
+          <label className="ux-sort" htmlFor={`${id}-sort`}>
+            <span>Ordenar por</span>
+            <select className="select" id={`${id}-sort`} defaultValue="date">
+              <option value="date">Data do atendimento</option>
+            </select>
+            <button
+              type="button"
+              className="btn btn-sm sort-dir"
+              data-dir={order}
+              aria-label={
+                order === 'asc' ? 'Ordem crescente' : 'Ordem decrescente'
+              }
+              onClick={() =>
+                filter(() => setOrder(order === 'asc' ? 'desc' : 'asc'))
+              }
+            >
+              <Icon
+                name={order === 'asc' ? 'sortUp' : 'sortDown'}
+                className="icon-sm"
+              />
+            </button>
+          </label>
         </div>
       </div>
 
       <div className="filter-more" id={`${id}-more`} hidden={!filtersOpen}>
+        {/* A busca de profissionais é só da equipe (RFPRO001). */}
+        {!patientView && (
+          <ProfessionalFilter
+            label="Profissional"
+            value={authorId}
+            onChange={(value) => filter(() => setAuthorId(value))}
+          />
+        )}
+
         {!patientView && (
           <MultiSelect
             label="Especialidade"
@@ -412,7 +473,10 @@ export default function AppointmentsTable({
                           {appointment.activity.title}
                         </td>
                         <td>
-                          <Professional author={appointment.author} />
+                          <Professional
+                            author={appointment.author}
+                            registeredBy={appointment.registeredBy}
+                          />
                         </td>
                         <td>{appointmentModalityLabel(appointment)}</td>
                         <td>

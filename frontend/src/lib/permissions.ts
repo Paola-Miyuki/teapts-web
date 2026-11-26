@@ -67,6 +67,7 @@ export type ActivityPermissionData = {
 
 export type AppointmentPermissionData = {
   author: { id: string } | null;
+  registeredBy: { id: string };
 };
 
 export type PermissionContext = {
@@ -197,8 +198,13 @@ export function can(
       case 'registerAppointment':
         return !pts || (isActivePts(pts) && activity?.status === 'running');
       case 'rectifyAppointment':
-        // RFACT007 – só o autor retifica; o admin não é autor.
-        return false;
+        // RFACT007 – só o autor retifica; o admin é autor do que registrou
+        // sem atribuir um profissional (RN029).
+        return (
+          context.appointment !== undefined &&
+          context.appointment.author === null &&
+          context.appointment.registeredBy.id === user.accountId
+        );
       default:
         return true;
     }

@@ -23,6 +23,12 @@ const responsible: PermissionUser = {
   accountId: 'acc-1',
   professionalProfileIds: ['prof-1'],
 };
+const admin: PermissionUser = {
+  accountId: 'acc-admin',
+  role: 'admin',
+  patientProfileId: null,
+  professionalProfileIds: [],
+};
 const patient: PermissionUser = {
   accountId: 'patient-1',
   role: 'user',
@@ -47,10 +53,17 @@ const ITEM = {
     name: 'João Lima',
     specialism: 'occupational_therapist',
   },
+  registeredBy: { id: 'acc-2', name: 'João Lima' },
   modality: 'in_person',
   visitPlace: null,
   attendance: 'done',
   rectified: true,
+};
+// Registrado pelo admin sem atribuir profissional (RN029).
+const BY_ADMIN = {
+  ...ITEM,
+  author: null,
+  registeredBy: { id: 'acc-admin', name: 'Kaio' },
 };
 const MISSED = {
   ...ITEM,
@@ -273,6 +286,98 @@ describe('AppointmentsTable (RFACT006)', () => {
         `${API}/appointments?page=1&limit=10&ptsId=pts-1`,
       ),
     );
+  });
+
+  it('filtra pelo profissional autor e inverte a ordem pela data', async () => {
+    const user = userEvent.setup();
+    mockApi(listRoute([ITEM]), (url) =>
+      url.startsWith(`${API}/professionals?`)
+        ? respond(200, list([{ id: 'prof-2', name: 'João Lima' }]))
+        : undefined,
+    );
+
+    render(
+      <AppointmentsTable
+        id="appointments"
+        title="Atendimentos"
+        account={author}
+      />,
+    );
+
+    await screen.findByText('Integração sensorial');
+    await user.click(screen.getByRole('button', { name: 'Ordem decrescente' }));
+
+    await waitFor(() =>
+      expect(calls().at(-1)?.url).toBe(
+        `${API}/appointments?page=1&limit=10&order=asc`,
+      ),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Ordem crescente' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filtros' }));
+    await user.type(screen.getByLabelText('Profissional'), 'João');
+    await waitFor(() =>
+      expect(
+        document.querySelector('option[value="João Lima"]'),
+      ).not.toBeNull(),
+    );
+    await user.clear(screen.getByLabelText('Profissional'));
+    await user.type(screen.getByLabelText('Profissional'), 'João Lima');
+
+    await waitFor(() =>
+      expect(calls().at(-1)?.url).toBe(
+        `${API}/appointments?page=1&limit=10&authorId=prof-2&order=asc`,
+      ),
+    );
+  });
+
+  it('o paciente não tem o filtro de profissional', async () => {
+    const user = userEvent.setup();
+    mockApi(listRoute([ITEM]));
+
+    render(
+      <AppointmentsTable
+        id="my-appointments"
+        title="Meus atendimentos"
+        account={patient}
+        scope={{ patientId: 'patient-1' }}
+      />,
+    );
+
+    await screen.findByText('Integração sensorial');
+    await user.click(screen.getByRole('button', { name: 'Filtros' }));
+
+    expect(screen.queryByLabelText('Profissional')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Período')).toBeInTheDocument();
+  });
+
+  it('sem autor, mostra quem registrou e só esse admin retifica (RN029)', async () => {
+    mockApi(listRoute([BY_ADMIN]));
+
+    render(
+      <AppointmentsTable
+        id="appointments"
+        title="Atendimentos"
+        account={admin}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await screen.findByText('Integração sensorial');
+    const row = screen.getByRole('row', { name: /Integração sensorial/ });
+
+    expect(within(row).getByText('Kaio')).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Ações para Atendimento de 03/11/2026',
+      }),
+    );
+
+    expect(
+      screen.getByRole('menuitem', { name: 'Retificar' }),
+    ).toBeInTheDocument();
   });
 
   it('mostra a lista vazia e o erro com a mensagem da API', async () => {
